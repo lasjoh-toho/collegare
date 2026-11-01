@@ -11,7 +11,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/Dockerfile" <<DOCKER
 FROM onlyoffice/documentserver:${VERSION}
-RUN documentserver-generate-allfonts.sh false
+RUN documentserver-generate-allfonts.sh false \\
+ && cd /var/www/onlyoffice/documentserver && chmod -R u+rwX,go+rX fonts sdkjs web-apps sdkjs-plugins
 DOCKER
 docker build -q -t "collegare-oo-assets:${VERSION}" "$TMP" >/dev/null
 CID="$(docker create "collegare-oo-assets:${VERSION}")"
