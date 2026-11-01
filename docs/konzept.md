@@ -400,6 +400,20 @@ Standard ist: Collegare speichert selbst (Abschnitt 7.5). Im Moodle-Betrieb kann
 - Die Abgabe in Moodle ist dann der **maßgebliche Nachweis** (Zeitpunkt, Prüfsumme, Prüfprotokoll-Hash), unabhängig vom Werkzeug. Das passt zur Forderung nach manipulationssicheren Protokollen und zu getrennten Aufbewahrungsfristen.
 - Zu klären: Netzlast, wenn eine ganze Prüfungsgruppe gleichzeitig sichert (Abstände staffeln), und ob Moodle in der Prüfungsumgebung erreichbar ist (abgesicherter Modus, Prüfungsbrowser).
 
+### 7.10 Lokaler Modus: der eigene Rechner als Speicherort (Option)
+
+Für Nutzung ohne Anmeldung (Frage Jo, 1. November 2026). office-website ist bereits „local-first“; darauf baut der Modus auf.
+
+| Fall | Umsetzung | Grenze |
+|---|---|---|
+| **Einzelarbeit** | alles im Browser: IndexedDB oder ein gewählter Ordner (File System Access API, Chrome/Edge); in Safari/Firefox als Projektdatei `.collegare` zum Speichern und Öffnen; in der späteren Desktop-App (7.8) ein normaler Ordner. Kein Konto nötig | geht verloren, wenn der Browser-Speicher gelöscht wird; daher regelmäßig „Projektdatei sichern“ anbieten |
+| **Gruppenarbeit** | Beitritt per Code ohne Konto; der Collegare-Server **leitet Änderungen nur weiter und speichert sie nicht**. Jeder Rechner hält eine vollständige Kopie. Mindmap, Notizen, Kanban (Yjs) führen Stände auch nach Offline-Phasen zusammen | Die Office-Editoren brauchen eine zentrale Reihenfolge der Änderungen: Gleichzeitig arbeiten geht nur, solange alle verbunden sind. Wer offline schreibt, gleicht beim nächsten Treffen über die Projektdatei ab (Abschnitt für Abschnitt) |
+| **Abgabe und Bewertung** | Die Lehrkraft sieht nur, was abgegeben wird: Projektdatei oder Endprodukte per Upload, QR-Kopplung oder in Moodle (7.9) | Laufende Begleitung, Zwischenfeedback und Zeitleiste für die Lehrkraft gibt es erst ab Abgabe |
+
+**Nachvollziehbarkeit trotz lokaler Daten:** Lokale Dateien lassen sich verändern. Damit Logbuch, Einfüge-Protokoll und Zeitleiste trotzdem belastbar bleiben, schickt der Browser für jedes Änderungspaket nur eine **Prüfsumme** an den Server, der sie mit Zeitstempel signiert zurückgibt (Quittung, keine Inhalte). Bei der Abgabe prüft Collegare die Kette der Quittungen; Lücken oder Abweichungen werden angezeigt, nicht bewertet.
+
+**Nicht geeignet für Prüfungen:** Dort braucht es eine Anmeldung und einen Speicher außerhalb des Schülergeräts (Collegare-Server oder Ablage der Umgebung, 7.9).
+
 ### 7.8 Plattformunabhängige App (langfristiges Ziel)
 
 Collegare soll langfristig auch als installierbare App auf Handy, Tablet und Rechner laufen. Grundsatz: **eine Web-Codebasis**, keine eigene native App, weil die OnlyOffice-Editoren nur als Web-Code existieren.
