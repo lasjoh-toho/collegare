@@ -243,4 +243,9 @@ export class DocRegistry {
   peek(id: string): DocState | undefined {
     return this.docs.get(id);
   }
+
+  /** Aus dem Speicher nehmen (nach dem letzten Verlassen; der Stand liegt in der Datenbank). */
+  drop(id: string): void {
+    this.docs.delete(id);
+  }
 }

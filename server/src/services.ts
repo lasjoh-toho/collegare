@@ -1,3 +1,4 @@
+import { DocChangeStore, Documents } from './projects/documents.js';
 import { MapStore } from './projects/maps.js';
 import { AuditLog } from './audit/auditLog.js';
 import { createDb, type Db } from './db/index.js';
@@ -44,6 +45,8 @@ export interface Services {
   projects: Projects;
   frame: FrameStore;
   maps: MapStore;
+  documents: Documents;
+  docStore: DocChangeStore;
   lti: Lti;
   toolKey: ToolKeyStore;
   loginLimiter: RateLimiter;
@@ -73,6 +76,8 @@ export async function createServices(config: Config, now: () => number = Date.no
     projects,
     frame: new FrameStore(db),
     maps: new MapStore(db),
+    documents: new Documents(db),
+    docStore: new DocChangeStore(db),
     lti,
     toolKey,
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),

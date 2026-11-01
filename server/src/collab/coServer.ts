@@ -8,7 +8,7 @@
  * DocService/sources/DocsCoServer.js (AGPL-3.0).
  */
 import type { Server, Socket } from 'socket.io';
-import { DocRegistry, DocState, type EditorKind, type Lock, type Participant, blockKey, cursorBlock } from './docState.js';
+import { DocRegistry, DocState, type EditorKind, type Lock, type Participant, type StoredChange, blockKey, cursorBlock } from './docState.js';
 
 export interface CoServerOptions {
   buildVersion?: string;
@@ -19,7 +19,16 @@ export interface CoServerOptions {
    * Prüft die Verbindung und liefert die Person (ab M1 aus der Sitzung). Ohne diese Funktion gilt die
    * Person aus der Anfrage (nur Spike und Protokolltests).
    */
-  authorize?: (socket: Socket, docId: string) => Promise<{ id: string; name: string } | null>;
+  authorize?: (socket: Socket, docId: string) => Promise<{ id: string; name: string; view?: boolean } | null>;
+  /** Dauerhafte Ablage der Änderungen (ab M1 in der Datenbank); ohne sie bleibt alles im Speicher. */
+  store?: DocStore;
+}
+
+/** Ablage der Änderungen eines Dokuments; Aufrufe je Dokument kommen in Reihenfolge. */
+export interface DocStore {
+  load(docId: string): Promise<StoredChange[]>;
+  append(docId: string, startIndex: number, changes: StoredChange[]): Promise<void>;
+  truncate(docId: string, index: number): Promise<void>;
 }
 
 interface ConnInfo {
@@ -46,6 +55,8 @@ export class CoServer {
   private conns = new Map<string, ConnInfo>();
   private now: () => number;
   private log: (msg: string, data?: unknown) => void;
+  private loading = new Map<string, Promise<void>>();
+  private writes = new Map<string, Promise<void>>();
 
   constructor(private io: Server, private opts: CoServerOptions = {}) {
     this.now = opts.now ?? Date.now;
@@ -64,15 +75,51 @@ export class CoServer {
         return next();
       }
       auth(socket, docId).then(
-        (user) => {
+        async (user) => {
           if (!user) return next(new Error('Nicht angemeldet oder kein Zugriff'));
-          socket.data.user = user;
+          socket.data.user = { id: user.id, name: user.name };
+          socket.data.view = !!user.view;
+          await this.ensureLoaded(docId, parseKind(q.kind));
           next();
         },
         (e) => next(e instanceof Error ? e : new Error(String(e))),
       );
     });
     nsp.on('connection', (socket) => this.onConnection(socket));
+  }
+
+  /** Lädt gespeicherte Änderungen, bevor die erste Person das Dokument öffnet. */
+  private ensureLoaded(docId: string, kind: EditorKind): Promise<void> {
+    const store = this.opts.store;
+    if (!store || this.docs.peek(docId)) return Promise.resolve();
+    let p = this.loading.get(docId);
+    if (!p) {
+      p = (async () => {
+        // offene Schreibvorgänge abwarten, damit nichts verloren geht
+        await this.writes.get(docId);
+        const changes = await store.load(docId);
+        if (!this.docs.peek(docId)) this.docs.get(docId, kind).changes.push(...changes);
+      })().finally(() => this.loading.delete(docId));
+      this.loading.set(docId, p);
+    }
+    return p;
+  }
+
+  /** Schreibt in Reihenfolge je Dokument; Fehler werden protokolliert, die Sitzung läuft weiter. */
+  private persist(docId: string, write: (store: DocStore) => Promise<void>) {
+    const store = this.opts.store;
+    if (!store) return;
+    const prev = this.writes.get(docId) ?? Promise.resolve();
+    const next = prev.then(() => write(store)).catch((e) => this.log('Speichern fehlgeschlagen', { doc: docId, error: String(e) }));
+    this.writes.set(docId, next);
+    void next.then(() => {
+      if (this.writes.get(docId) === next) this.writes.delete(docId);
+    });
+  }
+
+  /** Wartet, bis alles gespeichert ist (Tests, Herunterfahren). */
+  async flush(): Promise<void> {
+    await Promise.all([...this.writes.values()]);
   }
 
   private nsp() {
@@ -87,7 +134,7 @@ export class CoServer {
     const info: ConnInfo = {
       doc,
       user,
-      view: q.view === '1' || q.view === true,
+      view: q.view === '1' || q.view === true || socket.data.view === true,
     };
     this.conns.set(socket.id, info);
     void socket.join(ROOM(docId));
@@ -143,7 +190,7 @@ export class CoServer {
       case 'unSaveLock':
       case 'unLockDocument': {
         if (msg.releaseLocks) this.releaseLocksOf(socket, info);
-        if (typeof msg.deleteIndex === 'number') doc.truncate(msg.deleteIndex);
+        if (typeof msg.deleteIndex === 'number') this.truncate(doc, msg.deleteIndex);
         if (doc.saveLockUser === info.user.id) doc.saveLockUser = null;
         if (msg.isSave || msg.type === 'unSaveLock') {
           this.send(socket, { type: 'unSaveLock', index: -1, time: -1, syncChangesIndex: -1 });
@@ -209,7 +256,7 @@ export class CoServer {
   private onSaveChanges(socket: Socket, info: ConnInfo, msg: Msg) {
     const { doc } = info;
     if (info.view) return;
-    if (msg.startSaveChanges && typeof msg.deleteIndex === 'number' && msg.deleteIndex !== -1) doc.truncate(msg.deleteIndex);
+    if (msg.startSaveChanges && typeof msg.deleteIndex === 'number' && msg.deleteIndex !== -1) this.truncate(doc, msg.deleteIndex);
     let raw: unknown[] = [];
     if (typeof msg.changes === 'string') {
       try {
@@ -222,6 +269,7 @@ export class CoServer {
     }
     const now = this.now();
     const { startIndex, changesIndex, added } = doc.append(info.user.id, info.user.id, raw, now);
+    if (added.length) this.persist(doc.id, (st) => st.append(doc.id, startIndex, added));
     const ownIndex = msg.startSaveChanges && (msg.deleteIndex == null || msg.deleteIndex === -1) ? startIndex : -1;
     if (msg.endSaveChanges) {
       const released = msg.releaseLocks ? doc.releaseUser(info.user.id) : [];
@@ -249,6 +297,12 @@ export class CoServer {
     }
   }
 
+  private truncate(doc: DocState, index: number) {
+    if (index < 0 || index >= doc.changes.length) return;
+    doc.truncate(index);
+    this.persist(doc.id, (st) => st.truncate(doc.id, index));
+  }
+
   private releaseLocksOf(socket: Socket | null, info: ConnInfo) {
     const released = info.doc.releaseUser(info.user.id);
     if (released.length === 0) return;
@@ -272,6 +326,13 @@ export class CoServer {
       if (doc.saveLockUser === info.user.id) doc.saveLockUser = null;
     }
     this.toAll(doc, { type: 'connectState', participantsTimestamp: this.now(), participants: doc.participantList(), waitAuth: false });
+    // niemand mehr da: mit Ablage aus dem Speicher nehmen, beim nächsten Öffnen kommt der Stand aus der Datenbank
+    if (this.opts.store && doc.participants.size === 0 && ![...this.conns.values()].some((c) => c.doc === doc)) this.docs.drop(doc.id);
+  }
+
+  /** Alle Verbindungen eines Dokuments trennen (z. B. nach „Fertig“; die Oberfläche öffnet es neu zum Lesen). */
+  disconnectDoc(docId: string) {
+    this.nsp().in(ROOM(docId)).disconnectSockets(true);
   }
 
   /** Collegare-Erweiterung: Blöcke als fertig markieren und allen Editoren die neue Sperre melden. */

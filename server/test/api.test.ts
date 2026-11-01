@@ -184,21 +184,15 @@ describe('Projekte und Kanban', () => {
     expect(err.message).toBe('Bitte anmelden');
   });
 
-  it('Editor-Verbindung braucht eine Sitzung, die Person kommt aus der Sitzung', async () => {
+  it('Editor-Verbindung braucht eine Sitzung und ein Dokument der eigenen Gruppe', async () => {
     const { t } = await setup();
-    const anon = ioc(base + '/collab', { path: '/socket.io', query: { docId: 'x', userId: 'gefälscht' }, transports: ['websocket'], forceNew: true });
+    const anon = ioc(base + '/collab', { path: '/socket.io', query: { docId: 'cg1', userId: 'gefälscht' }, transports: ['websocket'], forceNew: true });
     sockets.push(anon);
-    const err = await new Promise<Error>((r) => anon.on('connect_error', r));
-    expect(err.message).toMatch(/Nicht angemeldet/);
-
-    const ok = ioc(base + '/collab', { path: '/socket.io', query: { docId: 'x', userId: 'gefälscht' }, auth: { token: t }, transports: ['websocket'], forceNew: true });
-    sockets.push(ok);
-    const auth = await new Promise<J>((r) => {
-      ok.on('message', (m: J) => m.type === 'auth' && r(m));
-      ok.emit('message', { type: 'auth' });
-    });
-    expect(auth.participants[0].username).toBe('Frau Müller');
-    expect(auth.participants[0].id).not.toBe('gefälscht');
+    expect((await new Promise<Error>((r) => anon.on('connect_error', r))).message).toMatch(/Nicht angemeldet/);
+    // beliebige Dokument-IDs gibt es nicht mehr
+    const other = ioc(base + '/collab', { path: '/socket.io', query: { docId: 'x' }, auth: { token: t }, transports: ['websocket'], forceNew: true });
+    sockets.push(other);
+    expect((await new Promise<Error>((r) => other.on('connect_error', r))).message).toMatch(/kein Zugriff/);
   });
 
   it('Protokollkette bleibt unversehrt', async () => {
@@ -251,6 +245,82 @@ describe('Mindmap in Echtzeit', () => {
     const wrong = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'update', id: 'karte1', patch: { owner: ids[2] } } });
     expect(wrong).toMatchObject({ ok: false, error: 'Diese Person gehört nicht zur Gruppe' });
     expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'x', kind: 'card' } } })).error).toBe('Ungültige Änderung');
+  });
+});
+
+describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
+  const emit = (sock: Socket, ev: string, msg: unknown) => new Promise<J>((r) => sock.emit(ev, msg, r));
+  const editor = (token: string, docId: string) => {
+    const sock = ioc(base + '/collab', { path: '/socket.io', query: { docId, userId: 'gefälscht' }, auth: { token }, transports: ['websocket'], forceNew: true });
+    sockets.push(sock);
+    return sock;
+  };
+  const auth = (sock: Socket) =>
+    new Promise<{ auth: J; changes: J[] }>((r, rej) => {
+      const changes: J[] = [];
+      sock.on('connect_error', rej);
+      sock.on('message', (m: J) => {
+        if (m.type === 'authChanges') changes.push(...(m.changes as J[]));
+        if (m.type === 'auth') r({ auth: m, changes });
+      });
+      sock.emit('message', { type: 'auth' });
+    });
+
+  it('Gruppe schreibt, Stand bleibt nach dem Schließen erhalten, Fertig sperrt', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: ids })).json.codes as J[];
+    const [anna, ben, clara] = await Promise.all(codes.map(async (c) => (await call('POST', '/api/access/redeem', undefined, { code: c.code })).json.token as string));
+
+    // Mindmap mit einem Cluster und zwei Karten, Gliederung übernehmen (über den Speicher, Echtzeit ist oben geprüft)
+    const people = new Set([ids[0], ids[1]]);
+    const add = (id: string, extra: J) => s.maps.apply(project, 'g' + g1, { type: 'add', card: { id, kind: 'card', title: id, text: '', x: 0, y: 0, w: 160, h: 90, color: null, parent: null, owner: null, ...extra } } as never, ids[0], people);
+    await add('clus1', { kind: 'cluster', title: 'Ursachen' });
+    await add('karteA', { parent: 'clus1', title: 'Reparationen', owner: ids[0] });
+    await add('karteB', { parent: 'clus1', y: 120, title: 'Ruhrbesetzung', owner: ids[1] });
+    expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1 })).status).toBe(400);
+    await s.maps.apply(project, 'g' + g1, { type: 'outline' }, ids[0], people);
+    expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1 })).json).toEqual({ created: 2, total: 2 });
+    expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1 })).json).toEqual({ created: 0, total: 2 });
+    const list = (await call('GET', `/api/projects/${project}/documents`, anna)).json;
+    expect(list.docs.map((d: J) => [d.sectionTitle, d.title, d.ownerId])).toEqual([['Ursachen', 'Reparationen', ids[0]], ['Ursachen', 'Ruhrbesetzung', ids[1]]]);
+    const docA = 'cg' + list.docs[0].id;
+
+    // Clara (andere Gruppe) kommt nicht hinein, auch nicht über die Liste
+    expect((await call('GET', `/api/projects/${project}/documents?bereich=g${g1}`, clara)).json.scope).toBeNull();
+    await expect(auth(editor(clara, docA))).rejects.toThrow(/kein Zugriff/);
+
+    // Anna schreibt; Ben öffnet später und bekommt alles
+    const ea = editor(anna, docA);
+    expect((await auth(ea)).auth.participants[0].username).toBe('Anna');
+    ea.emit('message', { type: 'saveChanges', changes: JSON.stringify([{ t: 'eins' }, { t: 'zwei' }]), startSaveChanges: true, endSaveChanges: true, deleteIndex: -1 });
+    await new Promise((r) => ea.on('message', (m: J) => m.type === 'unSaveLock' && r(m)));
+    ea.disconnect();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(app.co.docs.peek(docA)).toBeUndefined(); // aus dem Speicher genommen
+    const eb = editor(ben, docA);
+    expect((await auth(eb)).changes.map((c) => JSON.parse(c.change as string).t)).toEqual(['eins', 'zwei']);
+
+    // Ben ist nicht zuständig; Anna meldet fertig, Bens Editor wird getrennt und öffnet danach nur lesend
+    expect((await call('POST', `/api/documents/${list.docs[0].id}/done`, ben)).status).toBe(403);
+    const dropped = new Promise((r) => eb.on('disconnect', r));
+    expect((await call('POST', `/api/documents/${list.docs[0].id}/done`, anna)).status).toBe(200);
+    await dropped;
+    const eb2 = editor(ben, docA);
+    const again = await auth(eb2);
+    expect(again.auth.participants.find((p: J) => p.username === 'Ben').view).toBe(true);
+    eb2.emit('message', { type: 'saveChanges', changes: JSON.stringify([{ t: 'heimlich' }]), startSaveChanges: true, endSaveChanges: true, deleteIndex: -1 });
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await s.docStore.load(docA)).map((c) => JSON.parse(c.change).t)).toEqual(['eins', 'zwei']);
+
+    // Wieder öffnen: laut Voreinstellung nur die Lehrkraft
+    expect((await call('POST', `/api/documents/${list.docs[0].id}/reopen`, anna)).status).toBe(403);
+    expect((await call('POST', `/api/documents/${list.docs[0].id}/reopen`, t)).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/documents?bereich=g${g1}`, t)).json.docs[0].doneAt).toBeNull();
   });
 });
 

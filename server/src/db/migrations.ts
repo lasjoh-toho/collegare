@@ -203,6 +203,39 @@ migrations['0002_mindmap'] = {
   },
 };
 
+// Dokumente der Ausarbeitung (eines je Karte der Gliederung) und ihre Änderungen aus dem Editor
+migrations['0003_dokumente'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`longtext` : sql`text`;
+    await db.schema
+      .createTable('documents')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(32)', (c) => c.notNull())
+      .addColumn('section_id', 'varchar(40)', (c) => c.notNull())
+      .addColumn('section_title', 'varchar(255)', (c) => c.notNull())
+      .addColumn('card_id', 'varchar(40)')
+      .addColumn('kind', 'varchar(8)', (c) => c.notNull())
+      .addColumn('title', 'varchar(255)', (c) => c.notNull())
+      .addColumn('owner_id', 'integer')
+      .addColumn('position', 'integer', (c) => c.notNull())
+      .addColumn('done_at', ms)
+      .addColumn('done_by', 'integer')
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('documents_scope').on('documents').columns(['project_id', 'scope']).execute();
+    await db.schema
+      .createTable('doc_changes')
+      .addColumn('doc_id', 'varchar(64)', (c) => c.notNull())
+      .addColumn('seq', 'integer', (c) => c.notNull())
+      .addColumn('user_id', 'varchar(64)', (c) => c.notNull())
+      .addColumn('time', ms, (c) => c.notNull())
+      .addColumn('data', long, (c) => c.notNull())
+      .addPrimaryKeyConstraint('doc_changes_pk', ['doc_id', 'seq'])
+      .execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

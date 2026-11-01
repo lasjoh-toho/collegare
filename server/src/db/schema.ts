@@ -141,6 +141,32 @@ export interface MapsTable {
   updated_at: Ms;
 }
 
+export interface DocumentsTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  /** Cluster der Gliederung, aus dem der Abschnitt stammt */
+  section_id: string;
+  section_title: string;
+  card_id: string | null;
+  kind: 'word' | 'slide' | 'cell';
+  title: string;
+  owner_id: number | null;
+  position: number;
+  done_at: Ms | null;
+  done_by: number | null;
+  created_at: Ms;
+}
+
+export interface DocChangesTable {
+  doc_id: string;
+  seq: number;
+  user_id: string;
+  time: Ms;
+  /** eine Änderung des Editors, JSON-kodiert wie im Protokoll */
+  data: string;
+}
+
 export interface AuditLogTable {
   id: Generated<number>;
   time: Ms;
@@ -173,6 +199,8 @@ export interface Database {
   groups: GroupsTable;
   group_members: GroupMembersTable;
   maps: MapsTable;
+  documents: DocumentsTable;
+  doc_changes: DocChangesTable;
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
   kv: KeyValueTable;

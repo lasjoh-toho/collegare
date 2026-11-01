@@ -12,6 +12,8 @@ import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
+import { authorizeDoc, documentRoutes } from './routes/documents.js';
+import { collabId, parseCollabId } from './projects/documents.js';
 import type { Services } from './services.js';
 
 export interface App {
@@ -61,15 +63,17 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
   const s = opts.services ?? null;
 
   const authorize: CoServerOptions['authorize'] = s
-    ? async (socket) => {
+    ? async (socket, docId) => {
         const sess = await s.sessions.resolve(socketToken(socket));
         if (!sess) return null;
         const user = await s.users.byId(sess.userId);
-        // M1: Dokumente gehören noch keinem Projekt; ab M2 prüft hier die Projekt- und Gruppenzugehörigkeit.
-        return user ? { id: String(user.id), name: user.name } : null;
+        // nur Dokumente der Ausarbeitung (cg<ID>), mit Prüfung von Projekt und Gruppe
+        const id = parseCollabId(docId);
+        const access = user && id !== null ? await authorizeDoc(s, sess, id) : null;
+        return user && access ? { id: String(user.id), name: user.name, view: access.view } : null;
       }
     : undefined;
-  const co = new CoServer(io, { log: (m, d) => http.log.info({ d }, m), authorize, ...opts.co });
+  const co = new CoServer(io, { log: (m, d) => http.log.info({ d }, m), authorize, store: s?.docStore, ...opts.co });
 
   http.get('/api/health', async () => ({ ok: true }));
 
@@ -147,8 +151,14 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
       });
     });
     mapSocket(nsp, s);
+    documentRoutes(http, s, {
+      changed: (projectId, scope) => nsp.to('project:' + projectId).emit('docs', { projectId, scope }),
+      lockChanged: (docId) => co.disconnectDoc(collabId(docId)),
+    });
 
     http.addHook('onClose', async () => {
+      // offene Editor-Änderungen erst speichern
+      await co.flush();
       await s.db.destroy();
     });
   }
