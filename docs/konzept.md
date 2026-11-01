@@ -369,6 +369,31 @@ Ein Installationsskript richtet das ein; die Einrichtung im Browser folgt dem Vo
 
 Der Server ist leicht, weil die Editoren und die Umwandlung im Browser laufen; Collegare kann auf derselben VM wie Autogra.fi laufen. Zielgröße für den Start: eine Schule, einige hundert gleichzeitige Nutzende, je Dokument 3–6 gleichzeitig Bearbeitende.
 
+### 7.9 Moodle als Speicherort (Option im Moodle-Betrieb)
+
+Standard ist: Collegare speichert selbst (Abschnitt 7.5). Im Moodle-Betrieb kann die Schule zusätzlich zwei Optionen einschalten (Wunsch Jo, 1. November 2026). Beide sind **nicht** Standard.
+
+**a) Archiv in Moodle.** Bei Endabgabe oder Freigabe legt Collegare die Endprodukte (Ausarbeitung, Folien, Handout als PDF bzw. DOCX/PPTX, Prozess-Logbuch als PDF) in Moodle ab, als Abgabe in einer Moodle-Aufgabe je Person oder Gruppe. Nach Kursende kann Collegare seine Arbeitsdaten löschen; Aufbewahrung und Löschung regelt dann Moodle.
+
+**b) Ruhespeicher in Moodle („Auslagern bei Inaktivität“).** Ist in einem Projekt bzw. einer Gruppe **x Minuten** niemand mehr verbunden (einstellbar, z. B. 30 min), packt Collegare den gesamten Stand in ein Paket und legt es in Moodle ab. Beim nächsten Start aus Moodle holt Collegare das Paket zurück und stellt den Stand wieder her. Auf dem Collegare-Server liegen Daten dann nur, solange jemand arbeitet.
+
+| Baustein | Umsetzung |
+|---|---|
+| Inhalt des Pakets | Fassung jedes Dokuments (DOCX/PPTX, per nativem `x2t` erzeugt) **plus** Änderungsverlauf seit Projektbeginn (für Zeitleiste und Autorschaft), Mindmap/Kanban/Notizen als Yjs-Zustand, Quellen, Logbuch, Prozess-Ereignisse, Bewertungsentwürfe, Fotos; dazu ein Manifest mit Prüfsummen und dem letzten Hash des Prüfprotokolls |
+| Format | ein komprimiertes Archiv je Gruppe, signiert mit dem Schlüssel des Werkzeugs, damit eine Manipulation in Moodle beim Zurückladen auffällt |
+| Ablage in Moodle | LTI hat keinen Speicherdienst. Nötig ist ein kleines Moodle-Plugin (Erweiterung von `mod_securelink_QR` oder eigenes `local_collegare`), das Pakete im Dateibereich der Aktivität ablegt und über einen Webservice mit Token je Plattform annimmt und ausliefert. Die Moodle-Sicherung erfasst die Pakete dann automatisch |
+| Sicher auslagern | erst hochladen, dann in Moodle die Prüfsumme bestätigen lassen, **erst danach** lokal löschen. Schlägt das fehl (Moodle nicht erreichbar), bleibt der Stand in Collegare und der nächste Versuch folgt später |
+| Zurückladen | beim LTI-Start, wenn der Stand nicht lokal liegt: Paket holen, Signatur und Prüfsummen prüfen, wiederherstellen. Die Person sieht kurz „Arbeitsstand wird aus Moodle geladen“ (geschätzt wenige Sekunden, im Test zu messen) |
+| Gleichzeitigkeit | ausgelagert wird nur, wenn niemand der Gruppe verbunden ist; ein Start während des Auslagerns wartet, bis es fertig ist |
+| Größe | Fotos und lange Änderungsverläufe machen Pakete groß; Änderungen werden nach jeder Fassung zusammengefasst, Fotos nur einmal übertragen (inhaltsadressiert). Upload-Grenze der Moodle-Instanz beachten |
+| Grenzen | im Einzelbetrieb ohne Moodle nicht verfügbar; die Lehrkraft-Übersicht über ausgelagerte Gruppen braucht das Zurückladen (oder eine kleine Zusammenfassung, die lokal bleibt: Fortschritt je Phase, ohne Inhalte) |
+
+**Nutzen für den Prüfungsbetrieb (Autogra.fi-Prüfungsrahmen).** Hilfreich, mit zwei Anpassungen:
+
+- In Prüfungen gibt es kaum Inaktivität. Statt nur bei Inaktivität sichert Collegare deshalb zusätzlich **in festen Abständen** (z. B. alle 5 Minuten) und bei der Abgabe einen Stand nach Moodle. Fällt der Collegare-Server während der Prüfung aus, liegt der letzte Stand in Moodle und kann auf einem anderen Server weiterlaufen.
+- Die Abgabe in Moodle ist dann der **maßgebliche Nachweis** (Zeitpunkt, Prüfsumme, Prüfprotokoll-Hash), unabhängig vom Werkzeug. Das passt zur Forderung nach manipulationssicheren Protokollen und zu getrennten Aufbewahrungsfristen.
+- Zu klären: Netzlast, wenn eine ganze Prüfungsgruppe gleichzeitig sichert (Abstände staffeln), und ob Moodle in der Prüfungsumgebung erreichbar ist (abgesicherter Modus, Prüfungsbrowser).
+
 ### 7.8 Plattformunabhängige App (langfristiges Ziel)
 
 Collegare soll langfristig auch als installierbare App auf Handy, Tablet und Rechner laufen. Grundsatz: **eine Web-Codebasis**, keine eigene native App, weil die OnlyOffice-Editoren nur als Web-Code existieren.
@@ -411,7 +436,7 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 | **M3 Ausarbeitung** | Abschnitts-Dokumente, Gesamtansicht, Fertig-Sperre, Logbuch, Einfüge-Protokoll, Zeitleiste, Beitragsübersicht | Sperren greifen serverseitig; Zeitleiste spielt einen Abschnitt ab |
 | **M4 Feedback und Bewertung** | Peer-Review, KI-Feedback für Lernende, Kategorien, Zwischenfeedback, KI-Entwurf für die Lehrkraft, AGS | Note und Zwischenkommentar landen im Moodle-Gradebook |
 | **M5 Präsentation** | Folien- und Handout-Vorlagen, Quarto/Typst-Export, Verteidigungsmodus, Prozess-Logbuch als PDF | Export einer Beispielarbeit im Tufte-Stil |
-| **M6 Optionales** | Tippfluss-Analyse (nach DSFA-Vorlage), Deep Linking, Moodle-Gruppenimport, Autogra.fi-Abgabe | jeweils einzeln abnehmbar |
+| **M6 Optionales** | Tippfluss-Analyse (nach DSFA-Vorlage), Deep Linking, Moodle-Gruppenimport, Autogra.fi-Abgabe, Archiv und Ruhespeicher in Moodle mit Moodle-Plugin (7.9) | jeweils einzeln abnehmbar |
 | **Langfristig** | App für iOS/Android über Capacitor, ggf. Desktop über Tauri, gemeinsame Schul-App mit Autogra.fi (Abschnitt 7.8) | App aus dem Store verbindet sich per Schul-QR mit der eigenen Instanz |
 
 ---
