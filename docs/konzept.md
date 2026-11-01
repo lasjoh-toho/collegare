@@ -412,6 +412,8 @@ Für Nutzung ohne Anmeldung (Frage Jo, 1. November 2026). office-website ist ber
 
 **Nachvollziehbarkeit trotz lokaler Daten:** Lokale Dateien lassen sich verändern. Damit Logbuch, Einfüge-Protokoll und Zeitleiste trotzdem belastbar bleiben, schickt der Browser für jedes Änderungspaket nur eine **Prüfsumme** an den Server, der sie mit Zeitstempel signiert zurückgibt (Quittung, keine Inhalte). Bei der Abgabe prüft Collegare die Kette der Quittungen; Lücken oder Abweichungen werden angezeigt, nicht bewertet.
 
+**Offenes Office als Einstieg (Werbewirkung, Jo):** Die Startseite bietet ohne Anmeldung „Einfach loslegen“: neues Dokument, neue Präsentation, Tabelle oder eine Datei öffnen, alles lokal im Browser wie heute bei office-website. Daneben führen „Mit meiner Gruppe arbeiten“ (Code oder Anmeldung) und „Für Lehrkräfte“ in die Projektfunktionen. So lernen Schulen das Werkzeug ohne Hürde kennen; abschaltbar je Instanz.
+
 **Nicht geeignet für Prüfungen:** Dort braucht es eine Anmeldung und einen Speicher außerhalb des Schülergeräts (Collegare-Server oder Ablage der Umgebung, 7.9).
 
 ### 7.8 Plattformunabhängige App (langfristiges Ziel)
