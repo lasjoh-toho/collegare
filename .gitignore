@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.next/
+out/
+# OnlyOffice-Dateien werden mit scripts/onlyoffice-assets.sh erzeugt (ca. 1 GB)
+web/public/v*-*/
+.env
+.env.local
+*.log
