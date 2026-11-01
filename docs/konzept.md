@@ -39,6 +39,22 @@ Begriffe: *Projekt* = eine Aktivität (in Moodle: ein Ressourcen-Link), *Gruppe*
 
 Entfernt oder abgeschaltet werden: Uppy-Anbindung an Google Drive, Dropbox und OneDrive (Datenschutz an Schulen), Browser-Erweiterungshinweise, Vorlagen-Galerie von ziziyi.com, Analytics. Die Plugin-Galerie von OnlyOffice wird auf freigegebene, lokal ausgelieferte Plugins beschränkt.
 
+### 1.1 Design-Vorlage für Kanban, Mindmap und Notizen: brausa
+
+Für Kanban, Mindmap und Notiz-Thread ist [lasjoh-toho/brausa](https://github.com/lasjoh-toho/brausa) die Vorlage (Hinweis Jo, 1. November 2026). brausa hat genau diese Bausteine schon als „Projekt als Arbeitsraum“ (`docs/KONZEPT-PROJEKTRAUM.md`) gelöst:
+
+| brausa | Übernahme in Collegare |
+|---|---|
+| **Projekt-Startseite** mit Kacheln (Dateien, Notizen & Snippets, Pinboard, Kanban mit Zählern, Wikis) | Startseite eines Projekts bzw. einer Gruppe: Kacheln für Phase, Mindmap, Notizen, Quellen, Ausarbeitung, Logbuch, Feedback, jeweils mit Zählern und offenen Punkten |
+| **Kanban:** Spalten mit farbigem Punkt, Titel, Zähler, „+“ und Einstellungen; zart eingefärbte Spaltenflächen; Ablagezone „hierher ziehen zum Entfernen“; Auswahl-Leiste unten (Anzahl, Vorschau, Aktionen); Bahnen (Swimlanes) | Phase 0 Gruppenbildung (Säule = Thema, Karte = Person), später Aufgaben-Kanban der Gruppe (Offen · In Arbeit · Erledigt) |
+| **Map (Pinboard):** gepunktete Fläche, Karten mit farbiger Kopfleiste und Markdown-Text, **Karten in Karten** (Rahmen mit Unterkarten), Pfeile zwischen Karten, Hineintauchen in eine Karte, Umschalter Map/Kanban, Rückgängig/Wiederholen, Vollbild | Mindmap in Phase 1: Karten frei verteilen, durch Hineinziehen in eine Rahmenkarte clustern; Pfeile für Zusammenhänge |
+| **Outline-Ansicht:** dieselben Karten als eingerückte Liste, Tab/⇧Tab zum Ein- und Ausrücken | Die Gliederung der Ausarbeitung ist die Outline der Mindmap: Cluster → Abschnitt, Unterkarte → Unterabschnitt. Kein Kopieren, sondern zwei Sichten auf dieselben Daten |
+| **Notes & snippets** als Thread am rechten Rand: Eingabefeld oben, neueste Einträge, Karten auf die Map ziehen oder „Platzieren“, Karten von der Map zurück in den Thread | genau der Notiz-Thread aus Phase 2: Notizen und Fotos vom Handy erscheinen dort und werden auf die Mindmap oder einen Abschnitt gezogen |
+| **Abspielen** (▷) eines Pfads durch die Karten | Ausgangspunkt für einen Präsentationsentwurf in Phase 4 (Reihenfolge der Karten → Folienfolge) |
+| Farb- und Formsprache: ruhige Flächen (`--bg #fbfbfa`, `--bg-sunken #f2f2f0`), Akzent `#2f6bff`, Radius 10 px, Inter 13 px, dunkles Farbschema | wird als Tailwind-Theme hinterlegt und mit dem Look von office-website zusammengeführt (beide sind hell, ruhig, mit Seitenleiste) |
+
+brausa ist in Svelte geschrieben, Collegare (wie office-website) in React. Übernommen werden Gestaltung, Interaktionen und Datenmodell (Karte, Unterkarten, Link, Status, Notiz); die Komponenten werden in React nachgebaut. Wo brausa Dinge löst, die für Schulen nicht passen (Dateisystem, TiddlyWiki-Export), entfallen sie.
+
 **Oberflächen-Regel:** Collegare folgt dem Look von office-website. Teile, die aus Autogra.fi kommen (Handy-Scanner mit Seitenerkennung, QR-Kopplung, Zugangscodes), behalten ihre dort erarbeitete Bedienung. Jede Abweichung davon wird im README begründet.
 
 ---
@@ -294,7 +310,7 @@ office-website zeigt, welche Nachrichten der OnlyOffice-Client erwartet. Collega
 | Zweck | Baustein |
 |---|---|
 | Echtzeit für Mindmap, Kanban, Notizen, Gliederung | Yjs (CRDT), offline-fähig, Zusammenführung nach Wiederverbindung |
-| Mindmap-Fläche | React Flow (xyflow, MIT) |
+| Mindmap-Fläche | eigene Komponente nach dem Vorbild der brausa-Map (Karten in Karten, Pfeile); React Flow (xyflow, MIT) nur, falls der Nachbau zu aufwendig wird |
 | Kanban, Sortieren | dnd-kit (MIT), mit Tastaturbedienung |
 | Backend | Node.js 22, Fastify, socket.io, Kysely, Zod |
 | Datenbank | MariaDB (wie Autogra.fi), SQLite für Tests |
