@@ -15,6 +15,11 @@ export interface CoServerOptions {
   buildNumber?: number;
   now?: () => number;
   log?: (msg: string, data?: unknown) => void;
+  /**
+   * Prüft die Verbindung und liefert die Person (ab M1 aus der Sitzung). Ohne diese Funktion gilt die
+   * Person aus der Anfrage (nur Spike und Protokolltests).
+   */
+  authorize?: (socket: Socket, docId: string) => Promise<{ id: string; name: string } | null>;
 }
 
 interface ConnInfo {
@@ -45,7 +50,29 @@ export class CoServer {
   constructor(private io: Server, private opts: CoServerOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.log = opts.log ?? (() => {});
-    io.of('/collab').on('connection', (socket) => this.onConnection(socket));
+    const nsp = io.of('/collab');
+    // Anmeldung als Middleware, damit vor dem ersten „auth“ des Editors feststeht, wer verbunden ist
+    nsp.use((socket, next) => {
+      const q = { ...(socket.handshake.query as Record<string, unknown>), ...(socket.handshake.auth as Record<string, unknown>) };
+      const docId = typeof q.docId === 'string' ? q.docId : '';
+      const fromQuery = typeof q.userId === 'string' && q.userId ? { id: q.userId, name: typeof q.userName === 'string' && q.userName ? q.userName : q.userId } : null;
+      const auth = this.opts.authorize;
+      if (!docId) return next(new Error('docId fehlt'));
+      if (!auth) {
+        if (!fromQuery) return next(new Error('userId fehlt'));
+        socket.data.user = fromQuery;
+        return next();
+      }
+      auth(socket, docId).then(
+        (user) => {
+          if (!user) return next(new Error('Nicht angemeldet oder kein Zugriff'));
+          socket.data.user = user;
+          next();
+        },
+        (e) => next(e instanceof Error ? e : new Error(String(e))),
+      );
+    });
+    nsp.on('connection', (socket) => this.onConnection(socket));
   }
 
   private nsp() {
@@ -54,17 +81,12 @@ export class CoServer {
 
   private onConnection(socket: Socket) {
     const q = { ...(socket.handshake.query as Record<string, unknown>), ...(socket.handshake.auth as Record<string, unknown>) };
-    const docId = typeof q.docId === 'string' ? q.docId : '';
-    const userId = typeof q.userId === 'string' ? q.userId : '';
-    if (!docId || !userId) {
-      socket.emit('message', { type: 'drop', code: 4001, description: 'docId und userId fehlen' });
-      socket.disconnect(true);
-      return;
-    }
+    const docId = q.docId as string;
+    const user = socket.data.user as { id: string; name: string };
     const doc = this.docs.get(docId, parseKind(q.kind));
     const info: ConnInfo = {
       doc,
-      user: { id: userId, name: typeof q.userName === 'string' && q.userName ? q.userName : userId },
+      user,
       view: q.view === '1' || q.view === true,
     };
     this.conns.set(socket.id, info);

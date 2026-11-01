@@ -7,3 +7,5 @@ web/public/v*-*/
 .env
 .env.local
 *.log
+*.sqlite
+*.sqlite-*

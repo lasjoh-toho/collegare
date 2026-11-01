@@ -1,4 +1,5 @@
 // M0-Spike: zwei bzw. drei Browser bearbeiten dasselbe Dokument über den Collegare-Server.
+// Server mit SPIKE=1 starten (Test-Endpunkte unter /api/spike).
 // Voraussetzung: Server (server/: pnpm dev) auf :8787 und Next (web/: pnpm dev) auf :3000.
 // Aufruf: node scripts/m0-zwei-browser.cjs [docx|pptx]
 const { chromium } = require('playwright');

@@ -8,14 +8,13 @@ let base: string;
 const sockets: Socket[] = [];
 
 beforeEach(async () => {
-  app = buildApp();
+  app = await buildApp({ spike: true });
   await app.http.listen({ port: 0, host: '127.0.0.1' });
   base = `http://127.0.0.1:${(app.http.server.address() as AddressInfo).port}`;
 });
 
 afterEach(async () => {
   sockets.splice(0).forEach((s) => s.disconnect());
-  app.io.close();
   await app.http.close();
 });
 

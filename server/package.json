@@ -9,13 +9,21 @@
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "cli": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.7",
-    "socket.io": "^4.8.4"
+    "jose": "^6.2.14",
+    "kysely": "^0.29.7",
+    "mysql2": "^3.24.6",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
     "socket.io-client": "^4.8.4",
     "tsx": "^4.23.15",
