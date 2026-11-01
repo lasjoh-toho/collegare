@@ -209,7 +209,7 @@ Fertige Teile Einzelner sollen vor versehentlichem Überschreiben geschützt sei
 ### 5.3 Technische Durchsetzung
 
 - **Abschnitte** sind eigene Dokumente. Schreibrechte prüft der Kollaborationsserver beim Öffnen und bei jedem `saveChanges`. Damit ist die Sperre serverseitig durchgesetzt, nicht nur in der Oberfläche.
-- **Absätze innerhalb eines Abschnitts und Folien** nutzen das Sperrprotokoll von OnlyOffice: Ein Client muss vor dem Bearbeiten eines Blocks (Absatz, Folie) `getLock` anfragen. Der Server verweigert die Sperre für fertige Blöcke, und der Editor erlaubt dann keine Bearbeitung. Zusätzlich prüft der Server, ob eingehende Änderungen nur Blöcke betreffen, für die der Absender eine Sperre hält (im Spike zu klären, wie zuverlässig das am Änderungsformat erkennbar ist).
+- **Folien** (und nur bei Bedarf Absätze, siehe Entscheidung 10.4) nutzen das Sperrprotokoll von OnlyOffice: Ein Client muss vor dem Bearbeiten eines Blocks (Absatz, Folie) `getLock` anfragen. Der Server verweigert die Sperre für fertige Blöcke, und der Editor erlaubt dann keine Bearbeitung. Zusätzlich prüft der Server, ob eingehende Änderungen nur Blöcke betreffen, für die der Absender eine Sperre hält (im Spike zu klären, wie zuverlässig das am Änderungsformat erkennbar ist).
 - Absätze lassen sich zusätzlich als **Inhaltssteuerelement** mit Sperrattribut markieren, damit die Sperre auch in exportierten DOCX-Dateien sichtbar bleibt.
 
 ---
@@ -231,7 +231,7 @@ Grundsatz: Collegare **macht den Entstehungsprozess sichtbar und fragt nach**, e
 
 - Gemessen werden zusammengefasste Merkmale je Schreibsitzung: Länge ununterbrochener Schreibsequenzen, Verteilung der Pausen, Anteil von Korrekturen. **Einzelne Tastenanschläge und deren Zeitstempel werden nicht gespeichert** (Datenminimierung).
 - Erkennungslogik: lange, gleichmäßige Sequenzen ohne Denkpausen und mit sehr wenigen Korrekturen deuten auf Abtippen hin.
-- Folge: ein freundlicher Hinweis an die Person: Quelle notieren oder Vorfassung hochladen. Die Lehrkraft sieht, dass ein Hinweis kam und wie er beantwortet wurde, aber keine Punktzahl.
+- Folge: ein freundlicher Hinweis an die Person: Quelle notieren oder Vorfassung hochladen. Ob die Lehrkraft sieht, dass ein Hinweis kam und wie er beantwortet wurde, legt die Administration als Rahmen fest und die Lehrkraft innerhalb dieses Rahmens je Projekt (Entscheidung 10.5). Eine Punktzahl gibt es nie.
 - **Ausnahmen:** Diktiersoftware, Bildschirmtastaturen und andere Hilfsmittel erzeugen genau solche Muster. Die Lehrkraft kann die Analyse je Person abschalten (Nachteilsausgleich), ohne den Grund im System zu nennen.
 - Vor dem Einsatz an einer Schule ist eine Datenschutz-Folgenabschätzung nötig; Collegare liefert dafür eine Vorlage mit.
 
@@ -463,11 +463,18 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 
 ---
 
-## 10. Offene Fragen an Jo
+## 10. Entscheidungen und offene Fragen
 
-1. **Backend-Sprache:** TypeScript/Node (Empfehlung, Abschnitt 7.4) oder PHP wie Autogra.fi plus separater Kollaborationsdienst?
-2. **Betrieb:** geklärt, direkt auf der VM ohne Docker (Abschnitt 7.7). Offen: dieselbe VM wie Autogra.fi oder eine eigene?
-3. **Gruppen aus Moodle:** Reicht die Gruppenbildung in Collegare, oder ist der Import vorhandener Moodle-Gruppen Pflicht (dann Webservice-Token oder Plugin-Erweiterung)?
-4. **Sperr-Granularität:** Reicht „Abschnitt“ und „Folie“, oder werden einzelne Absätze innerhalb eines Abschnitts wirklich gebraucht?
-5. **Tippfluss-Analyse:** Soll die Lehrkraft die Hinweise an Lernende sehen, oder nur die Lernenden selbst?
-6. **Einsatzrahmen:** Welche Schulform und Altersgruppe zuerst (Oberstufe, Seminarfach, Hochschule)? Das bestimmt Vorlagen, Zitierstil und den Ton der Hinweise.
+Entschieden (Jo, 1. November 2026):
+
+1. **Backend:** TypeScript/Node (7.4).
+2. **Betrieb:** direkt auf der VM ohne Docker (7.7), auf derselben VM wie Autogra.fi im Unterordner `/collegare`.
+3. **Gruppen:** zunächst nur Gruppenbildung im Kanban; kein Moodle-Gruppenimport.
+4. **Sperr-Einheit:** die **Karte, die einer Person zugeordnet ist** (Karte der Gliederung = Abschnitt), danach die **Folie**. Keine Sperre einzelner Absätze; das spart die im Spike offen gebliebene Absatz-ID-Ermittlung.
+5. **Tippfluss-Hinweise:** Die Administration legt den Rahmen fest (aus, nur Lernende, Lernende und Lehrkraft); innerhalb dieses Rahmens entscheidet die Lehrkraft je Projekt, ob sie Hinweise und Antworten sieht.
+6. **Zielgruppe:** Oberstufe. Zitierstil, Vorlagen und Ton der Hinweise richten sich danach.
+7. **Moodle:** Es laufen verschiedene Moodle-Systeme in verschiedenen Versionen; auf dem hamburgweiten Moodle lassen sich (noch) keine Plugins installieren, auf dem Schul-Moodle schon, besser aber ohne. **Grundlage ist daher nur LTI 1.3 mit AGS und NRPS** (ab Moodle 3.7 enthalten). Archiv und Ruhespeicher (7.9) sind Zusatz für Umgebungen, die die Ablage-Schnittstelle anbieten; ein Moodle-Plugin wird erst gebaut, wenn es gebraucht wird.
+
+Offen:
+
+- Termin für den ersten Einsatz.
