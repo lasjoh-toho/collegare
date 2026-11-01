@@ -11,6 +11,8 @@ besonders Abschnitt 10 (Entscheidungen). Ergebnisse des ersten Tests: `docs/m0-s
   [brausa](https://github.com/lasjoh-toho/brausa) (`src/lib/components/ProjectMap.svelte`, `CardKanban.svelte`,
   `NotesThread.svelte`, Farben in `src/app.css`), in React nachgebaut. Teile aus Autogra.fi (Scanner, QR-Kopplung)
   behalten ihre Bedienung. Abweichungen im README begründen.
+- Gemeinsame Gestaltung mit Autogra.fi (Farben, Tag/Nacht, Seitenmenü, Office-Streifen, Kacheln, Verwaltung,
+  Korrektur): `docs/gestaltung.md`. Sie geht den Farben aus brausa vor.
 
 ## Festgelegte Entscheidungen (nicht ohne Rücksprache ändern)
 

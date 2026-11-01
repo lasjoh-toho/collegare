@@ -33,6 +33,8 @@ cd web && cp .env.example .env.local && pnpm install && pnpm dev       # Office-
 
 Im Betrieb liefert der Server die gebauten Oberflächen selbst aus (`client/out` unter `/`, `web/out` unter `/office/`).
 
+Gestaltungsrichtlinie für Autogra.fi und Collegare: [docs/gestaltung.md](docs/gestaltung.md).
+
 ### Abweichungen von den Vorlagen
 
 | Stelle | Vorlage | Abweichung und Grund |
