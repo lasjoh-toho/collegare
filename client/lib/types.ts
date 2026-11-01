@@ -93,3 +93,45 @@ export interface Frame {
   typingHints: 'off' | 'students' | 'students_teachers';
   openOffice: boolean;
 }
+
+/** Mindmap (Phase Orientierung), wie vom Server verteilt (server/src/projects/maps.ts). */
+export interface MapCard {
+  id: string;
+  kind: 'card' | 'cluster';
+  title: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string | null;
+  parent: string | null;
+  owner: number | null;
+  children: string[];
+}
+export interface MapLink {
+  id: string;
+  from: string;
+  to: string;
+}
+export interface OutlineSection {
+  id: string;
+  title: string;
+  cards: string[];
+  owners: number[];
+}
+export interface MindMap {
+  v: 1;
+  cards: Record<string, MapCard>;
+  roots: string[];
+  links: MapLink[];
+  outline: { sections: OutlineSection[]; at: number; by: number } | null;
+}
+export type MapOp =
+  | { type: 'add'; card: Omit<MapCard, 'children'> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h'>> }
+  | { type: 'move'; id: string; x: number; y: number; parent: string | null }
+  | { type: 'remove'; ids: string[] }
+  | { type: 'link'; id: string; from: string; to: string }
+  | { type: 'unlink'; id: string }
+  | { type: 'outline' };

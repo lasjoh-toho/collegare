@@ -97,9 +97,9 @@ export default function Projekt() {
         {project.settings.brief && <p className={p.brief}>{project.settings.brief}</p>}
         <nav className={p.phases}>
           <span className={`${p.phase} ${p.active}`}>Gruppen</span>
-          <span className={p.phase} title="folgt">
+          <a className={p.phase} href={href(`/projekt/mindmap/?id=${project.id}`)} title="Mindmap und Gliederung">
             Orientierung
-          </span>
+          </a>
           <span className={p.phase} title="folgt">
             Recherche
           </span>
