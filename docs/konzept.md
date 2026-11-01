@@ -388,6 +388,12 @@ Standard ist: Collegare speichert selbst (Abschnitt 7.5). Im Moodle-Betrieb kann
 | Größe | Fotos und lange Änderungsverläufe machen Pakete groß; Änderungen werden nach jeder Fassung zusammengefasst, Fotos nur einmal übertragen (inhaltsadressiert). Upload-Grenze der Moodle-Instanz beachten |
 | Grenzen | im Einzelbetrieb ohne Moodle nicht verfügbar; die Lehrkraft-Übersicht über ausgelagerte Gruppen braucht das Zurückladen (oder eine kleine Zusammenfassung, die lokal bleibt: Fortschritt je Phase, ohne Inhalte) |
 
+**Neutrale Ablage-Schnittstelle (Hinweis Jo).** Die Ablage wird nicht fest an Moodle gebunden, sondern als kleine, eigene Schnittstelle beschrieben, die jede Umgebung anbieten kann, in die Collegare als externes Werkzeug eingebettet ist: Moodle (über das Plugin), der Autogra.fi-Prüfungsrahmen oder eine andere Lernplattform.
+
+- Drei Aufrufe: Paket ablegen (`PUT`, liefert Prüfsumme und Version), Paket holen (`GET`), Ablage bestätigen bzw. alte Versionen freigeben.
+- Die Umgebung teilt Collegare beim Start mit, wo ihre Ablage liegt: im LTI-Start als Custom-Parameter (z. B. `collegare_storage_url`), das Zugriffsrecht holt Collegare mit seinem LTI-Schlüssel per OAuth2 (wie bei AGS/NRPS). So braucht es keine Zugangsdaten in der Konfiguration.
+- Collegare selbst spricht nur diese Schnittstelle; ein Moodle-Plugin, Autogra.fi oder ein anderer Dienst setzen sie jeweils um. Fehlt sie, speichert Collegare wie üblich selbst.
+
 **Nutzen für den Prüfungsbetrieb (Autogra.fi-Prüfungsrahmen).** Hilfreich, mit zwei Anpassungen:
 
 - In Prüfungen gibt es kaum Inaktivität. Statt nur bei Inaktivität sichert Collegare deshalb zusätzlich **in festen Abständen** (z. B. alle 5 Minuten) und bei der Abgabe einen Stand nach Moodle. Fällt der Collegare-Server während der Prüfung aus, liegt der letzte Stand in Moodle und kann auf einem anderen Server weiterlaufen.
