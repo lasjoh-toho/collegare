@@ -8,6 +8,8 @@ import { Sessions } from './identity/sessions.js';
 import { Users } from './identity/users.js';
 import { Projects } from './projects/projects.js';
 import { FrameStore } from './projects/settings.js';
+import { Lti } from './lti/lti.js';
+import { ToolKeyStore } from './lti/toolKey.js';
 import { RateLimiter } from './security/rateLimiter.js';
 
 export interface Config {
@@ -40,27 +42,36 @@ export interface Services {
   accessCodes: AccessCodes;
   projects: Projects;
   frame: FrameStore;
+  lti: Lti;
+  toolKey: ToolKeyStore;
   loginLimiter: RateLimiter;
   codeLimiter: RateLimiter;
 }
 
-export async function createServices(config: Config, now: () => number = Date.now): Promise<Services> {
+export async function createServices(config: Config, now: () => number = Date.now, fetchFn: typeof fetch = fetch): Promise<Services> {
   const db = createDb(config.databaseUrl);
   await migrate(db);
   const users = new Users(db, now);
   const contexts = new Contexts(db, now);
   await contexts.system();
+  const audit = new AuditLog(db, now);
+  const projects = new Projects(db, users, now);
+  const toolKey = new ToolKeyStore(db);
+  const lti = new Lti(db, users, contexts, audit, toolKey, { appUrl: config.appUrl }, now, fetchFn);
+  lti.addToProject = (projectId, userId) => projects.addMember(projectId, userId);
   return {
     config,
     db,
-    audit: new AuditLog(db, now),
+    audit,
     users,
     contexts,
     sessions: new Sessions(db, now),
     accounts: new LocalAccounts(db, users, now),
     accessCodes: new AccessCodes(db, now),
-    projects: new Projects(db, users, now),
+    projects,
     frame: new FrameStore(db),
+    lti,
+    toolKey,
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),
     codeLimiter: new RateLimiter(10, 10 * 60_000, now),
   };

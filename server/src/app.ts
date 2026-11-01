@@ -10,6 +10,7 @@ import { COOKIE, sessionHook } from './http/auth.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
+import { ltiRoutes } from './routes/lti.js';
 import type { Services } from './services.js';
 
 export interface App {
@@ -91,6 +92,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     authRoutes(http, s);
     adminRoutes(http, s);
     projectRoutes(http, s, bc);
+    await ltiRoutes(http, s, bc);
 
     // Projekt-Namespace: Wer ein Projekt geöffnet hat, bekommt Änderungen am Board sofort.
     const nsp = io.of('/project');

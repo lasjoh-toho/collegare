@@ -48,6 +48,15 @@ export default function Projekt() {
     setTimeout(() => setToast(''), 4000);
   };
 
+  async function moodleImport() {
+    try {
+      const r = await post<{ added: number; total: number }>(`/api/projects/${id}/moodle-import`, {});
+      showError(r.added ? `${r.added} neu aus Moodle übernommen (${r.total} Lernende im Kurs)` : `Alle ${r.total} Lernenden sind schon im Projekt`);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : String(e));
+    }
+  }
+
   if (error)
     return (
       <>
@@ -66,9 +75,15 @@ export default function Projekt() {
         <span className="chip">{project.course.title}</span>
         {teacher && (
           <div className={p.actions}>
-            <button className="btn" onClick={() => setDialog('students')}>
-              + Lernende
-            </button>
+            {project.course.moodle ? (
+              <button className="btn" onClick={moodleImport} title="Teilnehmende des Moodle-Kurses übernehmen">
+                ↻ Aus Moodle
+              </button>
+            ) : (
+              <button className="btn" onClick={() => setDialog('students')}>
+                + Lernende
+              </button>
+            )}
             <button className="btn" onClick={() => setDialog('codes')}>
               Zugangscodes
             </button>
@@ -98,10 +113,17 @@ export default function Projekt() {
         {project.board.members.length === 0 && teacher ? (
           <div className={`panel ${p.empty}`}>
             <h2>Noch keine Lernenden</h2>
-            <p className="muted">Trage die Namen ein (eine Zeile je Person) oder übernimm sie beim Start aus Moodle.</p>
-            <button className="btn primary" onClick={() => setDialog('students')}>
-              Lernende eintragen
-            </button>
+            <p className="muted">Trage die Namen ein (eine Zeile je Person) oder übernimm sie aus Moodle.</p>
+            <div className="row">
+              {project.course.moodle && (
+                <button className="btn primary" onClick={moodleImport}>
+                  Aus Moodle übernehmen
+                </button>
+              )}
+              <button className={`btn ${project.course.moodle ? '' : 'primary'}`} onClick={() => setDialog('students')}>
+                Lernende eintragen
+              </button>
+            </div>
           </div>
         ) : (
           <GroupBoard projectId={project.id} board={project.board} settings={project.settings} role={project.role} meId={me.id} onError={showError} />
