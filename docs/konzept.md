@@ -185,6 +185,72 @@ Startseite der Lehrkraft für ein Projekt ist ein **Kanban-Board**:
 - **Konsolidierung:** Am Ende erstellt Collegare ein Prozess-Logbuch je Person und Gruppe (PDF), das Logbuch, Meilensteine, Einfüge-Erklärungen, Reviews und Antworten zusammenführt.
 - Die Lehrkraft kann Reflexionsimpulse je Phase vorgeben.
 
+### Projekt-Einstellungen
+
+Jedes Projekt hat eine **Einstellungsseite** (Zahnrad an der Projektkarte und im Projektkopf). Vorlage für Aufbau und Bedienung ist die Einstellungsseite von Autogra.fi (`public/einstellungen.html`):
+
+- oben eine **Leiste mit Voreinstellungen**, die viele Schalter auf einmal setzen. Der aktive Knopf leuchtet wie dort, statt dass ein eigener Modus-Hinweis erscheint;
+- darunter **Akkordeons** je Thema; ein Akkordeon, dessen Funktion aus ist, wird grau (`.inactive`);
+- **ein** Speichern-Knopf, Konfliktschutz über eine Revisionsnummer (409, wenn zwei Lehrkräfte gleichzeitig ändern);
+- **Einstellungen exportieren/importieren** als JSON-Datei, damit eine Lehrkraft ihr Projekt im nächsten Jahr oder an Kolleginnen und Kollegen weitergeben kann;
+- nichts wird beim Start des Projekts gesperrt (wie in Autogra.fi entschieden). Änderungen während des Projekts stehen im Prüfprotokoll; was Lernende schon erstellt haben, bleibt erhalten, wenn ein Dokumenttyp später abgeschaltet wird (nur noch lesbar).
+
+Voreinstellungen (Vorschlag): **Gruppenreferat**, **Seminararbeit in Gruppen**, **Facharbeit (einzeln)**, **Präsentationsprüfung** (prüfungsnah: keine KI-Hilfe, Einfüge-Protokoll mit Erklärpflicht, Phasen mit festen Terminen).
+
+Die Akkordeons:
+
+| Akkordeon | Einstellungen |
+|---|---|
+| **Projekt** | Titel, Leitfrage bzw. Aufgabenstellung (für Lernende sichtbar), Fach (für KI-Vorlagen und Dokumentvorlagen), Zeitraum, Gruppen- oder Einzelbetrieb |
+| **Gruppenbildung** | Wer bildet Gruppen: *Lehrkraft* (Standard), *Lernende wählen selbst* (Wahlmodus: Lernende ziehen sich in eine Säule; Mindest- und Höchstzahl je Gruppe, Schluss-Termin, danach legt die Lehrkraft fest) oder *Lernende dürfen auch neue Gruppen anlegen*. Lernende dürfen das Thema ihrer Gruppe setzen (ja/nein). Rollenliste zur Auswahl (z. B. Zeitwächter:in, Quellenverantwortliche:r, Layout) oder freie Rollen. Gültigkeit der Zugangscodes |
+| **Phasen** | Je Phase *an*, *zeitgesteuert* (von/bis) oder *aus*, wie die Schritte in Autogra.fi; Zieltermin und Meilensteine (z. B. Mindestzahl Quellen); Reflexionsimpulse je Phase |
+| **Dokumente und Dateien** | **Welche Dokumenttypen Lernende anlegen dürfen** (Haken je Typ, siehe unten); **welche Dateitypen importiert werden dürfen**; welche Exportformate es gibt; Dokumentvorlagen (Folien, Handout, Methodik-Abschnitt) aus der Vorlagenbibliothek; Höchstgröße je Datei und Speicher je Gruppe |
+| **Formeln** | Formeleditor an/aus; Lernende dürfen **umformen** bzw. **rechnen** (je ein Schalter, Standard aus, wie `formulatransform`/`formulacalc` in mod_pinnwand) |
+| **Zusammenarbeit** | „Fertig“-Sperre an/aus; wer eine Sperre aufheben darf (nur Lehrkraft / Gruppe mit Zustimmung der Person); Peer-Review (innerhalb oder zwischen Gruppen, anonym oder offen, Leitfragen) |
+| **Protokoll** | Einfüge-Protokoll: ab wie vielen Zeichen, Erklärung verlangen ja/nein; Tippfluss-Hinweise (nur sichtbar, wenn die Administration es zulässt, siehe 10.5); Logbuch verpflichtend ja/nein, Mindestzahl Einträge |
+| **KI** | KI-Feedback für Lernende an/aus, Grenze je Person und Tag, Leitplanken (Systemanweisung, für Lernende unsichtbar) mit Fach-Standard aus der Seite „KI-Vorlagen“ wie in Autogra.fi; Erwartungshorizont an die KI geben ja/nein |
+| **Bewertung** | Kategorien mit Gewichtung, Notensystem (Punkte, Noten, Notenpunkte 0–15 wie in Autogra.fi), Zwischenfeedback je Meilenstein, Übertragung an Moodle (AGS) |
+
+**Rahmen der Administration.** Auf der Verwaltungsseite der Instanz legt die Administration fest, was Lehrkräfte überhaupt einstellen können: erlaubte Dokument- und Dateitypen, Höchstgrößen, ob KI verfügbar ist, Rahmen für Tippfluss-Hinweise, ob das offene Office ohne Anmeldung angeboten wird (7.10). Was der Rahmen nicht zulässt, erscheint in der Projekt-Einstellung grau mit dem Hinweis „von der Administration abgeschaltet“.
+
+**Dokumenttypen für Lernende** (Haken je Projekt, Standard fett):
+
+| Typ | Editor | Hinweis |
+|---|---|---|
+| **Abschnitt (Text)** | OnlyOffice-Texteditor, DOCX | Grundlage der Ausarbeitung, entsteht aus der Gliederung |
+| **Präsentation** | OnlyOffice-Präsentationseditor, PPTX | Folien einer Person zugeordnet; Export auch als HTML (siehe unten) |
+| **Handout** | Texteditor mit Layout-Vorlage | 1–2 Seiten |
+| Tabelle | OnlyOffice-Tabelleneditor, XLSX | für Messreihen, Umfragen, Auswertungen |
+| **Mindmap, Notizen, Logbuch** | Collegare selbst (brausa-Gestaltung) | immer da, solange die Phase aktiv ist |
+| Formel | Formeleditor (siehe unten) | in Karten, Notizen und Dokumenten |
+| PDF ansehen und kommentieren | OnlyOffice-PDF-Editor | für Quellen; kein eigener Text |
+
+**Import.** Die Lehrkraft wählt aus: Textdokumente (DOCX, ODT, RTF, TXT, Markdown), Präsentationen (PPTX, ODP, PPT), Tabellen (XLSX, ODS, CSV), PDF, Bilder (JPG, PNG, HEIC vom Handy), Literatur (BibTeX, RIS). Umgewandelt wird mit x2t im Browser bzw. nativ auf dem Server. Ein **Import gilt wie ein großes Einfügen**: Er steht mit Dateiname, Größe und Prüfsumme im Einfüge-Protokoll, und bei eingeschalteter Erklärpflicht fragt Collegare nach der Herkunft. Importe der Lehrkraft (Vorlagen, Material) gelten als interne Herkunft.
+
+**Vorlagenbibliothek.** Dokumentvorlagen (Folienmaster, Handout, Methodik-Abschnitt, Deckblatt), Einstellungs-Voreinstellungen und Rollenlisten liegen in einer Bibliothek mit drei Ebenen wie die KI-Vorlagen in Autogra.fi: mitgeliefert, von der Schule (Administration oder Fachschaft), von der Lehrkraft. Eine Lehrkraft kann ein Projekt als Vorlage speichern.
+
+### Formeleditor
+
+Vorlage ist der Formeleditor aus mod_pinnwand (`js/formeleditor/`): LaTeX als gespeicherte Form, Darstellung mit KaTeX (lokal ausgeliefert, kein CDN), Menüband mit Reitern nach Thema (Aufbau, Analysis, Symbole …), Vorschau, verständliche Fehlertexte, Rückgängig/Wiederholen, Menüs „Umformen“ und „Rechnen“, die die Lehrkraft für Lernende freischaltet. Die Logik (`formeleditor-logik.js`) läuft ohne DOM, also auch auf dem Server zum Prüfen.
+
+Einsatz in Collegare:
+
+- in Mindmap-Karten, Notizen, Logbuch und Kommentaren direkt (KaTeX-Darstellung);
+- in OnlyOffice-Dokumenten über einen Knopf „Formel“ in der Collegare-Leiste: Der Editor öffnet sich als Dialog und fügt die Formel als **OnlyOffice-Gleichung** ein (der Editor nimmt LaTeX entgegen und wandelt in OMML um; im Spike zu prüfen). Rückfall: als Bild (SVG) mit dem LaTeX-Text als Alternativtext, damit nichts verloren geht;
+- in den Komponenten wird die Bedienung übernommen, nicht neu erfunden (Regel aus CLAUDE.md: übernommene Teile behalten ihre Bedienung).
+
+### Präsentation als HTML (Bento)
+
+Präsentationen lassen sich zusätzlich als **eine einzige HTML-Datei** exportieren, nach dem Vorbild von mod_bento: `bentoconvert.js` wandelt PPTX (und altes PPT) im Browser in ein Bento-Deck, das in die Bento-Datei (`bento-shell.html`, MIT-Lizenz) eingesetzt wird. Erhalten bleiben laut mod_bento: Farben und Schriften mit Master-Vererbung, Hintergründe, Klick-Animationen als Aufdeck-Schritte, Übergänge einschließlich Morph, Sprechernotizen, Diagramme, Tabellen, Bilder mit Alternativtext.
+
+Nutzen:
+
+- Die Gruppe gibt ihre Präsentation als Datei ab, die in jedem Browser ohne Office läuft und weiter bearbeitbar bleibt („die Datei ist die Software“);
+- der **Verteidigungsmodus** (Phase 4) spielt das Deck im Bento-Präsentationsmodus (`#present`) und legt Zeitnahme je Person und Fragenliste daneben;
+- im Moodle-Betrieb kann das Deck als Endprodukt archiviert werden (7.9) oder als mod_bento-Aktivität weiterleben.
+
+Der Export läuft im Browser (wie in mod_bento), damit der Server dafür nichts installieren muss; er steht in der Einstellung „Exportformate“.
+
 ---
 
 ## 5. Kooperations- und Bearbeitungsrechte (Sperrfunktion)
@@ -453,11 +519,11 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 | Meilenstein | Inhalt | Ergebnis / Abnahme |
 |---|---|---|
 | **M0 Spike** (zuerst) | Node-Server mit socket.io statt MockSocket; zwei Browser bearbeiten dieselbe DOCX und PPTX; Sperre je Absatz/Folie vom Server verweigern; Beitritt mit Änderungsverlauf; Snapshot mit nativem x2t; Einfüge-Ereignis im iframe erfassen. NRPS-Gruppen in Moodle prüfen. | Entscheidung: eigenes Protokoll weiter oder Ausstieg (OnlyOffice Document Server bzw. eigener Texteditor auf ProseMirror/Yjs für Abschnitte). |
-| **M1 Fundament** | Repo aus office-website übernehmen, entschlacken, deutsch; Backend, Datenbank, Rechte, Prüfprotokoll; LTI-Start, NRPS-Import; lokale Konten und QR-Zugang; Phase 0 Kanban mit Einzelmodus | Start aus Moodle zeigt Projekt; Gruppen bilden auf dem Board |
+| **M1 Fundament** | Repo aus office-website übernehmen, entschlacken, deutsch; Backend, Datenbank, Rechte, Prüfprotokoll; LTI-Start, NRPS-Import; lokale Konten und QR-Zugang; Phase 0 Kanban mit Einzelmodus; Einstellungsseite mit den Akkordeons Projekt, Gruppenbildung (einschließlich Wahlmodus) und Dokumente | Start aus Moodle zeigt Projekt; Gruppen bilden auf dem Board |
 | **M2 Orientierung und Recherche** | Mindmap, Gliederung, Rollen; Notizen mobil/offline mit Thread; Literaturliste; Fotos mit Texterkennung | Gruppe erstellt Gliederung aus Mindmap, Notizen vom Handy erscheinen live |
-| **M3 Ausarbeitung** | Abschnitts-Dokumente, Gesamtansicht, Fertig-Sperre, Logbuch, Einfüge-Protokoll, Zeitleiste, Beitragsübersicht | Sperren greifen serverseitig; Zeitleiste spielt einen Abschnitt ab |
+| **M3 Ausarbeitung** | Abschnitts-Dokumente, Gesamtansicht, Fertig-Sperre, Logbuch, Einfüge-Protokoll (auch für Importe), Zeitleiste, Beitragsübersicht, Formeleditor | Sperren greifen serverseitig; Zeitleiste spielt einen Abschnitt ab |
 | **M4 Feedback und Bewertung** | Peer-Review, KI-Feedback für Lernende, Kategorien, Zwischenfeedback, KI-Entwurf für die Lehrkraft, AGS | Note und Zwischenkommentar landen im Moodle-Gradebook |
-| **M5 Präsentation** | Folien- und Handout-Vorlagen, Quarto/Typst-Export, Verteidigungsmodus, Prozess-Logbuch als PDF | Export einer Beispielarbeit im Tufte-Stil |
+| **M5 Präsentation** | Folien- und Handout-Vorlagen, Vorlagenbibliothek, Quarto/Typst-Export, Präsentation als HTML (Bento), Verteidigungsmodus im Bento-Player, Prozess-Logbuch als PDF | Export einer Beispielarbeit im Tufte-Stil |
 | **M6 Optionales** | Tippfluss-Analyse (nach DSFA-Vorlage), Deep Linking, Moodle-Gruppenimport, Autogra.fi-Abgabe, Archiv und Ruhespeicher in Moodle mit Moodle-Plugin (7.9) | jeweils einzeln abnehmbar |
 | **Langfristig** | App für iOS/Android über Capacitor, ggf. Desktop über Tauri, gemeinsame Schul-App mit Autogra.fi (Abschnitt 7.8) | App aus dem Store verbindet sich per Schul-QR mit der eigenen Instanz |
 
@@ -478,3 +544,4 @@ Entschieden (Jo, 1. November 2026):
 Offen:
 
 - Termin für den ersten Einsatz.
+- **Lizenz der übernommenen Teile:** Der Formeleditor (mod_pinnwand) und `bentoconvert.js` (mod_bento) stehen unter einer Lizenz nur für nicht-kommerzielle Nutzung, Collegare unter AGPL-3.0. Beides lässt sich nicht mischen. Da Jo Rechteinhaber ist, genügt eine Freigabe dieser Dateien zusätzlich unter AGPL-3.0 (Doppellizenz); bis dahin werden sie nicht ins Repository kopiert. KaTeX, JSZip und die Bento-Datei selbst stehen unter MIT und passen.
