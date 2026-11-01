@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Services } from '../services.js';
 import { requireSession } from '../http/auth.js';
 import { ProjectError, type ProjectRole } from '../projects/projects.js';
+import { PRESETS, SettingsSchema, clampToFrame } from '../projects/settings.js';
 
 type P = { Params: { id: string } };
 
@@ -123,11 +124,55 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
   app.patch<P>('/api/projects/:id', async (req, reply) => {
     const a = await access(req, reply, 'teacher');
     if (!a) return;
-    const body = z.object({ title: z.string().min(1).max(255).optional(), settings: z.object({ studentsSetTopic: z.boolean().optional() }).optional() }).safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: 'Ungültige Angaben' });
+    const body = z
+      .object({ title: z.string().min(1).max(255).optional(), settings: SettingsSchema.partial().optional(), revision: z.number().int().optional() })
+      .safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Ungültige Angaben', details: body.error.issues.map((i) => i.path.join('.')) });
     if (body.data.title) await s.db.updateTable('projects').set({ title: body.data.title.trim() }).where('id', '=', a.projectId).execute();
-    const settings = body.data.settings ? await s.projects.updateSettings(a.projectId, body.data.settings) : undefined;
-    return { ok: true, settings };
+    if (!body.data.settings) return { ok: true };
+    try {
+      const p = await s.projects.get(a.projectId);
+      const frame = await s.frame.get();
+      const wanted = clampToFrame({ ...p!.settings, ...body.data.settings }, frame);
+      const res = await s.projects.updateSettings(a.projectId, wanted, body.data.revision);
+      await s.audit.append({ actorId: a.userId, action: 'project.settings_changed', projectId: a.projectId, data: { keys: Object.keys(body.data.settings), revision: res.revision } });
+      await bc.push(a.projectId);
+      return { ok: true, ...res };
+    } catch (e) {
+      return handle(reply, e);
+    }
+  });
+
+  /** Einstellungsseite: Einstellungen, Revision, Rahmen der Administration und Voreinstellungen. */
+  app.get<P>('/api/projects/:id/settings', async (req, reply) => {
+    const a = await access(req, reply, 'teacher');
+    if (!a) return;
+    const p = await s.projects.get(a.projectId);
+    return {
+      title: p!.title,
+      mode: p!.mode,
+      settings: p!.settings,
+      revision: p!.revision,
+      frame: await s.frame.get(),
+      presets: Object.entries(PRESETS).map(([id, v]) => ({ id, title: v.title, patch: v.patch })),
+    };
+  });
+
+  /** Wahlmodus: Lernende ordnen sich selbst einer Gruppe zu. */
+  app.post<P>('/api/projects/:id/choose', async (req, reply) => {
+    const a = await access(req, reply, 'member');
+    if (!a) return;
+    const body = z.object({ groupId: z.number().int().nullable() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Gruppe angeben' });
+    if (a.role !== 'student') return reply.code(400).send({ error: 'Nur für Lernende; Lehrkräfte verschieben auf dem Board' });
+    try {
+      await s.projects.choose(a.projectId, a.userId, body.data.groupId);
+    } catch (e) {
+      return handle(reply, e);
+    }
+    await s.audit.append({ actorId: a.userId, action: 'project.group_chosen', projectId: a.projectId, data: { groupId: body.data.groupId } });
+    await bc.push(a.projectId);
+    return { ok: true };
   });
 
   app.post<P>('/api/projects/:id/students', async (req, reply) => {
@@ -157,10 +202,27 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
   });
 
   app.post<P>('/api/projects/:id/groups', async (req, reply) => {
-    const a = await access(req, reply, 'teacher');
+    const a = await access(req, reply, 'member');
     if (!a) return;
     const body = z.object({ title: z.string().max(255).default('') }).safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'Ungültiger Titel' });
+    if (a.role === 'student') {
+      // „Lernende dürfen auch Gruppen anlegen“: neue Säule und gleich hinein
+      const p = await s.projects.get(a.projectId);
+      const st = p!.settings;
+      const open = p!.mode === 'group' && st.groupFormation === 'open' && (st.choiceDeadline === null || Date.now() <= st.choiceDeadline);
+      if (!open) return reply.code(403).send({ error: 'Neue Gruppen legt hier die Lehrkraft an' });
+      const id = await s.projects.createGroup(a.projectId, body.data.title);
+      try {
+        await s.projects.choose(a.projectId, a.userId, id);
+      } catch (e) {
+        await s.projects.deleteGroup(a.projectId, id);
+        return handle(reply, e);
+      }
+      await s.audit.append({ actorId: a.userId, action: 'project.group_created_by_student', projectId: a.projectId, data: { groupId: id } });
+      await bc.push(a.projectId);
+      return { id };
+    }
     const id = await s.projects.createGroup(a.projectId, body.data.title);
     await bc.push(a.projectId);
     return { id };

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Services } from '../services.js';
 import { requireSession, setSessionCookie } from '../http/auth.js';
 import { AccountError } from '../identity/accounts.js';
+import { FrameSchema } from '../projects/settings.js';
 
 async function requireAdmin(s: Services, req: FastifyRequest, reply: FastifyReply): Promise<number | null> {
   const sess = requireSession(req, reply);
@@ -62,6 +63,22 @@ export function adminRoutes(app: FastifyInstance, s: Services) {
     const { token, expiresAt } = await s.sessions.create(id, { impersonatorId: actor, ttlMs: 2 * 3600_000 });
     setSessionCookie(reply, s, token, expiresAt);
     await s.audit.append({ actorId: actor, action: 'admin.impersonate', data: { userId: id } });
+    return { ok: true };
+  });
+
+  /** Rahmen der Instanz: was Lehrkräfte in ihren Projekten einschalten dürfen. */
+  app.get('/api/admin/frame', async (req, reply) => {
+    if (!(await requireAdmin(s, req, reply))) return;
+    return { frame: await s.frame.get() };
+  });
+
+  app.put('/api/admin/frame', async (req, reply) => {
+    const actor = await requireAdmin(s, req, reply);
+    if (!actor) return;
+    const body = FrameSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Ungültiger Rahmen' });
+    await s.frame.set(body.data);
+    await s.audit.append({ actorId: actor, action: 'admin.frame_changed', data: body.data });
     return { ok: true };
   });
 }

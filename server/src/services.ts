@@ -7,6 +7,7 @@ import { Contexts } from './identity/contexts.js';
 import { Sessions } from './identity/sessions.js';
 import { Users } from './identity/users.js';
 import { Projects } from './projects/projects.js';
+import { FrameStore } from './projects/settings.js';
 import { RateLimiter } from './security/rateLimiter.js';
 
 export interface Config {
@@ -38,6 +39,7 @@ export interface Services {
   accounts: LocalAccounts;
   accessCodes: AccessCodes;
   projects: Projects;
+  frame: FrameStore;
   loginLimiter: RateLimiter;
   codeLimiter: RateLimiter;
 }
@@ -58,6 +60,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     accounts: new LocalAccounts(db, users, now),
     accessCodes: new AccessCodes(db, now),
     projects: new Projects(db, users, now),
+    frame: new FrameStore(db),
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),
     codeLimiter: new RateLimiter(10, 10 * 60_000, now),
   };

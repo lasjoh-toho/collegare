@@ -1,17 +1,13 @@
 import type { Db } from '../db/index.js';
 import type { Users } from '../identity/users.js';
 import { randomToken } from '../security/crypto.js';
+import { DEFAULT_SETTINGS, type ProjectSettings, parseSettings } from './settings.js';
+
+export { DEFAULT_SETTINGS, type ProjectSettings };
 
 export const ROSTER_ISSUER = 'collegare:klassenliste';
 
 export type ProjectRole = 'teacher' | 'student' | null;
-
-export interface ProjectSettings {
-  /** Lernende dürfen das Thema ihrer Gruppe selbst setzen (Konzept Phase 0). */
-  studentsSetTopic: boolean;
-}
-
-export const DEFAULT_SETTINGS: ProjectSettings = { studentsSetTopic: true };
 
 export interface BoardGroup {
   id: number;
@@ -58,7 +54,8 @@ export class Projects {
   async get(id: number) {
     const p = await this.db.selectFrom('projects').selectAll().where('id', '=', id).executeTakeFirst();
     if (!p) return undefined;
-    return { ...p, settings: { ...DEFAULT_SETTINGS, ...(JSON.parse(p.settings) as Partial<ProjectSettings>) } };
+    const { revision, ...settings } = parseSettings(p.settings);
+    return { ...p, settings: settings as ProjectSettings, revision };
   }
 
   async roleOf(userId: number, projectId: number): Promise<ProjectRole> {
@@ -218,12 +215,48 @@ export class Projects {
     return m?.group_id ?? null;
   }
 
-  async updateSettings(projectId: number, patch: Partial<ProjectSettings>): Promise<ProjectSettings> {
+  /**
+   * Speichert Einstellungen. Mit revision: nur, wenn niemand inzwischen gespeichert hat (sonst 409),
+   * wie die Einstellungsseite in Autogra.fi.
+   */
+  async updateSettings(projectId: number, patch: Partial<ProjectSettings>, revision?: number): Promise<{ settings: ProjectSettings; revision: number }> {
+    return this.db.transaction().execute(async (tx) => {
+      const row = await tx.selectFrom('projects').select('settings').where('id', '=', projectId).executeTakeFirst();
+      if (!row) throw new ProjectError('Projekt nicht gefunden', 404);
+      const { revision: current, ...settings } = parseSettings(row.settings);
+      if (revision !== undefined && revision !== current) throw new ProjectError('Inzwischen hat jemand anderes gespeichert. Bitte neu laden.', 409);
+      const next = { ...(settings as ProjectSettings), ...patch };
+      if (next.groupMin > next.groupMax) throw new ProjectError('Mindestzahl ist größer als Höchstzahl');
+      // Vergleichen und Tauschen: schlägt fehl, wenn zwischen Lesen und Schreiben jemand gespeichert hat
+      const res = await tx.updateTable('projects').set({ settings: JSON.stringify({ ...next, revision: current + 1 }) }).where('id', '=', projectId).where('settings', '=', row.settings).executeTakeFirst();
+      if (Number(res.numUpdatedRows) !== 1) throw new ProjectError('Inzwischen hat jemand anderes gespeichert. Bitte neu laden.', 409);
+      return { settings: next, revision: current + 1 };
+    });
+  }
+
+  /**
+   * Wahlmodus: Lernende ordnen sich selbst einer Säule zu (oder zurück in „Noch ohne Gruppe“).
+   * Prüft Schluss-Termin und Höchstzahl in derselben Transaktion, damit zwei gleichzeitige Klicks die Grenze nicht sprengen.
+   */
+  async choose(projectId: number, userId: number, groupId: number | null): Promise<void> {
     const p = await this.get(projectId);
     if (!p) throw new ProjectError('Projekt nicht gefunden', 404);
-    const next = { ...p.settings, ...patch };
-    await this.db.updateTable('projects').set({ settings: JSON.stringify(next) }).where('id', '=', projectId).execute();
-    return next;
+    const s = p.settings;
+    if (p.mode === 'single' || s.groupFormation === 'teacher') throw new ProjectError('Die Gruppen teilt hier die Lehrkraft ein', 403);
+    if (s.choiceDeadline !== null && this.now() > s.choiceDeadline) throw new ProjectError('Die Wahl ist beendet. Änderungen nur noch über die Lehrkraft.', 403);
+    if (groupId !== null) {
+      const g = await this.db.selectFrom('groups').select('id').where('id', '=', groupId).where('project_id', '=', projectId).executeTakeFirst();
+      if (!g) throw new ProjectError('Gruppe nicht gefunden', 404);
+      const n = await this.db
+        .selectFrom('group_members')
+        .select((eb) => eb.fn.countAll().as('n'))
+        .where('project_id', '=', projectId)
+        .where('group_id', '=', groupId)
+        .where('user_id', '!=', userId)
+        .executeTakeFirst();
+      if (Number(n?.n ?? 0) >= s.groupMax) throw new ProjectError(`Diese Gruppe ist voll (höchstens ${s.groupMax})`, 409);
+    }
+    await this.moveMember(projectId, userId, groupId, Number.MAX_SAFE_INTEGER);
   }
 
   private async nextMemberPosition(projectId: number, groupId: number | null): Promise<number> {
