@@ -32,6 +32,7 @@ Im Betrieb liefert der Server die gebauten Oberflächen selbst aus (`client/out`
 | Stelle | Vorlage | Abweichung und Grund |
 |---|---|---|
 | Kanban der Gruppenbildung | brausa `CardKanban.svelte` | ohne Suche, Bahnen und Spaltenansichten (Karte = Person, wenige Karten); Säulen stehen am Handy untereinander, damit Lernende ohne seitliches Wischen wählen können; „Hierher wechseln“-Pfeil im Säulenkopf als Alternative zum Ziehen |
+| Einstellungsseite | Autogra.fi `einstellungen.html` | gleicher Aufbau (Voreinstellungen mit Leuchten, Akkordeons, ein Speichern, Export/Import), Farben aus brausa; Speichern-Leiste unten fest, damit sie bei langen Seiten erreichbar bleibt |
 | Code-Eingabe `/zugang` | Autogra.fi `zugang.html` | gleiche Bedienung (großes Codefeld, QR-Hinweis), aber Farben aus brausa, damit Collegare einheitlich aussieht |
 
 Gemeinsam bearbeiten: `http://localhost:3000/editor?new=docx&collab=test1&name=Anna` und in einem zweiten
