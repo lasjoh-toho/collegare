@@ -307,7 +307,7 @@ Autogra.fi-Kern ist PHP (Slim 4). Für Collegare schlage ich Node.js mit TypeScr
 
 - Echtzeit-Kollaboration braucht dauerhafte WebSocket-Verbindungen; der OnlyOffice-Client spricht socket.io, Yjs hat fertige Node-Server. PHP-FPM kann das nicht ohne Zusatzdienst.
 - Frontend und Backend teilen Typen und Validierung, und der Code aus office-website (`server.ts`, `types.ts`) lässt sich auf den Server übertragen.
-- Preis: Die LTI-, Rechte- und Protokoll-Logik aus autografi-kern wird nach TypeScript übertragen statt wiederverwendet (überschaubar, etwa die Klassen in `src/Lti`, `src/Access`, `src/Audit`), und der Betrieb läuft über Docker statt ZIP-Installation auf einem PHP-Webspace.
+- Preis: Die LTI-, Rechte- und Protokoll-Logik aus autografi-kern wird nach TypeScript übertragen statt wiederverwendet (überschaubar, etwa die Klassen in `src/Lti`, `src/Access`, `src/Audit`), und Node.js läuft als eigener Dienst auf der VM statt als PHP auf einem Webspace.
 
 Die Alternative wäre PHP wie Autogra.fi plus ein separater Node-Dienst nur für Kollaboration. Das spart die Übertragung, bedeutet aber zwei Laufzeitumgebungen in einer App.
 
@@ -342,7 +342,16 @@ Die Alternative wäre PHP wie Autogra.fi plus ein separater Node-Dienst nur für
 
 ### 7.7 Betrieb
 
-Docker Compose mit Caddy (statische Dateien, OnlyOffice-Assets, TLS), Collegare-Server, Worker (mit Pandoc, Quarto, Typst, x2t), MariaDB. Einrichtung im Browser nach dem Vorbild der Autogra.fi-Installationsseite (Administrationskonto, Moodle-Verbindung, KI-Dienst). Zielgröße für den Start: eine Schule, einige hundert gleichzeitige Nutzende, je Dokument 3–6 gleichzeitig Bearbeitende.
+**Ohne Docker, direkt auf der VM** (Entscheidung Jo, 1. November 2026: Autogra.fi läuft bereits in einer VM, eine zweite Verpackung bringt dort wenig). Ein GitHub-Workflow baut ein Release-Paket, das alles Fertige enthält: den Next.js-Export, die OnlyOffice-Assets und das native `x2t` (einmal beim Bauen aus dem `documentserver`-Image entnommen) sowie den übersetzten Server. Auf der VM laufen dann:
+
+- Node.js 22 als systemd-Dienste `collegare` (Server) und `collegare-worker`,
+- Caddy oder der vorhandene Webserver als Reverse-Proxy (statische Dateien, `/api`, `/lti`, `/socket.io`, TLS),
+- MariaDB (dieselbe Instanz wie Autogra.fi möglich, eigene Datenbank),
+- Pandoc, Quarto, Typst als Pakete bzw. Binärdateien für den Export (erst ab M5 nötig).
+
+Ein Installationsskript richtet das ein; die Einrichtung im Browser folgt dem Vorbild der Autogra.fi-Installationsseite (Administrationskonto, Moodle-Verbindung, KI-Dienst). Updates = neues Paket entpacken, Dienst neu starten, Migrationen laufen beim Start. Ein Docker-Compose-Setup kann zusätzlich für Schulträger angeboten werden, die lieber Container betreiben, ist aber nicht Voraussetzung.
+
+Der Server ist leicht, weil die Editoren und die Umwandlung im Browser laufen; Collegare kann auf derselben VM wie Autogra.fi laufen. Zielgröße für den Start: eine Schule, einige hundert gleichzeitige Nutzende, je Dokument 3–6 gleichzeitig Bearbeitende.
 
 ### 7.8 Plattformunabhängige App (langfristiges Ziel)
 
@@ -394,7 +403,7 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 ## 10. Offene Fragen an Jo
 
 1. **Backend-Sprache:** TypeScript/Node (Empfehlung, Abschnitt 7.4) oder PHP wie Autogra.fi plus separater Kollaborationsdienst?
-2. **Betrieb:** Ist Docker auf dem Zielserver möglich (der Autogra.fi-Server ist ein Proxmox-Gast), oder muss es wie Autogra.fi ohne Konsole auf Webspace laufen? Letzteres würde Echtzeit-Kollaboration stark einschränken.
+2. **Betrieb:** geklärt, direkt auf der VM ohne Docker (Abschnitt 7.7). Offen: dieselbe VM wie Autogra.fi oder eine eigene?
 3. **Gruppen aus Moodle:** Reicht die Gruppenbildung in Collegare, oder ist der Import vorhandener Moodle-Gruppen Pflicht (dann Webservice-Token oder Plugin-Erweiterung)?
 4. **Sperr-Granularität:** Reicht „Abschnitt“ und „Folie“, oder werden einzelne Absätze innerhalb eines Abschnitts wirklich gebraucht?
 5. **Tippfluss-Analyse:** Soll die Lehrkraft die Hinweise an Lernende sehen, oder nur die Lernenden selbst?
