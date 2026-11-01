@@ -49,4 +49,4 @@ Browser `…&name=Ben`. Ergebnisse des ersten Tests: [docs/m0-spike.md](docs/m0-
 
 ## Lizenz
 
-Kern (`server/`, `client/`) nicht-kommerziell, siehe `LICENSE`; Office-Teil `web/` AGPL-3.0 (`web/LICENSE.txt`). Einzelheiten in `LIZENZEN.md`.
+Kern (`server/`, `client/`) nicht-kommerziell, siehe `LICENSE`; Office-Teil `web/` AGPL-3.0 (`web/LICENSE.txt`). Schulen dürfen Collegare ohne Genehmigung auf eigenen Servern installieren; auf Servern von Unternehmen, die ein Schulträger beauftragt hat, nur mit Genehmigung. Einzelheiten in `LIZENZEN.md`.

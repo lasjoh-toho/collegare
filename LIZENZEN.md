@@ -7,6 +7,15 @@
 | OnlyOffice-Dateien in `web/public/v*/` (nicht im Repository, per Skript geholt) | AGPL-3.0 mit den Zusatzbedingungen von Ascensio System SIA | Hinweise und Logos von OnlyOffice bleiben unverändert erhalten |
 | Bibliotheken über npm (Fastify, socket.io, Kysely, zod, KaTeX, JSZip …) | jeweils eigene, freie Lizenz (MIT, Apache-2.0, BSD) | in `package.json` aufgeführt |
 
+## Installation auf Servern
+
+| Wo Collegare läuft | Genehmigung nötig? |
+|---|---|
+| Auf eigenen Servern einer Schule | nein |
+| Auf Servern eines Unternehmens, das ein Schulträger beauftragt hat (Hosting- oder IT-Dienstleister) | ja, vorherige schriftliche Genehmigung von `lasjoh-toho` |
+
+Die Genehmigung ist auch dann nötig, wenn der Einsatz an der Schule selbst nicht kommerziell ist. Anfragen über GitHub-Issues oder direkt an den Repository-Inhaber.
+
 ## Trennung von Kern und Office-Teil
 
 Der Kern enthält keinen Code aus OnlyOffice oder office-website. Er bindet die Editoren nur als eigenständiges Programm ein:
