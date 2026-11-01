@@ -1,0 +1,56 @@
+# Baut das Installationspaket (Server, Oberfläche, Office-Editoren, Node 22) und hängt es an ein GitHub-Release.
+# Auslösen: Actions → Release → Run workflow, Version eingeben (z. B. 0.1.0).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version ohne „v“, z. B. 0.1.0
+        required: true
+      prerelease:
+        description: Als Vorabversion markieren
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Platz schaffen (OnlyOffice-Image ist groß)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: OnlyOffice-Dateien holen
+        run: scripts/onlyoffice-assets.sh 9.3.1 1 && docker image prune -af
+
+      - name: Typprüfung Office-Editoren und Oberfläche
+        run: |
+          (cd web && pnpm install --frozen-lockfile && npx tsc --noEmit)
+          (cd client && pnpm install --frozen-lockfile && npx tsc --noEmit)
+
+      - name: Paket bauen (mit Tests)
+        run: scripts/build-release.sh "${{ inputs.version }}"
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.version }}
+        run: |
+          NOTES=docs/releases/$V.md
+          [ -f "$NOTES" ] || { echo "Installation: docs/installation.md" > /tmp/notes.md; NOTES=/tmp/notes.md; }
+          PRE=""; [ "${{ inputs.prerelease }}" = "true" ] && PRE="--prerelease"
+          gh release create "v$V" --target "$GITHUB_SHA" --title "Collegare $V" --notes-file "$NOTES" $PRE \
+            "dist-release/collegare-$V-linux-x64.tar.gz" "dist-release/collegare-$V-linux-x64.tar.gz.sha256"

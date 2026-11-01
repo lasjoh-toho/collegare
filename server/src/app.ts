@@ -1,9 +1,9 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import fstatic from '@fastify/static';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import Fastify, { type FastifyInstance } from 'fastify';
+import { createReadStream, existsSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { Server, type Socket } from 'socket.io';
 import { CoServer, type CoServerOptions } from './collab/coServer.js';
 import { COOKIE, sessionHook } from './http/auth.js';
@@ -76,7 +76,28 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
   if (opts.corsOrigin) await http.register(cors, { origin: opts.corsOrigin, credentials: true });
 
   if (opts.officeDir && existsSync(opts.officeDir)) {
-    await http.register(fstatic, { root: resolve(opts.officeDir), prefix: '/office/', decorateReply: false });
+    await http.register(fstatic, {
+      root: resolve(opts.officeDir),
+      prefix: '/office/',
+      decorateReply: false,
+      // x2t liegt brotli-komprimiert vor (wie in office-website, public/_headers)
+      setHeaders: (res, path) => {
+        const versioned = /[\\/]x2t-[^\\/]+[\\/]/.test(path);
+        if (versioned || /[\\/]x2t[\\/]x2t\.wasm$/.test(path)) res.header('Content-Encoding', 'br');
+        if (versioned || /[\\/]v\d[^\\/]*[\\/]/.test(path)) res.header('Cache-Control', 'public, max-age=31556952, immutable');
+      },
+    });
+  }
+  if (opts.officeDir && existsSync(opts.officeDir)) {
+    // Seiten des Exports liegen als editor.html neben dem Ordner editor/; /office/editor soll die Seite liefern
+    const root = resolve(opts.officeDir);
+    for (const f of readdirSync(root)) {
+      if (!f.endsWith('.html')) continue;
+      const page = f.slice(0, -5);
+      const send = (_req: unknown, reply: FastifyReply) => reply.type('text/html; charset=utf-8').send(createReadStream(join(root, f)));
+      http.get(`/office/${page}`, send);
+      http.get(`/office/${page}/`, send);
+    }
   }
   if (opts.clientDir && existsSync(opts.clientDir)) {
     await http.register(fstatic, { root: resolve(opts.clientDir), prefix: '/', extensions: ['html'], index: ['index.html'] });

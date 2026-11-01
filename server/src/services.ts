@@ -49,7 +49,7 @@ export interface Services {
 }
 
 export async function createServices(config: Config, now: () => number = Date.now, fetchFn: typeof fetch = fetch): Promise<Services> {
-  const db = createDb(config.databaseUrl);
+  const db = await createDb(config.databaseUrl);
   await migrate(db);
   const users = new Users(db, now);
   const contexts = new Contexts(db, now);

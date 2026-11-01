@@ -1,5 +1,4 @@
 import { Kysely, MysqlDialect, SqliteDialect } from 'kysely';
-import SQLite from 'better-sqlite3';
 import { createPool } from 'mysql2';
 import type { Database } from './schema.js';
 
@@ -8,8 +7,12 @@ export type Db = Kysely<Database>;
 /**
  * DATABASE_URL: mysql://user:pass@host:3306/collegare (Betrieb, MariaDB) oder sqlite:pfad bzw. sqlite::memory: (Tests).
  */
-export function createDb(url: string): Db {
+export async function createDb(url: string): Promise<Db> {
   if (url.startsWith('sqlite:')) {
+    // SQLite nur für Entwicklung und Tests; im Release-Paket fehlt das native Modul absichtlich
+    const { default: SQLite } = await import('better-sqlite3').catch(() => {
+      throw new Error('SQLite ist in diesem Paket nicht enthalten. Bitte DATABASE_URL=mysql://… (MariaDB) setzen.');
+    });
     const file = url.slice('sqlite:'.length) || ':memory:';
     const sqlite = new SQLite(file);
     sqlite.pragma('journal_mode = WAL');

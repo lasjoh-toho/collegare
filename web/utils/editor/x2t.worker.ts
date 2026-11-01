@@ -12,7 +12,8 @@ import { AvsFileType, X2tConvertParams, X2tConvertResult } from "./types";
 /* eslint-disable no-restricted-globals */
 
 // Base URL for x2t files - hardcoded since blob URL workers can't determine origin
-const BASE_URL = self.location.origin + "/x2t-1/";
+// Collegare: Unterordner-Betrieb (NEXT_PUBLIC_BASE_PATH wird beim Bauen eingesetzt)
+const BASE_URL = self.location.origin + (process.env.NEXT_PUBLIC_BASE_PATH || "") + "/x2t-1/";
 // const BASE_URL = self.location.origin + "/wasm/x2t/";
 
 let x2t: any = null;

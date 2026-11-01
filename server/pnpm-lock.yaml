@@ -20,9 +20,6 @@ importers:
       '@fastify/static':
         specifier: ^10.1.8
         version: 10.1.8
-      better-sqlite3:
-        specifier: ^13.0.3
-        version: 13.0.3
       fastify:
         specifier: ^5.12.7
         version: 5.12.7
@@ -60,6 +57,10 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+    optionalDependencies:
+      better-sqlite3:
+        specifier: ^13.0.3
+        version: 13.0.3
 
 packages:
 
@@ -1472,6 +1473,7 @@ snapshots:
   better-sqlite3@13.0.3:
     dependencies:
       node-addon-api: 8.9.2
+    optional: true
 
   brace-expansion@5.0.12:
     dependencies:
@@ -1766,7 +1768,8 @@ snapshots:
 
   negotiator@0.6.3: {}
 
-  node-addon-api@8.9.2: {}
+  node-addon-api@8.9.2:
+    optional: true
 
   object-assign@4.1.1: {}
 

@@ -117,5 +117,5 @@ export class X2tConverter {
 }
 
 export const converter = new X2tConverter({
-  scriptUrl: "/x2t/x2t.js",
+  scriptUrl: (process.env.NEXT_PUBLIC_BASE_PATH || "") + "/x2t/x2t.js",
 });

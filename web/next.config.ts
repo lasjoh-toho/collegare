@@ -18,6 +18,8 @@ const withNextIntl = createNextIntlPlugin({
 const nextConfig: NextConfig = {
   /* config options here */
   output: "export",
+  // Collegare: im Betrieb unter /collegare/office (NEXT_PUBLIC_BASE_PATH beim Bauen setzen)
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   images: {
     unoptimized: true,
   },

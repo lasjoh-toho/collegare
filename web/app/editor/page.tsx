@@ -172,8 +172,8 @@ export default function Page() {
               },
             },
             logo: {
-              image: location.origin + "/logo-name_black.svg",
-              imageDark: location.origin + "/logo-name_white.svg",
+              image: location.origin + (process.env.NEXT_PUBLIC_BASE_PATH || "") + "/logo-name_black.svg",
+              imageDark: location.origin + (process.env.NEXT_PUBLIC_BASE_PATH || "") + "/logo-name_white.svg",
               url: location.origin,
             },
           },

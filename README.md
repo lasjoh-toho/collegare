@@ -15,6 +15,12 @@ Konzept: [docs/konzept.md](docs/konzept.md)
 | `scripts/` | Hilfsskripte, z. B. OnlyOffice-Dateien holen |
 | `docs/` | Konzept, Ergebnisse der Meilensteine |
 
+## Installieren
+
+Release-Paket mit allem Nötigen (auch Node.js) für eine VM mit systemd, Apache und MariaDB:
+`sudo ./install.sh --url https://server.schule.de/collegare --admin <kürzel>`. Einzelheiten in
+[docs/installation.md](docs/installation.md), Moodle-Anbindung in [docs/moodle.md](docs/moodle.md).
+
 ## Entwickeln
 
 ```bash

@@ -191,8 +191,10 @@ export class EditorServer {
     if (!this.collab || this.remote) return;
     const { url, docId, kind, user } = this.collab;
     const remote = connectIo(url + "/collab", {
-      path: "/socket.io",
+      // Unterordner-Betrieb (/collegare): socket.io liegt unter <Basis>/socket.io
+      path: process.env.NEXT_PUBLIC_COLLAB_PATH || "/socket.io",
       transports: ["websocket"],
+      withCredentials: true,
       query: { docId, kind, userId: user.id, userName: user.name },
     });
     remote.on("message", async (msg: Record<string, unknown>) => {
