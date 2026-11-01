@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import fstatic from '@fastify/static';
 import { createReadStream, existsSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { Server, type Socket } from 'socket.io';
 import { CoServer, type CoServerOptions } from './collab/coServer.js';
 import { COOKIE, sessionHook } from './http/auth.js';
@@ -80,6 +80,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
       root: resolve(opts.officeDir),
       prefix: '/office/',
       decorateReply: false,
+      index: false,
       // x2t liegt brotli-komprimiert vor (wie in office-website, public/_headers)
       setHeaders: (res, path) => {
         const versioned = /[\\/]x2t-[^\\/]+[\\/]/.test(path);
@@ -94,7 +95,12 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     for (const f of readdirSync(root)) {
       if (!f.endsWith('.html')) continue;
       const page = f.slice(0, -5);
-      const send = (_req: unknown, reply: FastifyReply) => reply.type('text/html; charset=utf-8').send(createReadStream(join(root, f)));
+      const send = async (req: FastifyRequest, reply: FastifyReply) => {
+        // Startseite des offenen Office nur, wenn der Rahmen es erlaubt oder jemand angemeldet ist (Konzept 7.10)
+        if (page === 'index' && s && !req.session && !(await s.frame.get()).openOffice) return reply.redirect(s.config.appUrl + '/', 302);
+        return reply.type('text/html; charset=utf-8').send(createReadStream(join(root, f)));
+      };
+      if (page === 'index') http.get('/office/', send);
       http.get(`/office/${page}`, send);
       http.get(`/office/${page}/`, send);
     }

@@ -43,3 +43,30 @@ describe('statische Dateien', () => {
     expect((await app.http.inject({ url: '/projekt/?id=1' })).body).toBe('projekt');
   });
 });
+
+describe('offenes Office nach Rahmen', () => {
+  it('leitet ohne Anmeldung zur Startseite, solange der Rahmen es nicht erlaubt', async () => {
+    const { createServices } = await import('../src/services.js');
+    const { DEFAULT_FRAME } = await import('../src/projects/settings.js');
+    const dir = mkdtempSync(join(tmpdir(), 'cg-oo-'));
+    writeFileSync(join(dir, 'index.html'), 'office-start');
+    writeFileSync(join(dir, 'editor.html'), 'editor-seite');
+    const s = await createServices({ databaseUrl: 'sqlite::memory:', appUrl: 'http://localhost/collegare', cookieSecure: false, accessCodeDays: 14 });
+    const a = await buildApp({ services: s, officeDir: dir });
+    try {
+      const r = await a.http.inject({ url: '/office/' });
+      expect(r.statusCode).toBe(302);
+      expect(r.headers.location).toBe('http://localhost/collegare/');
+      // angemeldet geht es auch ohne Freigabe
+      await s.accounts.create('lk', 'Lehrkraft', 'passwort-123');
+      const t = (await a.http.inject({ method: 'POST', url: '/api/auth/login', payload: { login: 'lk', password: 'passwort-123' } })).json().token;
+      expect((await a.http.inject({ url: '/office/', headers: { authorization: 'Bearer ' + t } })).body).toBe('office-start');
+      // der Editor selbst bleibt erreichbar (Einbettung in Projekte)
+      expect((await a.http.inject({ url: '/office/editor' })).statusCode).toBe(200);
+      await s.frame.set({ ...DEFAULT_FRAME, openOffice: true });
+      expect((await a.http.inject({ url: '/office/' })).body).toBe('office-start');
+    } finally {
+      await a.http.close();
+    }
+  });
+});

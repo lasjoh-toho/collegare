@@ -50,6 +50,18 @@ export function authRoutes(app: FastifyInstance, s: Services) {
     };
   });
 
+  /** Ansicht als Lehrkraft beenden: zurück zum eigenen Admin-Konto. */
+  app.post('/api/auth/unimpersonate', async (req, reply) => {
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    if (sess.impersonatorId === null) return reply.code(400).send({ error: 'Keine fremde Ansicht aktiv' });
+    if (req.sessionToken) await s.sessions.destroy(req.sessionToken);
+    const { token, expiresAt } = await s.sessions.create(sess.impersonatorId);
+    setSessionCookie(reply, s, token, expiresAt);
+    await s.audit.append({ actorId: sess.impersonatorId, action: 'admin.impersonate_end', data: { userId: sess.userId } });
+    return { ok: true, token, expiresAt };
+  });
+
   /** Zugang für Lernende per QR-Geheimnis oder Code (Seite /zugang). */
   app.post('/api/access/redeem', async (req, reply) => {
     const body = RedeemBody.safeParse(req.body);

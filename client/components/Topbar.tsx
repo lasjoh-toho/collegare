@@ -7,6 +7,10 @@ export function Topbar({ me, title, children }: { me: Me | null; title?: string;
     await post('/api/auth/logout').catch(() => {});
     location.href = href('/');
   }
+  async function back() {
+    await post('/api/auth/unimpersonate').catch(() => {});
+    location.href = href('/verwaltung/lehrkraefte/');
+  }
   return (
     <header className="topbar">
       <a className="brand" href={href('/')}>
@@ -16,6 +20,11 @@ export function Topbar({ me, title, children }: { me: Me | null; title?: string;
       {children}
       <div className="right">
         {me?.impersonated && <span className="chip" style={{ background: 'var(--attr-soft)', color: 'var(--attr)' }}>Ansicht als {me.name}</span>}
+        {me?.impersonated && (
+          <button className="btn" onClick={back}>
+            Zurück zur Verwaltung
+          </button>
+        )}
         {me?.admin && !me.projectId && (
           <a className="btn" href={href('/verwaltung/')}>
             Verwaltung

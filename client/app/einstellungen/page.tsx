@@ -10,6 +10,7 @@ import { Topbar } from '@/components/Topbar';
 import { ApiError, get, href, patch } from '@/lib/api';
 import type { Frame, ProjectSettings } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
+import { DOC_LABELS, EXPORT_LABELS, IMPORT_LABELS, PHASE_LABELS } from '@/lib/labels';
 import e from './einstellungen.module.css';
 
 interface Page {
@@ -20,37 +21,6 @@ interface Page {
   frame: Frame;
   presets: { id: string; title: string; patch: Partial<ProjectSettings> }[];
 }
-
-const DOC_LABELS: Record<string, string> = {
-  section: 'Abschnitt (Text)',
-  slides: 'Präsentation',
-  handout: 'Handout',
-  sheet: 'Tabelle',
-  pdf: 'PDF ansehen und kommentieren',
-  formula: 'Formeln',
-};
-const IMPORT_LABELS: Record<string, string> = {
-  text: 'Textdokumente (DOCX, ODT, RTF, TXT, MD)',
-  slides: 'Präsentationen (PPTX, ODP, PPT)',
-  sheets: 'Tabellen (XLSX, ODS, CSV)',
-  pdf: 'PDF',
-  images: 'Bilder (JPG, PNG, HEIC)',
-  bib: 'Literatur (BibTeX, RIS)',
-};
-const EXPORT_LABELS: Record<string, string> = {
-  docx: 'Word (DOCX)',
-  pdf: 'PDF',
-  pptx: 'PowerPoint (PPTX)',
-  bento: 'Präsentation als HTML (Bento)',
-  quarto: 'Ausarbeitung im Tufte-Stil (HTML/PDF)',
-};
-const PHASE_LABELS: Record<string, string> = {
-  groups: 'Gruppenbildung',
-  orientation: 'Orientierung',
-  research: 'Recherche',
-  drafting: 'Ausarbeitung',
-  presentation: 'Präsentation',
-};
 
 const toLocal = (ms: number | null) => (ms === null ? '' : new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
 const fromLocal = (v: string) => (v ? new Date(v).getTime() : null);

@@ -82,6 +82,12 @@ describe('Anmeldung', () => {
     const token = /cg_session=([^;]+)/.exec(res.headers.get('set-cookie') ?? '')![1];
     const me = await call('GET', '/api/me', token);
     expect(me.json).toMatchObject({ name: 'Frau Müller', impersonated: true, teacher: true });
+    // zurück zur Administration; die fremde Sitzung ist danach ungültig
+    const back = await call('POST', '/api/auth/unimpersonate', token);
+    expect(back.status).toBe(200);
+    expect((await call('GET', '/api/me', back.json.token)).json).toMatchObject({ admin: true, impersonated: false });
+    expect((await call('GET', '/api/me', token)).status).toBe(401);
+    expect((await call('POST', '/api/auth/unimpersonate', at)).status).toBe(400);
   });
 });
 
