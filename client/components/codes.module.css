@@ -1,0 +1,18 @@
+.modal { width: min(820px, calc(100% - 32px)); }
+.list { display: flex; flex-direction: column; max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.item:last-child { border-bottom: 0; }
+.slips { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+.slip { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px dashed var(--fg-faint); border-radius: 10px; break-inside: avoid; background: #fff; color: #1c1c1a; }
+.slip img { width: 110px; height: 110px; flex: none; }
+.slipName { font-weight: 700; font-size: 15px; }
+.slipProject { font-size: 12px; color: #6b6b66; }
+.slipCode { margin: 6px 0; font-family: var(--mono); font-size: 24px; font-weight: 800; letter-spacing: 0.25em; }
+.slipHint { font-size: 10.5px; color: #6b6b66; }
+
+@media print {
+  :global(body) * { visibility: hidden; }
+  .slips, .slips * { visibility: visible; }
+  .slips { position: absolute; left: 0; top: 0; width: 100%; grid-template-columns: 1fr 1fr; }
+  .modal { box-shadow: none; overflow: visible; max-height: none; }
+}

@@ -9,3 +9,7 @@ web/public/v*-*/
 *.log
 *.sqlite
 *.sqlite-*
+client/.next/
+client/out/
+client/next-env.d.ts
+client/tsconfig.tsbuildinfo

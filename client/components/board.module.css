@@ -1,0 +1,48 @@
+/* Nach brausa CardKanban.svelte */
+.wrap { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hint { margin: 0 14px 10px; color: var(--fg-muted); }
+.board { overflow: auto; padding: 0 14px 14px; }
+.cols { display: flex; align-items: flex-start; gap: 12px; }
+.col { flex: none; width: 250px; display: flex; flex-direction: column; }
+.cols > .add { flex: none; width: 200px; }
+/* Handy: Säulen untereinander, Karten bleiben ziehbar */
+@media (max-width: 640px) {
+  .cols { flex-direction: column; align-items: stretch; }
+  .col, .cols > .add { width: auto; }
+  .cell { min-height: 56px; }
+}
+.colhead {
+  position: relative; display: flex; align-items: center; gap: 6px; padding: 9px 10px; border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--cc) 16%, var(--bg-sunken)); font-weight: 600;
+}
+.colhead.add { background: none; }
+.colhead.add :global(.input) { width: 100%; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cc); flex: none; }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.titleInput { flex: 1; min-width: 0; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--accent); background: var(--bg-elev); font-weight: 600; outline: none; }
+.n { color: var(--fg-faint); font-weight: 500; font-size: 12px; }
+.colset { top: calc(100% + 4px); right: 0; font-weight: 400; }
+.swatches { display: flex; gap: 6px; }
+.sw { width: 16px; height: 16px; border-radius: 50%; }
+.swOn { box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 3.5px var(--fg-muted); }
+.cell {
+  display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 6px 8px 10px; border-radius: 0 0 10px 10px;
+  background: color-mix(in srgb, var(--cc) 7%, var(--bg-sunken));
+}
+.cell.over { box-shadow: inset 0 0 0 2px var(--accent); }
+.card {
+  padding: 8px 10px; border-radius: 8px; background: var(--bg-elev); border-left: 3px solid var(--c);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); cursor: pointer; outline: none;
+}
+.card.draggable { cursor: grab; }
+.card:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.card.me { background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev)); }
+.card.ghost { opacity: 0.4; }
+.card.before { box-shadow: 0 -3px 0 var(--accent); }
+.endMark { height: 3px; border-radius: 2px; background: var(--accent); }
+.t { font-weight: 600; }
+.x { margin-top: 3px; font-size: 12px; color: var(--fg-muted); }
+.float {
+  position: fixed; z-index: 50; padding: 6px 10px; border-radius: 8px; background: var(--bg-elev);
+  box-shadow: var(--shadow); pointer-events: none; font-weight: 600;
+}

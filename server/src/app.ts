@@ -1,4 +1,8 @@
 import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import fstatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Server, type Socket } from 'socket.io';
 import { CoServer, type CoServerOptions } from './collab/coServer.js';
@@ -23,6 +27,10 @@ export interface AppOptions {
   services?: Services;
   /** Test-Endpunkte unter /api/spike (Fertig-Sperre von Hand setzen). Nie im Betrieb. */
   spike?: boolean;
+  /** Statischer Export der Projektoberfläche (client/out), ausgeliefert unter / */
+  clientDir?: string;
+  /** Statischer Export der Office-Editoren (web/out), ausgeliefert unter /office/ */
+  officeDir?: string;
 }
 
 /** Sitzungstoken aus dem Handshake: zuerst auth.token (App), dann Cookie (Browser). */
@@ -62,6 +70,16 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
   const co = new CoServer(io, { log: (m, d) => http.log.info({ d }, m), authorize, ...opts.co });
 
   http.get('/api/health', async () => ({ ok: true }));
+
+  // Entwicklung: Oberfläche läuft auf einem eigenen Port (Next-Dev-Server) und schickt das Cookie mit
+  if (opts.corsOrigin) await http.register(cors, { origin: opts.corsOrigin, credentials: true });
+
+  if (opts.officeDir && existsSync(opts.officeDir)) {
+    await http.register(fstatic, { root: resolve(opts.officeDir), prefix: '/office/', decorateReply: false });
+  }
+  if (opts.clientDir && existsSync(opts.clientDir)) {
+    await http.register(fstatic, { root: resolve(opts.clientDir), prefix: '/', extensions: ['html'], index: ['index.html'] });
+  }
 
   if (s) {
     await http.register(cookie);

@@ -6,7 +6,10 @@ const host = process.env.HOST ?? '127.0.0.1';
 const cors = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean);
 
 const services = await createServices(configFromEnv());
-const { http } = await buildApp({ logger: true, corsOrigin: cors, services, spike: process.env.SPIKE === '1' });
+const { http } = await buildApp({ logger: true, corsOrigin: cors, services, spike: process.env.SPIKE === '1',
+  clientDir: process.env.CLIENT_DIR ?? '../client/out',
+  officeDir: process.env.OFFICE_DIR ?? '../web/out',
+});
 
 // abgelaufene Sitzungen, Codes und LTI-Zustände stündlich aufräumen
 setInterval(() => void services.sessions.cleanup().catch((e) => http.log.warn(e)), 3_600_000).unref();

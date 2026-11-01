@@ -1,0 +1,17 @@
+.code {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--accent);
+  outline: none;
+}
+.code:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.hello { text-align: center; font-size: 1.1rem; margin: 10px 0 !important; }
+.check { display: block; font-size: 2.4rem; color: var(--ok); margin-bottom: 6px; }
