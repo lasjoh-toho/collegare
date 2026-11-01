@@ -120,6 +120,9 @@ export default function MindmapPage() {
           Gruppen
         </a>
         <span className={`${p.phase} ${p.active}`}>Orientierung</span>
+        <a className={p.phase} href={href(`/projekt/ausarbeitung/?id=${id}${scope ? '&bereich=' + scope : ''}`)}>
+          Ausarbeitung
+        </a>
         {join?.scopes && join.scopes.length > 1 && (
           <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Mindmap welcher Gruppe?">
             {join.scopes.map((x) => (

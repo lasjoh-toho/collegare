@@ -103,9 +103,9 @@ export default function Projekt() {
           <span className={p.phase} title="folgt">
             Recherche
           </span>
-          <span className={p.phase} title="folgt">
+          <a className={p.phase} href={href(`/projekt/ausarbeitung/?id=${project.id}`)} title="Abschnitte schreiben">
             Ausarbeitung
-          </span>
+          </a>
           <span className={p.phase} title="folgt">
             Präsentation
           </span>

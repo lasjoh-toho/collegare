@@ -142,7 +142,8 @@ export default function Page() {
         document: {
           fileType: doc.fileType,
           key: doc.key,
-          title: doc.title,
+          // Collegare: Titel des Abschnitts aus der Projektoberfläche
+          title: (collabDoc && searchParams.get("title")) || doc.title,
           url: doc.url,
 
           permissions: {
@@ -188,7 +189,8 @@ export default function Page() {
           },
           onDocumentStateChange: (e: { data: boolean; target: unknown }) => {
             console.log("Document state change", e);
-            if (e.data) {
+            // gemeinsame Dokumente liegen auf dem Server, kein Hinweis beim Verlassen
+            if (e.data && !collabDoc) {
               isDirty.current = true;
             }
           },
