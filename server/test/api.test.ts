@@ -208,3 +208,49 @@ describe('Projekte und Kanban', () => {
     expect((await s.audit.verify()).ok).toBe(false);
   });
 });
+
+describe('Mindmap in Echtzeit', () => {
+  const emit = (sock: Socket, ev: string, msg: unknown) => new Promise<J>((r) => sock.emit(ev, msg, r));
+  const connect = (token: string) => {
+    const sock = ioc(base + '/project', { path: '/socket.io', auth: { token }, transports: ['websocket'], forceNew: true });
+    sockets.push(sock);
+    return sock;
+  };
+
+  it('nur die eigene Gruppe und die Lehrkraft, Änderungen kommen bei allen an', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0], ids[2]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const clara = (await call('POST', '/api/access/redeem', undefined, { code: codes[1].code })).json.token as string;
+
+    const sa = connect(anna);
+    const joined = await emit(sa, 'map:join', { projectId: project });
+    expect(joined).toMatchObject({ ok: true, role: 'student', scope: 'g' + g1, scopes: [{ scope: 'g' + g1, title: 'Inflation' }] });
+    expect((joined.people as J[]).map((p) => p.name).sort()).toEqual(['Anna', 'Ben']);
+
+    const st = connect(t);
+    const tj = await emit(st, 'map:join', { projectId: project, scope: 'g' + g1 });
+    expect(tj.scopes).toHaveLength(2);
+    const seen = new Promise<J>((r) => st.on('map', r));
+
+    const ok = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'karte1', kind: 'card', title: 'Hyperinflation', x: 10, y: 10, w: 160, h: 90, owner: ids[1] } } });
+    expect(ok).toMatchObject({ ok: true, version: 1 });
+    const m = await seen;
+    expect(m.map.cards.karte1).toMatchObject({ title: 'Hyperinflation', owner: ids[1] });
+
+    // Clara (andere Gruppe) darf weder sehen noch ändern; Person außerhalb der Gruppe nicht zuordnen
+    const sc = connect(clara);
+    expect((await emit(sc, 'map:join', { projectId: project, scope: 'g' + g1 })).scope).toBeNull();
+    expect((await emit(sc, 'map:join', { projectId: project })).scope).toBe('g' + g2);
+    expect((await emit(sc, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'remove', ids: ['karte1'] } })).ok).toBe(false);
+    const wrong = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'update', id: 'karte1', patch: { owner: ids[2] } } });
+    expect(wrong).toMatchObject({ ok: false, error: 'Diese Person gehört nicht zur Gruppe' });
+    expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'x', kind: 'card' } } })).error).toBe('Ungültige Änderung');
+  });
+});
+

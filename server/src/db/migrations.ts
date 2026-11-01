@@ -188,6 +188,21 @@ const migrations: Record<string, Migration> = {
   },
 };
 
+// Mindmap je Gruppe (oder je Person im Einzelprojekt), als JSON mit Versionszähler
+migrations['0002_mindmap'] = {
+  async up(db) {
+    await db.schema
+      .createTable('maps')
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(32)', (c) => c.notNull())
+      .addColumn('data', isMysql(db) ? sql`longtext` : 'text', (c) => c.notNull())
+      .addColumn('version', 'integer', (c) => c.notNull())
+      .addColumn('updated_at', ms, (c) => c.notNull())
+      .addPrimaryKeyConstraint('maps_pk', ['project_id', 'scope'])
+      .execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

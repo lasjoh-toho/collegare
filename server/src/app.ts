@@ -11,6 +11,7 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
 import { ltiRoutes } from './routes/lti.js';
+import { mapSocket } from './routes/maps.js';
 import type { Services } from './services.js';
 
 export interface App {
@@ -145,6 +146,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
         socket.emit('board', await s.projects.board(id));
       });
     });
+    mapSocket(nsp, s);
 
     http.addHook('onClose', async () => {
       await s.db.destroy();

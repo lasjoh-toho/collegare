@@ -132,6 +132,15 @@ export interface YdocsTable {
   updated_at: Ms;
 }
 
+export interface MapsTable {
+  project_id: number;
+  /** g<Gruppen-ID> oder u<Personen-ID> (Einzelprojekt) */
+  scope: string;
+  data: string;
+  version: number;
+  updated_at: Ms;
+}
+
 export interface AuditLogTable {
   id: Generated<number>;
   time: Ms;
@@ -163,6 +172,7 @@ export interface Database {
   projects: ProjectsTable;
   groups: GroupsTable;
   group_members: GroupMembersTable;
+  maps: MapsTable;
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
   kv: KeyValueTable;
