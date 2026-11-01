@@ -337,12 +337,30 @@ Die Alternative wäre PHP wie Autogra.fi plus ein separater Node-Dienst nur für
 - Gruppenarbeit ist personenbezogen; eine pseudonymisierte Korrektur wie in Autogra.fi ist hier nicht sinnvoll (Zielkonflikt 2.5 der Ausschreibungsanalyse). Bei der Kopplung mit Autogra.fi gilt das für Collegare-Abgaben ausdrücklich.
 - Aufbewahrungsklassen: Inhalte bis Projektende + Frist (Schule stellt ein), Tippfluss-Merkmale kürzer (Standard: bis zur Endbewertung), Prüfprotokoll eigene Frist; Löschjournal, damit Löschungen nach einem Restore erneut greifen.
 - Auskunft und Export je Person (DSGVO Art. 15/20): alle eigenen Beiträge, Logbuch und Feedback als ZIP.
-- QR-Geheimnisse im URL-Fragment, Rate-Limits, kurzlebige Sitzungstoken für den Kollaborationskanal.
+- QR-Geheimnisse im URL-Fragment, Rate-Limits, kurzlebige Sitzungstoken für den Kollaborationskanal; Token-Anmeldung auch für eine spätere App (Abschnitt 7.8).
 - Barrierefreiheit: WCAG 2.2 AA als Ziel; für jede Zieh-Interaktion gibt es eine Tastatur-/Menü-Alternative.
 
 ### 7.7 Betrieb
 
 Docker Compose mit Caddy (statische Dateien, OnlyOffice-Assets, TLS), Collegare-Server, Worker (mit Pandoc, Quarto, Typst, x2t), MariaDB. Einrichtung im Browser nach dem Vorbild der Autogra.fi-Installationsseite (Administrationskonto, Moodle-Verbindung, KI-Dienst). Zielgröße für den Start: eine Schule, einige hundert gleichzeitige Nutzende, je Dokument 3–6 gleichzeitig Bearbeitende.
+
+### 7.8 Plattformunabhängige App (langfristiges Ziel)
+
+Collegare soll langfristig auch als installierbare App auf Handy, Tablet und Rechner laufen. Grundsatz: **eine Web-Codebasis**, keine eigene native App, weil die OnlyOffice-Editoren nur als Web-Code existieren.
+
+| Stufe | Umsetzung | Nutzen |
+|---|---|---|
+| 1. PWA (ab M2) | installierbare Web-App, Notizen offline in IndexedDB, Kamera über den Browser | deckt den Großteil ab, ohne App-Stores |
+| 2. Capacitor (langfristig) | derselbe Next.js-Export als iOS- und Android-App | Teilen-Menü („an Collegare senden“ für Fotos und Links), verlässlicher Offline-Speicher, Push-Hinweise (z. B. neues Zwischenfeedback), bessere Kamera; der Autogra.fi-Scanner kann mit hinein |
+| 3. Tauri (nur bei Bedarf) | Desktop-App für Windows, macOS, Linux | meist reicht dort die PWA |
+
+Damit das ohne Umbau möglich bleibt, gilt **von Anfang an**:
+
+- Anmeldung über Tokens, nicht nur über Cookies. Die App startet nicht aus Moodle, sondern per QR-Code, Zugangscode oder Login im Systembrowser.
+- Die Serveradresse ist einstellbar, weil jede Schule eine eigene Instanz betreibt; ein Schul-QR-Code kann sie setzen.
+- Jede Funktion läuft über die REST-API bzw. den Kollaborationskanal, nichts nur über serverseitig gerenderte Seiten.
+
+Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 gemessen); App-Store-Konten, Prüfungen und Updates sind laufender Aufwand. Langfristig liegt eine gemeinsame Schul-App für Autogra.fi und Collegare nahe.
 
 ---
 
@@ -369,6 +387,7 @@ Docker Compose mit Caddy (statische Dateien, OnlyOffice-Assets, TLS), Collegare-
 | **M4 Feedback und Bewertung** | Peer-Review, KI-Feedback für Lernende, Kategorien, Zwischenfeedback, KI-Entwurf für die Lehrkraft, AGS | Note und Zwischenkommentar landen im Moodle-Gradebook |
 | **M5 Präsentation** | Folien- und Handout-Vorlagen, Quarto/Typst-Export, Verteidigungsmodus, Prozess-Logbuch als PDF | Export einer Beispielarbeit im Tufte-Stil |
 | **M6 Optionales** | Tippfluss-Analyse (nach DSFA-Vorlage), Deep Linking, Moodle-Gruppenimport, Autogra.fi-Abgabe | jeweils einzeln abnehmbar |
+| **Langfristig** | App für iOS/Android über Capacitor, ggf. Desktop über Tauri, gemeinsame Schul-App mit Autogra.fi (Abschnitt 7.8) | App aus dem Store verbindet sich per Schul-QR mit der eigenen Instanz |
 
 ---
 
