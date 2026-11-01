@@ -1,0 +1,33 @@
+Collegare – Lizenz
+
+Copyright (c) 2026 lasjoh-toho
+
+Geltungsbereich: Diese Lizenz gilt für alle Dateien dieses Repositorys mit
+Ausnahme des Ordners web/ (Office-Teil, siehe unten) und der Bibliotheken
+Dritter, die unter ihrer eigenen Lizenz stehen (siehe LIZENZEN.md).
+
+Diese Software und die zugehörigen Dateien ("Collegare") dürfen für
+nicht-kommerzielle Zwecke frei verwendet, kopiert, verändert und verteilt
+werden, insbesondere für den Einsatz an Schulen, Hochschulen und anderen
+Bildungseinrichtungen, sofern kein kommerzieller Zweck verfolgt wird.
+
+Für jede kommerzielle Nutzung – darunter insbesondere der entgeltliche
+Vertrieb, die Bereitstellung als kostenpflichtiger Dienst (SaaS/Hosting),
+der Einsatz durch kommerzielle Anbieter von Hosting oder Support, sowie
+jede sonstige Nutzung mit Gewinnerzielungsabsicht – ist die vorherige
+schriftliche Genehmigung des Rechteinhabers (`lasjoh-toho`) erforderlich.
+
+Die Software wird ohne jegliche Gewährleistung bereitgestellt, weder
+ausdrücklich noch stillschweigend, einschließlich, aber nicht beschränkt
+auf die Gewährleistung der Marktgängigkeit, der Eignung für einen
+bestimmten Zweck und der Nichtverletzung von Rechten Dritter. In keinem
+Fall haften die Urheber oder Rechteinhaber für Ansprüche, Schäden oder
+sonstige Verpflichtungen, die sich aus der Nutzung der Software ergeben.
+
+Office-Teil: Der Ordner web/ ist ein Fork von office-website (ZIZIYI Office)
+mit den OnlyOffice-Editoren und steht unter der GNU Affero General Public
+License Version 3 (web/LICENSE.txt). Er ist ein eigenständiges Programm, das
+der Collegare-Kern nur über ein iframe und ein Netzwerkprotokoll anspricht.
+
+Anfragen zur kommerziellen Nutzung bitte über GitHub-Issues oder direkt
+an den Repository-Inhaber richten.

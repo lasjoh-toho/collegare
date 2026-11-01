@@ -9,7 +9,8 @@ Konzept: [docs/konzept.md](docs/konzept.md)
 
 | Ordner | Inhalt |
 |---|---|
-| `web/` | Oberfläche, Grundlage [office-website](https://github.com/lasjoh-toho/office-website) (Fork von ZIZIYI Office, AGPL-3.0) mit den OnlyOffice-Editoren |
+| `client/` | Projektoberfläche (Kanban, Mindmap, Notizen, Einstellungen), Gestaltung nach brausa; bindet die Editoren per iframe ein (folgt in M1) |
+| `web/` | Office-Teil, Grundlage [office-website](https://github.com/lasjoh-toho/office-website) (Fork von ZIZIYI Office, AGPL-3.0) mit den OnlyOffice-Editoren |
 | `server/` | Collegare-Server (Node.js, TypeScript): Kollaboration, später LTI, API, Worker |
 | `scripts/` | Hilfsskripte, z. B. OnlyOffice-Dateien holen |
 | `docs/` | Konzept, Ergebnisse der Meilensteine |
@@ -27,4 +28,4 @@ Browser `…&name=Ben`. Ergebnisse des ersten Tests: [docs/m0-spike.md](docs/m0-
 
 ## Lizenz
 
-AGPL-3.0, wie office-website (siehe `web/LICENSE.txt`).
+Kern (`server/`, `client/`) nicht-kommerziell, siehe `LICENSE`; Office-Teil `web/` AGPL-3.0 (`web/LICENSE.txt`). Einzelheiten in `LIZENZEN.md`.

@@ -14,13 +14,16 @@ besonders Abschnitt 10 (Entscheidungen). Ergebnisse des ersten Tests: `docs/m0-s
 
 ## Festgelegte Entscheidungen (nicht ohne Rücksprache ändern)
 
-- Backend Node.js 22 + TypeScript (`server/`), Fastify, socket.io; Frontend Next.js (`web/`, statischer Export).
+- Backend Node.js 22 + TypeScript (`server/`), Fastify, socket.io; Frontend Next.js, statischer Export: Projektoberfläche in `client/`, Office-Editoren in `web/`.
 - Betrieb ohne Docker direkt auf einer VM (systemd, Reverse-Proxy, Unterordner `/collegare`), MariaDB.
 - Moodle-Grundlage nur LTI 1.3 mit AGS und NRPS (Moodle ab 3.7); kein Moodle-Plugin voraussetzen.
 - Gruppen entstehen im Kanban von Collegare. „Fertig“-Sperre je Karte/Abschnitt einer Person und je Folie,
   nicht je Absatz.
 - Tippfluss-Analyse nur mit Freischaltung durch Administration und Lehrkraft; nur Hinweise, nie Bewertung.
-- Lizenz AGPL-3.0.
+- Lizenzen getrennt (Jo, 1. November 2026, siehe `LIZENZEN.md`): Kern (`server/`, `client/`, `docs/`, `scripts/`)
+  nicht-kommerziell wie mod_pinnwand; Office-Teil `web/` AGPL-3.0. Kein Code aus `web/` in den Kern kopieren oder
+  importieren und umgekehrt; der Kern spricht die Editoren nur per iframe/`postMessage` und über `/collab` an.
+  Hinweise und Logos von OnlyOffice bleiben unverändert.
 
 ## Arbeiten
 
@@ -34,3 +37,5 @@ cd web && pnpm install && npx tsc --noEmit
 - Mehrere Personen arbeiten mit: größere Arbeiten auf einem eigenen Branch mit Pull Request, nicht direkt auf `main`.
   Aufgaben und Zuständigkeiten stehen in den GitHub-Issues.
 - Keine Zugangsdaten, Tokens oder Schülerdaten ins Repository.
+- Beiträge zum Kern stehen unter `LICENSE`; der Rechteinhaber darf sie auch anders lizenzieren (`LIZENZEN.md`, „Beiträge“).
+  Im Pull Request bitte bestätigen.

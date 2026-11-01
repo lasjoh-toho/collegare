@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-or-later",
+  "license": "SEE LICENSE IN ../LICENSE",
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",

@@ -35,7 +35,7 @@ Begriffe: *Projekt* = eine Aktivität (in Moodle: ein Ressourcen-Link), *Gruppe*
 | XHR-/fetch-Proxy in den Editor-iframe (gleicher Ursprung) | Collegare kann im Editor Einfüge- und Tastatur-Ereignisse erfassen (Abschnitt 6). |
 | IndexedDB (`idb`), lokale Dateiliste | Grundlage für offline-fähige Notizen auf dem Handy. |
 | Docker-Build mit Caddy, statischer Next-Export, OnlyOffice-Assets aus dem `documentserver`-Image | Betriebsmodell wird übernommen und um Backend und Datenbank ergänzt. |
-| Lizenz **AGPL-3.0** | Collegare wird ebenfalls AGPL-3.0. Autogra.fi-Code (EUPL-1.2) darf übernommen werden, die EUPL erlaubt die Weitergabe unter AGPL-3.0. Die Kopplung über eine Netzschnittstelle berührt keine der beiden Lizenzen. |
+| Lizenz **AGPL-3.0** | Gilt nur für den Office-Teil `web/`. Der Collegare-Kern (Server, Projektoberfläche) ist ein eigenes Programm unter Jos nicht-kommerzieller Lizenz und spricht die Editoren nur per iframe und Netzwerkprotokoll an (Entscheidung 9, `LIZENZEN.md`). Autogra.fi-Code (EUPL-1.2) darf in den Kern nur übernommen werden, soweit Jo Rechteinhaber ist. |
 
 Entfernt oder abgeschaltet werden: Uppy-Anbindung an Google Drive, Dropbox und OneDrive (Datenschutz an Schulen), Browser-Erweiterungshinweise, Vorlagen-Galerie von ziziyi.com, Analytics. Die Plugin-Galerie von OnlyOffice wird auf freigegebene, lokal ausgelieferte Plugins beschränkt.
 
@@ -236,7 +236,7 @@ Vorlage ist der Formeleditor aus mod_pinnwand (`js/formeleditor/`): LaTeX als ge
 Einsatz in Collegare:
 
 - in Mindmap-Karten, Notizen, Logbuch und Kommentaren direkt (KaTeX-Darstellung);
-- in OnlyOffice-Dokumenten über einen Knopf „Formel“ in der Collegare-Leiste: Der Editor öffnet sich als Dialog und fügt die Formel als **OnlyOffice-Gleichung** ein (der Editor nimmt LaTeX entgegen und wandelt in OMML um; im Spike zu prüfen). Rückfall: als Bild (SVG) mit dem LaTeX-Text als Alternativtext, damit nichts verloren geht;
+- in OnlyOffice-Dokumenten über einen Knopf „Formel“ in der Collegare-Leiste: Der Editor öffnet sich als Dialog in der Projektoberfläche (nicht im Office-iframe) und fügt die Formel per `postMessage` als **OnlyOffice-Gleichung** ein (der Editor nimmt LaTeX entgegen und wandelt in OMML um; im Spike zu prüfen). Rückfall: als Bild (SVG) mit dem LaTeX-Text als Alternativtext, damit nichts verloren geht;
 - in den Komponenten wird die Bedienung übernommen, nicht neu erfunden (Regel aus CLAUDE.md: übernommene Teile behalten ihre Bedienung).
 
 ### Präsentation als HTML (Bento)
@@ -335,9 +335,9 @@ Wenn freigeschaltet, erstellt die KI einen **Feedback-Entwurf** aus: Bewertungsk
 ### 7.1 Überblick
 
 ```
-Browser (Next.js-Export aus office-website)
- ├─ Projektoberfläche: Kanban, Mindmap, Notizen, Gliederung, Quellen, Logbuch, Bewertung
- ├─ OnlyOffice-Editoren (sdkjs/web-apps, x2t-WASM) im iframe
+Browser
+ ├─ Projektoberfläche (client/, Kern): Kanban, Mindmap, Notizen, Gliederung, Quellen, Logbuch, Bewertung
+ ├─ OnlyOffice-Editoren (web/, AGPL, Export aus office-website) im iframe, nur per postMessage angesprochen
  └─ PWA für Handy: Notizen offline (IndexedDB), Kamera, QR-Kopplung
         │  HTTPS (REST /api/v1)       │  WebSocket (socket.io)
         ▼                             ▼
@@ -540,7 +540,8 @@ Entschieden (Jo, 1. November 2026):
 5. **Tippfluss-Hinweise:** Die Administration legt den Rahmen fest (aus, nur Lernende, Lernende und Lehrkraft); innerhalb dieses Rahmens entscheidet die Lehrkraft je Projekt, ob sie Hinweise und Antworten sieht.
 6. **Zielgruppe:** Oberstufe. Zitierstil, Vorlagen und Ton der Hinweise richten sich danach.
 7. **Moodle:** Es laufen verschiedene Moodle-Systeme in verschiedenen Versionen; auf dem hamburgweiten Moodle lassen sich (noch) keine Plugins installieren, auf dem Schul-Moodle schon, besser aber ohne. **Grundlage ist daher nur LTI 1.3 mit AGS und NRPS** (ab Moodle 3.7 enthalten). Archiv und Ruhespeicher (7.9) sind Zusatz für Umgebungen, die die Ablage-Schnittstelle anbieten; ein Moodle-Plugin wird erst gebaut, wenn es gebraucht wird.
-8. **Formeleditor und Bento-Konverter als getrennte Erweiterungen** (vorläufig, kann später auf eine Doppellizenz umgestellt werden): Der Formeleditor aus mod_pinnwand und `bentoconvert.js` aus mod_bento stehen unter Jos Lizenz nur für nicht-kommerzielle Nutzung und kommen deshalb **nicht** ins AGPL-Repository und nicht ins Release-Paket. Die Administration holt sie bei Bedarf mit `scripts/erweiterungen-holen.sh` aus den Original-Repositories in einen nicht versionierten Ordner (`web/public/erweiterungen/`). Collegare erkennt, ob sie vorhanden sind; ohne sie gibt es den eingebauten Gleichungseditor von OnlyOffice und keinen HTML-Export der Präsentation. Rechtlich ist das eine Grauzone, weil der Code im selben Browserfenster zusammenarbeitet; Jo hat das bewusst so entschieden. KaTeX, JSZip und die Bento-Datei stehen unter MIT und dürfen ins Repository.
+8. **Formeleditor und Bento-Konverter** (aus mod_pinnwand und mod_bento): Sie stehen unter derselben nicht-kommerziellen Lizenz wie der Kern (Entscheidung 9) und gehören deshalb **direkt in den Kern** (`client/`). Die zuerst gewählte Lösung als getrennt geholte Erweiterung entfällt. Wichtig: Sie laufen in der Projektoberfläche, nicht im Office-iframe; eine Formel kommt per `postMessage` als Gleichung oder Bild ins Dokument. KaTeX, JSZip und die Bento-Datei stehen unter MIT.
+9. **Lizenzen getrennt** (1. November 2026): Der **Kern** (`server/`, `client/` mit Kanban, Mindmap, Notizen, Einstellungen) steht unter Jos nicht-kommerzieller Lizenz wie mod_pinnwand; der **Office-Teil** `web/` bleibt AGPL-3.0, mit unveränderten OnlyOffice-Hinweisen und -Logos. Kein Code wird zwischen beiden Teilen kopiert oder importiert. Beiträge zum Kern stehen unter dieser Lizenz und dürfen von Jo auch anders lizenziert werden. Stände bis Commit `36910cb` bleiben AGPL. Einzelheiten in `LIZENZEN.md`.
 
 Offen:
 

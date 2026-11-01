@@ -4,7 +4,6 @@ dist/
 out/
 # OnlyOffice-Dateien werden mit scripts/onlyoffice-assets.sh erzeugt (ca. 1 GB)
 web/public/v*-*/
-web/public/erweiterungen/
 .env
 .env.local
 *.log
