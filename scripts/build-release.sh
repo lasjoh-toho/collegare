@@ -38,6 +38,7 @@ rm -rf "$STAGE/node/include" "$STAGE/node/share"
 
 echo "== Installer"
 cp "$ROOT/packaging/install.sh" "$STAGE/install.sh" && chmod +x "$STAGE/install.sh"
+cp "$ROOT/packaging/collegare.sh" "$STAGE/collegare.sh" && chmod +x "$STAGE/collegare.sh"
 cp "$ROOT/LICENSE" "$ROOT/LIZENZEN.md" "$ROOT/docs/installation.md" "$STAGE/"
 echo "$VERSION" > "$STAGE/VERSION"
 

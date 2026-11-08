@@ -17,9 +17,16 @@ Konzept: [docs/konzept.md](docs/konzept.md)
 
 ## Installieren
 
-Release-Paket mit allem Nötigen (auch Node.js) für eine VM mit systemd, Apache und MariaDB:
-`sudo ./install.sh --url https://server.schule.de/collegare --admin <kürzel>`. Einzelheiten in
-[docs/installation.md](docs/installation.md), Moodle-Anbindung in [docs/moodle.md](docs/moodle.md).
+Auf einer VM mit systemd, Apache und MariaDB genügt ein Befehl im Terminal (lädt die neueste Version mit Node.js und
+den Office-Editoren):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lasjoh-toho/collegare/main/packaging/collegare.sh \
+  | sudo bash -s -- installieren --url https://server.schule.de/collegare --admin <kürzel>
+```
+
+Später aktualisieren: `sudo collegare aktualisieren`. Anleitung mit allen Schritten, Installation von Hand und
+Betrieb: [docs/installation.md](docs/installation.md); Moodle-Anbindung: [docs/moodle.md](docs/moodle.md).
 
 ## Entwickeln
 

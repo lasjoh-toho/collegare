@@ -11,13 +11,33 @@ Node.js 22. Auf der VM müssen nur systemd, Apache und MariaDB vorhanden sein. C
 - MariaDB ab 10.6 (`apt install mariadb-server`), root kann sich lokal ohne Passwort anmelden (Standard bei Debian/Ubuntu)
 - etwa 2 GB freier Platz (das Paket hält die letzten drei Versionen vor)
 
-## Erstinstallation
+## Erstinstallation im Terminal (empfohlen)
+
+Ein Befehl lädt die neueste Version von GitHub, prüft die Prüfsumme, entpackt sie und richtet alles ein:
 
 ```bash
-wget https://github.com/lasjoh-toho/collegare/releases/download/v0.1.0/collegare-0.1.0-linux-x64.tar.gz
-sha256sum -c collegare-0.1.0-linux-x64.tar.gz.sha256   # optional, Prüfsumme liegt daneben
-tar -xzf collegare-0.1.0-linux-x64.tar.gz
-cd collegare-0.1.0
+curl -fsSL https://raw.githubusercontent.com/lasjoh-toho/collegare/main/packaging/collegare.sh \
+  | sudo bash -s -- installieren --url https://server.schule.de/collegare --admin jo
+```
+
+- `--url` ist die Adresse, unter der Collegare später erreichbar sein soll (Unterordner `/collegare`).
+- `--admin jo` legt das erste Administrationskonto an; der Installer fragt im Terminal nach Name und Passwort.
+- Eine bestimmte Version statt der neuesten: `… installieren 0.3.0 --url … --admin jo`.
+
+Danach gibt es auf dem Server den Befehl `collegare` (siehe „Aktualisieren“ und „Betrieb“).
+
+## Erstinstallation von Hand
+
+Wer das Paket lieber selbst lädt (z. B. ohne Internet auf dem Server), nimmt es von der
+[Release-Seite](https://github.com/lasjoh-toho/collegare/releases):
+
+```bash
+V=0.3.0
+wget https://github.com/lasjoh-toho/collegare/releases/download/v$V/collegare-$V-linux-x64.tar.gz
+wget https://github.com/lasjoh-toho/collegare/releases/download/v$V/collegare-$V-linux-x64.tar.gz.sha256
+sha256sum -c collegare-$V-linux-x64.tar.gz.sha256
+tar -xzf collegare-$V-linux-x64.tar.gz
+cd collegare-$V
 sudo ./install.sh --url https://server.schule.de/collegare --admin jo
 ```
 
@@ -44,14 +64,22 @@ Siehe [moodle.md](moodle.md). Kurz: in Moodle ein externes Tool (LTI 1.3) anlege
 
 ## Aktualisieren
 
-Neues Paket herunterladen, entpacken und `sudo ./install.sh` ohne weitere Angaben aufrufen. Einstellungen und Datenbank
-bleiben erhalten; die Datenbank wird beim Start automatisch auf den neuen Stand gebracht.
+```bash
+collegare version                 # installierte und neueste Version
+sudo collegare aktualisieren      # auf die neueste Version
+sudo collegare aktualisieren 0.3.0   # auf eine bestimmte Version
+```
 
-Zurück auf die vorige Version:
+Einstellungen und Datenbank bleiben erhalten; die Datenbank wird beim Start automatisch auf den neuen Stand gebracht.
+Ohne den Befehl `collegare` (Installation vor 0.3.1): den Einzeiler aus der Erstinstallation mit `aktualisieren` statt
+`installieren` und ohne weitere Angaben aufrufen, oder ein neues Paket von Hand entpacken und `sudo ./install.sh`
+aufrufen.
+
+Zurück auf eine vorige Version (die letzten drei bleiben auf dem Server):
 
 ```bash
-ls /opt/collegare/releases
-sudo ln -sfn /opt/collegare/releases/0.1.0 /opt/collegare/current && sudo systemctl restart collegare
+sudo collegare zurueck            # zeigt die vorhandenen Versionen
+sudo collegare zurueck 0.2.0
 ```
 
 (Nur, wenn die neuere Version die Datenbank nicht verändert hat; die Release-Notizen sagen das.)
@@ -60,19 +88,20 @@ sudo ln -sfn /opt/collegare/releases/0.1.0 /opt/collegare/current && sudo system
 
 | Aufgabe | Befehl |
 |---|---|
-| Zustand | `systemctl status collegare` |
-| Protokoll | `journalctl -u collegare -f` |
-| Neu starten | `sudo systemctl restart collegare` |
-| Weiteres Admin-Konto | `sudo ./install.sh --admin <kürzel>` (aus einem entpackten Paket) |
-| Passwort zurücksetzen | `cd /opt/collegare/current/server && sudo bash -c 'set -a; . /etc/collegare/collegare.env; sudo -E -u collegare ../node/bin/node dist/cli.js admin:password <kürzel>'` |
-| Protokollkette prüfen | wie oben mit `audit:verify` |
+| Zustand | `collegare status` |
+| Protokoll | `collegare protokoll` |
+| Neu starten | `sudo collegare neustart` |
+| Weiteres Admin-Konto | `sudo collegare admin <kürzel>` |
+| Passwort zurücksetzen | `sudo collegare passwort <kürzel>` |
+| Protokollkette prüfen | `sudo collegare pruefen` |
+| Alle Befehle | `collegare hilfe` |
 | Sicherung | `mysqldump collegare > collegare.sql` (enthält Schülerdaten, sicher ablegen) |
 
 ## Selbst bauen
 
 ```bash
 scripts/onlyoffice-assets.sh 9.3.1 1   # einmalig, Docker nur zum Holen der OnlyOffice-Dateien
-scripts/build-release.sh 0.1.0         # → dist-release/collegare-0.1.0-linux-x64.tar.gz
+scripts/build-release.sh 0.3.1         # → dist-release/collegare-0.3.1-linux-x64.tar.gz
 ```
 
 Auf GitHub baut der Workflow „Release“ das Paket und hängt es an ein Release (Actions → Release → Run workflow).
