@@ -121,6 +121,10 @@ aus den gemeinsamen Farbnamen. Teile aus Autogra.fi (Scanner, QR-Kopplung, Codee
 
 ## Stand der Umsetzung
 
-Noch nicht umgesetzt: gemeinsame Farbnamen, Tag/Nacht, Seitenmenü, Kacheln, Office-Streifen, Collegare-Korrektur,
-gemeinsame Verwaltung. Reihenfolge: Farbnamen und Tag/Nacht in beiden Apps; Seitenmenü und Kacheln in Collegare vor
-dem ersten Kurs; Korrektur für Collegare; gemeinsame Verwaltung nach dem ersten Kurs.
+Collegare (8. November 2026): gemeinsame Farbnamen und Tag/Nacht (`client/app/globals.css`, `client/lib/theme.ts`),
+Seitenmenü (`client/components/ProjectShell.tsx`), Kacheln (`client/app/projekt/page.tsx`), Office-Streifen über dem
+Texteditor, Startseite im rot-orangen Verlauf. Markenwerte Collegare: `--brand-1: #8a1c0c`, `--brand-2: #d9541a`.
+Neutrale Akzentfarbe: Tag `#3f5f8a`, Nacht `#8fb0dc`; Autogra.fi übernimmt dieselben Werte.
+
+Noch offen: Farbnamen und Tag/Nacht in Autogra.fi, Tag/Nacht-Wahl je Konto (heute im Browser), zarter Verlauf hinter
+dem OnlyOffice-Menüband, Collegare-Korrektur, gemeinsame Verwaltung (nach dem ersten Kurs).

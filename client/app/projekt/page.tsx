@@ -1,61 +1,42 @@
 'use client';
+/**
+ * Projekt-Übersicht (docs/gestaltung.md, Abschnitt 7): Ist kein Editor offen, zeigt Collegare alle Oberflächen
+ * als Kacheln mit Symbol, Name und Zustand. Nicht freigegebene sind gestrichelt mit dem Hinweis, ab wann sie kommen.
+ * Lehrkräfte sehen dieselbe Übersicht und oben ihre Knöpfe (Lernende, Zugangscodes, Einstellungen).
+ */
 import { useCallback, useEffect, useState } from 'react';
-import { CodesDialog } from '@/components/CodesDialog';
-import { GroupBoard } from '@/components/GroupBoard';
+import { Icon } from '@/components/Icon';
+import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
-import { ApiError, get, href, post, projectSocket } from '@/lib/api';
-import type { Board, ProjectView } from '@/lib/types';
+import { ApiError, get, href } from '@/lib/api';
+import { OFFICE_VAR, TILES, currentPhase, phaseDone, phaseList, type DocSummary, type TileDef } from '@/lib/phases';
+import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
+import { TeacherActions } from './TeacherActions';
 import p from './projekt.module.css';
+import t from './tiles.module.css';
 
 export default function Projekt() {
   const [me] = useMe();
   const idParam = useQuery('id');
   const id = idParam ? Number(idParam) : NaN;
   const [project, setProject] = useState<ProjectView | null>(null);
+  const [docs, setDocs] = useState<DocSummary | null>(null);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
-  const [dialog, setDialog] = useState<'codes' | 'students' | null>(null);
 
   const load = useCallback(() => {
     if (!Number.isInteger(id)) return;
     get<ProjectView>(`/api/projects/${id}`)
       .then(setProject)
       .catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
+    // Zustand der Kacheln (Gliederung übernommen, Abschnitte fertig); ohne Gruppe einfach leer
+    get<DocSummary>(`/api/projects/${id}/documents`).then(setDocs, () => setDocs(null));
   }, [id]);
 
   useEffect(() => {
     if (me === null) location.replace(href('/'));
   }, [me]);
-
   useEffect(load, [load]);
-
-  // Echtzeit: Änderungen am Board kommen sofort an
-  useEffect(() => {
-    if (!Number.isInteger(id) || !me) return;
-    const sock = projectSocket();
-    sock.on('connect', () => sock.emit('join', id, () => {}));
-    sock.on('board', (b: Board) => setProject((cur) => (cur ? { ...cur, board: b, myGroupId: b.members.find((m) => m.userId === me.id)?.groupId ?? null } : cur)));
-    // Einstellungen oder Codes können sich geändert haben: nach Wiederverbindung neu laden
-    sock.io.on('reconnect', load);
-    return () => {
-      sock.disconnect();
-    };
-  }, [id, me, load]);
-
-  const showError = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 4000);
-  };
-
-  async function moodleImport() {
-    try {
-      const r = await post<{ added: number; total: number }>(`/api/projects/${id}/moodle-import`, {});
-      showError(r.added ? `${r.added} neu aus Moodle übernommen (${r.total} Lernende im Kurs)` : `Alle ${r.total} Lernenden sind schon im Projekt`);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : String(e));
-    }
-  }
 
   if (error)
     return (
@@ -68,105 +49,94 @@ export default function Projekt() {
     );
   if (!project || !me) return null;
   const teacher = project.role === 'teacher';
+  const phases = phaseList(project.settings, project.mode === 'single');
+  const now = currentPhase(phases, phaseDone(project, me.id, docs));
+  const nowInfo = phases.find((x) => x.key === now);
+  const myGroup = project.board.groups.find((g) => g.id === project.myGroupId);
 
-  return (
-    <>
-      <Topbar me={me} title={project.title}>
-        <span className="chip">{project.course.title}</span>
-        {teacher && (
-          <div className={p.actions}>
-            {project.course.moodle ? (
-              <button className="btn" onClick={moodleImport} title="Teilnehmende des Moodle-Kurses übernehmen">
-                ↻ Aus Moodle
-              </button>
-            ) : (
-              <button className="btn" onClick={() => setDialog('students')}>
-                + Lernende
-              </button>
-            )}
-            <button className="btn" onClick={() => setDialog('codes')}>
-              Zugangscodes
-            </button>
-            <a className="btn" href={href(`/einstellungen/?id=${project.id}`)}>
-              ⚙ Einstellungen
-            </a>
-          </div>
-        )}
-      </Topbar>
-      <main className={p.main}>
-        {project.settings.brief && <p className={p.brief}>{project.settings.brief}</p>}
-        <nav className={p.phases}>
-          <span className={`${p.phase} ${p.active}`}>Gruppen</span>
-          <a className={p.phase} href={href(`/projekt/mindmap/?id=${project.id}`)} title="Mindmap und Gliederung">
-            Orientierung
-          </a>
-          <span className={p.phase} title="folgt">
-            Recherche
-          </span>
-          <a className={p.phase} href={href(`/projekt/ausarbeitung/?id=${project.id}`)} title="Abschnitte schreiben">
-            Ausarbeitung
-          </a>
-          <span className={p.phase} title="folgt">
-            Präsentation
-          </span>
-        </nav>
-        {project.board.members.length === 0 && teacher ? (
-          <div className={`panel ${p.empty}`}>
-            <h2>Noch keine Lernenden</h2>
-            <p className="muted">Trage die Namen ein (eine Zeile je Person) oder übernimm sie aus Moodle.</p>
-            <div className="row">
-              {project.course.moodle && (
-                <button className="btn primary" onClick={moodleImport}>
-                  Aus Moodle übernehmen
-                </button>
-              )}
-              <button className={`btn ${project.course.moodle ? '' : 'primary'}`} onClick={() => setDialog('students')}>
-                Lernende eintragen
-              </button>
-            </div>
-          </div>
-        ) : (
-          <GroupBoard projectId={project.id} board={project.board} settings={project.settings} role={project.role} meId={me.id} onError={showError} />
-        )}
-      </main>
-      {toast && <div className={p.toast}>{toast}</div>}
-      {dialog === 'codes' && <CodesDialog projectId={project.id} title={project.title} members={project.board.members} validUntil={project.codesValidUntil} onClose={() => (setDialog(null), load())} />}
-      {dialog === 'students' && <StudentsDialog projectId={project.id} onClose={() => setDialog(null)} />}
-    </>
-  );
-}
-
-function StudentsDialog({ projectId, onClose }: { projectId: number; onClose: () => void }) {
-  const [text, setText] = useState('');
-  const [error, setError] = useState('');
-  const names = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  async function save() {
-    try {
-      await post(`/api/projects/${projectId}/students`, { names });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+  const status = (tile: TileDef): { kind: 'missing' | 'draft' | 'released' | 'done'; line: string; open: boolean } => {
+    const ph = tile.phase ? phases.find((x) => x.key === tile.phase)! : null;
+    if (ph?.state === 'upcoming') return { kind: 'missing', line: `freigegeben ${ph.badge}`, open: teacher && !!tile.path };
+    if (!tile.path) return { kind: 'missing', line: 'folgt in einer der nächsten Versionen', open: false };
+    const closed = ph?.state === 'closed';
+    const base = { kind: (closed ? 'draft' : 'released') as 'draft' | 'released', open: true };
+    switch (tile.key) {
+      case 'groups':
+        if (teacher) return { ...base, line: `${project.board.members.length} Lernende, ${project.board.groups.length} Gruppen` };
+        if (myGroup) return { ...base, kind: 'done', line: `Du bist in „${myGroup.title}“` };
+        return { ...base, line: project.settings.groupFormation === 'teacher' ? 'Die Lehrkraft teilt ein' : 'Wähle deine Gruppe' };
+      case 'outline':
+        if (docs?.outlineAt) return { ...base, kind: 'done', line: `übernommen am ${new Date(docs.outlineAt).toLocaleDateString('de-DE')}` };
+        return { ...base, line: 'noch nicht übernommen' };
+      case 'sections': {
+        const list = teacher ? (docs?.docs ?? []) : (docs?.docs ?? []).filter((d) => d.ownerId === me.id || d.ownerId === null);
+        if (!list.length) return { ...base, line: docs?.outlineAt ? 'Abschnitte noch nicht angelegt' : 'zuerst die Gliederung übernehmen' };
+        const done = list.filter((d) => d.doneAt).length;
+        const what = teacher ? 'Abschnitten' : 'deinen Abschnitten';
+        return { ...base, kind: done === list.length ? 'done' : base.kind, line: `${done} von ${list.length} ${what} fertig` };
+      }
     }
-  }
+    return { ...base, line: closed ? 'Phase beendet, nur lesen' : tile.sub };
+  };
+
+  const tiles = TILES.filter((tile) => {
+    const ph = tile.phase ? phases.find((x) => x.key === tile.phase) : null;
+    if (ph?.state === 'off') return false;
+    if (tile.docType && !project.settings.docTypes[tile.docType]) return false;
+    return true;
+  });
+
   return (
-    <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-label="Lernende eintragen">
-        <h2>Lernende eintragen</h2>
-        <p className="muted">Eine Zeile je Person, z. B. aus einer Klassenliste kopiert. Namen bleiben in Collegare und gehen nicht an die KI.</p>
-        <div className="field">
-          <textarea rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Anna Beispiel\nBen Muster'} autoFocus />
-        </div>
-        {error && <div className="error">{error}</div>}
-        <div className="row">
-          <span className="grow" />
-          <button className="btn" onClick={onClose}>
-            Abbrechen
-          </button>
-          <button className="btn primary" disabled={!names.length} onClick={save}>
-            {names.length} eintragen
-          </button>
+    <ProjectShell me={me} project={project} where="Übersicht" docs={docs} actions={teacher && <TeacherActions project={project} onChanged={load} />}>
+      <div className={t.wrap}>
+        {nowInfo && !teacher && (
+          <a className={`panel ${t.now}`} href={href(TILES.find((x) => x.phase === now && x.path)?.path?.replace('{id}', String(id)) ?? `/projekt/?id=${id}`)}>
+            <span className={t.nowIcon}>
+              <Icon name={nowInfo.icon} size={22} />
+            </span>
+            <span className={t.nowText}>
+              <span className={t.nowLabel}>Jetzt dran: {nowInfo.title}</span>
+              <span>{nowInfo.help}</span>
+            </span>
+            <Icon name="arrow" size={18} className={t.nowArrow} />
+          </a>
+        )}
+        {teacher && project.board.members.length === 0 && (
+          <div className={`notice ${t.hint}`}>Noch keine Lernenden. Trage sie oben mit „+ Lernende“ ein oder übernimm sie aus Moodle.</div>
+        )}
+        <div className={t.grid}>
+          {tiles.map((tile) => {
+            const st = status(tile);
+            const color = tile.office ? OFFICE_VAR[tile.office] : 'var(--ui-muted)';
+            const inner = (
+              <>
+                <span className={t.icon} style={{ color: st.kind === 'missing' ? undefined : color }}>
+                  <Icon name={tile.icon} size={26} />
+                  {st.kind === 'done' && (
+                    <span className={t.tick} title="erledigt">
+                      <Icon name="check" size={12} />
+                    </span>
+                  )}
+                </span>
+                <span className={t.title}>{tile.title}</span>
+                <span className={t.line}>{st.line}</span>
+                {!st.open && st.kind === 'missing' && tile.path && <Icon name="lock" size={14} className={t.lock} />}
+              </>
+            );
+            const cls = `${t.tile} ${t[st.kind]}`;
+            const style = { '--tile-color': color } as React.CSSProperties;
+            return st.open ? (
+              <a key={tile.key} className={cls} style={style} href={href(tile.path!.replace('{id}', String(id)))} data-office={tile.office ?? undefined}>
+                {inner}
+              </a>
+            ) : (
+              <div key={tile.key} className={cls} style={style} aria-disabled="true" data-office={tile.office ?? undefined}>
+                {inner}
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
+    </ProjectShell>
   );
 }

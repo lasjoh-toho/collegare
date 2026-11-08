@@ -1,0 +1,38 @@
+/* Kacheln der Projekt-Übersicht (docs/gestaltung.md, Abschnitte 2 und 7). Office-Kacheln in ihrer Office-Farbe, übrige grau. */
+.wrap { max-width: 1040px; margin: 0 auto; padding: 18px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+.now { display: flex; align-items: center; gap: 14px; padding: 14px 16px; color: var(--ui-text); border-left: 4px solid var(--ui-accent); }
+.now:hover { box-shadow: var(--shadow), 0 0 0 1px var(--ui-accent); }
+.nowIcon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--ui-accent); color: var(--ui-accent-fg); }
+.nowText { display: flex; flex-direction: column; gap: 3px; font-size: 13px; line-height: 1.45; color: var(--ui-muted); }
+.nowLabel { font-size: 15px; font-weight: 700; color: var(--ui-text); }
+.nowArrow { flex: none; margin-left: auto; color: var(--ui-muted); }
+.hint { max-width: 640px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.tile {
+  position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 148px; padding: 16px; border-radius: 14px;
+  background: var(--ui-panel); color: var(--ui-text); box-shadow: var(--shadow), 0 0 0 1px var(--ui-border); overflow: hidden;
+}
+/* Office-Kacheln: oben der kräftige Streifen ihrer Art, wie über dem Editor */
+.tile[data-office]::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: var(--tile-color); }
+.tile[data-office].released, .tile[data-office].done {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tile-color) 9%, var(--ui-panel)) 0%, var(--ui-panel) 70%);
+}
+a.tile:hover { box-shadow: var(--shadow), 0 0 0 2px var(--tile-color); }
+.icon { position: relative; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 12px; background: var(--ui-sunken); margin-bottom: 4px; }
+.tick {
+  position: absolute; right: -5px; bottom: -5px; width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--state-done); color: #fff; border: 2px solid var(--ui-panel);
+}
+.title { font-size: 15px; font-weight: 650; }
+.line { font-size: 12px; color: var(--ui-muted); line-height: 1.4; }
+.lock { position: absolute; right: 12px; top: 14px; color: var(--ui-faint); }
+/* Zustände: fehlt = gestrichelt, vorhanden/beendet = grau, freigegeben = farbig, fertig = mit Haken */
+.missing { background: transparent; box-shadow: none; border: 2px dashed var(--state-missing); color: var(--ui-muted); }
+.missing .icon { background: none; color: var(--state-missing); }
+.missing[data-office]::before { opacity: 0.35; }
+.draft .icon { color: var(--state-draft) !important; }
+.draft { color: var(--ui-muted); }
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { min-height: 128px; padding: 12px; }
+}

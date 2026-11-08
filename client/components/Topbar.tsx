@@ -1,6 +1,7 @@
 'use client';
 import { href, post } from '@/lib/api';
 import type { Me } from '@/lib/types';
+import { ThemeSwitch } from './ThemeSwitch';
 
 export function Topbar({ me, title, children }: { me: Me | null; title?: string; children?: React.ReactNode }) {
   async function logout() {
@@ -30,6 +31,7 @@ export function Topbar({ me, title, children }: { me: Me | null; title?: string;
             Verwaltung
           </a>
         )}
+        <ThemeSwitch compact />
         {me && <span className="muted">{me.name}</span>}
         {me && (
           <button className="btn" onClick={logout}>

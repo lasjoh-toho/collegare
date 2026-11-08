@@ -5,6 +5,7 @@
  * (Lizenztrennung, LIZENZEN.md).
  */
 import { useCallback, useEffect, useState } from 'react';
+import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { ApiError, BASE_PATH, get, href, post, projectSocket } from '@/lib/api';
 import type { ProjectView } from '@/lib/types';
@@ -127,31 +128,59 @@ export default function Ausarbeitung() {
   const mayFinish = (d: Doc) => !!data?.finishLock && !teacher && !d.doneAt && (d.ownerId === null || d.ownerId === me.id);
   const mayReopen = (d: Doc) => !!d.doneAt && (teacher || data?.reopenBy === 'group');
 
+  const status = current
+    ? current.doneAt
+      ? `fertig seit ${new Date(current.doneAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
+      : teacher
+        ? 'Ansicht für die Lehrkraft'
+        : name(current.ownerId)
+          ? `zuständig: ${name(current.ownerId)}`
+          : ''
+    : '';
+
+  // Keine eigene Leiste über OnlyOffice (docs/gestaltung.md, Abschnitt 5): Titel, Zustand und „Fertig“ stehen in der Kopfzeile.
   return (
-    <div className={s.page}>
-      <Topbar me={me} title={project.title}>
-        <a className="btn" href={href(`/projekt/?id=${id}`)}>
-          ← Projekt
-        </a>
-      </Topbar>
-      <nav className={`${p.phases} ${s.phases}`}>
-        <a className={p.phase} href={href(`/projekt/?id=${id}`)}>
-          Gruppen
-        </a>
-        <a className={p.phase} href={href(`/projekt/mindmap/?id=${id}${scope ? '&bereich=' + scope : ''}`)}>
-          Orientierung
-        </a>
-        <span className={`${p.phase} ${p.active}`}>Ausarbeitung</span>
-        {data && data.scopes.length > 1 && (
-          <select className={s.scope} value={scope ?? ''} onChange={(e) => (setOpen(null), void load(e.target.value))}>
-            {data.scopes.map((x) => (
-              <option key={x.scope} value={x.scope}>
-                {x.title}
-              </option>
-            ))}
-          </select>
-        )}
-      </nav>
+    <ProjectShell
+      me={me}
+      project={project}
+      where={current ? current.title : 'Textabschnitte'}
+      phase="drafting"
+      docs={data}
+      fill
+      actions={
+        <>
+          {current && (
+            <button className={`btn ${s.back}`} onClick={() => setOpen(null)}>
+              ← Abschnitte
+            </button>
+          )}
+          {current && status && (
+            <span className={`chip ${current.doneAt ? s.doneChip : ''}`} title={status}>
+              {current.doneAt ? '✓ fertig' : <span className={s.status}>{status}</span>}
+            </span>
+          )}
+          {data && data.scopes.length > 1 && (
+            <select className={s.scope} value={scope ?? ''} onChange={(e) => (setOpen(null), void load(e.target.value))} title="Abschnitte welcher Gruppe?">
+              {data.scopes.map((x) => (
+                <option key={x.scope} value={x.scope}>
+                  {x.title}
+                </option>
+              ))}
+            </select>
+          )}
+          {current && mayFinish(current) && (
+            <button className="btn primary" onClick={() => act(current, 'done')}>
+              Fertig melden
+            </button>
+          )}
+          {current && mayReopen(current) && (
+            <button className="btn" onClick={() => act(current, 'reopen')}>
+              Wieder öffnen
+            </button>
+          )}
+        </>
+      }
+    >
       <div className={s.area}>
         <aside className={`${s.side} ${current ? s.hideOnPhone : ''}`}>
           {data && !data.scope && <p className="muted">{teacher ? 'Noch keine Gruppen.' : 'Du bist noch keiner Gruppe zugeordnet.'}</p>}
@@ -176,7 +205,7 @@ export default function Ausarbeitung() {
                         <span className={s.docTitle}>{d.title}</span>
                         <span className={s.meta}>
                           {name(d.ownerId) ?? 'niemand zuständig'}
-                          {d.doneAt && <span className={s.done}>fertig</span>}
+                          {d.doneAt && <span className={s.done}>✓ fertig</span>}
                         </span>
                       </button>
                     ))}
@@ -189,24 +218,7 @@ export default function Ausarbeitung() {
         <section className={s.editor}>
           {current ? (
             <>
-              <div className={s.bar}>
-                <button className={`btn ${s.back}`} onClick={() => setOpen(null)}>
-                  ← Abschnitte
-                </button>
-                <strong className={s.barTitle}>{current.title}</strong>
-                <span className="muted">{current.doneAt ? `fertig seit ${new Date(current.doneAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}` : teacher ? 'Ansicht für die Lehrkraft' : name(current.ownerId) ? `zuständig: ${name(current.ownerId)}` : ''}</span>
-                <span className="grow" />
-                {mayFinish(current) && (
-                  <button className="btn primary" onClick={() => act(current, 'done')}>
-                    Fertig melden
-                  </button>
-                )}
-                {mayReopen(current) && (
-                  <button className="btn" onClick={() => act(current, 'reopen')}>
-                    Wieder öffnen
-                  </button>
-                )}
-              </div>
+              <div className={s.stripe} aria-hidden="true" />
               <iframe key={`${current.id}-${frameKey}`} className={s.frame} src={editorUrl(current)} title={`Editor: ${current.title}`} allow="clipboard-read; clipboard-write" />
             </>
           ) : (
@@ -215,6 +227,6 @@ export default function Ausarbeitung() {
         </section>
       </div>
       {toast && <div className={p.toast}>{toast}</div>}
-    </div>
+    </ProjectShell>
   );
 }

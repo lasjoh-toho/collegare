@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { MindMap, type Person } from '@/components/MindMap';
+import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { get, href, projectSocket } from '@/lib/api';
 import type { MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
@@ -27,6 +28,7 @@ export default function MindmapPage() {
   // erst nach dem Lesen der Adresse gültig (statischer Export)
   const id = idParam ? Number(idParam) : NaN;
   const wanted = useQuery('bereich');
+  const outlineParam = useQuery('gliederung');
   const [project, setProject] = useState<ProjectView | null>(null);
   const [join, setJoin] = useState<JoinAck | null>(null);
   const [map, setMap] = useState<MapData | null>(null);
@@ -41,6 +43,10 @@ export default function MindmapPage() {
   useEffect(() => {
     if (me === null) location.replace(href('/'));
   }, [me]);
+  // Kachel „Gliederung“ öffnet die Mindmap mit aufgeklappter Gliederung
+  useEffect(() => {
+    if (outlineParam) setOutlineOpen(true);
+  }, [outlineParam]);
 
   useEffect(() => {
     if (Number.isInteger(id)) get<ProjectView>(`/api/projects/${id}`).then(setProject, (e) => setToast(String(e.message ?? e)));
@@ -109,41 +115,36 @@ export default function MindmapPage() {
   const name = (uid: number) => people.find((x) => x.id === uid)?.name ?? 'unbekannt';
 
   return (
-    <div className={s.page}>
-      <Topbar me={me} title={project.title}>
-        <a className="btn" href={href(`/projekt/?id=${id}`)}>
-          ← Projekt
-        </a>
-      </Topbar>
-      <nav className={`${p.phases} ${s.phases}`}>
-        <a className={p.phase} href={href(`/projekt/?id=${id}`)}>
-          Gruppen
-        </a>
-        <span className={`${p.phase} ${p.active}`}>Orientierung</span>
-        <a className={p.phase} href={href(`/projekt/ausarbeitung/?id=${id}${scope ? '&bereich=' + scope : ''}`)}>
-          Ausarbeitung
-        </a>
-        {join?.scopes && join.scopes.length > 1 && (
-          <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Mindmap welcher Gruppe?">
-            {join.scopes.map((x) => (
-              <option key={x.scope} value={x.scope}>
-                {x.title}
-              </option>
-            ))}
-          </select>
-        )}
-        <span className="grow" />
-        {map && (
-          <>
-            <button className="btn" onClick={() => setOutlineOpen((o) => !o)}>
-              Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
-            </button>
-            <button className="btn primary" onClick={takeOutline} title="Jeder Cluster wird ein Abschnitt, in Lesereihenfolge">
-              Gliederung übernehmen
-            </button>
-          </>
-        )}
-      </nav>
+    <ProjectShell
+      me={me}
+      project={project}
+      where={outlineOpen ? 'Mindmap und Gliederung' : 'Mindmap'}
+      phase="orientation"
+      fill
+      actions={
+        <>
+          {join?.scopes && join.scopes.length > 1 && (
+            <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Mindmap welcher Gruppe?">
+              {join.scopes.map((x) => (
+                <option key={x.scope} value={x.scope}>
+                  {x.title}
+                </option>
+              ))}
+            </select>
+          )}
+          {map && (
+            <>
+              <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
+                Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
+              </button>
+              <button className="btn primary" onClick={takeOutline} title="Jeder Cluster wird ein Abschnitt, in Lesereihenfolge">
+                <span className={s.long}>Gliederung </span>übernehmen
+              </button>
+            </>
+          )}
+        </>
+      }
+    >
       <div className={s.area}>
         {join && !scope && (
           <div className={`panel ${s.notice}`}>
@@ -186,6 +187,6 @@ export default function MindmapPage() {
         )}
       </div>
       {toast && <div className={p.toast}>{toast}</div>}
-    </div>
+    </ProjectShell>
   );
 }

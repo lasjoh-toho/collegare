@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Topbar } from '@/components/Topbar';
-import { ApiError, get, href, post } from '@/lib/api';
+import { Welcome } from '@/components/Welcome';
+import { get, href, post } from '@/lib/api';
 import type { Course, ProjectListItem } from '@/lib/types';
 import { useMe } from '@/lib/useMe';
 import s from './start.module.css';
@@ -15,62 +16,12 @@ export default function Start() {
   }, [me]);
 
   if (me === undefined || me?.projectId) return null;
-  if (me === null) return <Login onDone={reload} />;
+  if (me === null) return <Welcome onLogin={reload} />;
   return (
     <>
       <Topbar me={me} />
       <Projects teacher={me.teacher || me.admin} />
     </>
-  );
-}
-
-function Login({ onDone }: { onDone: () => void }) {
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      await post('/api/auth/login', { login, password });
-      onDone();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Keine Verbindung zum Server');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <main className={s.loginWrap}>
-      <div className={`panel ${s.login}`}>
-        <h1 className={s.logo}>
-          Colle<span>gare</span>
-        </h1>
-        <p className="muted">Gemeinsam forschen, schreiben und präsentieren.</p>
-        <form onSubmit={submit} className={s.form}>
-          <div className="field">
-            <label htmlFor="login">Kürzel</label>
-            <input id="login" autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} autoFocus />
-          </div>
-          <div className="field">
-            <label htmlFor="pw">Passwort</label>
-            <input id="pw" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          {error && <div className="error">{error}</div>}
-          <button className="btn primary big" disabled={busy || !login || !password}>
-            Anmelden
-          </button>
-        </form>
-        <div className={s.sep}>oder</div>
-        <a className="btn big" href={href('/zugang/')} style={{ width: '100%' }}>
-          Ich habe einen Code von meiner Lehrkraft
-        </a>
-      </div>
-    </main>
   );
 }
 
