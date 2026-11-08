@@ -84,6 +84,6 @@ case "$cmd" in
   admin) [ -n "${1:-}" ] || die "Kürzel angeben."; if has_tty; then read -r -p "Name für $1: " NAME </dev/tty; else read -r -p "Name für $1: " NAME; fi; run_cli admin:create "$1" "$NAME" ;;
   pruefen) run_cli audit:verify ;;
   passwort) [ -n "${1:-}" ] || die "Kürzel angeben."; run_cli admin:password "$1" ;;
-  hilfe|-h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
+  hilfe|-h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "Unbekannter Befehl: $cmd (collegare hilfe)" ;;
 esac
