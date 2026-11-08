@@ -74,7 +74,7 @@ Diese Farben kennzeichnen die Art eines Dokuments: im Streifen über dem Editor 
 
 - Aufbau wie die Korrektur von Autogra.fi: Warteschlange, Arbeitsfläche, Notenblase, Notizen, KI-Rückmeldung.
 - Wo Autogra.fi links die Blätter zeigt, zeigt Collegare die **Phasen und Produkte** des Projekts (Mindmap,
-  Gliederung, Textabschnitte, Folien, Notiz-Thread) mit den Zuständen aus Abschnitt 2.
+  Gliederung, Textabschnitte, Folien, Notizen und Quellen) mit den Zuständen aus Abschnitt 2.
 - Collegare kann die Warteschlange **nach Gruppen ordnen** (eine Zeile je Gruppe, aufklappbar zu den Mitgliedern;
   bei jedem Produkt steht, wer zuständig ist). Das ist nur eine Sortierung: Noten bleiben je Person.
 
@@ -100,6 +100,9 @@ Wenn kein Editor offen ist, zeigt Collegare alle verfügbaren Oberflächen als *
 wie die Startseite von Office oder die Projektkacheln in brausa. Nicht freigegebene Oberflächen sind ausgegraut, mit
 Hinweis, ab wann sie kommen. Office-Kacheln tragen ihre Office-Farbe; die übrigen bleiben grau.
 
+Notizen und Quellen sind **eine** Oberfläche (Jo, 8. November 2026): Notiz-Thread und Quellensammlung liegen
+zusammen, eine Quelle ist eine Notiz mit Fundstelle.
+
 ## 8. Gemeinsame Farbnamen
 
 Beide Apps verwenden diese CSS-Variablen (Werte für Tag/Nacht in der jeweiligen App, gleich gehalten):
@@ -116,7 +119,7 @@ Beide Apps verwenden diese CSS-Variablen (Werte für Tag/Nacht in der jeweiligen
 
 ## 9. Vorbilder für einzelne Bausteine
 
-Kanban, Mindmap und Notiz-Thread folgen im Aufbau weiter brausa (siehe README, Abweichungstabelle); ihre Farben kommen
+Kanban, Mindmap sowie Notizen und Quellen folgen im Aufbau weiter brausa (siehe README, Abweichungstabelle); ihre Farben kommen
 aus den gemeinsamen Farbnamen. Teile aus Autogra.fi (Scanner, QR-Kopplung, Codeeingabe) behalten ihre Bedienung.
 
 ## Stand der Umsetzung

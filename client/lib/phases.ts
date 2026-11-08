@@ -43,7 +43,7 @@ function help(key: PhaseKey, s: ProjectSettings, single: boolean): string {
     case 'orientation':
       return 'Sammelt in der Mindmap Ideen und Fragen als Karten und legt Zusammengehöriges in Cluster. Steht die Ordnung, tippt auf „Gliederung übernehmen“: Jeder Cluster wird ein Abschnitt.';
     case 'research':
-      return 'Sucht Quellen, haltet sie mit Fundstelle fest und ordnet sie euren Abschnitten zu.';
+      return 'Haltet in „Notizen und Quellen“ Absprachen, Fragen und Quellen mit Fundstelle fest und ordnet sie euren Abschnitten zu.';
     case 'drafting':
       return s.finishLock
         ? 'Jede Person schreibt ihre Abschnitte im Texteditor. Ist dein Abschnitt fertig, meldest du ihn „fertig“; danach ist er gesperrt.'
@@ -118,12 +118,11 @@ export const TILES: TileDef[] = [
   { key: 'groups', phase: 'groups', title: 'Gruppen', icon: 'users', path: '/projekt/gruppen/?id={id}', sub: 'Board der Gruppenbildung' },
   { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}', sub: 'Ideen sammeln und ordnen' },
   { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/mindmap/?id={id}&gliederung=1', sub: 'Abschnitte aus den Clustern' },
-  { key: 'research', phase: 'research', title: 'Quellen', icon: 'search', sub: 'Literatur und Fundstellen' },
+  { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
   { key: 'sections', phase: 'drafting', title: 'Textabschnitte', icon: 'doc', office: 'word', docType: 'section', path: '/projekt/ausarbeitung/?id={id}', sub: 'Texteditor je Abschnitt' },
   { key: 'slides', phase: 'presentation', title: 'Präsentation', icon: 'slides', office: 'slide', docType: 'slides', sub: 'Folien der Gruppe' },
   { key: 'handout', phase: 'presentation', title: 'Handout', icon: 'doc', office: 'word', docType: 'handout', sub: 'Zusammenfassung für die Klasse' },
   { key: 'sheet', phase: 'research', title: 'Tabelle', icon: 'grid', office: 'cell', docType: 'sheet', sub: 'Daten auswerten' },
-  { key: 'notes', phase: null, title: 'Notiz-Thread', icon: 'notes', sub: 'Absprachen und Fragen der Gruppe' },
 ];
 
 export const OFFICE_VAR: Record<Office, string> = { word: 'var(--office-word)', slide: 'var(--office-slide)', cell: 'var(--office-cell)' };
