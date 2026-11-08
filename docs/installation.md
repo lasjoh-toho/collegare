@@ -6,7 +6,7 @@ Node.js 22. Auf der VM müssen nur systemd, Apache und MariaDB vorhanden sein. C
 
 ## Voraussetzungen
 
-- Debian oder Ubuntu (x86-64) mit systemd
+- Debian oder Ubuntu (x86-64) mit systemd, z. B. TurnKey LAMP (dort ist alles Nötige schon da; `sudo` wird nicht gebraucht)
 - Apache 2.4 mit HTTPS (Zertifikat ist schon eingerichtet)
 - MariaDB ab 10.6 (`apt install mariadb-server`), root kann sich lokal ohne Passwort anmelden (Standard bei Debian/Ubuntu)
 - etwa 2 GB freier Platz (das Paket hält die letzten drei Versionen vor)
@@ -20,7 +20,11 @@ curl -fsSL https://raw.githubusercontent.com/lasjoh-toho/collegare/main/packagin
   | sudo bash -s -- installieren --url https://server.schule.de/collegare --admin jo
 ```
 
-- `--url` ist die Adresse, unter der Collegare später erreichbar sein soll (Unterordner `/collegare`).
+- `--url` ist die Adresse, unter der Collegare später erreichbar sein soll (Unterordner `/collegare`). Ohne `--url`
+  schlägt der Installer `https://<Rechnername>/collegare` vor und fragt nach; Enter übernimmt den Vorschlag.
+  Die Adresse braucht Collegare für Moodle (LTI), die QR-Codes auf den Zugangszetteln und sichere Cookies.
+- Als root (z. B. auf einem TurnKey-LAMP-Server) einfach ohne `sudo`:
+  `curl -fsSL https://raw.githubusercontent.com/lasjoh-toho/collegare/main/packaging/collegare.sh | bash -s -- installieren --admin jo`
 - `--admin jo` legt das erste Administrationskonto an; der Installer fragt im Terminal nach Name und Passwort.
 - Eine bestimmte Version statt der neuesten: `… installieren 0.3.0 --url … --admin jo`.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installiert oder aktualisiert Collegare auf einer Linux-VM (Debian/Ubuntu, systemd, Apache, MariaDB).
 # Aus dem entpackten Release-Paket als root aufrufen:
-#   sudo ./install.sh --url https://server.schule.de/collegare [--db mysql://user:pw@127.0.0.1:3306/collegare] [--port 8787] [--admin kürzel]
+#   sudo ./install.sh [--url https://server.schule.de/collegare] [--db mysql://user:pw@127.0.0.1:3306/collegare] [--port 8787] [--admin kürzel]
 # Ein zweiter Aufruf mit einem neueren Paket aktualisiert; vorhandene Einstellungen bleiben erhalten.
 set -euo pipefail
 
@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ "$(id -u)" = 0 ] || { echo "Bitte als root ausführen (sudo)." >&2; exit 1; }
+[ "$(id -u)" = 0 ] || { echo "Bitte als root ausführen (z. B. mit sudo)." >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "systemd wird benötigt." >&2; exit 1; }
 SRC="$(cd "$(dirname "$0")" && pwd)"
 VERSION="$(cat "$SRC/VERSION")"
@@ -36,7 +36,17 @@ chown collegare:collegare "$DATA"
 
 # Einstellungen beim ersten Mal anlegen
 if [ ! -f "$ENVF" ]; then
-  [ -n "$URL" ] || { echo "Beim ersten Mal --url angeben, z. B. --url https://server.schule.de/collegare" >&2; exit 1; }
+  if [ -z "$URL" ]; then
+    # Adresse vorschlagen: voller Rechnername, sonst die erste IP-Adresse des Servers
+    H="$(hostname -f 2>/dev/null || hostname)"
+    case "$H" in *.*) ;; *) H="$(hostname -I 2>/dev/null | awk '{print $1}')"; H="${H:-localhost}" ;; esac
+    URL="https://$H/collegare"
+    if { : </dev/tty; } 2>/dev/null; then
+      read -r -p "Adresse, unter der Collegare erreichbar sein soll [$URL]: " ANS </dev/tty
+      [ -z "$ANS" ] || URL="${ANS%/}"
+    fi
+    echo "Adresse: $URL (später änderbar in $ENVF, dann systemctl restart collegare)"
+  fi
   if [ -z "$DB" ]; then
     command -v mysql >/dev/null || { echo "MariaDB nicht gefunden. Bitte installieren (apt install mariadb-server) oder --db angeben." >&2; exit 1; }
     PW="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
@@ -135,7 +145,7 @@ done
 [ "${OK:-0}" = 1 ] || { echo "Collegare startet nicht. Protokoll: journalctl -u collegare -n 50" >&2; exit 1; }
 
 # erstes Admin-Konto
-run_cli() { (cd "$PREFIX/current/server" && set -a && . "$ENVF" && set +a && sudo -E -u collegare "$PREFIX/current/node/bin/node" dist/cli.js "$@"); }
+run_cli() { (cd "$PREFIX/current/server" && set -a && . "$ENVF" && set +a && runuser -u collegare -- "$PREFIX/current/node/bin/node" dist/cli.js "$@"); }
 if [ -n "$ADMIN" ]; then
   if { : </dev/tty; } 2>/dev/null; then read -r -p "Name für $ADMIN: " NAME </dev/tty; else read -r -p "Name für $ADMIN: " NAME; fi
   run_cli admin:create "$ADMIN" "$NAME"

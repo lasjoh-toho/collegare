@@ -22,7 +22,7 @@ ENVF=/etc/collegare/collegare.env
 
 die() { echo "$*" >&2; exit 1; }
 has_tty() { { : </dev/tty; } 2>/dev/null; }
-need_root() { [ "$(id -u)" = 0 ] || die "Bitte mit sudo aufrufen."; }
+need_root() { [ "$(id -u)" = 0 ] || die "Bitte als root aufrufen (z. B. mit sudo)."; }
 installed() { cat "$PREFIX/current/VERSION" 2>/dev/null || echo "keine"; }
 
 # neueste Version laut GitHub (Vorabversionen eingeschlossen, die neueste zuerst)
@@ -54,7 +54,7 @@ fetch_and_install() {
 run_cli() {
   need_root
   [ -f "$ENVF" ] || die "Collegare ist nicht installiert."
-  (cd "$PREFIX/current/server" && set -a && . "$ENVF" && set +a && sudo -E -u collegare "$PREFIX/current/node/bin/node" dist/cli.js "$@")
+  (cd "$PREFIX/current/server" && set -a && . "$ENVF" && set +a && runuser -u collegare -- "$PREFIX/current/node/bin/node" dist/cli.js "$@")
 }
 
 cmd="${1:-hilfe}"; shift || true
