@@ -103,6 +103,38 @@ export class Projects {
     return out;
   }
 
+  /**
+   * Kennzahlen je Projekt für das Portal (Konzept 8b): Lernende, Gruppen, Abschnitte und neue Fertig-Meldungen
+   * seit einem Zeitpunkt. Wenige gebündelte Abfragen statt einer je Projekt.
+   */
+  async summaries(projectIds: number[], since: number | null) {
+    const out = new Map<number, { subject: string | null; phases: ProjectSettings['phases']; students: number; unassigned: number; groups: number; docs: number; done: number; newDone: number }>();
+    if (!projectIds.length) return out;
+    const projects = await this.db.selectFrom('projects').select(['id', 'settings']).where('id', 'in', projectIds).execute();
+    for (const p of projects) {
+      const st = parseSettings(p.settings) as ProjectSettings;
+      out.set(p.id, { subject: st.subject, phases: st.phases, students: 0, unassigned: 0, groups: 0, docs: 0, done: 0, newDone: 0 });
+    }
+    const members = await this.db.selectFrom('group_members').select(['project_id', 'group_id']).where('project_id', 'in', projectIds).execute();
+    for (const m of members) {
+      const o = out.get(m.project_id)!;
+      o.students++;
+      if (m.group_id === null) o.unassigned++;
+    }
+    const groups = await this.db.selectFrom('groups').select(['project_id']).where('project_id', 'in', projectIds).execute();
+    for (const g of groups) out.get(g.project_id)!.groups++;
+    const docs = await this.db.selectFrom('documents').select(['project_id', 'done_at']).where('project_id', 'in', projectIds).execute();
+    for (const d of docs) {
+      const o = out.get(d.project_id)!;
+      o.docs++;
+      if (d.done_at !== null) {
+        o.done++;
+        if (since !== null && Number(d.done_at) > since) o.newDone++;
+      }
+    }
+    return out;
+  }
+
   async board(projectId: number): Promise<Board> {
     const p = await this.db.selectFrom('projects').select(['mode']).where('id', '=', projectId).executeTakeFirstOrThrow();
     const groups = await this.db.selectFrom('groups').select(['id', 'title', 'position', 'color']).where('project_id', '=', projectId).orderBy('position').orderBy('id').execute();

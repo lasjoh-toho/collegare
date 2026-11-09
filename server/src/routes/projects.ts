@@ -86,7 +86,10 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
     if (!sess) return;
     let list = await s.projects.listFor(sess.userId);
     if (sess.projectId !== null) list = list.filter((p) => p.id === sess.projectId);
-    return { projects: list };
+    // Kennzahlen für das Portal nur für eigene Projekte als Lehrkraft (Konzept 8b); ?seit= für „neu“
+    const since = Number((req.query as { seit?: string }).seit);
+    const sums = await s.projects.summaries(list.filter((p) => p.role === 'teacher').map((p) => p.id), Number.isFinite(since) && since > 0 ? since : null);
+    return { projects: list.map((p) => ({ ...p, summary: sums.get(p.id) ?? null })) };
   });
 
   app.post('/api/projects', async (req, reply) => {

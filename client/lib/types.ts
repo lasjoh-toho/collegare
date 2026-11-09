@@ -14,6 +14,20 @@ export interface ProjectListItem {
   contextId: number;
   role: 'teacher' | 'student';
   createdAt: number;
+  /** Kennzahlen für das Portal, nur bei eigenen Projekten als Lehrkraft */
+  summary?: ProjectSummary | null;
+}
+
+export interface ProjectSummary {
+  subject: string | null;
+  phases: ProjectSettings['phases'];
+  students: number;
+  unassigned: number;
+  groups: number;
+  docs: number;
+  done: number;
+  /** Fertig-Meldungen seit dem letzten Besuch im Portal */
+  newDone: number;
 }
 
 export interface Course {

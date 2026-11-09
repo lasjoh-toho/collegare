@@ -1,6 +1,6 @@
 'use client';
 /** Übersicht der Verwaltung (Issue #5). */
-import { Topbar } from '@/components/Topbar';
+import { PortalHead, PortalShell } from '@/components/PortalShell';
 import { href } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import s from '../start.module.css';
@@ -13,10 +13,11 @@ const PAGES = [
 
 export default function Verwaltung() {
   const [me] = useMe();
+  if (!me) return null;
   return (
-    <>
-      <Topbar me={me ?? null} title="Verwaltung" />
-      <main className={s.start}>
+    <PortalShell me={me} active="admin">
+      <div>
+        <PortalHead title="Verwaltung" />
         <div className={s.cards}>
           {PAGES.map((p) => (
             <a key={p.path} className={`panel ${s.card}`} href={href(p.path)}>
@@ -25,7 +26,7 @@ export default function Verwaltung() {
             </a>
           ))}
         </div>
-      </main>
-    </>
+      </div>
+    </PortalShell>
   );
 }

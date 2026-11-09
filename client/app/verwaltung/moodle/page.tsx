@@ -1,7 +1,7 @@
 'use client';
 /** Seite „Moodle-Verbindung“ wie in Autogra.fi: Werte für Moodle anzeigen, Plattform aus Moodle eintragen. */
 import { useEffect, useState } from 'react';
-import { Topbar } from '@/components/Topbar';
+import { PortalHead, PortalShell } from '@/components/PortalShell';
 import { ApiError, del, get, post } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import s from '../../start.module.css';
@@ -71,10 +71,11 @@ export default function MoodlePage() {
   );
   const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
+  if (!me) return null;
   return (
-    <>
-      <Topbar me={me ?? null} title="Moodle-Verbindung" />
-      <main className={s.start} style={{ maxWidth: 820 }}>
+    <PortalShell me={me} active="moodle">
+      <div style={{ maxWidth: 900 }}>
+        <PortalHead title="Moodle-Verbindung" />
         {error && <div className="error">{error}</div>}
         {tool && (
           <section className={`panel ${m.box}`}>
@@ -134,7 +135,7 @@ export default function MoodlePage() {
             </div>
           ))}
         </section>
-      </main>
-    </>
+      </div>
+    </PortalShell>
   );
 }

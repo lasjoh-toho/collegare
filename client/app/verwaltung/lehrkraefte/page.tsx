@@ -1,7 +1,7 @@
 'use client';
 /** Lehrkräfte anlegen, Passwort setzen und als Lehrkraft ansehen (wie im Autogra.fi-Portal). */
 import { useEffect, useState } from 'react';
-import { Topbar } from '@/components/Topbar';
+import { PortalHead, PortalShell } from '@/components/PortalShell';
 import { ApiError, get, href, post } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import s from '../../start.module.css';
@@ -57,10 +57,11 @@ export default function Lehrkraefte() {
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
+  if (!me) return null;
   return (
-    <>
-      <Topbar me={me ?? null} title="Lehrkräfte" />
-      <main className={s.start} style={{ maxWidth: 820 }}>
+    <PortalShell me={me} active="teachers">
+      <div style={{ maxWidth: 900 }}>
+        <PortalHead title="Lehrende" />
         {error && <div className="error">{error}</div>}
         {note && (
           <div className="panel" style={{ padding: '10px 14px', boxShadow: '0 0 0 2px var(--ok)' }}>
@@ -71,19 +72,59 @@ export default function Lehrkraefte() {
           </div>
         )}
         <section className={`panel ${v.box}`}>
-          <h2>Lehrkraft anlegen</h2>
+          <h2>Angelegte Lehrende ({list.length})</h2>
+          {list.length === 0 ? (
+            <p className="muted">Noch keine. Wer über Moodle startet, erscheint hier nicht: Moodle legt die Person beim ersten Start an.</p>
+          ) : (
+            <table className={v.table}>
+              <thead>
+                <tr>
+                  <th>Kürzel</th>
+                  <th>Name</th>
+                  <th>Angelegt</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((t) => (
+                  <tr key={t.id}>
+                    <td>
+                      <span className={v.chip}>{t.login}</span>
+                    </td>
+                    <td>{t.name}</td>
+                    <td className="muted">{new Date(Number(t.created_at)).toLocaleDateString('de-DE')}</td>
+                    <td>
+                      <span className={v.acts}>
+                        {t.id !== me?.id && (
+                          <button className="btn" onClick={() => viewAs(t)} title="Collegare so sehen wie diese Lehrkraft (wird protokolliert)">
+                            Übersicht
+                          </button>
+                        )}
+                        <button className="btn" onClick={() => setPwFor(t)}>
+                          Passwort
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+        <section className={`panel ${v.box}`}>
+          <h2>Neue Lehrkraft anlegen</h2>
           <p className="muted">Jede Lehrkraft bekommt einen eigenen Bereich für ihre Kurse. Wer über Moodle startet, braucht kein Konto: Moodle legt die Person beim ersten Start an.</p>
           <div className={v.grid}>
             <div className="field">
-              <label>Kürzel (Anmeldename)</label>
+              <label>Kürzel (2–6 Buchstaben)</label>
               <input value={form.login} onChange={set('login')} placeholder="mue" autoComplete="off" />
             </div>
             <div className="field">
-              <label>Name</label>
+              <label>Vollständiger Name</label>
               <input value={form.name} onChange={set('name')} placeholder="Frau Müller" />
             </div>
             <div className="field">
-              <label>Startpasswort</label>
+              <label>Initialkennwort</label>
               <div className="row">
                 <input className={v.pw} value={form.password} onChange={set('password')} autoComplete="new-password" />
                 <button className="btn icon" title="Passwort erzeugen" onClick={() => setForm({ ...form, password: newPassword() })}>
@@ -99,32 +140,9 @@ export default function Lehrkraefte() {
             </button>
           </div>
         </section>
-        <section className={`panel ${v.box}`}>
-          <h2>Lehrkräfte mit Konto ({list.length})</h2>
-          {list.length === 0 && <p className="muted">Noch keine.</p>}
-          {list.map((t) => (
-            <div key={t.id} className={v.person}>
-              <span>
-                {t.name}
-                <small>{t.login}</small>
-              </span>
-              <span className="muted">{new Date(Number(t.created_at)).toLocaleDateString('de-DE')}</span>
-              <span className={v.acts}>
-                <button className="btn" onClick={() => setPwFor(t)}>
-                  Passwort setzen
-                </button>
-                {t.id !== me?.id && (
-                  <button className="btn" onClick={() => viewAs(t)} title="Collegare so sehen wie diese Lehrkraft (wird protokolliert)">
-                    Ansehen als
-                  </button>
-                )}
-              </span>
-            </div>
-          ))}
-        </section>
-      </main>
+      </div>
       {pwFor && <PasswordDialog teacher={pwFor} onClose={(msg) => (setPwFor(null), msg && setNote(msg))} />}
-    </>
+    </PortalShell>
   );
 }
 

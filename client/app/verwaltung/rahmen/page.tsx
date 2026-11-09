@@ -4,7 +4,7 @@
  * einschalten dürfen. Abgeschaltetes erscheint in der Projekt-Einstellung grau.
  */
 import { useEffect, useState } from 'react';
-import { Topbar } from '@/components/Topbar';
+import { PortalHead, PortalShell } from '@/components/PortalShell';
 import { ApiError, get, put } from '@/lib/api';
 import { DOC_LABELS, EXPORT_LABELS, IMPORT_LABELS } from '@/lib/labels';
 import type { Frame } from '@/lib/types';
@@ -54,10 +54,11 @@ export default function Rahmen() {
   }
   const dirty = JSON.stringify(frame) !== JSON.stringify(saved);
 
+  if (!me) return null;
   return (
-    <>
-      <Topbar me={me ?? null} title="Rahmen für Projekte" />
-      <main className={s.start} style={{ maxWidth: 820, paddingBottom: 90 }}>
+    <PortalShell me={me} active="frame">
+      <div style={{ maxWidth: 900, paddingBottom: 90 }}>
+        <PortalHead title="Rahmen für Projekte" />
         {error && <div className="error">{error}</div>}
         {frame && (
           <>
@@ -111,7 +112,7 @@ export default function Rahmen() {
             </section>
           </>
         )}
-      </main>
+      </div>
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'color-mix(in srgb, var(--bg) 92%, transparent)', backdropFilter: 'blur(8px)', borderTop: '1px solid var(--line)' }}>
         <span className="grow" />
         {ok && !dirty && <span className={v.saved}>Gespeichert</span>}
@@ -119,6 +120,6 @@ export default function Rahmen() {
           Rahmen speichern
         </button>
       </div>
-    </>
+    </PortalShell>
   );
 }

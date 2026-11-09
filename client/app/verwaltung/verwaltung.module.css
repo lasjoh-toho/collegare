@@ -12,8 +12,15 @@
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
 .saved { color: var(--ok); font-weight: 600; }
 .pw { font-family: var(--mono); }
+/* Tabelle „Angelegte Lehrende“ wie im Autogra.fi-Portal */
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-faint); font-weight: 600; padding: 6px 8px; }
+.table td { padding: 9px 8px; border-top: 1px solid var(--line); vertical-align: middle; }
+.table td:last-child, .table th:last-child { text-align: right; }
+.chip { display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--ui-accent-soft, rgba(63,95,138,.14)); color: var(--ui-accent, #3f5f8a); }
 @media (max-width: 640px) {
   .grid, .cols { grid-template-columns: 1fr; }
   .person { grid-template-columns: 1fr; }
+  .table th:nth-child(3), .table td:nth-child(3) { display: none; }
   .acts { justify-content: flex-start; }
 }
