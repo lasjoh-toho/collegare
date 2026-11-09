@@ -20,7 +20,7 @@ done
 
 [ "$(id -u)" = 0 ] || { echo "Bitte als root ausführen (z. B. mit sudo)." >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "systemd wird benötigt." >&2; exit 1; }
-SRC="$(cd "$(dirname "$0")" && pwd)"
+SRC="$(cd "$(dirname "$0")" && pwd -P)"
 VERSION="$(cat "$SRC/VERSION")"
 PREFIX=/opt/collegare
 ETC=/etc/collegare
@@ -42,8 +42,14 @@ if [ ! -f "$ENVF" ]; then
     case "$H" in *.*) ;; *) H="$(hostname -I 2>/dev/null | awk '{print $1}')"; H="${H:-localhost}" ;; esac
     URL="https://$H/collegare"
     if { : </dev/tty; } 2>/dev/null; then
-      read -r -p "Adresse, unter der Collegare erreichbar sein soll [$URL]: " ANS </dev/tty
-      [ -z "$ANS" ] || URL="${ANS%/}"
+      while :; do
+        read -r -p "Adresse, unter der Collegare erreichbar sein soll (Enter übernimmt) [$URL]: " ANS </dev/tty
+        case "$ANS" in
+          ""|y|yes|j|ja|Y|J|Ja|Yes) break ;;
+          http://*|https://*) URL="${ANS%/}"; break ;;
+          *) echo "Bitte Enter drücken oder eine Adresse mit https:// eingeben." ;;
+        esac
+      done
     fi
     echo "Adresse: $URL (später änderbar in $ENVF, dann systemctl restart collegare)"
   fi
@@ -73,6 +79,10 @@ ENV
   chown root:collegare "$ENVF" && chmod 640 "$ENVF"
   umask 022
 fi
+if [ -n "$URL" ]; then
+  case "$URL" in http://*|https://*) ;; *) echo "Die Adresse muss mit https:// beginnen: $URL" >&2; exit 1 ;; esac
+  grep -q "^APP_URL=$URL\$" "$ENVF" || { sed -i "s#^APP_URL=.*#APP_URL=$URL#" "$ENVF"; echo "Adresse gesetzt: $URL"; }
+fi
 # shellcheck disable=SC1090
 . "$ENVF"
 PORT="${PORT:-8787}"
@@ -81,9 +91,13 @@ APP_PATH="${APP_PATH:-/}"
 
 # Dateien
 DEST="$PREFIX/releases/$VERSION"
-rm -rf "$DEST" && mkdir -p "$DEST"
-cp -a "$SRC/server" "$SRC/client" "$SRC/office" "$SRC/node" "$SRC/VERSION" "$DEST/"
-[ -f "$SRC/LICENSE" ] && cp "$SRC/LICENSE" "$SRC/LIZENZEN.md" "$DEST/" || true
+if [ "$SRC" != "$(readlink -f "$DEST" 2>/dev/null || echo "$DEST")" ]; then
+  rm -rf "$DEST" && mkdir -p "$DEST"
+  cp -a "$SRC/server" "$SRC/client" "$SRC/office" "$SRC/node" "$SRC/VERSION" "$DEST/"
+  [ -f "$SRC/LICENSE" ] && cp "$SRC/LICENSE" "$SRC/LIZENZEN.md" "$DEST/" || true
+  # Installer mit ablegen, damit `collegare adresse` die Einrichtung ohne neues Paket wiederholen kann
+  cp "$SRC/install.sh" "$DEST/" && [ -f "$SRC/collegare.sh" ] && cp "$SRC/collegare.sh" "$DEST/" || true
+fi
 ln -sfn "$DEST" "$PREFIX/current"
 chown -R root:root "$DEST"
 

@@ -94,6 +94,7 @@ sudo collegare zurueck 0.2.0
 |---|---|
 | Zustand | `collegare status` |
 | Protokoll | `collegare protokoll` |
+| Adresse ändern | `sudo collegare adresse https://server.schule.de/collegare` |
 | Neu starten | `sudo collegare neustart` |
 | Weiteres Admin-Konto | `sudo collegare admin <kürzel>` |
 | Passwort zurücksetzen | `sudo collegare passwort <kürzel>` |

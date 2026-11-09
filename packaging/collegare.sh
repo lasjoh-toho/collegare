@@ -9,6 +9,7 @@
 #   sudo collegare aktualisieren 0.3.0      bestimmte Version
 #   collegare version                       installierte und neueste Version
 #   sudo collegare zurueck 0.2.0            auf eine vorhandene ältere Version zurück
+#   sudo collegare adresse https://…/collegare   Adresse ändern (Apache wird mit angepasst)
 #   collegare status | protokoll            Dienst ansehen
 #   sudo collegare neustart
 #   sudo collegare admin <kürzel>           weiteres Administrationskonto
@@ -78,12 +79,17 @@ case "$cmd" in
     [ -n "${1:-}" ] || { echo "Vorhanden:"; ls -1 "$PREFIX/releases"; exit 0; }
     [ -d "$PREFIX/releases/$1" ] || die "Version $1 liegt nicht unter $PREFIX/releases."
     ln -sfn "$PREFIX/releases/$1" "$PREFIX/current" && systemctl restart collegare && echo "Zurück auf $1." ;;
+  adresse)
+    need_root
+    [ -n "${1:-}" ] || { grep '^APP_URL=' "$ENVF"; exit 0; }
+    [ -x "$PREFIX/current/install.sh" ] || die "Diese Version hat den Installer nicht abgelegt. Bitte: collegare aktualisieren"
+    "$PREFIX/current/install.sh" --url "${1%/}" ;;
   status) systemctl status collegare --no-pager ;;
   protokoll|log) journalctl -u collegare -f ;;
   neustart|restart) need_root; systemctl restart collegare ;;
   admin) [ -n "${1:-}" ] || die "Kürzel angeben."; if has_tty; then read -r -p "Name für $1: " NAME </dev/tty; else read -r -p "Name für $1: " NAME; fi; run_cli admin:create "$1" "$NAME" ;;
   pruefen) run_cli audit:verify ;;
   passwort) [ -n "${1:-}" ] || die "Kürzel angeben."; run_cli admin:password "$1" ;;
-  hilfe|-h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+  hilfe|-h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "Unbekannter Befehl: $cmd (collegare hilfe)" ;;
 esac
