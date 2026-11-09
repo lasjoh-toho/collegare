@@ -5,14 +5,42 @@
  *   node dist/cli.js audit:verify
  */
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { configFromEnv, createServices } from './services.js';
+
+/** Eine Zeile lesen; mit hidden ohne Anzeige der Zeichen (Passwort im Terminal). */
+async function ask(question: string, hidden: boolean): Promise<string> {
+  const tty = !!process.stdin.isTTY && hidden;
+  let mute = false;
+  // Ausgabe über einen Filter: nach der Frage wird nichts mehr zurückgeschrieben
+  const output = new Writable({
+    write(chunk, _enc, done) {
+      if (!mute) process.stdout.write(chunk);
+      done();
+    },
+  });
+  const rl = createInterface({ input: process.stdin, output: tty ? output : process.stdout, terminal: tty });
+  const pending = rl.question(question);
+  mute = tty;
+  const answer = await pending;
+  rl.close();
+  if (tty) process.stdout.write('\n');
+  return answer;
+}
 
 async function askPassword(): Promise<string> {
   if (process.env.COLLEGARE_PASSWORD) return process.env.COLLEGARE_PASSWORD;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const pw = await rl.question('Passwort (mind. 8 Zeichen): ');
-  rl.close();
-  return pw;
+  // ohne Terminal (z. B. echo … | cli) nur einmal lesen
+  if (!process.stdin.isTTY) return ask('Passwort: ', false);
+  for (;;) {
+    const pw = await ask('Passwort (mind. 8 Zeichen, wird nicht angezeigt): ', true);
+    if (pw.length < 8) {
+      console.log('Zu kurz, bitte mindestens 8 Zeichen.');
+      continue;
+    }
+    if ((await ask('Passwort wiederholen: ', true)) === pw) return pw;
+    console.log('Die beiden Eingaben stimmen nicht überein, bitte noch einmal.');
+  }
 }
 
 const [cmd, ...args] = process.argv.slice(2);
