@@ -512,6 +512,124 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 | **Abgabe an Autogra.fi** (später) | Ein Endprodukt (z. B. Ausarbeitung als PDF) oder einzelne Leistungen werden als Leistungsnachweis an Autogra.fi übergeben und dort mit der bekannten Korrekturoberfläche bewertet. |
 | **Gemeinsame Anmeldung** (später) | Beide Werkzeuge sind eigene LTI-Tools in Moodle; im Einzelbetrieb einheitliche Lehrkraft-Konten (OIDC oder gemeinsamer Kontodienst). |
 
+## 8a. Module: Werkzeuge in Collegare einbinden
+
+Stand: 9. November 2026, Wunsch von Jo. Collegare soll eine übergreifende Plattform werden, in die Teile von
+Autogra.fi (z. B. Notizen scannen und überarbeiten) und andere Werkzeuge (z. B. GeoGebra für Funktionen) als
+**Module** eingebunden werden. Dieser Abschnitt legt die Anforderungen fest, **bevor** das erste Modul gebaut wird,
+damit heutige Entscheidungen das später nicht verbauen.
+
+### 8a.1 Begriffe
+
+| Begriff | Bedeutung |
+|---|---|
+| **Modul** | ein Werkzeug mit eigener Oberfläche oder ein Dienst ohne Oberfläche, das Collegare einbindet |
+| **Produkt** (Artefakt) | was in einem Modul entsteht: Textabschnitt, Folie, Mindmap, Notiz, GeoGebra-Konstruktion, gescannte Seite |
+| **Modulbeschreibung** (Manifest) | Datei, die ein Modul beschreibt: Name, Symbol, Adresse, Produktarten, Fähigkeiten, Rechte, Lizenz, Datenfluss |
+| **Werkzeug-Kachel** | Kachel der Übersicht (gestaltung.md 7), die ein Modul öffnet |
+
+Die heutigen Oberflächen (Kanban, Mindmap, Office-Editoren, Notizen und Quellen) werden **selbst als Module
+beschrieben**. So gibt es keinen Sonderweg für eingebaute Teile, und die Kachelliste (`client/lib/phases.ts`,
+`TILES`) wird später aus den Modulbeschreibungen erzeugt statt von Hand gepflegt.
+
+### 8a.2 Drei Arten der Einbindung
+
+| Art | Wie | Beispiele |
+|---|---|---|
+| **Eingebettet** | eigene Seite im iframe, Austausch nur über ein festes Nachrichtenprotokoll (`postMessage`, 8a.4) | Office-Editoren (heute schon so), GeoGebra, Scannen und Überarbeiten aus Autogra.fi |
+| **LTI 1.3** | Collegare tritt gegenüber dem Werkzeug als Plattform auf (wie Moodle) | fertige Lernwerkzeuge mit LTI |
+| **Dienst** | Server-Schnittstelle ohne Oberfläche, mit Dienst-Token | Texterkennung von Autogra.fi (Abschnitt 8), Sprachmodell, Export |
+
+Eingebettet ist der Standard; LTI kommt dazu, wenn ein gewünschtes Werkzeug nur LTI kann.
+
+### 8a.3 Anforderungen an jedes Modul
+
+1. **Collegare besitzt die Daten.** Der maßgebliche Stand jedes Produkts liegt in Collegare (versioniert, mit
+   Prüfprotokoll), nicht im Modul. Ein Modul, das eigene Daten halten muss (z. B. Autogra.fi mit Seitenbildern),
+   liefert Collegare mindestens einen Verweis **und** einen Schnappschuss (Text, Bild oder PDF), damit Korrektur,
+   Archiv (7.9) und Export ohne das Modul funktionieren.
+2. **Rechte und Sperren setzt Collegare durch.** Das Modul bekommt beim Start „lesen“ oder „schreiben“ und hält sich
+   daran; Speichern prüft der Collegare-Server trotzdem (Fertig-Sperre 5.2, Phasen, Rollen). Ein Modul greift nie
+   direkt auf die Datenbank zu.
+3. **Einheitliche Zustände.** Jedes Produkt hat die Zustände aus gestaltung.md 2 (fehlt, Entwurf, freigegeben,
+   fertig). „Fertig melden“ und „Wieder öffnen“ bietet Collegare an, nicht das Modul.
+4. **Leseansicht für die Korrektur.** Jedes Modul kann ein Produkt nur anzeigen (ohne Bearbeiten) und möglichst als
+   PDF oder Bild ausgeben, für Korrektur, Archiv und Abgabe an Autogra.fi.
+5. **Protokoll.** Einfügen und Importe meldet das Modul an Collegare (Einfüge-Protokoll 6.1); Collegare schreibt sie
+   ins Prüfprotokoll.
+6. **Gestaltung.** Das Modul übernimmt Tag/Nacht und die neutralen Farbnamen (gestaltung.md 8) und baut keine eigene
+   Leiste über sich (wie bei OnlyOffice, gestaltung.md 5). Inhalte behalten ihre eigenen Farben.
+7. **Handy.** Die Modulbeschreibung sagt, ob das Modul am Handy nutzbar ist; sonst zeigt die Kachel dort einen
+   Hinweis statt eines kaputten Werkzeugs.
+8. **Datenschutz.** Die Modulbeschreibung sagt, wohin Daten fließen (eigener Server, fremder Server). Module auf
+   fremden Servern schaltet nur die Administration frei, nach Bestätigung. Namen gehen standardmäßig **nicht** an
+   Module, nur eine Kennung je Person und Projekt; Namen nur, wenn das Modul sie braucht und die Administration es
+   erlaubt. Keine Daten an die KI ohne die Regeln aus Abschnitt 6.7.
+9. **Lizenz getrennt.** Ein Modul ist ein eigener Teil mit eigener Lizenz (wie `web/`). Kein Code wird zwischen Kern
+   und Modul kopiert oder importiert; nur Protokoll und Dienstschnittstelle verbinden sie (`LIZENZEN.md`).
+10. **Versionen.** Modulbeschreibung und Protokoll tragen eine Versionsnummer. Ein Modul muss ältere Stände seiner
+    Produkte lesen können (oder sie selbst umwandeln); Collegare speichert die Version mit jedem Stand.
+11. **Freigabe in zwei Stufen.** Die Administration erlaubt Module im Rahmen (wie Dokumentarten heute); die Lehrkraft
+    wählt in den Projekt-Einstellungen, welche Module in welcher Phase zur Verfügung stehen.
+12. **Ausfall.** Ist ein Modul nicht erreichbar, bleibt Collegare bedienbar; die Kachel zeigt den Fehler, und der
+    letzte Schnappschuss bleibt lesbar.
+
+### 8a.4 Nachrichtenprotokoll für eingebettete Module (Entwurf `collegare/1`)
+
+| Richtung | Nachricht | Inhalt |
+|---|---|---|
+| Collegare → Modul | `init` | Protokollversion, Produkt-ID und -art, Modus lesen/schreiben, Sprache, Tag/Nacht, Kennung der Person, kurzlebiges Token nur für dieses Produkt, gespeicherter Stand |
+| Modul → Collegare | `ready` | Modulversion, Fähigkeiten |
+| Modul → Collegare | `save` | neuer Stand (JSON oder Datei), optional Schnappschuss |
+| Collegare → Modul | `saved` / `rejected` | Versionsnummer bzw. Grund (gesperrt, Phase beendet, veraltet) |
+| Collegare → Modul | `mode` | Wechsel lesen/schreiben (z. B. nach „Fertig melden“) |
+| Modul → Collegare | `paste` | Länge und Art des Eingefügten (6.1) |
+| Collegare → Modul | `theme` | Tag/Nacht gewechselt |
+| Modul → Collegare | `export` | PDF oder Bild für Korrektur und Archiv |
+| beide | `error` | Fehler mit Text für die Oberfläche |
+
+Collegare prüft bei jeder Nachricht den Absender (Herkunft aus der Modulbeschreibung). Das Token erlaubt nur
+Lesen/Schreiben dieses einen Produkts über `/api/modules/…`; große Dateien gehen über diese Schnittstelle, nicht über
+`postMessage`.
+
+### 8a.5 Was das für heutige Entscheidungen heißt
+
+- **Datenmodell:** Produkte bekommen eine gemeinsame Tabelle (Projekt, Bereich/Gruppe, Modul, Produktart,
+  zuständige Person, Zustand, Version) mit Ständen in einer eigenen Tabelle. Keine modul-eigenen Spalten in den
+  Kerntabellen. Die heutigen Tabellen für Mindmaps und Dokumente werden bei Gelegenheit auf diese Form gebracht.
+- **Phasen verweisen auf Modulkacheln**, nicht auf fest eingebaute Seiten.
+- **Korrektur** (gestaltung.md 4) listet Produkte über die gemeinsame Tabelle, damit neue Module ohne Umbau darin
+  erscheinen.
+- **IDs bleiben stabil** und werden nie wiederverwendet, damit Verweise aus Modulen und Moodle gültig bleiben.
+
+### 8a.6 Erste Module (Vorschlag)
+
+1. **Notiz scannen (Autogra.fi):** In „Notizen und Quellen“ öffnet „Notiz scannen“ Scanner und QR-Kopplung von
+   Autogra.fi; die Texterkennung läuft über den Dienst aus Abschnitt 8, Überarbeiten im Editor von Autogra.fi.
+   Zurück kommt eine Notiz mit Seitenbild und Text. Beide Apps gehören Jo, daher der einfachste erste Fall, an dem
+   sich das Protokoll bewähren muss.
+2. **GeoGebra:** Konstruktion oder Funktionsgraph als Produkt, Stand als GeoGebra-Datei in Collegare. Vorher klären:
+   Lizenz (für Schulen kostenlos, aber nicht frei; Selbst-Hosten erlaubt?) und Datenschutz (Laden von fremden
+   Servern vermeiden, möglichst eigene Kopie der Dateien).
+
+## 8b. Mehrere Aufgaben gleichzeitig verfolgen (Lehrkräfte)
+
+Wunsch von Jo (9. November 2026): Eine Lehrkraft soll ihre verschiedenen Aufgaben gleichzeitig im Blick behalten,
+später über beide Apps hinweg.
+
+- **Portal als Startpunkt:** Das Portal (gleicher Aufbau wie in Autogra.fi, gestaltung.md 3) zeigt alle Aufgaben
+  der Lehrkraft, Collegare-Projekte und später Autogra.fi-Aufgaben in **einer** Liste, mit Klasse, Phase bzw.
+  Schritt, Termin und Zählern („3 neue Fertig-Meldungen“, „5 Abgaben ohne Korrektur“, „2 Fragen offen“).
+- **Was ist neu?** Eine Spalte bzw. Ansicht „Neu seit dem letzten Besuch“ über alle Aufgaben: Fertig-Meldungen,
+  Abgaben, Fragen im Notiz-Thread, Gruppen ohne Fortschritt, abgelaufene Phasen. Ein Klick führt direkt an die Stelle.
+- **Filter** nach Klasse, App, Zustand („braucht mich“, „läuft“, „abgeschlossen“); die Wahl bleibt gespeichert.
+- **Wechseln ohne Umweg:** In Korrektur und Projekt lässt sich über das Seitenmenü zur nächsten Aufgabe springen, die
+  Aufmerksamkeit braucht.
+- **Technisch:** Jede App bietet eine kleine Dienstschnittstelle „Aufgaben-Übersicht“ (Liste mit Zählern und
+  Ereignissen seit Zeitpunkt X, je Lehrkraft). Das gemeinsame Portal fragt beide ab; ist nur eine App installiert,
+  arbeitet es mit dieser allein (gestaltung.md 3). Zähler werden serverseitig berechnet, nicht im Browser.
+- **Benachrichtigungen** (später, abschaltbar): tägliche Zusammenfassung statt Einzelmeldungen.
+
 ---
 
 ## 9. Umsetzungsplan
@@ -543,6 +661,12 @@ Entschieden (Jo, 1. November 2026):
 8. **Formeleditor und Bento-Konverter** (aus mod_pinnwand und mod_bento): Sie stehen unter derselben nicht-kommerziellen Lizenz wie der Kern (Entscheidung 9) und gehören deshalb **direkt in den Kern** (`client/`). Die zuerst gewählte Lösung als getrennt geholte Erweiterung entfällt. Wichtig: Sie laufen in der Projektoberfläche, nicht im Office-iframe; eine Formel kommt per `postMessage` als Gleichung oder Bild ins Dokument. KaTeX, JSZip und die Bento-Datei stehen unter MIT.
 9. **Lizenzen getrennt** (1. November 2026): Der **Kern** (`server/`, `client/` mit Kanban, Mindmap, Notizen, Einstellungen) steht unter Jos nicht-kommerzieller Lizenz wie mod_pinnwand; der **Office-Teil** `web/` bleibt AGPL-3.0, mit unveränderten OnlyOffice-Hinweisen und -Logos. Kein Code wird zwischen beiden Teilen kopiert oder importiert. Beiträge zum Kern stehen unter dieser Lizenz und dürfen von Jo auch anders lizenziert werden. Stände bis Commit `36910cb` bleiben AGPL. Einzelheiten in `LIZENZEN.md`.
 
+10. **Module** (9. November 2026): Collegare wird Plattform für Module (Abschnitt 8a). Die Anforderungen dort gelten
+    für neue Teile ab jetzt; die heutigen Oberflächen werden schrittweise als Module beschrieben.
+11. **Mehrere Aufgaben verfolgen** (9. November 2026): Portal und Dienstschnittstelle „Aufgaben-Übersicht“ wie in 8b.
+
 Offen:
 
 - Termin für den ersten Einsatz.
+- Erstes Modul: „Notiz scannen“ über Autogra.fi (Vorschlag 8a.6).
+- GeoGebra: Lizenz für Selbst-Hosten und Datenschutz klären.
