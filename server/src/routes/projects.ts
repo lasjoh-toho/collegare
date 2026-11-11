@@ -77,8 +77,9 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
       .executeTakeFirst();
     let areaId = area?.id;
     if (areaId === undefined) {
-      // Administration darf selbst Projekte anlegen: beim ersten Kurs bekommt sie einen eigenen Bereich (Wunsch Jo)
-      if (!(await s.users.isSystemAdmin(sess.userId))) return reply.code(403).send({ error: 'Nur für Lehrkräfte mit eigenem Bereich' });
+      // Administration und Lehrkräfte ohne eigenen Bereich (z. B. aus Moodle) bekommen ihn beim ersten eigenen Kurs (Wunsch Jo)
+      const teaches = await s.db.selectFrom('memberships').select('role').where('user_id', '=', sess.userId).where('role', 'in', ['teacher', 'admin']).executeTakeFirst();
+      if (!teaches) return reply.code(403).send({ error: 'Nur für Lehrkräfte und die Administration' });
       const me = await s.users.byId(sess.userId);
       areaId = await s.contexts.create('school', await s.contexts.system(), 'Bereich ' + (me?.name ?? 'Administration'));
       await s.users.grant(sess.userId, areaId, 'teacher');

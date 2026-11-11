@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { Services } from '../services.js';
 import { clearSessionCookie, requireSession, setSessionCookie } from '../http/auth.js';
@@ -33,7 +34,14 @@ export function authRoutes(app: FastifyInstance, s: Services) {
   });
 
   /** Öffentliche Angaben für die Startseite (ohne Anmeldung): ob das offene Office angeboten wird (Konzept 7.10). */
-  app.get('/api/public', async () => ({ openOffice: (await s.frame.get()).openOffice }));
+  // laufende Version (aus dem Release-Paket), damit man sieht, ob die Aktualisierung angekommen ist
+  let version = 'Entwicklung';
+  try {
+    version = readFileSync(new URL('../../../VERSION', import.meta.url), 'utf8').trim() || version;
+  } catch {
+    /* kein Release-Paket */
+  }
+  app.get('/api/public', async () => ({ openOffice: (await s.frame.get()).openOffice, version }));
 
   app.get('/api/me', async (req, reply) => {
     const sess = requireSession(req, reply);

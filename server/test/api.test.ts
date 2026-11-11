@@ -63,9 +63,9 @@ describe('Anmeldung', () => {
   });
 
   it('Startseite erfährt ohne Anmeldung, ob das offene Office angeboten wird', async () => {
-    expect((await call('GET', '/api/public')).json).toEqual({ openOffice: false });
+    expect((await call('GET', '/api/public')).json).toMatchObject({ openOffice: false });
     await s.frame.set({ ...(await s.frame.get()), openOffice: true });
-    expect((await call('GET', '/api/public')).json).toEqual({ openOffice: true });
+    expect((await call('GET', '/api/public')).json).toMatchObject({ openOffice: true });
   });
 
   it('Kontodienst: Autogra.fi meldet sich per OpenID Connect mit PKCE an', async () => {
@@ -144,6 +144,18 @@ describe('Anmeldung', () => {
     const p = await call('POST', '/api/projects', at, { courseId: c1.json.id, title: 'Admin-Projekt' });
     expect(p.status).toBe(200);
     expect((await call('GET', '/api/me', at)).json).toMatchObject({ admin: true, teacher: true });
+  });
+
+  it('Lehrkraft nur mit Kurs (z. B. aus Moodle) bekommt beim ersten eigenen Kurs einen Bereich', async () => {
+    const { course } = await setup();
+    const id = await s.accounts.create('moo', 'Herr Moodle', 'passwort-123');
+    await s.users.grant(id, course, 'teacher');
+    const t = (await call('POST', '/api/auth/login', undefined, { login: 'moo', password: 'passwort-123' })).json.token as string;
+    expect((await call('POST', '/api/courses', t, { title: 'Eigener Kurs' })).status).toBe(200);
+    const sid = await s.accounts.create('lern', 'Lernende', 'passwort-123');
+    const st = (await call('POST', '/api/auth/login', undefined, { login: 'lern', password: 'passwort-123' })).json.token as string;
+    expect((await call('POST', '/api/courses', st, { title: 'Nein' })).status).toBe(403);
+    expect(sid).toBeGreaterThan(0);
   });
 
   it('sperrt nach zu vielen Fehlversuchen', async () => {
