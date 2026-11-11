@@ -255,6 +255,38 @@ migrations['0004_bewertungen'] = {
   },
 };
 
+// Einführendes Material je Projekt: Links, Videos, Dateien (Wunsch Jo, 11. November 2026)
+migrations['0005_material'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`longtext` : sql`text`;
+    await db.schema
+      .createTable('materials')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('kind', 'varchar(10)', (c) => c.notNull())
+      .addColumn('title', 'varchar(200)', (c) => c.notNull())
+      .addColumn('url', 'varchar(2000)')
+      .addColumn('note', long, (c) => c.notNull())
+      .addColumn('file_name', 'varchar(255)')
+      .addColumn('mime', 'varchar(120)')
+      .addColumn('size', 'integer')
+      .addColumn('data', blobType(db))
+      .addColumn('position', 'integer', (c) => c.notNull())
+      .addColumn('created_by', 'integer', (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('materials_project').on('materials').column('project_id').execute();
+  },
+};
+
+// Lernseite im Tufte-Stil: Text (Markdown mit Randnotizen) direkt am Material
+migrations['0006_material_seite'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`longtext` : sql`text`;
+    await db.schema.alterTable('materials').addColumn('body', long).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

@@ -194,6 +194,25 @@ export interface GradingsTable {
   updated_at: Ms;
 }
 
+/** Einführendes Material: eigene Lernseite (page), Webseite (link), Video (video, Link oder Datei), Datei (file: PDF, Dokument, Bild). */
+export interface MaterialsTable {
+  id: Generated<number>;
+  project_id: number;
+  kind: 'link' | 'video' | 'file' | 'page';
+  title: string;
+  url: string | null;
+  /** Lernseite: Markdown mit Randnotizen (^[…], ^^[…]) */
+  body: string | null;
+  note: string;
+  file_name: string | null;
+  mime: string | null;
+  size: number | null;
+  data: Buffer | null;
+  position: number;
+  created_by: number;
+  created_at: Ms;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -219,5 +238,6 @@ export interface Database {
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
   gradings: GradingsTable;
+  materials: MaterialsTable;
   kv: KeyValueTable;
 }

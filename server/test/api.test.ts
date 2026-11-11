@@ -158,6 +158,37 @@ describe('Anmeldung', () => {
     expect(sid).toBeGreaterThan(0);
   });
 
+  it('Material: Lehrkraft veröffentlicht Link und Datei, Lernende lesen, Fremde nicht', async () => {
+    const { t, project, ids } = await setup();
+    expect((await call('POST', `/api/projects/${project}/materials`, t, { kind: 'video', title: 'Einführung', url: 'https://www.youtube.com/watch?v=abc' })).status).toBe(200);
+    expect((await call('POST', `/api/projects/${project}/materials`, t, { kind: 'link', url: 'javascript:alert(1)' })).status).toBe(400);
+    const pdf = Buffer.from('%PDF-1.4 Testdatei');
+    const up = await fetch(`${base}/api/projects/${project}/materials/file?name=${encodeURIComponent('Quelle 1.pdf')}&title=Quelle`, { method: 'POST', headers: { authorization: 'Bearer ' + t, 'content-type': 'application/octet-stream' }, body: pdf });
+    expect(up.status).toBe(200);
+    const fid = ((await up.json()) as J).id;
+    const bad = await fetch(`${base}/api/projects/${project}/materials/file?name=x.html`, { method: 'POST', headers: { authorization: 'Bearer ' + t, 'content-type': 'application/octet-stream' }, body: Buffer.from('<script>') });
+    expect(bad.status).toBe(400);
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const list = await call('GET', `/api/projects/${project}/materials`, anna);
+    expect(list.json).toMatchObject({ canEdit: false, materials: [{ kind: 'video', title: 'Einführung' }, { kind: 'file', title: 'Quelle', fileName: 'Quelle 1.pdf' }] });
+    const f = await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`, { headers: { authorization: 'Bearer ' + anna } });
+    expect(f.headers.get('content-type')).toBe('application/pdf');
+    expect(Buffer.from(await f.arrayBuffer()).toString()).toBe('%PDF-1.4 Testdatei');
+    const part = await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`, { headers: { authorization: 'Bearer ' + anna, range: 'bytes=0-3' } });
+    expect(part.status).toBe(206);
+    expect(await part.text()).toBe('%PDF');
+    expect((await call('POST', `/api/projects/${project}/materials`, anna, { kind: 'link', url: 'https://example.org' })).status).toBe(403);
+    // Lernseite: anlegen, ändern, lesen
+    const pg = await call('POST', `/api/projects/${project}/materials/page`, t, { title: 'Die Inflation 1923', body: '# Einstieg\n\nText^[Randnotiz]' });
+    expect(pg.status).toBe(200);
+    expect((await call('PATCH', `/api/projects/${project}/materials/${pg.json.id}`, t, { body: 'Neu' })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/materials/${pg.json.id}`, anna)).json).toMatchObject({ canEdit: false, page: { title: 'Die Inflation 1923', body: 'Neu' } });
+    expect((await call('PATCH', `/api/projects/${project}/materials/${pg.json.id}`, anna, { body: 'x' })).status).toBe(403);
+    // ohne Anmeldung nichts
+    expect((await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`)).status).toBe(401);
+  });
+
   it('sperrt nach zu vielen Fehlversuchen', async () => {
     await admin();
     for (let i = 0; i < 10; i++) expect((await call('POST', '/api/auth/login', undefined, { login: 'admin', password: 'falsch' })).status).toBe(401);

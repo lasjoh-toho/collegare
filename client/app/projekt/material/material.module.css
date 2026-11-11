@@ -1,0 +1,20 @@
+.wrap { max-width: 920px; margin: 0 auto; padding: 18px 16px 40px; display: flex; flex-direction: column; gap: 12px; }
+.head h1 { margin: 0; font-size: 22px; }
+.head p { margin: 4px 0 0; }
+.add { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.item { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.title { font-size: 15px; }
+.tools { display: inline-flex; gap: 4px; }
+.note { margin: 0; color: var(--fg); font-size: 13.5px; }
+.video { position: relative; width: 100%; max-width: 720px; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.media { max-width: 100%; max-height: 70vh; border-radius: 8px; align-self: flex-start; }
+.pdf { width: 100%; height: 75vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+@media (max-width: 700px) {
+  .fields { grid-template-columns: 1fr; }
+}
+.span { grid-column: 1 / -1; margin: 0; }

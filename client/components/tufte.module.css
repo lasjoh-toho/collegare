@@ -1,0 +1,92 @@
+/*
+ * Lernseite im Tufte-Stil (angelehnt an tufte-css, eigene Umsetzung): ruhige Serifenschrift, Text links,
+ * breiter Rand rechts für Seitennotizen, Marginalien und Bildunterschriften.
+ * Auf schmalen Bildschirmen rücken die Notizen als eingerückter Kasten direkt in den Text (Wunsch Jo).
+ */
+.t {
+  --paper: #fffff8;
+  --ink: #111;
+  --muted: #555;
+  --rule: #ccc;
+  counter-reset: sidenote-counter;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-size: 18px;
+  line-height: 1.55;
+  padding: 3rem 0 4rem 8%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-radius: 10px;
+}
+:global([data-theme='dark']) .t {
+  --paper: #151515;
+  --ink: #ddd;
+  --muted: #aaa;
+  --rule: #444;
+}
+.t h1 { font-weight: 400; font-size: 2.6rem; line-height: 1.1; margin: 0 0 1.5rem; width: 55%; }
+.t :global(.subtitle) { font-style: italic; font-size: 1.3rem; color: var(--muted); margin: -1rem 0 2rem; width: 55%; }
+.t :global(section) { padding: 0.5rem 0 1rem; }
+.t h2 { font-style: italic; font-weight: 400; font-size: 1.9rem; margin: 2.2rem 0 0.8rem; width: 55%; }
+.t h3 { font-style: italic; font-weight: 400; font-size: 1.45rem; margin: 1.8rem 0 0.6rem; width: 55%; }
+.t p, .t ul, .t ol, .t blockquote { width: 55%; }
+.t p { margin: 0 0 1.1rem; }
+.t ul, .t ol { padding-left: 1.4rem; margin: 0 0 1.1rem; }
+.t li { margin: 0.25rem 0; }
+.t blockquote { margin: 1.2rem 0; padding: 0 0 0 1.2rem; border-left: 2px solid var(--rule); font-style: italic; }
+.t blockquote p { width: auto; margin: 0; }
+.t blockquote footer { font-style: normal; text-align: right; color: var(--muted); font-size: 0.95em; margin-top: 0.3rem; }
+.t blockquote footer::before { content: '— '; }
+.t a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.t code { font-family: ui-monospace, Consolas, monospace; font-size: 0.85em; background: rgba(127, 127, 127, 0.12); padding: 0 0.2em; border-radius: 3px; }
+.t img { max-width: 100%; height: auto; }
+.t :global(figure) { width: 55%; margin: 0 0 1.8rem; padding: 0; }
+.t :global(figure.fullwidth) { width: 90%; }
+.t :global(figure.fullwidth figcaption) { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
+.t :global(.iframe-wrapper) { position: relative; aspect-ratio: 16 / 9; }
+.t :global(.iframe-wrapper iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* Seitennotizen und Marginalien rechts neben dem Text */
+.t :global(.sidenote), .t :global(.marginnote) {
+  float: right;
+  clear: right;
+  margin-right: -60%;
+  width: 50%;
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  vertical-align: baseline;
+  position: relative;
+  color: var(--ink);
+}
+.t :global(figure) :global(.marginnote) { margin-right: -82%; width: 75%; }
+.t :global(.sidenote-number) { counter-increment: sidenote-counter; }
+.t :global(.sidenote-number::after) { content: counter(sidenote-counter); font-size: 0.7em; vertical-align: super; line-height: 0; margin-left: 0.1em; }
+.t :global(.sidenote::before) { content: counter(sidenote-counter) '\00a0'; font-size: 0.8em; vertical-align: super; line-height: 0; }
+.t :global(input.margin-toggle) { display: none; }
+.t :global(label.margin-toggle:not(.sidenote-number)) { display: none; }
+.t :global(label.sidenote-number) { display: inline; cursor: default; }
+
+/* Smartphone: Notizen rücken als eingerückter Kasten in den Text, ohne Antippen */
+@media (max-width: 760px) {
+  .t { padding: 1.5rem 16px 2.5rem; font-size: 17px; border-radius: 0; }
+  .t h1, .t :global(.subtitle), .t h2, .t h3, .t p, .t ul, .t ol, .t blockquote, .t :global(figure), .t :global(figure.fullwidth) { width: 100%; }
+  .t h1 { font-size: 2rem; }
+  .t :global(.sidenote), .t :global(.marginnote), .t :global(figure) :global(.marginnote) {
+    display: block;
+    float: none;
+    clear: both;
+    width: auto;
+    margin: 0.6rem 0 0.8rem 0.8rem;
+    padding: 0.35rem 0 0.35rem 0.75rem;
+    border-left: 2px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+  .t :global(figure) :global(.marginnote) { margin: 0 0 0.5rem; }
+}

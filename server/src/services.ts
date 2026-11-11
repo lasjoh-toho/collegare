@@ -1,6 +1,7 @@
 import { DocChangeStore, Documents } from './projects/documents.js';
 import { MapStore } from './projects/maps.js';
 import { Gradings } from './projects/gradings.js';
+import { Materials } from './projects/materials.js';
 import { OidcProvider } from './identity/oidcProvider.js';
 import { AuditLog } from './audit/auditLog.js';
 import { createDb, type Db } from './db/index.js';
@@ -48,6 +49,7 @@ export interface Services {
   frame: FrameStore;
   maps: MapStore;
   gradings: Gradings;
+  materials: Materials;
   oidc: OidcProvider;
   documents: Documents;
   docStore: DocChangeStore;
@@ -82,6 +84,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     frame: new FrameStore(db),
     maps,
     gradings: new Gradings(db, projects, maps, now),
+    materials: new Materials(db, now),
     oidc: new OidcProvider(db, toolKey, users, contexts, config.appUrl, now),
     documents: new Documents(db),
     docStore: new DocChangeStore(db),

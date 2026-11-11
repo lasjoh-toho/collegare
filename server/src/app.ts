@@ -11,6 +11,7 @@ import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
 import { gradingRoutes } from './routes/gradings.js';
+import { materialRoutes } from './routes/materials.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
@@ -56,7 +57,7 @@ function socketToken(socket: Socket): string | null {
  * (Namespace /collab für die Editoren, /project für Board und Projektstand).
  */
 export async function buildApp(opts: AppOptions = {}): Promise<App> {
-  const http = Fastify({ logger: opts.logger ?? false, trustProxy: true, bodyLimit: 5 * 1024 * 1024 });
+  const http = Fastify({ logger: opts.logger ?? false, trustProxy: true, bodyLimit: 6 * 1024 * 1024 });
   const io = new Server(http.server, {
     path: '/socket.io',
     maxHttpBufferSize: 100_000_000,
@@ -127,6 +128,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     adminRoutes(http, s);
     projectRoutes(http, s, bc);
     gradingRoutes(http, s);
+    materialRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 

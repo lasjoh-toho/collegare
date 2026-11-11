@@ -1,5 +1,5 @@
 /* Rahmen der Projektseiten: Kopfzeile, Seitenmenü (docs/gestaltung.md, Abschnitt 6). Neutral grau, keine Markenfarbe. */
-.shell { min-height: 100dvh; display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+.shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
 .shell.fill { height: 100dvh; min-height: 0; }
 .head {
   grid-column: 1 / -1; position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 10px;
@@ -7,7 +7,7 @@
   background: linear-gradient(180deg, var(--ui-panel), color-mix(in srgb, var(--ui-panel) 70%, var(--ui-bg)));
 }
 .who {
-  display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 42vw; padding: 5px 10px 5px 8px; border-radius: 10px;
+  flex: 0 1 auto; display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 42vw; padding: 5px 10px 5px 8px; border-radius: 10px;
   text-align: left; color: var(--ui-text);
 }
 .who:hover, .who[aria-expanded='true'] { background: var(--ui-sunken); }
@@ -65,7 +65,7 @@ div.phase { opacity: 0.75; }
 .fill .body { display: flex; flex-direction: column; overflow: hidden; }
 
 /* angeheftet (nur breite Bildschirme, siehe ProjectShell): Menü als Spalte links */
-.pinned { grid-template-columns: 340px 1fr; }
+.pinned { grid-template-columns: 340px minmax(0, 1fr); }
 .pinned .menu { position: sticky; top: 52px; height: calc(100dvh - 52px); width: auto; transform: none; visibility: visible; box-shadow: none; z-index: 5; }
 .pinned.fill .menu { height: auto; }
 .pinned .closeBtn { display: none; }
@@ -84,3 +84,9 @@ div.phase { opacity: 0.75; }
 .gate p { margin: 4px 0 0; }
 .doneBadge { background: color-mix(in srgb, var(--state-done) 16%, transparent); color: var(--state-done); }
 .phase.isDone:not(.now) .phaseIcon { background: var(--state-done); color: #fff; }
+
+/* schmale Bildschirme: Kopfzeile nie breiter als das Gerät; Knöpfe dürfen umbrechen */
+@media (max-width: 560px) {
+  .actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+  .where { display: none; }
+}

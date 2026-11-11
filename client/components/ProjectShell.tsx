@@ -160,6 +160,9 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           <a className={`${sh.overview} ${phase === null && where === 'Übersicht' ? sh.here : ''}`} href={href(`/projekt/?id=${project.id}`)}>
             <Icon name="grid" size={16} /> Übersicht aller Oberflächen
           </a>
+          <a className={`${sh.overview} ${where === 'Material' ? sh.here : ''}`} href={href(`/projekt/material/?id=${project.id}`)}>
+            <Icon name="info" size={16} /> Material zum Einarbeiten
+          </a>
           {phases.map((p, i) => {
             const path = phasePath(p.key);
             const reachable = !!path && (teacher || p.state === 'open' || p.state === 'closed');
