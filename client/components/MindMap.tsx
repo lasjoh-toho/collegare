@@ -468,18 +468,6 @@ export function MindMap({
         {shown.roots.map(renderCard)}
       </div>
 
-      {Object.keys(shown.cards).length === 0 && (
-        <div className={m.emptyHint}>
-          {canEdit ? (
-            <>
-              <strong>Sammelt eure Ideen.</strong> Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht zusammengehörige Karten in einen Cluster; aus den Clustern wird später die Gliederung.
-            </>
-          ) : (
-            'Diese Mindmap ist noch leer.'
-          )}
-        </div>
-      )}
-
       <div className={m.tools} data-ui>
         {canEdit && (
           <>

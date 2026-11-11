@@ -11,10 +11,55 @@ import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { Icon } from '@/components/Icon';
 import { get, href, projectSocket } from '@/lib/api';
-import type { MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
+import type { MapCard, MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import p from '../projekt.module.css';
 import s from './mindmap-page.module.css';
+
+/** Standardwerte für Felder, die eine Karte noch nie gesetzt hatte (zum Zurücknehmen einer Änderung). */
+function fieldDefault(c: MapCard, k: string): unknown {
+  if (k === 'via') return [];
+  if (k === 'shape') return c.kind === 'card' && !c.parent ? 'none' : 'rect';
+  if (k === 'route') return c.kind === 'card' && !c.parent ? 'curve' : 'metro';
+  if (k === 'bend') return 0.5;
+  return null;
+}
+
+/** Gegenoperation(en) zu op auf dem Stand m, oder null, wenn sie sich nicht zurücknehmen lässt. */
+function inverse(m: MapData, op: MapOp): MapOp[] | null {
+  switch (op.type) {
+    case 'add':
+      return [{ type: 'remove', ids: [op.card.id] }];
+    case 'update': {
+      const c = m.cards[op.id];
+      if (!c) return null;
+      const prev: Record<string, unknown> = {};
+      for (const k of Object.keys(op.patch)) prev[k] = (c as unknown as Record<string, unknown>)[k] ?? fieldDefault(c, k);
+      return [{ type: 'update', id: op.id, patch: prev as Extract<MapOp, { type: 'update' }>['patch'] }];
+    }
+    case 'move': {
+      const c = m.cards[op.id];
+      return c ? [{ type: 'move', id: op.id, x: c.x, y: c.y, parent: c.parent }] : null;
+    }
+    case 'remove': {
+      const gone = op.ids.map((id) => m.cards[id]).filter(Boolean);
+      const strip = ({ children: _c, ...rest }: MapCard) => rest;
+      // erst Cluster, dann Karten, dann zurückgelöste Karten wieder hinein, dann Pfeile
+      const adds: MapOp[] = [...gone.filter((c) => c.kind === 'cluster'), ...gone.filter((c) => c.kind === 'card')].map((c) => ({ type: 'add', card: strip(c) }));
+      const moves: MapOp[] = gone.flatMap((c) => c.children.filter((ch) => !op.ids.includes(ch) && m.cards[ch]).map((ch): MapOp => ({ type: 'move', id: ch, x: m.cards[ch].x, y: m.cards[ch].y, parent: c.id })));
+      const links: MapOp[] = m.links.filter((l) => op.ids.includes(l.from) || op.ids.includes(l.to)).map((l) => ({ type: 'link', id: l.id, from: l.from, to: l.to }));
+      return [...adds, ...moves, ...links];
+    }
+    case 'link':
+      return [{ type: 'unlink', id: op.id }];
+    case 'unlink': {
+      const l = m.links.find((x) => x.id === op.id);
+      return l ? [{ type: 'link', id: l.id, from: l.from, to: l.to }] : null;
+    }
+    default:
+      return null;
+  }
+}
 
 interface JoinAck {
   ok: boolean;
@@ -58,6 +103,28 @@ export default function MindmapPage() {
   const version = useRef(0);
   const scopeRef = useRef<string | null>(null);
   scopeRef.current = scope;
+  const mapRef = useRef<MapData | null>(null);
+  mapRef.current = map;
+  // Rückgängig/Wiederholen: je Schritt die Gegenoperationen (nur eigene Änderungen, nur in dieser Sitzung)
+  const undoStack = useRef<MapOp[][]>([]);
+  const redoStack = useRef<MapOp[][]>([]);
+  const [hist, setHist] = useState({ u: 0, r: 0 });
+  const syncHist = () => setHist({ u: undoStack.current.length, r: redoStack.current.length });
+  // geschlossene Erklärblase: gemerkt wird ihr Text, damit ein neuer Text der Lehrkraft wieder erscheint
+  const [closedHelp, setClosedHelp] = useState<string[]>([]);
+  const helpStore = `collegare-mindmap-blase-${idParam ?? ''}`;
+  useEffect(() => {
+    try {
+      setClosedHelp(JSON.parse(localStorage.getItem(helpStore) ?? '[]'));
+    } catch {}
+  }, [helpStore]);
+  const closeHelp = (text: string, closed: boolean) => {
+    const next = closed ? [...closedHelp.filter((t) => t !== text), text].slice(-5) : closedHelp.filter((t) => t !== text);
+    setClosedHelp(next);
+    try {
+      localStorage.setItem(helpStore, JSON.stringify(next));
+    } catch {}
+  };
 
   useEffect(() => {
     if (me === null) location.replace(href('/'));
@@ -81,6 +148,11 @@ export default function MindmapPage() {
       sock.current?.emit('map:join', { projectId: id, scope: sc ?? undefined }, (r: JoinAck) => {
         if (!r.ok) return show(r.error ?? 'Kein Zugriff');
         setJoin(r);
+        if ((r.scope ?? null) !== scopeRef.current) {
+          undoStack.current = [];
+          redoStack.current = [];
+          syncHist();
+        }
         setScope(r.scope ?? null);
         if (r.map) {
           version.current = r.version ?? 0;
@@ -108,20 +180,76 @@ export default function MindmapPage() {
     };
   }, [id, me, doJoin, wanted]);
 
-  const send = useCallback(
+  const raw = useCallback(
     (op: MapOp) =>
       new Promise<boolean>((resolve) => {
         if (!sock.current?.connected) {
           show('Keine Verbindung zum Server. Bitte kurz warten.');
           return resolve(false);
         }
-        sock.current.emit('map:op', { projectId: id, scope: scopeRef.current, op }, (r: { ok: boolean; error?: string }) => {
+        sock.current.emit('map:op', { projectId: id, scope: scopeRef.current, op }, (r: { ok: boolean; error?: string; version?: number }) => {
           if (!r.ok) show(r.error ?? 'Änderung fehlgeschlagen');
           resolve(r.ok);
         });
       }),
     [id],
   );
+
+  const send = useCallback(
+    // join: gehört zum vorigen Schritt (z. B. Abzweigungen nachführen), ein Strg+Z nimmt beides zurück
+    async (op: MapOp, join = false) => {
+      const inv = mapRef.current ? inverse(mapRef.current, op) : null;
+      const ok = await raw(op);
+      const last = undoStack.current[undoStack.current.length - 1];
+      if (ok && inv && join && last) {
+        undoStack.current[undoStack.current.length - 1] = [...inv, ...last];
+        redoStack.current = [];
+        syncHist();
+      } else if (ok && inv) {
+        undoStack.current.push(inv);
+        if (undoStack.current.length > 100) undoStack.current.shift();
+        redoStack.current = [];
+        syncHist();
+      }
+      return ok;
+    },
+    [raw],
+  );
+
+  /** Einen Schritt zurück (oder wieder vor): Gegenoperationen senden und deren Gegenteil auf den anderen Stapel legen */
+  const step = useCallback(
+    async (from: React.MutableRefObject<MapOp[][]>, to: React.MutableRefObject<MapOp[][]>) => {
+      const ops = from.current.pop();
+      syncHist();
+      if (!ops) return;
+      const back: MapOp[][] = [];
+      for (const op of ops) {
+        const inv = mapRef.current ? inverse(mapRef.current, op) : null;
+        if (!(await raw(op))) break;
+        if (inv) back.unshift(inv);
+        // warten, bis der neue Stand da ist, damit die nächste Gegenoperation vom richtigen Stand ausgeht
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      if (back.length) to.current.push(back.flat());
+      syncHist();
+    },
+    [raw],
+  );
+  const undo = useCallback(() => void step(undoStack, redoStack), [step]);
+  const redo = useCallback(() => void step(redoStack, undoStack), [step]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) (e.preventDefault(), undo());
+      else if ((k === 'z' && e.shiftKey) || k === 'y') (e.preventDefault(), redo());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
 
   function seedFromTopic() {
     if (!confirm('Die Themen-Mindmap als Start für diese Mindmap übernehmen? Danach arbeitet ihr an eurer eigenen Kopie weiter.')) return;
@@ -146,6 +274,22 @@ export default function MindmapPage() {
   const canEdit = !join?.readOnly;
   const hasTopic = !!join?.scopes?.some((x) => x.scope === 'p');
   const empty = !!map && Object.keys(map.cards).length === 0;
+  // Erklärblase: Text der Lehrkraft aus den Einstellungen oder Standardtext; je Person mit × schließbar
+  const settings = project.settings;
+  const helpText =
+    settings.mapHelp === false
+      ? ''
+      : settings.mapHelpText?.trim() ||
+        (isTopic
+          ? canEdit
+            ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
+            : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
+          : canEdit
+            ? view === 'karten'
+              ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster; jeder Cluster wird ein Abschnitt der Gliederung. Strg+Z nimmt zurück.'
+              : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Jeder Abschnitt wird Teil der Gliederung. Strg+Z nimmt zurück.'
+            : 'Hier seht ihr die Mindmap der Gruppe.');
+  const helpClosed = closedHelp.includes(helpText);
   const center = isTopic ? project.title : join?.scopes?.find((x) => x.scope === scope)?.title || project.title;
 
   return (
@@ -176,6 +320,11 @@ export default function MindmapPage() {
                   <Icon name="grid" size={14} /> <span className={s.long}>Karten</span>
                 </button>
               </span>
+              {helpText && helpClosed && (
+                <button className="btn icon" onClick={() => closeHelp(helpText, false)} title="Erklärung wieder zeigen" aria-label="Erklärung zeigen">
+                  ?
+                </button>
+              )}
               {!isTopic && (
                 <>
                   <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
@@ -197,11 +346,13 @@ export default function MindmapPage() {
             {teacher ? 'Noch keine Gruppen. Bilde zuerst die Gruppen auf dem Board.' : 'Du bist noch keiner Gruppe zugeordnet. Sobald die Gruppen stehen, erscheint hier eure Mindmap.'}
           </div>
         )}
-        {isTopic && (
-          <div className={`panel ${s.banner}`}>
-            {canEdit
-              ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
-              : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'}
+        <div className={s.notes}>
+        {map && helpText && !helpClosed && (
+          <div className={`panel ${s.banner} ${s.help}`} role="note">
+            <button className={`btn icon ${s.helpX}`} onClick={() => closeHelp(helpText, true)} title="Erklärung schließen" aria-label="Erklärung schließen">
+              ×
+            </button>
+            <span>{helpText}</span>
           </div>
         )}
         {!isTopic && empty && hasTopic && canEdit && (
@@ -209,6 +360,17 @@ export default function MindmapPage() {
             Eure Mindmap ist noch leer.
             <button className="btn primary" onClick={seedFromTopic}>
               Mit der Themen-Mindmap beginnen
+            </button>
+          </div>
+        )}
+        </div>
+        {map && canEdit && (
+          <div className={s.history}>
+            <button className="btn icon" onClick={undo} disabled={!hist.u} title="Rückgängig (Strg+Z)" aria-label="Rückgängig">
+              ↶
+            </button>
+            <button className="btn icon" onClick={redo} disabled={!hist.r} title="Wiederholen (Strg+Umschalt+Z oder Strg+Y)" aria-label="Wiederholen">
+              ↷
             </button>
           </div>
         )}

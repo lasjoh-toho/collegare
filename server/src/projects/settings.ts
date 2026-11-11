@@ -49,6 +49,9 @@ export const SettingsSchema = z.object({
   studentsSetTopic: z.boolean(),
   /** Gemeinsame Themen-Mindmap vor der Gruppenbildung: wer darf daran arbeiten (Wunsch Jo, 11. November 2026) */
   topicMapEdit: z.enum(['teacher', 'all']),
+  /** Erklärblase in der Mindmap: an/aus und eigener Text der Lehrkraft (leer = Standardtext) */
+  mapHelp: z.boolean(),
+  mapHelpText: z.string().max(1000),
   roles: z.array(z.string().min(1).max(60)).max(20),
   freeRoles: z.boolean(),
   phases: z.object(Object.fromEntries(PHASES.map((p) => [p, PhaseSchema])) as { [K in (typeof PHASES)[number]]: typeof PhaseSchema }),
@@ -79,6 +82,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   choiceDeadline: null,
   studentsSetTopic: true,
   topicMapEdit: 'all',
+  mapHelp: true,
+  mapHelpText: '',
   roles: ['Zeitwächter:in', 'Quellenverantwortliche:r', 'Layout', 'Moderation'],
   freeRoles: true,
   phases: { topic: phase('on'), groups: phase('on'), orientation: phase('on'), research: phase('on'), drafting: phase('on'), presentation: phase('on') },

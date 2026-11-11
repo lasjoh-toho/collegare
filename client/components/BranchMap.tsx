@@ -377,7 +377,7 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   return { nodes, height: Math.max(hr, hl, 200) };
 }
 
-export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp) => Promise<boolean> }) {
+export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean> }) {
   const { nodes, height } = useMemo(() => layout(map), [map]);
   const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
@@ -391,7 +391,10 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
   const [sizes, setSizes] = useState<Record<string, [number, number]>>({});
   const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [hd, setHd] = useState<{ id: string; kind: 'start' | 'via' | 'hand'; i: number; x: number; y: number } | null>(null);
+  const [hd, setHd] = useState<{ id: string; kind: 'start' | 'via' | 'hand'; i: number; x: number; y: number; moved?: boolean } | null>(null);
+  // angetippter Punkt am gewählten Ast (Stopp, Bézier-Griff oder Ansatz): Entf entfernt nur ihn
+  const [pick, setPick] = useState<{ kind: 'start' | 'via' | 'hand'; i: number } | null>(null);
+  useEffect(() => setPick(null), [sel]);
 
   // Breiten der Knoten messen, damit die Linien genau an den Kanten ansetzen
   useLayoutEffect(() => {
@@ -455,7 +458,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     if (!c) return;
     const nid = newId();
     if (await send({ type: 'add', card: { id: nid, kind: 'cluster', title: c.title, text: c.text, x: c.x, y: c.y, w: 340, h: 230, color: null, parent: null, owner: null, shape: c.shape } })) {
-      await send({ type: 'remove', ids: [id] });
+      await send({ type: 'remove', ids: [id] }, true);
       setSel(nid);
     }
   }
@@ -524,7 +527,22 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       startEdit(selected.id, selected.title);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
+      if (pick) return void removePick();
       void remove(selected.id);
+    } else if (e.key === 'Escape' && pick) setPick(null);
+  }
+
+  /** Nur den angetippten Punkt entfernen: Stopp weg, Bézier-Griff wieder automatisch, Ansatz wieder automatisch */
+  async function removePick() {
+    const c = selected;
+    const p = pick;
+    if (!c || !p) return;
+    setPick(null);
+    const via = c.via ?? [];
+    if (p.kind === 'start') await send({ type: 'update', id: c.id, patch: { start: null, fork: null } });
+    else if (p.kind === 'hand' && via[p.i]) await send({ type: 'update', id: c.id, patch: { via: via.map((v, j): MapVia => (j === p.i ? [v[0], v[1]] : v)) } });
+    else if (p.kind === 'via' && via[p.i]) {
+      if (await send({ type: 'update', id: c.id, patch: { via: via.filter((_, j) => j !== p.i) } })) await shiftForks(c.id, p.i, -1);
     }
   }
 
@@ -636,8 +654,8 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     for (const o of nodes) {
       const f = o.card.fork;
       if (!f || f.from !== id) continue;
-      if (at === null || (delta < 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: null } });
-      else if (f.i > at || (delta > 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: { from: id, i: f.i + delta } } });
+      if (at === null || (delta < 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: null } }, true);
+      else if (f.i > at || (delta > 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: { from: id, i: f.i + delta } } }, true);
     }
   }
 
@@ -655,16 +673,21 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         e.stopPropagation();
         const [x, y] = at(e);
         setHd({ id: g.n.card.id, kind, i, x, y });
+        setPick({ kind, i });
+        wrap.current?.focus({ preventScroll: true });
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
       onPointerMove: (e: React.PointerEvent) => {
         if (!hd) return;
         const [x, y] = at(e);
-        setHd({ ...hd, x, y });
+        if (!hd.moved && Math.hypot(x - hd.x, y - hd.y) < 2) return;
+        setHd({ ...hd, x, y, moved: true });
       },
       onPointerUp: () => {
         const h = hd;
         if (!h) return;
+        // nur angetippt (zum Auswählen für Entf): nichts speichern
+        if (!h.moved) return setHd(null);
         const c = g.n.card;
         const r = Math.round;
         const patch =
@@ -797,7 +820,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
                 className={b.hit}
                 d={g.d}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => (setSel(g.n.card.id), wrap.current?.focus({ preventScroll: true }))}
+                onClick={() => (setSel(g.n.card.id), setPick(null), wrap.current?.focus({ preventScroll: true }))}
                 onDoubleClick={(e) => canEdit && void addVia(g, toStage(e))}
               >
                 <title>{canEdit ? 'Doppelklick: Zwischenstopp setzen' : ''}</title>
@@ -821,7 +844,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
               .filter((o) => o !== selGeo && o.n.parentId === selGeo.n.parentId && !forksFrom(o.n, selGeo.n.card.id))
               .flatMap((o) => o.via.map((v, i) => <div key={`t${o.n.card.id}${i}`} className={`${b.target} ${hd?.kind === 'start' && selGeo.fork?.from === o.n.card.id && selGeo.fork.i === i ? b.on : ''}`} style={{ left: v[0], top: v[1], ['--c' as string]: o.color }} />))}
             <div
-              className={`${b.handle} ${b.start} ${selGeo.fork ? b.forked : ''}`}
+              className={`${b.handle} ${b.start} ${selGeo.fork ? b.forked : ''} ${pick?.kind === 'start' ? b.picked : ''}`}
               style={{ left: selGeo.a.p[0], top: selGeo.a.p[1], ['--c' as string]: selGeo.color }}
               title="Ansatz verschieben; auf einen Stopp eines anderen Asts ziehen: dort abzweigen (Doppelklick: wieder automatisch)"
               {...handleDrag(selGeo, 'start', -1)}
@@ -830,9 +853,9 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
             {selGeo.via.map((v, i) => (
               <div
                 key={i}
-                className={`${b.handle} ${b.stop}`}
+                className={`${b.handle} ${b.stop} ${pick?.kind === 'via' && pick.i === i ? b.picked : ''}`}
                 style={{ left: v[0], top: v[1], ['--c' as string]: selGeo.color }}
-                title="Zwischenstopp ziehen (Doppelklick: entfernen)"
+                title="Zwischenstopp ziehen (antippen und Entf oder Doppelklick: entfernen)"
                 {...handleDrag(selGeo, 'via', i)}
                 onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } }).then((ok) => void (ok && shiftForks(selGeo.n.card.id, i, -1)))}
               />
@@ -841,9 +864,9 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
               [1, -1].map((sg) => (
                 <div
                   key={`h${i}${sg}`}
-                  className={`${b.handle} ${b.hand}`}
+                  className={`${b.handle} ${b.hand} ${pick?.kind === 'hand' && pick.i === i ? b.picked : ''}`}
                   style={{ left: selGeo.via[i][0] + sg * h[0], top: selGeo.via[i][1] + sg * h[1], ['--c' as string]: selGeo.color }}
-                  title="Bézier-Griff: Richtung und Schwung der Kurve (Doppelklick: wieder automatisch)"
+                  title="Bézier-Griff: Richtung und Schwung der Kurve (antippen und Entf oder Doppelklick: wieder automatisch)"
                   {...handleDrag(selGeo, 'hand', i, sg)}
                   onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.map((v, j): MapVia => (j === i ? [v[0], v[1]] : v)) } })}
                 />
@@ -966,12 +989,6 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           <button className="btn icon" onClick={() => void remove(selected.id)} title="Löschen">
             <Icon name="close" size={14} />
           </button>
-        </div>
-      )}
-      {nodes.length === 0 && canEdit && (
-        <div className={b.hint}>
-          Erst einmal Ideen sammeln: <strong>+</strong> am Thema oder <kbd>Tab</kbd>. Wenn sich Themen zeigen, wird eine Idee „Als Abschnitt“ zum
-          Hauptast, andere Ideen hängt ihr daran. Jeder Abschnitt wird Teil der Gliederung.
         </div>
       )}
     </div>
