@@ -73,8 +73,23 @@
 .t :global(label.sidenote-number) { display: inline; cursor: default; }
 
 /* Worterklärungen: Wort nur etwas kräftiger; Erklärung erscheint nach Antippen am Rand (Handy: im Text) */
-.t :global(label.gloss) { font-weight: 600; cursor: pointer; }
-.t :global(label.gloss:hover) { text-decoration: underline dotted; text-underline-offset: 3px; }
+.t :global(label.gloss) {
+  font-weight: 600;
+  cursor: pointer;
+  /* Touch: größere Trefferfläche, kein Doppeltipp-Zoom, kein grauer Tipp-Blitz */
+  padding: 0.2em 0.05em;
+  margin: -0.2em -0.05em;
+  border-radius: 3px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Unterstreichen nur mit Maus; auf Touch bliebe der Hover nach dem Antippen hängen */
+@media (hover: hover) {
+  .t :global(label.gloss:hover) { text-decoration: underline dotted; text-underline-offset: 3px; }
+}
+/* geöffnetes Wort leicht hinterlegt, damit klar ist, wozu der Kasten gehört */
+.t :global(label.gloss:has(+ input.gloss-toggle:checked)) { background: color-mix(in srgb, currentColor 9%, transparent); }
+.t :global(label.glossnote) { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .t :global(input.gloss-toggle) { display: none; }
 .t :global(.glossnote) { display: none; }
 .t :global(input.gloss-toggle:checked + .glossnote) {

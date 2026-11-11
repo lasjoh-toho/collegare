@@ -91,7 +91,7 @@ function inline(s: string, ctx: Ctx, notes = true): string {
       const bar = end > 0 ? s.indexOf('|', i) : -1;
       if (end > 0 && bar > i && bar < end) {
         const id = `gl-${++ctx.n}`;
-        out += `<label for="${id}" class="gloss" title="Erklärung anzeigen">${inline(s.slice(i + 1, bar), ctx, false)}</label><input type="checkbox" id="${id}" class="gloss-toggle"/><span class="glossnote">${inline(s.slice(bar + 1, end), ctx, false)}</span>`;
+        out += `<label for="${id}" class="gloss" title="Erklärung anzeigen">${inline(s.slice(i + 1, bar), ctx, false)}</label><input type="checkbox" id="${id}" class="gloss-toggle"/><label for="${id}" class="glossnote" title="Schließen">${inline(s.slice(bar + 1, end), ctx, false)}</label>`;
         i = end + 1;
         continue;
       }
