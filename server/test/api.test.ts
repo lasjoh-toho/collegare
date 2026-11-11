@@ -133,6 +133,19 @@ describe('Anmeldung', () => {
     expect((await call('POST', '/api/auth/login', undefined, { login: 'mue', password: 'passwort-123' })).status).toBe(401);
   });
 
+  it('Administration legt selbst Kurs und Projekt an (eigener Bereich beim ersten Mal)', async () => {
+    const { at } = await setup();
+    const c1 = await call('POST', '/api/courses', at, { title: 'Admin-Kurs' });
+    expect(c1.status).toBe(200);
+    const c2 = await call('POST', '/api/courses', at, { title: 'Zweiter Kurs' });
+    expect(c2.status).toBe(200);
+    const courses = (await call('GET', '/api/courses', at)).json.courses as J[];
+    expect(courses.map((c) => c.title)).toEqual(expect.arrayContaining(['Admin-Kurs', 'Zweiter Kurs']));
+    const p = await call('POST', '/api/projects', at, { courseId: c1.json.id, title: 'Admin-Projekt' });
+    expect(p.status).toBe(200);
+    expect((await call('GET', '/api/me', at)).json).toMatchObject({ admin: true, teacher: true });
+  });
+
   it('sperrt nach zu vielen Fehlversuchen', async () => {
     await admin();
     for (let i = 0; i < 10; i++) expect((await call('POST', '/api/auth/login', undefined, { login: 'admin', password: 'falsch' })).status).toBe(401);
