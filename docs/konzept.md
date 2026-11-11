@@ -510,7 +510,7 @@ Risiken: OnlyOffice braucht auf älteren iPads viel Speicher (wird im Spike M0 g
 | **Texterkennung über Autogra.fi** (ab M2, wenn vorhanden) | Autogra.fi bekommt eine Dienstschnittstelle, z. B. `POST /api/v1/service/ocr` (Bild → Zeilen und Text, Auftrag mit Statusabfrage), abgesichert mit einem Dienst-Token je Collegare-Instanz. So nutzt Collegare die dort gemessene Kette (kraken-Zeilen + Sprachmodell, Training) statt sie zu kopieren. Ohne Autogra.fi: direkt ein Sprachmodell mit Bildeingabe über Ollama. |
 | **Gemeinsame KI-Vorlagen** (später) | Fach-Prompts und Schul-Systemprompts aus Autogra.fi lesen, damit Schulen KI an einer Stelle pflegen. |
 | **Abgabe an Autogra.fi** (später) | Ein Endprodukt (z. B. Ausarbeitung als PDF) oder einzelne Leistungen werden als Leistungsnachweis an Autogra.fi übergeben und dort mit der bekannten Korrekturoberfläche bewertet. |
-| **Gemeinsame Anmeldung** (später) | Beide Werkzeuge sind eigene LTI-Tools in Moodle; im Einzelbetrieb einheitliche Lehrkraft-Konten (OIDC oder gemeinsamer Kontodienst). |
+| **Gemeinsame Anmeldung** | Beide Werkzeuge sind eigene LTI-Tools in Moodle; im Einzelbetrieb stellt Collegare die Konten aus (Abschnitt 8c). |
 
 ## 8a. Module: Werkzeuge in Collegare einbinden
 
@@ -632,6 +632,50 @@ später über beide Apps hinweg.
 
 ---
 
+## 8c. Gemeinsame Konten: Collegare als Kontodienst
+
+Collegare entspricht im Aufbau der Ausschreibung; Autogra.fi kommt als Zusatz dazu. Deshalb stellt **Collegare die
+Konten aus**, wenn beide auf einem Server laufen (Entscheidung 12). Grundlage ist Standard-OpenID-Connect, damit
+dieselbe Kopplung auch mit einem Schul-Login (IServ, Hamburger Dienst) funktioniert.
+
+### 8c.1 Betriebsarten
+
+| Betrieb | Anmeldung |
+|---|---|
+| Start aus Moodle | Beide Werkzeuge sind eigene LTI-Tools; Moodle liefert dieselbe Personenkennung, nichts weiter nötig. |
+| Beide auf dem Schulserver | Autogra.fi zeigt „Mit Collegare anmelden“; Kürzel, Passwort, Lehrende und Klassen werden nur in Collegare verwaltet. |
+| Schul-Login vorhanden | Collegare und Autogra.fi melden sich beide dort an; Collegare kann den Schul-Login zusätzlich weiterreichen. |
+| Eine App allein | Eigene Konten wie bisher. |
+
+### 8c.2 Anforderungen an Collegare
+
+1. **OpenID-Provider:** Discovery (`/.well-known/openid-configuration`), JWKS, Autorisierung mit PKCE, Token- und
+   Userinfo-Endpunkt. Clients trägt die Administration ein (zuerst Autogra.fi), keine offene Registrierung.
+2. **Wenige Angaben:** `sub` (feste Kennung, nie das Kürzel), Name, Rolle (`teacher`, `admin`, `student`), Bereich.
+   Keine E-Mail, keine Klassen im Token.
+3. **Admin nur mit Bestätigung:** Die Rolle `admin` gilt in Autogra.fi erst nach erneuter Passworteingabe (wie
+   „Administrieren …“ in Autogra.fi).
+4. **Klassen über die Dienstschnittstelle** (8a), nicht über das Token: Autogra.fi holt Klassenlisten mit einem
+   Dienst-Schlüssel und legt dieselben Personen an (Kennung Collegare + `sub`).
+5. **Fehlende Teile nachziehen**, die Autogra.fi heute schon hat: Lehrende mit eigenem Bereich, Löschen, „Ansehen
+   als“, Schutz gegen Fehlversuche, Konten verbinden (8c.3), Protokoll aller Anmeldungen.
+
+### 8c.3 Bestehende Konten verbinden, nicht zusammenlegen
+
+Beim ersten „Mit Collegare anmelden“ fragt Autogra.fi, ob ein vorhandenes Kürzel-Konto mit dem Collegare-Konto
+verbunden werden soll (Bestätigung mit dessen Passwort). Wie bei „Konten verbinden“ in Autogra.fi (8. November 2026)
+bleiben beide Konten erhalten, die Verbindung lässt sich trennen, nichts wird überschrieben.
+
+### 8c.4 Ausfallsicherheit für Klausuren
+
+Klausuren in Autogra.fi dürfen nicht an Collegare hängen:
+
+- Laufende Sitzungen in Autogra.fi bleiben gültig, auch wenn Collegare nicht erreichbar ist.
+- Lernende in Klausuren melden sich weiter per QR-Code oder Kurzcode direkt bei Autogra.fi an.
+- Die Administration von Autogra.fi behält ein lokales Notfallkonto.
+- Updates von Collegare zeigen vorher einen Hinweis, wenn in Autogra.fi gerade eine Klausur läuft (über die
+  Dienstschnittstelle).
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |
@@ -664,6 +708,8 @@ Entschieden (Jo, 1. November 2026):
 10. **Module** (9. November 2026): Collegare wird Plattform für Module (Abschnitt 8a). Die Anforderungen dort gelten
     für neue Teile ab jetzt; die heutigen Oberflächen werden schrittweise als Module beschrieben.
 11. **Mehrere Aufgaben verfolgen** (9. November 2026): Portal und Dienstschnittstelle „Aufgaben-Übersicht“ wie in 8b.
+12. **Collegare ist der Kontodienst** (11. November 2026, Jo): Collegare entspricht im Aufbau der Ausschreibung,
+    Autogra.fi ist ein Zusatz. Laufen beide, stellt Collegare die Konten per OpenID Connect aus (Abschnitt 8c).
 
 Offen:
 
