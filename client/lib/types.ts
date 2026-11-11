@@ -127,9 +127,11 @@ export interface MapCard {
   bx?: number | null;
   by?: number | null;
   start?: MapStart | null;
-  via?: [number, number][];
+  /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
+  via?: MapVia[];
   children: string[];
 }
+export type MapVia = [number, number] | [number, number, number, number];
 export interface MapStart {
   side: 't' | 'r' | 'b' | 'l';
   t: number;

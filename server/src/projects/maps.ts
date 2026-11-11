@@ -46,7 +46,7 @@ export interface MapCard {
   /** von Hand gesetzter Ansatz des Asts an der Form davor: Seite und Stelle (0..1) entlang der Seite; null = automatisch */
   start?: { side: Side; t: number } | null;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
-  via?: [number, number][];
+  via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
   children: string[];
 }
@@ -79,7 +79,8 @@ export const emptyMap = (): MindMap => ({ v: 1, cards: {}, roots: [], links: [],
 const Id = z.string().regex(/^[A-Za-z0-9_-]{4,40}$/);
 const Num = z.number().finite().min(-100_000).max(100_000);
 const Start = z.object({ side: z.enum(SIDES), t: z.number().min(0).max(1) }).nullable();
-const Via = z.array(z.tuple([Num, Num])).max(12);
+/** Zwischenstopp: x, y und optional der Bézier-Griff hx, hy (Vektor vom Stopp aus) */
+const Via = z.array(z.union([z.tuple([Num, Num]), z.tuple([Num, Num, Num, Num])])).max(12);
 const Size = z.number().finite().min(60).max(4000);
 const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable();
 

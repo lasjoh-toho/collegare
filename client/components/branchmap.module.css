@@ -44,3 +44,5 @@
 .handle:active { cursor: grabbing; }
 .start { border-radius: 50%; }
 .stop { border-radius: 3px; }
+.hand { width: 11px; height: 11px; border-width: 2px; border-radius: 50%; background: var(--c); }
+.tangent { stroke: var(--ui-muted, #888); stroke-width: 1.5; stroke-dasharray: 4 3; }

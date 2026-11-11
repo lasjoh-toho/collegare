@@ -9,7 +9,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
-import type { MapCard, MapOp, MapRoute, MapShape, MapStart, MindMap as MapData } from '@/lib/types';
+import type { MapCard, MapOp, MapRoute, MapShape, MapStart, MapVia, MindMap as MapData } from '@/lib/types';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
 import b from './branchmap.module.css';
@@ -77,6 +77,8 @@ function rounded(pts: [number, number][], r = 12): string {
 }
 
 const LEAD = 18; // gerades Stück vor der Pfeilspitze
+const LINE = 5; // alle Äste gleich dick (Wunsch Jo)
+const TIP = 2; // Länge der Spitze in Linienbreiten
 
 type V = [number, number];
 interface Box {
@@ -151,32 +153,46 @@ function leg(kind: MapRoute, bend: number, a: V, da: V, e: V, de: V): V[] {
   return [a, [a[0], e[1] - sy * d], [a[0] + sx * d, e[1]], e];
 }
 
+const endOf = (b: V, db: V): V => [b[0] + db[0] * LEAD, b[1] + db[1] * LEAD]; // vor der Pfeilspitze
+
+/**
+ * Bézier-Griffe an den Zwischenstopps (Vektor vom Stopp zum vorderen Griff; der hintere liegt gespiegelt gegenüber).
+ * Von Hand gesetzt (hs) oder automatisch: Richtung von davor nach danach, Länge nach dem kürzeren Nachbarabstand.
+ */
+function handles(a: V, da: V, via: V[], end: V, db: V, bend: number, hs: (V | null)[] = []): V[] {
+  const pts: V[] = [a, ...via, end];
+  return via.map((w, j) => {
+    if (hs[j]) return hs[j]!;
+    const prev = pts[j];
+    const next = pts[j + 2];
+    const v: V = [next[0] - prev[0], next[1] - prev[1]];
+    const l = Math.hypot(v[0], v[1]) || 1;
+    const len = Math.min(Math.hypot(w[0] - prev[0], w[1] - prev[1]), Math.hypot(next[0] - w[0], next[1] - w[1])) * (0.25 + 0.4 * bend);
+    return [(v[0] / l) * len, (v[1] / l) * len];
+  });
+}
+
 /**
  * Weg von Anschluss a (Richtung da nach außen) über die Zwischenstopps zu Anschluss b (Richtung db nach außen aus
  * dem Ziel). Zwischen zwei Stopps läuft die Linie im gewählten Stil; das letzte Stück zeigt gerade in das Ziel.
  */
-function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V): string {
-  const end: V = [b[0] + db[0] * LEAD, b[1] + db[1] * LEAD]; // vor der Pfeilspitze
+function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V, hs: (V | null)[] = []): string {
+  const end: V = endOf(b, db);
   if (kind === 'straight') return rounded([a, ...via, b], 10);
   const stops: V[] = [a, ...via, end];
   if (kind === 'curve') {
-    // weiche Kurve durch alle Stopps (Tangente an einem Stopp: von davor nach danach)
-    const tan = (i: number): V => {
-      if (i === 0) return da;
-      if (i === stops.length - 1) return [-db[0], -db[1]];
-      const v: V = [stops[i + 1][0] - stops[i - 1][0], stops[i + 1][1] - stops[i - 1][1]];
-      const l = Math.hypot(v[0], v[1]) || 1;
-      return [v[0] / l, v[1] / l];
-    };
+    // Bézierkurve durch alle Stopps; an jedem Stopp ein Griff (von Hand gezogen oder automatisch glatt)
+    const hv = handles(a, da, via, end, db, bend, hs);
     let d = `M${a[0]},${a[1]}`;
     for (let i = 0; i < stops.length - 1; i++) {
       const p = stops[i];
       const q = stops[i + 1];
       const dist = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      // mit Stopps nach der Länge des Teilstücks, sonst schlägt die Kurve kurz vor dem Ziel eine Schleife
       const k = via.length ? dist * (0.15 + 0.35 * bend) : Math.max(40, dist * (0.2 + 0.6 * bend));
-      const tp = tan(i);
-      const tq = tan(i + 1);
-      d += ` C${p[0] + tp[0] * k},${p[1] + tp[1] * k} ${q[0] - tq[0] * k},${q[1] - tq[1] * k} ${q[0]},${q[1]}`;
+      const c1: V = i === 0 ? [p[0] + da[0] * k, p[1] + da[1] * k] : [p[0] + hv[i - 1][0], p[1] + hv[i - 1][1]];
+      const c2: V = i === stops.length - 2 ? [q[0] + db[0] * k, q[1] + db[1] * k] : [q[0] - hv[i][0], q[1] - hv[i][1]];
+      d += ` C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${q[0]},${q[1]}`;
     }
     return d + ` L${b[0]},${b[1]}`;
   }
@@ -232,12 +248,13 @@ function segDist([px, py]: V, [ax, ay]: V, [bx, by]: V): number {
 
 const snap = (v: number) => Math.round(v / 10) * 10;
 
-function arrow(x: number, y: number, [dx, dy]: [number, number], size: number): string {
-  const px = -dy;
-  const py = dx;
-  const bx = x - dx * size * 1.6;
-  const by = y - dy * size * 1.6;
-  return `M${x},${y} L${bx + px * size},${by + py * size} L${bx - px * size},${by - py * size} Z`;
+/** Spitze ohne Widerhaken: so breit wie die Linie, läuft zu einem Punkt zu. */
+function arrow(x: number, y: number, [dx, dy]: [number, number], w: number): string {
+  const px = (-dy * w) / 2;
+  const py = (dx * w) / 2;
+  const bx = x - dx * w * TIP;
+  const by = y - dy * w * TIP;
+  return `M${x},${y} L${bx + px},${by + py} L${bx - px},${by - py} Z`;
 }
 
 const IDEA = '#9a9a94';
@@ -302,7 +319,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
   const [sizes, setSizes] = useState<Record<string, [number, number]>>({});
   const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [hd, setHd] = useState<{ id: string; kind: 'start' | 'via'; i: number; x: number; y: number } | null>(null);
+  const [hd, setHd] = useState<{ id: string; kind: 'start' | 'via' | 'hand'; i: number; x: number; y: number } | null>(null);
 
   // Breiten der Knoten messen, damit die Linien genau an den Kanten ansetzen
   useLayoutEffect(() => {
@@ -443,17 +460,21 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     const from: Box = { x: pp.x, y: pp.y, w: pw, h: ph };
     const to: Box = { x: me.x, y: me.y, w: cw, h: ch };
     const h = hd && hd.id === n.card.id ? hd : null;
-    const via: V[] = (n.card.via ?? []).map((v, i) => (h && h.kind === 'via' && h.i === i ? [h.x, h.y] : v));
+    const via: V[] = (n.card.via ?? []).map((v, i) => (h && h.kind === 'via' && h.i === i ? [h.x, h.y] : [v[0], v[1]]));
+    const hs: (V | null)[] = (n.card.via ?? []).map((v, i) => (h && h.kind === 'hand' && h.i === i ? [h.x - via[i][0], h.y - via[i][1]] : v.length === 4 ? [v[2], v[3]] : null));
     const first = via[0] ?? [me.x, me.y];
     const last = via[via.length - 1] ?? [pp.x, pp.y];
     const start = h && h.kind === 'start' ? anchorFrom(from, [h.x, h.y]) : n.card.start;
     const a = start ? anchorAt(from, start) : port(from, first[0], first[1], pointy(parent?.card ?? null, false));
     const z = port(to, last[0], last[1], pointy(n.card, n.idea));
-    const w = n.idea ? 2 : n.depth === 1 ? 6 : 4;
+    const w = LINE;
     const tip: V = z.p;
-    const stop: V = [tip[0] + z.dir[0] * w * 1.4, tip[1] + z.dir[1] * w * 1.4];
-    const d = route(n.card.route ?? (n.idea ? 'curve' : 'metro'), n.card.bend ?? 0.5, a.p, a.dir, via, stop, z.dir);
-    return { n, from, a, z, via, tip, w, d };
+    const stop: V = [tip[0] + z.dir[0] * w * TIP, tip[1] + z.dir[1] * w * TIP];
+    const kind = n.card.route ?? (n.idea ? 'curve' : 'metro');
+    const bend = n.card.bend ?? 0.5;
+    const d = route(kind, bend, a.p, a.dir, via, stop, z.dir, hs);
+    const hv = kind === 'curve' ? handles(a.p, a.dir, via, endOf(stop, z.dir), z.dir, bend, hs) : [];
+    return { n, from, a, z, via, hv, tip, w, d };
   });
   type Geo = (typeof geo)[number];
   const selGeo = sel ? geo.find((g) => g.n.card.id === sel) ?? null : null;
@@ -465,32 +486,45 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     for (let i = 1; i < pts.length - 1; i++) if (segDist(at, pts[i], pts[i + 1]) < segDist(at, pts[best], pts[best + 1])) best = i;
     const via = [...(g.n.card.via ?? [])];
     if (via.length >= 12) return;
-    via.splice(best, 0, [snap(at[0]), snap(at[1])]);
+    via.splice(best, 0, [snap(at[0]), snap(at[1])] as MapVia);
     setSel(g.n.card.id);
     await send({ type: 'update', id: g.n.card.id, patch: { via } });
   }
 
-  /** Griffe für Ansatz und Zwischenstopps */
-  const handleDrag = (g: Geo, kind: 'start' | 'via', i: number) => ({
-    onPointerDown: (e: React.PointerEvent) => {
-      e.stopPropagation();
+  /** Griffe für Ansatz, Zwischenstopps und Bézier-Griffe (sg: welcher der beiden gespiegelten Griffe) */
+  const handleDrag = (g: Geo, kind: 'start' | 'via' | 'hand', i: number, sg = 1) => {
+    // beim Bézier-Griff wird der vordere Griff gespeichert; der hintere zieht gespiegelt mit
+    const at = (e: React.PointerEvent): [number, number] => {
       const [x, y] = toStage(e);
-      setHd({ id: g.n.card.id, kind, i, x, y });
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    onPointerMove: (e: React.PointerEvent) => {
-      if (!hd) return;
-      const [x, y] = toStage(e);
-      setHd({ ...hd, x: kind === 'via' ? snap(x) : x, y: kind === 'via' ? snap(y) : y });
-    },
-    onPointerUp: () => {
-      const h = hd;
-      if (!h) return;
-      const c = g.n.card;
-      const patch = h.kind === 'start' ? { start: anchorFrom(g.from, [h.x, h.y]) } : { via: (c.via ?? []).map((v, j): [number, number] => (j === h.i ? [h.x, h.y] : v)) };
-      void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
-    },
-  });
+      if (kind === 'via') return [snap(x), snap(y)];
+      if (kind === 'hand') return [g.via[i][0] + sg * (x - g.via[i][0]), g.via[i][1] + sg * (y - g.via[i][1])];
+      return [x, y];
+    };
+    return {
+      onPointerDown: (e: React.PointerEvent) => {
+        e.stopPropagation();
+        const [x, y] = at(e);
+        setHd({ id: g.n.card.id, kind, i, x, y });
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      },
+      onPointerMove: (e: React.PointerEvent) => {
+        if (!hd) return;
+        const [x, y] = at(e);
+        setHd({ ...hd, x, y });
+      },
+      onPointerUp: () => {
+        const h = hd;
+        if (!h) return;
+        const c = g.n.card;
+        const r = Math.round;
+        const patch =
+          h.kind === 'start'
+            ? { start: anchorFrom(g.from, [h.x, h.y]) }
+            : { via: (c.via ?? []).map((v, j): MapVia => (j !== h.i ? v : h.kind === 'via' ? (v.length === 4 ? [h.x, h.y, v[2], v[3]] : [h.x, h.y]) : [v[0], v[1], r(h.x - v[0]), r(h.y - v[1])])) };
+        void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
+      },
+    };
+  };
 
   const label = (n: Node) => {
     const c = n.card;
@@ -593,8 +627,11 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
           {geo.map((g) => (
             <g key={g.n.card.id} style={{ color: g.n.color }}>
-              <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="round" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
-              <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w + 2.5)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
+              <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
+              <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
+              {sel === g.n.card.id && canEdit && g.hv.map((h, i) => (
+                <line key={i} className={b.tangent} x1={g.via[i][0] - h[0]} y1={g.via[i][1] - h[1]} x2={g.via[i][0] + h[0]} y2={g.via[i][1] + h[1]} />
+              ))}
               {/* breiter unsichtbarer Streifen: Ast anklicken wählt ihn, Doppelklick setzt einen Zwischenstopp */}
               <path
                 className={b.hit}
@@ -636,6 +673,18 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
                 onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } })}
               />
             ))}
+            {selGeo.hv.flatMap((h, i) =>
+              [1, -1].map((sg) => (
+                <div
+                  key={`h${i}${sg}`}
+                  className={`${b.handle} ${b.hand}`}
+                  style={{ left: selGeo.via[i][0] + sg * h[0], top: selGeo.via[i][1] + sg * h[1], ['--c' as string]: selGeo.n.color }}
+                  title="Bézier-Griff: Richtung und Schwung der Kurve (Doppelklick: wieder automatisch)"
+                  {...handleDrag(selGeo, 'hand', i, sg)}
+                  onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.map((v, j): MapVia => (j === i ? [v[0], v[1]] : v)) } })}
+                />
+              )),
+            )}
           </>
         )}
       </div>
