@@ -68,6 +68,7 @@ export interface ProjectSettings {
   groupMax: number;
   choiceDeadline: number | null;
   studentsSetTopic: boolean;
+  topicMapEdit: 'teacher' | 'all';
   roles: string[];
   freeRoles: boolean;
   phases: Record<string, { state: 'on' | 'scheduled' | 'off'; from: number | null; to: number | null }>;

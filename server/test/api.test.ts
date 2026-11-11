@@ -346,12 +346,12 @@ describe('Mindmap in Echtzeit', () => {
 
     const sa = connect(anna);
     const joined = await emit(sa, 'map:join', { projectId: project });
-    expect(joined).toMatchObject({ ok: true, role: 'student', scope: 'g' + g1, scopes: [{ scope: 'g' + g1, title: 'Inflation' }] });
+    expect(joined).toMatchObject({ ok: true, role: 'student', scope: 'g' + g1, scopes: [{ scope: 'p' }, { scope: 'g' + g1, title: 'Inflation' }] });
     expect((joined.people as J[]).map((p) => p.name).sort()).toEqual(['Anna', 'Ben']);
 
     const st = connect(t);
     const tj = await emit(st, 'map:join', { projectId: project, scope: 'g' + g1 });
-    expect(tj.scopes).toHaveLength(2);
+    expect(tj.scopes).toHaveLength(3);
     const seen = new Promise<J>((r) => st.on('map', r));
 
     const ok = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'karte1', kind: 'card', title: 'Hyperinflation', x: 10, y: 10, w: 160, h: 90, owner: ids[1] } } });
@@ -367,6 +367,33 @@ describe('Mindmap in Echtzeit', () => {
     const wrong = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'update', id: 'karte1', patch: { owner: ids[2] } } });
     expect(wrong).toMatchObject({ ok: false, error: 'Diese Person gehört nicht zur Gruppe' });
     expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'x', kind: 'card' } } })).error).toBe('Ungültige Änderung');
+  });
+
+  it('Themen-Mindmap vor den Gruppen: alle arbeiten mit, Gruppe übernimmt sie als Start', async () => {
+    const { t, project, ids } = await setup();
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const sa = connect(anna);
+    // noch keine Gruppe: Anna landet in der Themen-Mindmap und darf mitschreiben
+    expect(await emit(sa, 'map:join', { projectId: project })).toMatchObject({ ok: true, scope: 'p', readOnly: false });
+    const card = { id: 'idee01', kind: 'card', title: 'Hyperinflation', x: 0, y: 0, w: 160, h: 90, owner: null };
+    expect((await emit(sa, 'map:op', { projectId: project, scope: 'p', op: { type: 'add', card } })).ok).toBe(true);
+    expect((await emit(sa, 'map:op', { projectId: project, scope: 'p', op: { type: 'outline' } })).ok).toBe(false);
+    // nur die Lehrkraft: Anna liest nur noch
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { topicMapEdit: 'teacher' } })).status).toBe(200);
+    expect(await emit(sa, 'map:join', { projectId: project, scope: 'p' })).toMatchObject({ readOnly: true });
+    expect((await emit(sa, 'map:op', { projectId: project, scope: 'p', op: { type: 'remove', ids: ['idee01'] } })).ok).toBe(false);
+    // Gruppe bilden und die Themen-Mindmap übernehmen (nur in eine leere Mindmap)
+    const g = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g, position: 0 });
+    expect((await emit(sa, 'map:join', { projectId: project })).scope).toBe('g' + g);
+    expect((await emit(sa, 'map:seed', { projectId: project, scope: 'g' + g })).ok).toBe(true);
+    expect((await s.maps.get(project, 'g' + g)).map.cards.idee01).toMatchObject({ title: 'Hyperinflation' });
+    expect((await emit(sa, 'map:seed', { projectId: project, scope: 'g' + g })).ok).toBe(false);
+    // Phase aus: keine Themen-Mindmap mehr
+    const phases = (await call('GET', `/api/projects/${project}`, t)).json.settings.phases;
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { phases: { ...phases, topic: { state: 'off', from: null, to: null } } } })).status).toBe(200);
+    expect(((await emit(sa, 'map:join', { projectId: project })).scopes as J[]).map((x) => x.scope)).toEqual(['g' + g]);
   });
 });
 

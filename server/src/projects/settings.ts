@@ -7,7 +7,8 @@
 import { z } from 'zod';
 import type { Db } from '../db/index.js';
 
-export const DOC_TYPES = ['section', 'slides', 'handout', 'sheet', 'pdf', 'formula'] as const;
+/** brochure: gemeinsame Broschüre aller Gruppen (Wunsch Jo, 11. November 2026) */
+export const DOC_TYPES = ['section', 'slides', 'handout', 'brochure', 'sheet', 'pdf', 'formula'] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
 /** Import-Gruppen und die zugehörigen Dateiendungen. */
@@ -25,7 +26,7 @@ const IMPORT_KEYS = Object.keys(IMPORT_TYPES) as [ImportType, ...ImportType[]];
 export const EXPORT_FORMATS = ['docx', 'pdf', 'pptx', 'bento', 'quarto'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
-export const PHASES = ['groups', 'orientation', 'research', 'drafting', 'presentation'] as const;
+export const PHASES = ['topic', 'groups', 'orientation', 'research', 'drafting', 'presentation'] as const;
 const PhaseSchema = z.object({
   state: z.enum(['on', 'scheduled', 'off']),
   from: z.number().int().nullable().default(null),
@@ -46,6 +47,8 @@ export const SettingsSchema = z.object({
   /** Bis wann Lernende selbst wählen dürfen (ms); danach entscheidet die Lehrkraft */
   choiceDeadline: z.number().int().nullable(),
   studentsSetTopic: z.boolean(),
+  /** Gemeinsame Themen-Mindmap vor der Gruppenbildung: wer darf daran arbeiten (Wunsch Jo, 11. November 2026) */
+  topicMapEdit: z.enum(['teacher', 'all']),
   roles: z.array(z.string().min(1).max(60)).max(20),
   freeRoles: z.boolean(),
   phases: z.object(Object.fromEntries(PHASES.map((p) => [p, PhaseSchema])) as { [K in (typeof PHASES)[number]]: typeof PhaseSchema }),
@@ -75,10 +78,11 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   groupMax: 4,
   choiceDeadline: null,
   studentsSetTopic: true,
+  topicMapEdit: 'all',
   roles: ['Zeitwächter:in', 'Quellenverantwortliche:r', 'Layout', 'Moderation'],
   freeRoles: true,
-  phases: { groups: phase('on'), orientation: phase('on'), research: phase('on'), drafting: phase('on'), presentation: phase('on') },
-  docTypes: { section: true, slides: true, handout: true, sheet: false, pdf: true, formula: false },
+  phases: { topic: phase('on'), groups: phase('on'), orientation: phase('on'), research: phase('on'), drafting: phase('on'), presentation: phase('on') },
+  docTypes: { section: true, slides: true, handout: true, brochure: false, sheet: false, pdf: true, formula: false },
   importTypes: { text: true, slides: true, sheets: false, pdf: true, images: true, bib: true },
   exportFormats: { docx: true, pdf: true, pptx: true, bento: true, quarto: false },
   maxFileMb: 25,
@@ -127,7 +131,7 @@ export const FrameSchema = z.object({
 export type Frame = z.infer<typeof FrameSchema>;
 
 export const DEFAULT_FRAME: Frame = {
-  docTypes: { section: true, slides: true, handout: true, sheet: true, pdf: true, formula: true },
+  docTypes: { section: true, slides: true, handout: true, brochure: true, sheet: true, pdf: true, formula: true },
   importTypes: { text: true, slides: true, sheets: true, pdf: true, images: true, bib: true },
   exportFormats: { docx: true, pdf: true, pptx: true, bento: true, quarto: true },
   maxFileMb: 50,

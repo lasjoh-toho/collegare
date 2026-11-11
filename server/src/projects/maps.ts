@@ -295,17 +295,31 @@ export class MapStore {
     return { map: parseMap(row?.data), version: row?.version ?? 0 };
   }
 
-  apply(projectId: number, scope: string, op: MapOp, actor: number, people: Set<number>): Promise<{ map: MindMap; version: number }> {
-    const key = `${projectId}:${scope}`;
-    const run = async () => {
+  /**
+   * Themen-Mindmap in eine noch leere Mindmap übernehmen (Gruppe beginnt mit dem, was die Klasse gesammelt hat).
+   * Zuständigkeiten und Gliederung werden nicht mitgenommen.
+   */
+  seed(projectId: number, scope: string, source: MindMap): Promise<{ map: MindMap; version: number }> {
+    return this.queue(projectId, scope, async () => {
       const { map, version } = await this.get(projectId, scope);
-      applyOp(map, op, actor, people);
-      const data = JSON.stringify(map);
-      const now = Date.now();
-      if (version === 0) await this.db.insertInto('maps').values({ project_id: projectId, scope, data, version: 1, updated_at: now }).execute();
-      else await this.db.updateTable('maps').set({ data, version: version + 1, updated_at: now }).where('project_id', '=', projectId).where('scope', '=', scope).execute();
-      return { map, version: version + 1 };
-    };
+      if (Object.keys(map.cards).length) throw new MapError('Diese Mindmap ist nicht mehr leer.');
+      const copy: MindMap = JSON.parse(JSON.stringify(source));
+      for (const c of Object.values(copy.cards)) c.owner = null;
+      copy.outline = null;
+      await this.save(projectId, scope, copy, version);
+      return { map: copy, version: version + 1 };
+    });
+  }
+
+  private async save(projectId: number, scope: string, map: MindMap, version: number) {
+    const data = JSON.stringify(map);
+    const now = Date.now();
+    if (version === 0) await this.db.insertInto('maps').values({ project_id: projectId, scope, data, version: 1, updated_at: now }).execute();
+    else await this.db.updateTable('maps').set({ data, version: version + 1, updated_at: now }).where('project_id', '=', projectId).where('scope', '=', scope).execute();
+  }
+
+  private queue<T>(projectId: number, scope: string, run: () => Promise<T>): Promise<T> {
+    const key = `${projectId}:${scope}`;
     const prev = this.queues.get(key) ?? Promise.resolve();
     const next = prev.then(run, run);
     const tail = next.catch(() => undefined);
@@ -314,5 +328,14 @@ export class MapStore {
       if (this.queues.get(key) === tail) this.queues.delete(key);
     });
     return next;
+  }
+
+  apply(projectId: number, scope: string, op: MapOp, actor: number, people: Set<number>): Promise<{ map: MindMap; version: number }> {
+    return this.queue(projectId, scope, async () => {
+      const { map, version } = await this.get(projectId, scope);
+      applyOp(map, op, actor, people);
+      await this.save(projectId, scope, map, version);
+      return { map, version: version + 1 };
+    });
   }
 }

@@ -302,7 +302,8 @@ function NewProject({ courses, initialCourse, onClose }: { courses: Course[]; in
       let cid = courseId;
       if (cid === 'new') cid = (await post<{ id: number }>('/api/courses', { title: courseTitle })).id;
       const { id } = await post<{ id: number }>('/api/projects', { courseId: cid, title, mode });
-      location.href = href(`/projekt/?id=${id}`);
+      // erst die Einstellungsseite: Phasen, Mindmaps, Gruppenbildung festlegen
+      location.href = href(`/einstellungen/?id=${id}&neu=1`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
