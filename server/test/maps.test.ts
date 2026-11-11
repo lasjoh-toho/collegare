@@ -63,4 +63,20 @@ describe('Mindmap-Operationen', () => {
     expect(m.outline).toMatchObject({ at: 1234, by: 2 });
     expect(() => applyOp(emptyMap(), { type: 'outline' }, 1, people)).toThrow('Cluster');
   });
+
+  it('Ast-Ansicht: Idee an einer Karte, Abzweigung an einem Zwischenstopp', async () => {
+    const { MapOp: Schema } = await import('../src/projects/maps.js');
+    const m = emptyMap();
+    applyOp(m, add('clus1', 0, 0, { kind: 'cluster' }), 1, people);
+    applyOp(m, add('clus2', 400, 0, { kind: 'cluster' }), 1, people);
+    applyOp(m, add('card1', 0, 0, { parent: 'clus1' }), 1, people);
+    applyOp(m, Schema.parse({ type: 'add', card: { id: 'card2', kind: 'card', x: 0, y: 100, w: 160, h: 90, parent: 'clus1', under: 'card1' } }), 1, people);
+    expect(m.cards.card2).toMatchObject({ parent: 'clus1', under: 'card1' });
+    applyOp(m, Schema.parse({ type: 'update', id: 'clus1', patch: { via: [[100, -100]] } }), 1, people);
+    applyOp(m, Schema.parse({ type: 'update', id: 'clus2', patch: { fork: { from: 'clus1', i: 0 } } }), 1, people);
+    expect(m.cards.clus2.fork).toEqual({ from: 'clus1', i: 0 });
+    applyOp(m, Schema.parse({ type: 'update', id: 'clus2', patch: { fork: null } }), 1, people);
+    expect(m.cards.clus2.fork).toBeNull();
+    expect(() => Schema.parse({ type: 'update', id: 'clus2', patch: { fork: { from: 'clus1', i: 12 } } })).toThrow();
+  });
 });

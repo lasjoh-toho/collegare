@@ -128,11 +128,19 @@ export interface MapCard {
   bx?: number | null;
   by?: number | null;
   start?: MapStart | null;
+  /** Abzweigung am Zwischenstopp i eines Geschwister-Asts */
+  fork?: MapFork | null;
+  /** Ast-Ansicht: hängt an dieser Karte (gleicher Cluster), statt direkt am Cluster */
+  under?: string | null;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
   via?: MapVia[];
   children: string[];
 }
 export type MapVia = [number, number] | [number, number, number, number];
+export interface MapFork {
+  from: string;
+  i: number;
+}
 export interface MapStart {
   side: 't' | 'r' | 'b' | 'l';
   t: number;
@@ -159,7 +167,7 @@ export interface MindMap {
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'via'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }

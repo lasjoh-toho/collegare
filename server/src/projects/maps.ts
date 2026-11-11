@@ -45,6 +45,10 @@ export interface MapCard {
   by?: number | null;
   /** von Hand gesetzter Ansatz des Asts an der Form davor: Seite und Stelle (0..1) entlang der Seite; null = automatisch */
   start?: { side: Side; t: number } | null;
+  /** Abzweigung: Ast beginnt am Zwischenstopp i des Geschwister-Asts from (gleicher Ursprung); null = an der Form */
+  fork?: { from: string; i: number } | null;
+  /** Ast-Ansicht: Karte hängt an dieser Karte desselben Clusters (beliebig tief); null = direkt am Cluster */
+  under?: string | null;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
   via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
@@ -79,6 +83,7 @@ export const emptyMap = (): MindMap => ({ v: 1, cards: {}, roots: [], links: [],
 const Id = z.string().regex(/^[A-Za-z0-9_-]{4,40}$/);
 const Num = z.number().finite().min(-100_000).max(100_000);
 const Start = z.object({ side: z.enum(SIDES), t: z.number().min(0).max(1) }).nullable();
+const Fork = z.object({ from: Id, i: z.number().int().min(0).max(11) }).nullable();
 /** Zwischenstopp: x, y und optional der Bézier-Griff hx, hy (Vektor vom Stopp aus) */
 const Via = z.array(z.union([z.tuple([Num, Num]), z.tuple([Num, Num, Num, Num])])).max(12);
 const Size = z.number().finite().min(60).max(4000);
@@ -105,6 +110,8 @@ export const MapOp = z.discriminatedUnion('type', [
       bx: Num.nullable().optional(),
       by: Num.nullable().optional(),
       start: Start.optional(),
+      fork: Fork.optional(),
+      under: Id.nullable().optional(),
       via: Via.optional(),
     }),
   }),
@@ -112,7 +119,7 @@ export const MapOp = z.discriminatedUnion('type', [
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, via: Via })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),

@@ -46,3 +46,8 @@
 .stop { border-radius: 3px; }
 .hand { width: 11px; height: 11px; border-width: 2px; border-radius: 50%; background: var(--c); }
 .tangent { stroke: var(--ui-muted, #888); stroke-width: 1.5; stroke-dasharray: 4 3; }
+/* Stopps anderer Äste, an denen der gewählte Ast abzweigen kann */
+.target { position: absolute; width: 20px; height: 20px; transform: translate(-50%, -50%); border: 2px dashed var(--c); border-radius: 50%; pointer-events: none; z-index: 2; opacity: 0.7; }
+.target.on { border-style: solid; background: color-mix(in srgb, var(--c) 25%, transparent); opacity: 1; }
+.forked { background: var(--c); }
+.auto { background: var(--ui-panel); color: var(--ui-text); font-size: 11px; font-weight: 700; line-height: 1; display: inline-grid; place-items: center; }

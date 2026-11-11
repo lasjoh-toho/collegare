@@ -9,7 +9,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
-import type { MapCard, MapOp, MapRoute, MapShape, MapStart, MapVia, MindMap as MapData } from '@/lib/types';
+import type { MapCard, MapFork, MapOp, MapRoute, MapShape, MapStart, MapVia, MindMap as MapData } from '@/lib/types';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
 import b from './branchmap.module.css';
@@ -35,13 +35,28 @@ const SHAPES: { key: MapShape; label: string }[] = [
   { key: 'para', label: 'Parallelogramm' },
 ];
 
+interface Geo {
+  n: Node;
+  from: Box;
+  a: { p: V; dir: V };
+  z: { p: V; dir: V };
+  via: V[];
+  hv: V[];
+  tip: V;
+  w: number;
+  d: string;
+  kind: MapRoute;
+  fork: MapFork | null;
+  color: string;
+}
+
 interface Node {
   card: MapCard;
   side: 1 | -1;
   x: number;
   y: number;
   color: string;
-  depth: 1 | 2;
+  depth: number;
   /** lockere Idee: Karte ohne Ast, wie „no shape“ (Text unterbricht den Ast), noch kein Abschnitt */
   idea: boolean;
   parentId: string | null;
@@ -78,7 +93,7 @@ function rounded(pts: [number, number][], r = 12): string {
 
 const LEAD = 18; // gerades Stück vor der Pfeilspitze
 const LINE = 5; // alle Äste gleich dick (Wunsch Jo)
-const TIP = 2; // Länge der Spitze in Linienbreiten
+const TIP = 1.25; // Länge der Spitze in Linienbreiten (stumpfer, Wunsch Jo)
 
 type V = [number, number];
 interface Box {
@@ -248,22 +263,70 @@ function segDist([px, py]: V, [ax, ay]: V, [bx, by]: V): number {
 
 const snap = (v: number) => Math.round(v / 10) * 10;
 
-/** Spitze ohne Widerhaken: so breit wie die Linie, läuft zu einem Punkt zu. */
+/** Spitze ohne Widerhaken: so breit wie die Linie, kurz und an der Spitze leicht gerundet. */
 function arrow(x: number, y: number, [dx, dy]: [number, number], w: number): string {
   const px = (-dy * w) / 2;
   const py = (dx * w) / 2;
   const bx = x - dx * w * TIP;
   const by = y - dy * w * TIP;
-  return `M${x},${y} L${bx + px},${by + py} L${bx - px},${by - py} Z`;
+  const f = 0.22; // Anteil der Flanke, der in die Rundung geht
+  const l: V = [x + (bx + px - x) * f, y + (by + py - y) * f];
+  const r: V = [x + (bx - px - x) * f, y + (by - py - y) * f];
+  return `M${bx + px},${by + py} L${l[0]},${l[1]} Q${x},${y} ${r[0]},${r[1]} L${bx - px},${by - py} Z`;
+}
+
+/** Farbe leicht abwandeln (k-te Abzweigung): Farbton abwechselnd nach beiden Seiten, etwas heller. */
+function shade(hex: string, k: number): string {
+  if (!k || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, bl = (n & 255) / 255;
+  const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
+  let h = 0;
+  const l = (mx + mn) / 2;
+  const d = mx - mn;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (d) h = mx === r ? ((g - bl) / d) % 6 : mx === g ? (bl - r) / d + 2 : (r - g) / d + 4;
+  const step = Math.ceil(k / 2);
+  const h2 = (h * 60 + (k % 2 ? 1 : -1) * 9 * step + 360) % 360;
+  const l2 = Math.min(0.68, l + 0.035 * step);
+  const c = (1 - Math.abs(2 * l2 - 1)) * sat;
+  const x = c * (1 - Math.abs(((h2 / 60) % 2) - 1));
+  const m = l2 - c / 2;
+  const [a, b2, e] = h2 < 60 ? [c, x, 0] : h2 < 120 ? [x, c, 0] : h2 < 180 ? [0, c, x] : h2 < 240 ? [0, x, c] : h2 < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + [a, b2, e].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
 }
 
 const IDEA = '#9a9a94';
 
+/** Gültiger Knoten, an dem eine Karte in der Ast-Ansicht hängt (gleicher Cluster bzw. beide lose, kein Kreis). */
+function underOf(map: MapData, c: MapCard): string | null {
+  const u = c.under ? map.cards[c.under] : null;
+  if (!u || u.id === c.id || u.kind !== 'card' || c.kind !== 'card' || u.parent !== c.parent) return null;
+  let x: MapCard | undefined = u;
+  for (let guard = 0; x?.under && guard < 50; guard++) {
+    if (x.under === c.id) return null;
+    x = map.cards[x.under];
+  }
+  return u.id;
+}
+
 function layout(map: MapData): { nodes: Node[]; height: number } {
-  const roots = map.roots.map((id) => map.cards[id]).filter(Boolean);
+  // Knoten an Knoten: Karten mit „under“ hängen in der Ast-Ansicht an einer anderen Karte (beliebig tief)
+  const subs = new Map<string, MapCard[]>();
+  for (const c of Object.values(map.cards)) {
+    const u = underOf(map, c);
+    if (u) subs.set(u, [...(subs.get(u) ?? []), c]);
+  }
+  const byY = (l: MapCard[]) => [...l].sort((a, b) => a.y - b.y || a.x - b.x);
+  const rows = (c: MapCard): number => {
+    const l = subs.get(c.id) ?? [];
+    return l.length ? l.reduce((sum, k) => sum + rows(k), 0) : 1;
+  };
+  const direct = (c: MapCard) => c.children.map((id) => map.cards[id]).filter((k) => k && !underOf(map, k));
+  const roots = map.roots.map((id) => map.cards[id]).filter((c) => c && !underOf(map, c));
   const all = readingOrder(roots);
   const mains = all.filter((c) => c.kind === 'cluster');
-  const size = (c: MapCard) => (c.kind === 'card' ? ROW : Math.max(1, c.children.length) * ROW + GAP);
+  const size = (c: MapCard) => (c.kind === 'card' ? rows(c) * ROW : Math.max(1, direct(c).reduce((sum, k) => sum + rows(k), 0)) * ROW + GAP);
   // Erste Hälfte rechts, zweite links (im Uhrzeigersinn lesbar)
   const right: MapCard[] = [];
   let acc = 0;
@@ -276,26 +339,35 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   }
   const left = all.filter((c) => !right.includes(c));
   const nodes: Node[] = [];
+  /** Kinder eines Knotens auffächern, jedes so hoch wie seine eigenen Unteräste */
+  const fan = (list: MapCard[], pn: Node, idea: boolean) => {
+    const ordered = byY(list);
+    let y = pn.y - (ordered.reduce((sum, k) => sum + rows(k), 0) * ROW) / 2;
+    for (const k of ordered) {
+      const r = rows(k);
+      const ky = k.by ?? y + (r * ROW) / 2;
+      const kx = k.bx ?? pn.x + pn.side * (pn.depth === 1 ? SUB_X : SUB_X * 0.8);
+      const node: Node = { card: k, side: kx >= pn.x ? 1 : -1, x: kx, y: ky, color: pn.color, depth: pn.depth + 1, idea, parentId: pn.card.id };
+      nodes.push(node);
+      fan(subs.get(k.id) ?? [], node, idea);
+      y += r * ROW;
+    }
+  };
   const place = (list: MapCard[], side: 1 | -1) => {
     const h = list.reduce((s, c) => s + size(c), 0);
     let y = -h / 2;
     list.forEach((c) => {
       const idx = mains.indexOf(c);
       const idea = c.kind === 'card';
-      const color = idea ? IDEA : (c.color ?? COLUMN_COLORS[(idx + 1) % COLUMN_COLORS.length]);
+      const color = c.color ?? (idea ? IDEA : COLUMN_COLORS[(idx + 1) % COLUMN_COLORS.length]);
       const sz = size(c);
       const autoY = y + sz / 2;
       const mx = c.bx ?? side * (MAIN_X + 60);
       const my = c.by ?? autoY;
       const s: 1 | -1 = mx >= 0 ? 1 : -1;
-      nodes.push({ card: c, side: s, x: mx, y: my, color, depth: 1, idea, parentId: null });
-      const kids = c.children.map((id) => map.cards[id]).filter(Boolean);
-      const ordered = [...kids].sort((a, b) => a.y - b.y || a.x - b.x);
-      ordered.forEach((k, i) => {
-        const ky = k.by ?? my - ((ordered.length - 1) * ROW) / 2 + i * ROW;
-        const kx = k.bx ?? mx + s * SUB_X;
-        nodes.push({ card: k, side: kx >= mx ? 1 : -1, x: kx, y: ky, color, depth: 2, idea: false, parentId: c.id });
-      });
+      const node: Node = { card: c, side: s, x: mx, y: my, color, depth: 1, idea, parentId: null };
+      nodes.push(node);
+      fan(idea ? (subs.get(c.id) ?? []) : direct(c), node, idea);
       y += sz;
     });
     return h;
@@ -388,6 +460,21 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     }
   }
 
+  /** Neue Idee direkt an einem Knoten (Unterast oder lockere Idee), beliebig tief */
+  async function addUnder(nodeId: string) {
+    const n = map.cards[nodeId];
+    if (!n) return;
+    if (n.kind === 'cluster') return addChild(n.id);
+    const id = newId();
+    const p = n.parent ? map.cards[n.parent] : null;
+    const y = p ? p.children.reduce((m, c) => Math.max(m, (map.cards[c]?.y ?? 0) + (map.cards[c]?.h ?? 0) + 10), 0) : n.y + n.h + 20;
+    const x = p ? 0 : n.x + n.w + 30;
+    if (await send({ type: 'add', card: { id, kind: 'card', title: '', text: '', x, y, w: 180, h: 100, color: null, parent: n.parent, owner: null, under: n.id } })) {
+      setSel(id);
+      startEdit(id, '');
+    }
+  }
+
   async function addChild(parentId: string) {
     const p = map.cards[parentId];
     if (!p) return;
@@ -431,9 +518,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     if (edit || !selected || !canEdit) return;
     if (e.key === 'Tab') {
       e.preventDefault();
-      if (selected.kind === 'cluster') void addChild(selected.id);
-      else if (selected.parent) void addChild(selected.parent);
-      else void addIdea();
+      void addUnder(selected.id);
     } else if (e.key === 'Enter' || e.key === 'F2') {
       e.preventDefault();
       startEdit(selected.id, selected.title);
@@ -449,9 +534,33 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     return [(e.clientX - r.left - cam.x) / cam.k, (e.clientY - r.top - cam.y) / cam.k];
   };
 
-  // Linien je Ast: Ansatz (automatisch oder von Hand), Zwischenstopps, Ziel
-  const geo = nodes.map((n) => {
-    const parent = n.parentId ? nodes.find((x) => x.card.id === n.parentId) : null;
+  // Linien je Ast: Ansatz (automatisch, von Hand oder als Abzweigung), Zwischenstopps, Ziel
+  const byId = new Map(nodes.map((n) => [n.card.id, n]));
+  /** führt die Kette der Abzweigungen von n zurück zu id? (dann wäre es ein Kreis) */
+  const forksFrom = (n: Node, id: string): boolean => {
+    let f = n.card.fork?.from;
+    for (let guard = 0; f && guard < 50; guard++) {
+      if (f === id) return true;
+      f = byId.get(f)?.card.fork?.from;
+    }
+    return false;
+  };
+  /** Zwischenstopp eines Geschwister-Asts in der Nähe (beim Ziehen des Ansatzes): dort abzweigen */
+  const snapFork = (n: Node, [x, y]: V): MapFork | null => {
+    for (const o of nodes) {
+      if (o === n || o.parentId !== n.parentId || o.card.id === n.card.id || forksFrom(o, n.card.id)) continue;
+      const i = (o.card.via ?? []).findIndex((v) => Math.hypot(v[0] - x, v[1] - y) < 18 / cam.k);
+      if (i >= 0) return { from: o.card.id, i };
+    }
+    return null;
+  };
+  const memo = new Map<string, Geo>();
+  const busy = new Set<string>();
+  const geoOf = (n: Node): Geo => {
+    const done = memo.get(n.card.id);
+    if (done) return done;
+    busy.add(n.card.id);
+    const parent = n.parentId ? (byId.get(n.parentId) ?? null) : null;
     const me = pos(n);
     const pp = parent ? pos(parent) : { x: 0, y: 0 };
     const sz = (id: string, d: [number, number]) => sizes[id] ?? d;
@@ -464,19 +573,50 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     const hs: (V | null)[] = (n.card.via ?? []).map((v, i) => (h && h.kind === 'hand' && h.i === i ? [h.x - via[i][0], h.y - via[i][1]] : v.length === 4 ? [v[2], v[3]] : null));
     const first = via[0] ?? [me.x, me.y];
     const last = via[via.length - 1] ?? [pp.x, pp.y];
-    const start = h && h.kind === 'start' ? anchorFrom(from, [h.x, h.y]) : n.card.start;
-    const a = start ? anchorAt(from, start) : port(from, first[0], first[1], pointy(parent?.card ?? null, false));
+    const kind = n.card.route ?? (n.idea ? 'curve' : 'metro');
+    const bend = n.card.bend ?? 0.5;
+    // Abzweigung: beim Ziehen des Ansatzes rastet er an Stopps der Geschwister-Äste ein
+    const wantFork = h && h.kind === 'start' ? snapFork(n, [h.x, h.y]) : (n.card.fork ?? null);
+    const trunkNode = wantFork ? byId.get(wantFork.from) : undefined;
+    const trunk = wantFork && trunkNode && trunkNode !== n && trunkNode.parentId === n.parentId && !busy.has(trunkNode.card.id) ? geoOf(trunkNode) : null;
+    const fork = trunk && wantFork && trunk.via.length > wantFork.i ? wantFork : null;
+    let a: { p: V; dir: V };
+    if (fork && trunk) {
+      const p = trunk.via[fork.i];
+      const tv: V = [first[0] - p[0], first[1] - p[1]];
+      let dir: V = axis(tv);
+      if (trunk.kind === 'curve' && kind !== 'metro' && kind !== 'ortho') {
+        // tangential aus der Kurve heraus, in die Richtung, in der das Ziel liegt
+        const t = trunk.hv[fork.i];
+        const l = Math.hypot(t[0], t[1]) || 1;
+        const sg = t[0] * tv[0] + t[1] * tv[1] >= 0 ? 1 : -1;
+        dir = [(sg * t[0]) / l, (sg * t[1]) / l];
+      }
+      a = { p, dir };
+    } else {
+      const start = h && h.kind === 'start' ? anchorFrom(from, [h.x, h.y]) : n.card.start;
+      a = start ? anchorAt(from, start) : port(from, first[0], first[1], pointy(parent?.card ?? null, false));
+    }
     const z = port(to, last[0], last[1], pointy(n.card, n.idea));
     const w = LINE;
     const tip: V = z.p;
     const stop: V = [tip[0] + z.dir[0] * w * TIP, tip[1] + z.dir[1] * w * TIP];
-    const kind = n.card.route ?? (n.idea ? 'curve' : 'metro');
-    const bend = n.card.bend ?? 0.5;
     const d = route(kind, bend, a.p, a.dir, via, stop, z.dir, hs);
     const hv = kind === 'curve' ? handles(a.p, a.dir, via, endOf(stop, z.dir), z.dir, bend, hs) : [];
-    return { n, from, a, z, via, hv, tip, w, d };
-  });
-  type Geo = (typeof geo)[number];
+    // Farbe: eigene Wahl, sonst bei jeder Abzweigung leicht abgewandelt
+    let color = n.color;
+    if (!n.card.color) {
+      if (fork && trunk) color = shade(trunk.color, nodes.filter((o) => o.parentId === n.parentId && o.card.fork?.from === fork.from).indexOf(n) + 1);
+      else if (parent) color = shade(geoOf(parent).color, nodes.filter((o) => o.parentId === parent.card.id).indexOf(n) + 1);
+    }
+    const g: Geo = { n, from, a, z, via, hv, tip, w, d, kind, fork, color };
+    busy.delete(n.card.id);
+    memo.set(n.card.id, g);
+    return g;
+  };
+  const geo = nodes.map(geoOf);
+  const colorOf = (id: string) => memo.get(id)?.color ?? byId.get(id)?.color ?? IDEA;
+
   const selGeo = sel ? geo.find((g) => g.n.card.id === sel) ?? null : null;
 
   /** Zwischenstopp dort einfügen, wo geklickt wurde (zwischen den nächsten beiden Punkten) */
@@ -488,7 +628,17 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     if (via.length >= 12) return;
     via.splice(best, 0, [snap(at[0]), snap(at[1])] as MapVia);
     setSel(g.n.card.id);
-    await send({ type: 'update', id: g.n.card.id, patch: { via } });
+    if (await send({ type: 'update', id: g.n.card.id, patch: { via } })) await shiftForks(g.n.card.id, best, 1);
+  }
+
+  /** Abzweigungen an einem Ast nachführen, wenn dort ein Stopp eingefügt (+1) oder entfernt (-1, null: alle) wird */
+  async function shiftForks(id: string, at: number | null, delta: 1 | -1) {
+    for (const o of nodes) {
+      const f = o.card.fork;
+      if (!f || f.from !== id) continue;
+      if (at === null || (delta < 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: null } });
+      else if (f.i > at || (delta > 0 && f.i === at)) await send({ type: 'update', id: o.card.id, patch: { fork: { from: id, i: f.i + delta } } });
+    }
   }
 
   /** Griffe für Ansatz, Zwischenstopps und Bézier-Griffe (sg: welcher der beiden gespiegelten Griffe) */
@@ -519,7 +669,10 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         const r = Math.round;
         const patch =
           h.kind === 'start'
-            ? { start: anchorFrom(g.from, [h.x, h.y]) }
+            ? (() => {
+                const f = snapFork(g.n, [h.x, h.y]);
+                return f ? { fork: f, start: null } : { start: anchorFrom(g.from, [h.x, h.y]), fork: null };
+              })()
             : { via: (c.via ?? []).map((v, j): MapVia => (j !== h.i ? v : h.kind === 'via' ? (v.length === 4 ? [h.x, h.y, v[2], v[3]] : [h.x, h.y]) : [v[0], v[1], r(h.x - v[0]), r(h.y - v[1])])) };
         void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
       },
@@ -537,7 +690,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     const style: React.CSSProperties = {
       left: p.x,
       top: p.y,
-      ['--c' as string]: n.color,
+      ['--c' as string]: colorOf(c.id),
       transform: 'translate(-50%, -50%)',
     };
     return (
@@ -548,7 +701,8 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         data-node={c.id}
         onPointerDown={(e) => {
           e.stopPropagation();
-          if (!canEdit || edit === c.id) return;
+          // Plus-Knopf im Knoten: nicht einfangen, sonst landet sein Klick beim Knoten statt beim Knopf
+          if (!canEdit || edit === c.id || (e.target as HTMLElement).closest('button')) return;
           drag.current = { id: c.id, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y, moved: false };
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }}
@@ -589,7 +743,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         )}
         {owner && <span className={b.owner}>{owner}</span>}
         {isSel && canEdit && edit !== c.id && (
-          <button className={b.plus} title={n.idea ? 'Weitere Idee (Tab)' : 'Unterast hinzufügen (Tab)'} onClick={(e) => (e.stopPropagation(), void (n.idea ? addIdea() : addChild(c.kind === 'cluster' ? c.id : c.parent!)))}>
+          <button className={b.plus} title="Idee hier anhängen (Tab)" onClick={(e) => (e.stopPropagation(), void addUnder(c.id))}>
             +
           </button>
         )}
@@ -603,6 +757,12 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       className={b.wrap}
       tabIndex={0}
       onKeyDown={onKey}
+      // Der Browser scrollt die Fläche beim Fokussieren sonst still mit (overflow: hidden); dann säßen Griffe und
+      // Zeiger versetzt. Die Fläche bewegt sich nur über die Kamera.
+      onScroll={(e) => {
+        e.currentTarget.scrollTop = 0;
+        e.currentTarget.scrollLeft = 0;
+      }}
       onPointerDown={(e) => {
         setSel(null);
         pan.current = { sx: e.clientX, sy: e.clientY, x: cam.x, y: cam.y };
@@ -626,7 +786,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       <div ref={stage} className={b.stage} style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})` }}>
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
           {geo.map((g) => (
-            <g key={g.n.card.id} style={{ color: g.n.color }}>
+            <g key={g.n.card.id} style={{ color: g.color }}>
               <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
               <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
               {sel === g.n.card.id && canEdit && g.hv.map((h, i) => (
@@ -656,21 +816,25 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         {nodes.map(label)}
         {selGeo && canEdit && (
           <>
+            {/* Stopps der Geschwister-Äste: hierhin den Ansatz ziehen, um abzuzweigen */}
+            {geo
+              .filter((o) => o !== selGeo && o.n.parentId === selGeo.n.parentId && !forksFrom(o.n, selGeo.n.card.id))
+              .flatMap((o) => o.via.map((v, i) => <div key={`t${o.n.card.id}${i}`} className={`${b.target} ${hd?.kind === 'start' && selGeo.fork?.from === o.n.card.id && selGeo.fork.i === i ? b.on : ''}`} style={{ left: v[0], top: v[1], ['--c' as string]: o.color }} />))}
             <div
-              className={`${b.handle} ${b.start}`}
-              style={{ left: selGeo.a.p[0], top: selGeo.a.p[1], ['--c' as string]: selGeo.n.color }}
-              title="Ansatz verschieben (Doppelklick: wieder automatisch)"
+              className={`${b.handle} ${b.start} ${selGeo.fork ? b.forked : ''}`}
+              style={{ left: selGeo.a.p[0], top: selGeo.a.p[1], ['--c' as string]: selGeo.color }}
+              title="Ansatz verschieben; auf einen Stopp eines anderen Asts ziehen: dort abzweigen (Doppelklick: wieder automatisch)"
               {...handleDrag(selGeo, 'start', -1)}
-              onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { start: null } })}
+              onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { start: null, fork: null } })}
             />
             {selGeo.via.map((v, i) => (
               <div
                 key={i}
                 className={`${b.handle} ${b.stop}`}
-                style={{ left: v[0], top: v[1], ['--c' as string]: selGeo.n.color }}
+                style={{ left: v[0], top: v[1], ['--c' as string]: selGeo.color }}
                 title="Zwischenstopp ziehen (Doppelklick: entfernen)"
                 {...handleDrag(selGeo, 'via', i)}
-                onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } })}
+                onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } }).then((ok) => void (ok && shiftForks(selGeo.n.card.id, i, -1)))}
               />
             ))}
             {selGeo.hv.flatMap((h, i) =>
@@ -678,7 +842,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
                 <div
                   key={`h${i}${sg}`}
                   className={`${b.handle} ${b.hand}`}
-                  style={{ left: selGeo.via[i][0] + sg * h[0], top: selGeo.via[i][1] + sg * h[1], ['--c' as string]: selGeo.n.color }}
+                  style={{ left: selGeo.via[i][0] + sg * h[0], top: selGeo.via[i][1] + sg * h[1], ['--c' as string]: selGeo.color }}
                   title="Bézier-Griff: Richtung und Schwung der Kurve (Doppelklick: wieder automatisch)"
                   {...handleDrag(selGeo, 'hand', i, sg)}
                   onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.map((v, j): MapVia => (j === i ? [v[0], v[1]] : v)) } })}
@@ -741,18 +905,21 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
               + Stopp
             </button>
           )}
-          {((selected.via?.length ?? 0) > 0 || selected.start) && (
-            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { via: [], start: null } })} title="Zwischenstopps entfernen, Ansatz wieder automatisch">
+          {((selected.via?.length ?? 0) > 0 || selected.start || selected.fork) && (
+            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { via: [], start: null, fork: null } }).then((ok) => void (ok && shiftForks(selected.id, null, -1)))} title="Zwischenstopps und Abzweigung entfernen, Ansatz wieder automatisch">
               Linie zurücksetzen
             </button>
           )}
-          {selected.kind === 'cluster' && (
-            <span className={b.colors}>
-              {COLUMN_COLORS.map((c) => (
-                <button key={c} className={b.swatch} style={{ background: c }} title="Farbe des Asts" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: c } })} />
-              ))}
-            </span>
-          )}
+          <span className={b.colors}>
+            {COLUMN_COLORS.map((c) => (
+              <button key={c} className={b.swatch} style={{ background: c }} title="Farbe des Asts" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: c } })} />
+            ))}
+            {selected.color && selected.kind === 'card' && (
+              <button className={`${b.swatch} ${b.auto}`} title="Farbe automatisch: leicht abgewandelt vom Ast davor" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: null } })}>
+                A
+              </button>
+            )}
+          </span>
           {selected.kind === 'card' && !selected.parent && (
             <>
               <button className="btn primary" onClick={() => void promote(selected.id)} title="Wird ein Abschnitt der Gliederung">
@@ -793,11 +960,9 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>
             <Icon name="pen" size={14} /> Umbenennen
           </button>
-          {(selected.kind === 'cluster' || selected.parent) && (
-            <button className="btn" onClick={() => void addChild(selected.kind === 'cluster' ? selected.id : selected.parent!)}>
-              + Unterast
-            </button>
-          )}
+          <button className="btn" onClick={() => void addUnder(selected.id)} title="Neue Idee an diesem Knoten (Tab)">
+            + Unterast
+          </button>
           <button className="btn icon" onClick={() => void remove(selected.id)} title="Löschen">
             <Icon name="close" size={14} />
           </button>
