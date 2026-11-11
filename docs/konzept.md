@@ -174,7 +174,7 @@ Startseite der Lehrkraft für ein Projekt ist ein **Kanban-Board**:
 
 - **Präsentation:** PPTX im OnlyOffice-Präsentationseditor mit Collegare-Vorlagen (wenig Text, große Bilder, Quellenfolie automatisch aus der Literaturliste). Folien werden Mitgliedern zugeordnet.
 - **Handout:** gestaltete Vorlage (1–2 Seiten) im Texteditor oder als Layout-Vorlage mit Feldern (Kernaussagen, Grafik, Quellen).
-- **Wissenschaftliche Ausarbeitung im Tufte-/Quarto-Stil:** Export der zusammengesetzten Abschnitte über DOCX → Pandoc → Quarto mit Randnotizen, Randabbildungen und Literaturverzeichnis aus CSL-JSON; Ausgabe als HTML und als PDF über Typst (ohne LaTeX-Installation). Läuft serverseitig in der Warteschlange.
+- **Wissenschaftliche Ausarbeitung im Tufte-Stil:** Export direkt aus dem Strukturmodell des eigenen Editors (Entscheidungen 13 und 14): PDF über Typst mit eigener Tufte-Vorlage (Randnotizen, Randabbildungen, Literaturverzeichnis aus den Quellen in „Notizen und Quellen“), HTML im Tufte-Stil aus Collegare selbst und eine `.qmd`-Datei zum Weiterarbeiten mit Quarto. Kein Pandoc und kein Quarto auf dem Server.
 - **Verteidigung:** Probelauf-Modus mit Zeitnahme je Person; Sammlung erwarteter Fragen (von der Gruppe, optional mit KI-Vorschlägen); Notizfeld der Lehrkraft während der Verteidigung, das in die Bewertung einfließt.
 - Meilenstein: Abgabe der Endprodukte. Danach ist alles schreibgeschützt (außer nach Freigabe durch die Lehrkraft).
 
@@ -717,6 +717,18 @@ Entschieden (Jo, 1. November 2026):
 11. **Mehrere Aufgaben verfolgen** (9. November 2026): Portal und Dienstschnittstelle „Aufgaben-Übersicht“ wie in 8b.
 12. **Collegare ist der Kontodienst** (11. November 2026, Jo): Collegare entspricht im Aufbau der Ausschreibung,
     Autogra.fi ist ein Zusatz. Laufen beide, stellt Collegare die Konten per OpenID Connect aus (Abschnitt 8c).
+
+13. **Eigener Editor statt OnlyOffice** (11. November 2026, Jo): Perspektivisch ersetzen eigene Editoren das
+    eingebettete OnlyOffice. Gründe: Ladezeit (unter 1 MB statt 15–30 MB, Wechsel zwischen Abschnitten ohne
+    Neustart), volle Kontrolle über Sperren, Herkunft und Tippfluss, eine einzige Lizenz. Reihenfolge:
+    (1) Textabschnitte mit ProseMirror/Tiptap (nur freie Erweiterungen) und Yjs, (2) Präsentation mit dem Editor aus
+    mod_bento und einem Menüband wie PowerPoint im Office-Streifen, (3) Tabellen (Univer oder FortuneSheet), bis dahin
+    OnlyOffice. Word/PowerPoint nur über Import und Export (mammoth, docx, PptxGenJS). Alle Bausteine stehen unter MIT,
+    BSD oder Apache und dürfen in den Kern; sind alle drei Arten ersetzt, entfällt `web/` samt AGPL. Vorher prüfen:
+    mod_bento-Code nur von Jo oder mit Rechteeinräumung.
+14. **Export über Typst, Quarto als Austauschformat** (11. November 2026, Jo): Auf dem Server läuft nur Typst
+    (Apache-2.0, ein Programm); Quarto (MIT) und Pandoc (GPL) werden nicht mitgeliefert. Eine Datei
+    `DRITTANBIETER.md` im Paket nennt Lizenzen und Hinweise (Typst, CSL-Stile CC BY-SA, Schriften OFL).
 
 Offen:
 
