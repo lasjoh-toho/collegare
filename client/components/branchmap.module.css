@@ -31,4 +31,8 @@
 .barTitle { font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colors { display: flex; gap: 4px; }
 .swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ui-panel); box-shadow: 0 0 0 1px var(--ui-border); cursor: pointer; }
-.hint { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); max-width: 520px; padding: 10px 14px; border-radius: 10px; background: var(--ui-panel); border: 1px solid var(--ui-border); font-size: 13px; color: var(--ui-muted); text-align: center; }
+.hint { position: absolute; left: 50%; top: 60px; transform: translateX(-50%); max-width: 520px; padding: 10px 14px; border-radius: 10px; background: var(--ui-panel); border: 1px solid var(--ui-border); font-size: 13px; color: var(--ui-muted); text-align: center; }
+
+/* lockere Idee: Text unterbricht den dünnen grauen Ast (wie „no shape“) */
+.idea .text { color: var(--ui-muted); }
+.adders { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; }

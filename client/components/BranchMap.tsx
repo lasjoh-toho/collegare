@@ -34,6 +34,8 @@ interface Node {
   y: number;
   color: string;
   depth: 1 | 2;
+  /** lockere Idee: Karte ohne Ast, wie „no shape“ (Text unterbricht den Ast), noch kein Abschnitt */
+  idea: boolean;
   parentX: number;
   parentY: number;
 }
@@ -51,38 +53,41 @@ function branch(x0: number, y0: number, x1: number, y1: number, w0: number, w1: 
   return top + ' ' + bottom;
 }
 
-function layout(map: MapData): { nodes: Node[]; loose: MapCard[]; height: number } {
+const IDEA = '#9a9a94';
+
+function layout(map: MapData): { nodes: Node[]; height: number } {
   const roots = map.roots.map((id) => map.cards[id]).filter(Boolean);
-  const mains = readingOrder(roots.filter((c) => c.kind === 'cluster'));
-  const loose = roots.filter((c) => c.kind === 'card');
-  const size = (c: MapCard) => Math.max(1, c.children.length) * ROW + GAP;
+  const all = readingOrder(roots);
+  const mains = all.filter((c) => c.kind === 'cluster');
+  const size = (c: MapCard) => (c.kind === 'card' ? ROW : Math.max(1, c.children.length) * ROW + GAP);
   // Erste Hälfte rechts, zweite links (im Uhrzeigersinn lesbar)
-  const total = mains.reduce((s, c) => s + size(c), 0);
   const right: MapCard[] = [];
   let acc = 0;
-  for (const c of mains) {
-    if (acc < total / 2 || right.length === 0) {
+  const total2 = all.reduce((s, c) => s + size(c), 0);
+  for (const c of all) {
+    if (acc < total2 / 2 || right.length === 0) {
       right.push(c);
       acc += size(c);
     }
   }
-  const left = mains.filter((c) => !right.includes(c));
+  const left = all.filter((c) => !right.includes(c));
   const nodes: Node[] = [];
   const place = (list: MapCard[], side: 1 | -1) => {
     const h = list.reduce((s, c) => s + size(c), 0);
     let y = -h / 2;
     list.forEach((c) => {
       const idx = mains.indexOf(c);
-      const color = c.color ?? COLUMN_COLORS[(idx + 1) % COLUMN_COLORS.length];
+      const idea = c.kind === 'card';
+      const color = idea ? IDEA : (c.color ?? COLUMN_COLORS[(idx + 1) % COLUMN_COLORS.length]);
       const sz = size(c);
       const my = y + sz / 2;
       const mx = side * MAIN_X;
-      nodes.push({ card: c, side, x: mx, y: my, color, depth: 1, parentX: 0, parentY: 0 });
+      nodes.push({ card: c, side, x: mx, y: my, color, depth: 1, idea, parentX: 0, parentY: 0 });
       const kids = c.children.map((id) => map.cards[id]).filter(Boolean);
       const ordered = [...kids].sort((a, b) => a.y - b.y || a.x - b.x);
       ordered.forEach((k, i) => {
         const ky = my - ((ordered.length - 1) * ROW) / 2 + i * ROW;
-        nodes.push({ card: k, side, x: mx + side * SUB_X, y: ky, color, depth: 2, parentX: mx, parentY: my });
+        nodes.push({ card: k, side, x: mx + side * SUB_X, y: ky, color, depth: 2, idea: false, parentX: mx, parentY: my });
       });
       y += sz;
     });
@@ -90,11 +95,12 @@ function layout(map: MapData): { nodes: Node[]; loose: MapCard[]; height: number
   };
   const hr = place(right, 1);
   const hl = place(left, -1);
-  return { nodes, loose, height: Math.max(hr, hl, 200) };
+  return { nodes, height: Math.max(hr, hl, 200) };
 }
 
 export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp) => Promise<boolean> }) {
-  const { nodes, loose, height } = useMemo(() => layout(map), [map]);
+  const { nodes, height } = useMemo(() => layout(map), [map]);
+  const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -130,6 +136,35 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     }
   }
 
+  /** Schnell denken: lockere Idee direkt am Thema, ohne Abschnitt */
+  async function addIdea() {
+    const id = newId();
+    const max = Math.max(0, ...Object.values(map.cards).filter((c) => !c.parent).map((c) => c.y + c.h));
+    if (await send({ type: 'add', card: { id, kind: 'card', title: '', text: '', x: 0, y: max + 30, w: 180, h: 100, color: null, parent: null, owner: null } })) {
+      setSel(id);
+      startEdit(id, '');
+    }
+  }
+
+  /** Lockere Idee an einen Hauptast hängen */
+  async function attach(id: string, parentId: string) {
+    const p = map.cards[parentId];
+    if (!p) return;
+    const y = p.children.reduce((m, c) => Math.max(m, (map.cards[c]?.y ?? 0) + (map.cards[c]?.h ?? 0) + 10), 0);
+    await send({ type: 'move', id, x: 0, y, parent: parentId });
+  }
+
+  /** Lockere Idee wird Hauptast (Abschnitt der Gliederung) */
+  async function promote(id: string) {
+    const c = map.cards[id];
+    if (!c) return;
+    const nid = newId();
+    if (await send({ type: 'add', card: { id: nid, kind: 'cluster', title: c.title, text: c.text, x: c.x, y: c.y, w: 340, h: 230, color: null, parent: null, owner: null, shape: c.shape } })) {
+      await send({ type: 'remove', ids: [id] });
+      setSel(nid);
+    }
+  }
+
   async function addChild(parentId: string) {
     const p = map.cards[parentId];
     if (!p) return;
@@ -150,7 +185,14 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
   async function commit() {
     const id = edit;
     setEdit(null);
-    if (!id || !map.cards[id] || map.cards[id].title === draft.trim()) return;
+    wrap.current?.focus({ preventScroll: true });
+    if (!id || !map.cards[id]) return;
+    // Leer gelassene neue Idee verschwindet wieder
+    if (!draft.trim() && !map.cards[id].title && map.cards[id].kind === 'card' && !map.cards[id].text) {
+      await send({ type: 'remove', ids: [id] });
+      return;
+    }
+    if (map.cards[id].title === draft.trim()) return;
     await send({ type: 'update', id, patch: { title: draft.trim().slice(0, 200) } });
   }
 
@@ -168,6 +210,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       e.preventDefault();
       if (selected.kind === 'cluster') void addChild(selected.id);
       else if (selected.parent) void addChild(selected.parent);
+      else void addIdea();
     } else if (e.key === 'Enter' || e.key === 'F2') {
       e.preventDefault();
       startEdit(selected.id, selected.title);
@@ -181,22 +224,22 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     const c = n.card;
     const shape = c.shape ?? 'none';
     const owner = c.owner != null ? people.find((p) => p.id === c.owner)?.name : null;
-    const text = c.title || (n.depth === 1 ? 'Ohne Titel' : '…');
+    const text = c.title || (n.depth === 1 && !n.idea ? 'Ohne Titel' : '…');
     const isSel = sel === c.id;
     // Text sitzt am Ende des Asts, nach außen ausgerichtet
     const style: React.CSSProperties = {
       left: n.x,
       top: n.y,
       ['--c' as string]: n.color,
-      transform: `translate(${n.side === 1 ? '0' : '-100%'}, ${shape === 'none' ? '-100%' : '-50%'})`,
+      transform: `translate(${n.side === 1 ? '0' : '-100%'}, ${shape === 'none' && !n.idea ? '-100%' : '-50%'})`,
     };
     return (
       <div
         key={c.id}
-        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 ? b.main : b.sub} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''}`}
+        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''}`}
         style={style}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => setSel(c.id)}
+        onClick={() => (setSel(c.id), wrap.current?.focus({ preventScroll: true }))}
         onDoubleClick={() => startEdit(c.id, c.title)}
       >
         {edit === c.id ? (
@@ -211,14 +254,14 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
               if (e.key === 'Escape') setEdit(null);
               e.stopPropagation();
             }}
-            placeholder={n.depth === 1 ? 'Abschnitt' : 'Idee'}
+            placeholder={n.depth === 1 && !n.idea ? 'Abschnitt' : 'Idee'}
           />
         ) : (
           <span className={b.text}>{text}</span>
         )}
         {owner && <span className={b.owner}>{owner}</span>}
         {isSel && canEdit && edit !== c.id && (
-          <button className={b.plus} title="Unterast hinzufügen (Tab)" onClick={(e) => (e.stopPropagation(), void addChild(c.kind === 'cluster' ? c.id : c.parent!))}>
+          <button className={b.plus} title={n.idea ? 'Weitere Idee (Tab)' : 'Unterast hinzufügen (Tab)'} onClick={(e) => (e.stopPropagation(), void (n.idea ? addIdea() : addChild(c.kind === 'cluster' ? c.id : c.parent!)))}>
             +
           </button>
         )}
@@ -260,9 +303,9 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
             const sy = n.depth === 1 ? 0 : n.parentY;
             return (
               <g key={n.card.id} fill={n.color}>
-                <path d={branch(start, sy, n.x, n.y, n.depth === 1 ? 14 : 6, n.depth === 1 ? 6 : 2.5)} opacity={n.depth === 1 ? 0.95 : 0.8} />
+                <path d={branch(start, sy, n.x, n.y, n.idea ? 4 : n.depth === 1 ? 14 : 6, n.idea ? 2 : n.depth === 1 ? 6 : 2.5)} opacity={n.depth === 1 && !n.idea ? 0.95 : 0.8} />
                 {/* Linie unter dem Text: der Ast läuft unter der Beschriftung weiter */}
-                <path d={branch(n.x, n.y, end, n.y, n.depth === 1 ? 6 : 2.5, n.depth === 1 ? 3 : 1.5)} opacity={n.depth === 1 ? 0.95 : 0.8} />
+                {!n.idea && <path d={branch(n.x, n.y, end, n.y, n.depth === 1 ? 6 : 2.5, n.depth === 1 ? 3 : 1.5)} opacity={n.depth === 1 ? 0.95 : 0.8} />}
               </g>
             );
           })}
@@ -270,20 +313,24 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         <div className={b.root} onPointerDown={(e) => e.stopPropagation()}>
           <span>{topic}</span>
           {canEdit && (
-            <button className={b.plus} title="Neuen Hauptast hinzufügen" onClick={addMain}>
+            <button className={b.plus} title="Neue Idee (Tab)" onClick={addIdea}>
               +
             </button>
           )}
         </div>
         {nodes.map(label)}
-        {loose.length > 0 && (
-          <div className={b.loose} style={{ top: height / 2 + 40 }} onPointerDown={(e) => e.stopPropagation()}>
-            <strong>Noch keinem Ast zugeordnet</strong> (in der Karten-Ansicht in einen Cluster ziehen):{' '}
-            {loose.map((c) => c.title || 'Ohne Titel').join(' · ')}
-          </div>
-        )}
       </div>
 
+      {canEdit && (
+        <div className={b.adders} onPointerDown={(e) => e.stopPropagation()}>
+          <button className="btn" onClick={addIdea} title="Lockere Idee am Thema (Tab)">
+            + Idee
+          </button>
+          <button className="btn" onClick={addMain} title="Hauptast: wird ein Abschnitt der Gliederung">
+            + Abschnitt
+          </button>
+        </div>
+      )}
       {selected && canEdit && (
         <div className={b.bar} onPointerDown={(e) => e.stopPropagation()}>
           <span className={b.barTitle}>{selected.title || 'Ohne Titel'}</span>
@@ -301,6 +348,33 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
               ))}
             </span>
           )}
+          {selected.kind === 'card' && !selected.parent && (
+            <>
+              <button className="btn primary" onClick={() => void promote(selected.id)} title="Wird ein Abschnitt der Gliederung">
+                Als Abschnitt
+              </button>
+              {mains.length > 0 && (
+                <select value="" onChange={(e) => e.target.value && void attach(selected.id, e.target.value)} title="An einen Abschnitt hängen">
+                  <option value="">Hängen an …</option>
+                  {mains.map((m) => (
+                    <option key={m.card.id} value={m.card.id}>
+                      {m.card.title || 'Ohne Titel'}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
+          {selected.kind === 'card' && selected.parent && (
+            <select value={selected.parent} onChange={(e) => void (e.target.value === '_' ? send({ type: 'move', id: selected.id, x: 0, y: 0, parent: null }) : attach(selected.id, e.target.value))} title="Verschieben">
+              {mains.map((m) => (
+                <option key={m.card.id} value={m.card.id}>
+                  an {m.card.title || 'Ohne Titel'}
+                </option>
+              ))}
+              <option value="_">lösen (lockere Idee)</option>
+            </select>
+          )}
           {selected.kind === 'card' && (
             <select value={selected.owner ?? ''} onChange={(e) => void send({ type: 'update', id: selected.id, patch: { owner: e.target.value ? Number(e.target.value) : null } })} title="Wer schreibt dazu?">
               <option value="">niemand zuständig</option>
@@ -314,9 +388,11 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>
             <Icon name="pen" size={14} /> Umbenennen
           </button>
-          <button className="btn" onClick={() => void addChild(selected.kind === 'cluster' ? selected.id : selected.parent!)}>
-            + Unterast
-          </button>
+          {(selected.kind === 'cluster' || selected.parent) && (
+            <button className="btn" onClick={() => void addChild(selected.kind === 'cluster' ? selected.id : selected.parent!)}>
+              + Unterast
+            </button>
+          )}
           <button className="btn icon" onClick={() => void remove(selected.id)} title="Löschen">
             <Icon name="close" size={14} />
           </button>
@@ -324,8 +400,8 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       )}
       {nodes.length === 0 && canEdit && (
         <div className={b.hint}>
-          Tippe auf <strong>+</strong> am Thema, um den ersten Ast anzulegen. Jeder Hauptast wird ein Abschnitt der Gliederung, Unteräste sind die Ideen
-          dazu. <kbd>Tab</kbd> legt einen Unterast an, <kbd>Enter</kbd> benennt um.
+          Erst einmal Ideen sammeln: <strong>+</strong> am Thema oder <kbd>Tab</kbd>. Wenn sich Themen zeigen, wird eine Idee „Als Abschnitt“ zum
+          Hauptast, andere Ideen hängt ihr daran. Jeder Abschnitt wird Teil der Gliederung.
         </div>
       )}
     </div>
