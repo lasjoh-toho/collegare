@@ -263,6 +263,9 @@ function Acts({ p }: { p: ProjectListItem }) {
       </a>
       {p.role === 'teacher' && (
         <>
+          <a className="btn icon" href={href(`/projekt/korrektur/?id=${p.id}`)} title="Korrektur">
+            <Icon name="pen" size={15} />
+          </a>
           <a className="btn icon" href={href(`/projekt/gruppen/?id=${p.id}`)} title="Gruppen-Board">
             <Icon name="users" size={15} />
           </a>

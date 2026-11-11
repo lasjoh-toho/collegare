@@ -10,6 +10,7 @@ import { COOKIE, sessionHook } from './http/auth.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
+import { gradingRoutes } from './routes/gradings.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
 import { authorizeDoc, documentRoutes } from './routes/documents.js';
@@ -124,6 +125,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     authRoutes(http, s);
     adminRoutes(http, s);
     projectRoutes(http, s, bc);
+    gradingRoutes(http, s);
     await ltiRoutes(http, s, bc);
 
     // Projekt-Namespace: Wer ein Projekt geöffnet hat, bekommt Änderungen am Board sofort.

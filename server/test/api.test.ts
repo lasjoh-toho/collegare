@@ -147,6 +147,32 @@ describe('Projekte und Kanban', () => {
     expect((await call('POST', '/api/access/redeem', undefined, { code: codes.codes[0].code })).status).toBe(404);
   });
 
+  it('Korrektur: Übersicht nach Gruppen, Note je Person, nur für Lehrkräfte', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, {})).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    const o = (await call('GET', `/api/projects/${project}/korrektur`, t)).json;
+    expect(o.scopes).toHaveLength(1);
+    expect(o.scopes[0].people.map((p: J) => p.name)).toEqual(['Anna', 'Ben']);
+    expect(o.scopes[0].products.map((p: J) => [p.key, p.state])).toEqual([['map', 'missing'], ['outline', 'missing']]);
+    expect(o.unassigned.map((p: J) => p.name)).toEqual(['Clara']);
+
+    expect((await call('PUT', `/api/projects/${project}/gradings/${ids[0]}`, t, { points: 16 })).status).toBe(400);
+    const g = (await call('PUT', `/api/projects/${project}/gradings/${ids[0]}`, t, { points: 12, feedback: '<p>Gut</p>', notes: 'privat' })).json.grading;
+    expect(g).toMatchObject({ points: 12, final: false });
+    await call('PUT', `/api/projects/${project}/gradings/${ids[0]}`, t, { final: true });
+    const o2 = (await call('GET', `/api/projects/${project}/korrektur`, t)).json;
+    expect(o2.gradings[ids[0]]).toMatchObject({ points: 12, feedback: '<p>Gut</p>', notes: 'privat', final: true });
+    expect(o2.gradings[ids[1]]).toBeUndefined();
+    expect((await call('PUT', `/api/projects/${project}/gradings/999`, t, { points: 3 })).status).toBe(404);
+
+    const code = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes[0].code;
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code })).json.token;
+    expect((await call('GET', `/api/projects/${project}/korrektur`, anna)).status).toBe(403);
+    expect((await call('PUT', `/api/projects/${project}/gradings/${ids[0]}`, anna, { points: 15 })).status).toBe(403);
+  });
+
   it('fremde Lehrkraft und fremdes Projekt bleiben unsichtbar', async () => {
     const { at, project } = await setup();
     await call('POST', '/api/admin/teachers', at, { login: 'sch', name: 'Herr Schulz', password: 'passwort-456' });

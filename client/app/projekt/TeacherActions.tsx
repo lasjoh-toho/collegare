@@ -40,6 +40,9 @@ export function TeacherActions({ project, onChanged }: { project: ProjectView; o
         <button className="btn" onClick={() => setDialog('codes')} title="Zugangscodes">
           <Icon name="key" size={15} /> <span className={p.label}>Zugangscodes</span>
         </button>
+        <a className="btn" href={href(`/projekt/korrektur/?id=${project.id}`)} title="Korrektur">
+          <Icon name="pen" size={15} /> <span className={p.label}>Korrektur</span>
+        </a>
         <a className="btn" href={href(`/einstellungen/?id=${project.id}`)} title="Einstellungen">
           <Icon name="gear" size={15} /> <span className={p.label}>Einstellungen</span>
         </a>

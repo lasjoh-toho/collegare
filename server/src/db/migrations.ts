@@ -236,6 +236,25 @@ migrations['0003_dokumente'] = {
   },
 };
 
+// Korrektur: Bewertung je Person und Projekt
+migrations['0004_bewertungen'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`longtext` : sql`text`;
+    await db.schema
+      .createTable('gradings')
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('points', 'integer')
+      .addColumn('feedback', long, (c) => c.notNull())
+      .addColumn('notes', long, (c) => c.notNull())
+      .addColumn('final_at', ms)
+      .addColumn('graded_by', 'integer', (c) => c.notNull())
+      .addColumn('updated_at', ms, (c) => c.notNull())
+      .addPrimaryKeyConstraint('gradings_pk', ['project_id', 'user_id'])
+      .execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

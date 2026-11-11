@@ -1,5 +1,6 @@
 import { DocChangeStore, Documents } from './projects/documents.js';
 import { MapStore } from './projects/maps.js';
+import { Gradings } from './projects/gradings.js';
 import { AuditLog } from './audit/auditLog.js';
 import { createDb, type Db } from './db/index.js';
 import { migrate } from './db/migrations.js';
@@ -45,6 +46,7 @@ export interface Services {
   projects: Projects;
   frame: FrameStore;
   maps: MapStore;
+  gradings: Gradings;
   documents: Documents;
   docStore: DocChangeStore;
   lti: Lti;
@@ -61,6 +63,7 @@ export async function createServices(config: Config, now: () => number = Date.no
   await contexts.system();
   const audit = new AuditLog(db, now);
   const projects = new Projects(db, users, now);
+  const maps = new MapStore(db);
   const toolKey = new ToolKeyStore(db);
   const lti = new Lti(db, users, contexts, audit, toolKey, { appUrl: config.appUrl }, now, fetchFn);
   lti.addToProject = (projectId, userId) => projects.addMember(projectId, userId);
@@ -75,7 +78,8 @@ export async function createServices(config: Config, now: () => number = Date.no
     accessCodes: new AccessCodes(db, now),
     projects,
     frame: new FrameStore(db),
-    maps: new MapStore(db),
+    maps,
+    gradings: new Gradings(db, projects, maps, now),
     documents: new Documents(db),
     docStore: new DocChangeStore(db),
     lti,

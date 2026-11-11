@@ -179,6 +179,21 @@ export interface AuditLogTable {
   hash: string;
 }
 
+/** Bewertung je Person und Projekt (Korrektur wie in Autogra.fi; Noten bleiben je Person, gestaltung.md 4). */
+export interface GradingsTable {
+  project_id: number;
+  user_id: number;
+  /** Notenpunkte 0–15, null = noch keine Note */
+  points: number | null;
+  /** Rückmeldung an die Person (HTML wie im Autogra.fi-Editor, „Ausblenden“ als Kommentar) */
+  feedback: string;
+  /** Notizen der Lehrkraft, nie für Lernende */
+  notes: string;
+  final_at: Ms | null;
+  graded_by: number;
+  updated_at: Ms;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -203,5 +218,6 @@ export interface Database {
   doc_changes: DocChangesTable;
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
+  gradings: GradingsTable;
   kv: KeyValueTable;
 }
