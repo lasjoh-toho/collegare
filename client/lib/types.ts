@@ -71,6 +71,8 @@ export interface ProjectSettings {
   topicMapEdit: 'teacher' | 'all';
   mapHelp: boolean;
   mapHelpText: string;
+  chatGroups: boolean;
+  chatAll: boolean;
   roles: string[];
   freeRoles: boolean;
   phases: Record<string, { state: 'on' | 'scheduled' | 'off'; from: number | null; to: number | null }>;

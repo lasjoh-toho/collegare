@@ -252,6 +252,9 @@ export default function Einstellungen() {
             />
           </div>
           <Check label="Eigene Rollen erlaubt" checked={s.freeRoles} onChange={(v) => set('freeRoles', v)} />
+          <h4>Chat</h4>
+          <Check label="Chat je Gruppe" checked={s.chatGroups ?? true} onChange={(v) => set('chatGroups', v)} hint="Nur die Gruppe und du lesen mit." />
+          <Check label="Chat für alle im Projekt" checked={s.chatAll ?? true} onChange={(v) => set('chatAll', v)} hint="Du kannst jede Nachricht löschen." />
         </AccBox>
 
         <AccBox open={open.has('phases')} onToggle={toggle} id="phases" title="Phasen und Werkzeuge">

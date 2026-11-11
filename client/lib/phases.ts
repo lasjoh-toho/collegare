@@ -125,6 +125,7 @@ export interface TileDef {
 
 export const TILES: TileDef[] = [
   { key: 'material', phase: null, title: 'Material', icon: 'info', path: '/projekt/material/?id={id}', sub: 'Zum Einarbeiten: Texte, Videos, Webseiten' },
+  { key: 'chat', phase: null, title: 'Chat', icon: 'chat', path: '/projekt/chat/?id={id}', sub: 'Mit der Gruppe und mit allen schreiben' },
   { key: 'topic', phase: 'topic', title: 'Themen-Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}&bereich=p', sub: 'Das Thema gemeinsam umreißen' },
   { key: 'groups', phase: 'groups', title: 'Gruppen', icon: 'users', path: '/projekt/gruppen/?id={id}', sub: 'Board der Gruppenbildung' },
   { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}', sub: 'Ideen sammeln und ordnen' },

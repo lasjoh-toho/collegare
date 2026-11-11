@@ -10,6 +10,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
 import type { MapCard, MapFork, MapOp, MapRoute, MapShape, MapStart, MapVia, MindMap as MapData } from '@/lib/types';
+import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
 import b from './branchmap.module.css';
@@ -463,6 +464,32 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     }
   }
 
+  /** Beitrag aus dem Chat: auf einen Knoten gezogen hängt er dort, sonst lockere Idee an der Stelle */
+  async function dropChat(e: React.DragEvent) {
+    const d = readChatDrop(e);
+    if (!d || !canEdit) return;
+    e.preventDefault();
+    const { title, text } = cardFromChat(d);
+    const at = toStage(e);
+    const onId = (e.target as HTMLElement).closest<HTMLElement>('[data-node]')?.dataset.node;
+    const on = onId && onId !== '__root' ? map.cards[onId] : null;
+    const id = newId();
+    const base = { id, kind: 'card' as const, title, text, w: 180, h: 100, color: null, owner: null };
+    let ok: boolean;
+    if (on?.kind === 'cluster') {
+      const y = on.children.reduce((m, c) => Math.max(m, (map.cards[c]?.y ?? 0) + (map.cards[c]?.h ?? 0) + 10), 0);
+      ok = await send({ type: 'add', card: { ...base, x: 0, y, parent: on.id } });
+    } else if (on) {
+      const p = on.parent ? map.cards[on.parent] : null;
+      const y = p ? p.children.reduce((m, c) => Math.max(m, (map.cards[c]?.y ?? 0) + (map.cards[c]?.h ?? 0) + 10), 0) : on.y + on.h + 20;
+      ok = await send({ type: 'add', card: { ...base, x: p ? 0 : on.x + on.w + 30, y, parent: on.parent, under: on.id } });
+    } else {
+      const max = Math.max(0, ...Object.values(map.cards).filter((c) => !c.parent).map((c) => c.y + c.h));
+      ok = await send({ type: 'add', card: { ...base, x: 0, y: max + 30, parent: null, bx: Math.round(at[0]), by: Math.round(at[1]) } });
+    }
+    if (ok) setSel(id);
+  }
+
   /** Neue Idee direkt an einem Knoten (Unterast oder lockere Idee), beliebig tief */
   async function addUnder(nodeId: string) {
     const n = map.cards[nodeId];
@@ -782,6 +809,12 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       onKeyDown={onKey}
       // Der Browser scrollt die Fläche beim Fokussieren sonst still mit (overflow: hidden); dann säßen Griffe und
       // Zeiger versetzt. Die Fläche bewegt sich nur über die Kamera.
+      onDragOver={(e) => {
+        if (!canEdit || !isChatDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(e) => void dropChat(e)}
       onScroll={(e) => {
         e.currentTarget.scrollTop = 0;
         e.currentTarget.scrollLeft = 0;

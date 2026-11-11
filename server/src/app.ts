@@ -15,6 +15,7 @@ import { materialRoutes } from './routes/materials.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
+import { chatSocket } from './routes/chat.js';
 import { authorizeDoc, documentRoutes } from './routes/documents.js';
 import { collabId, parseCollabId } from './projects/documents.js';
 import type { Services } from './services.js';
@@ -157,6 +158,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
       });
     });
     mapSocket(nsp, s);
+    chatSocket(nsp, s);
     documentRoutes(http, s, {
       changed: (projectId, scope) => nsp.to('project:' + projectId).emit('docs', { projectId, scope }),
       lockChanged: (docId) => co.disconnectDoc(collabId(docId)),

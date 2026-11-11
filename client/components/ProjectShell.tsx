@@ -9,11 +9,13 @@ import { get, href, post } from '@/lib/api';
 import { groupColor } from '@/lib/colors';
 import { currentPhase, phaseDone, phaseList, phasePath, type DocSummary, type PhaseKey } from '@/lib/phases';
 import type { Me, ProjectView } from '@/lib/types';
+import { ChatPanel } from './ChatPanel';
 import { Icon } from './Icon';
 import { ThemeSwitch } from './ThemeSwitch';
 import sh from './shell.module.css';
 
 const PIN_KEY = 'collegare-menu-pinned';
+const CHAT_KEY = 'collegare-chat-offen';
 
 interface Props {
   me: Me;
@@ -36,6 +38,19 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
   const [ownDocs, setOwnDocs] = useState<DocSummary | null>(null);
+  // Chat als Leiste am rechten Rand, je Gerät gemerkt
+  const [chatOpen, setChatOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setChatOpen(localStorage.getItem(CHAT_KEY) === '1');
+    } catch {}
+  }, []);
+  const toggleChat = (v: boolean) => {
+    setChatOpen(v);
+    try {
+      localStorage.setItem(CHAT_KEY, v ? '1' : '0');
+    } catch {}
+  };
   useEffect(() => {
     if (docs === undefined) get<DocSummary>(`/api/projects/${project.id}/documents`).then(setOwnDocs, () => setOwnDocs(null));
   }, [docs, project.id]);
@@ -72,6 +87,8 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   };
 
   const teacher = project.role === 'teacher';
+  const chatOn = project.settings.chatAll !== false || (project.settings.chatGroups !== false && project.mode === 'group');
+  const showChat = chatOn && chatOpen && where !== 'Chat';
   const phases = phaseList(project.settings, project.mode === 'single').filter((p) => p.state !== 'off');
   const done = phaseDone(project, me.id, docs === undefined ? ownDocs : docs);
   const now = currentPhase(phases, done);
@@ -92,7 +109,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }
 
   return (
-    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${fill ? sh.fill : ''}`}>
+    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${fill ? sh.fill : ''} ${showChat ? sh.chatOpen : ''}`}>
       <header className={sh.head}>
         <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü: Projekt, Phasen, Tag/Nacht">
           <Icon name="menu" size={18} />
@@ -113,6 +130,11 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             </button>
           )}
           {actions}
+          {chatOn && where !== 'Chat' && (
+            <button className={`btn icon ${showChat ? 'on' : ''}`} onClick={() => toggleChat(!chatOpen)} title={showChat ? 'Chat ausblenden' : 'Chat am rechten Rand zeigen'} aria-pressed={showChat} aria-label="Chat">
+              <Icon name="chat" size={16} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -163,6 +185,11 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           <a className={`${sh.overview} ${where === 'Material' ? sh.here : ''}`} href={href(`/projekt/material/?id=${project.id}`)}>
             <Icon name="info" size={16} /> Material zum Einarbeiten
           </a>
+          {chatOn && (
+            <a className={`${sh.overview} ${where === 'Chat' ? sh.here : ''}`} href={href(`/projekt/chat/?id=${project.id}`)}>
+              <Icon name="chat" size={16} /> Chat
+            </a>
+          )}
           {phases.map((p, i) => {
             const path = phasePath(p.key);
             const reachable = !!path && (teacher || p.state === 'open' || p.state === 'closed');
@@ -224,6 +251,11 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           children
         )}
       </main>
+      {showChat && (
+        <aside className={sh.chat} aria-label="Chat">
+          <ChatPanel me={me} project={project} panel onClose={() => toggleChat(false)} />
+        </aside>
+      )}
     </div>
   );
 }

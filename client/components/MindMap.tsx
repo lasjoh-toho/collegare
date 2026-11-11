@@ -7,6 +7,7 @@
  * Vereinfacht gegenüber brausa: Cluster sind eine Ebene tief und werden nicht verkleinert dargestellt.
  * Der Server ist maßgeblich; die Ansicht schickt Operationen und zeigt den verteilten Stand.
  */
+import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
 import { renderMarkdown } from '@/lib/markdown';
@@ -442,6 +443,21 @@ export function MindMap({
       onPointerUp={up}
       onPointerCancel={up}
       onDoubleClick={dblclick}
+      onDragOver={(e) => {
+        if (!canEdit || !isChatDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(e) => {
+        const d = readChatDrop(e);
+        if (!d || !canEdit) return;
+        e.preventDefault();
+        // Beitrag aus dem Chat wird eine Karte an der Stelle (im Cluster darunter, falls einer da ist)
+        const w = toWorld(e.clientX, e.clientY);
+        const p = placeAt(w.x, w.y, 'card');
+        const id = newId();
+        void send({ type: 'add', card: { id, kind: 'card', ...cardFromChat(d), color: null, owner: null, ...p } }).then((ok) => ok && setSel(id));
+      }}
       onWheel={wheel}
       onContextMenu={(e) => e.preventDefault()}
       style={{ backgroundPosition: `${cam.x}px ${cam.y}px`, backgroundSize: `${22 * cam.k}px ${22 * cam.k}px` }}

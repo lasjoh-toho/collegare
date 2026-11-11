@@ -287,6 +287,23 @@ migrations['0006_material_seite'] = {
   },
 };
 
+// Chat je Gruppe und für das ganze Projekt (Wunsch Jo, 11. November 2026)
+migrations['0007_chat'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`text` : sql`text`;
+    await db.schema
+      .createTable('chat_messages')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('body', long, (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('chat_project_scope').on('chat_messages').columns(['project_id', 'scope', 'id']).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

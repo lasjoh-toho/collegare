@@ -52,6 +52,9 @@ export const SettingsSchema = z.object({
   /** Erklärblase in der Mindmap: an/aus und eigener Text der Lehrkraft (leer = Standardtext) */
   mapHelp: z.boolean(),
   mapHelpText: z.string().max(1000),
+  /** Chat je Gruppe und Chat für alle im Projekt */
+  chatGroups: z.boolean(),
+  chatAll: z.boolean(),
   roles: z.array(z.string().min(1).max(60)).max(20),
   freeRoles: z.boolean(),
   phases: z.object(Object.fromEntries(PHASES.map((p) => [p, PhaseSchema])) as { [K in (typeof PHASES)[number]]: typeof PhaseSchema }),
@@ -84,6 +87,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   topicMapEdit: 'all',
   mapHelp: true,
   mapHelpText: '',
+  chatGroups: true,
+  chatAll: true,
   roles: ['Zeitwächter:in', 'Quellenverantwortliche:r', 'Layout', 'Moderation'],
   freeRoles: true,
   phases: { topic: phase('on'), groups: phase('on'), orientation: phase('on'), research: phase('on'), drafting: phase('on'), presentation: phase('on') },

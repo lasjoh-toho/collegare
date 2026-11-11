@@ -83,6 +83,7 @@ export default function Projekt() {
     const ph = tile.phase ? phases.find((x) => x.key === tile.phase) : null;
     if (ph?.state === 'off') return false;
     if (tile.docType && !project.settings.docTypes[tile.docType]) return false;
+    if (tile.key === 'chat' && project.settings.chatAll === false && (project.settings.chatGroups === false || project.mode !== 'group')) return false;
     return true;
   });
 

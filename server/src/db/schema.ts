@@ -213,6 +213,16 @@ export interface MaterialsTable {
   created_at: Ms;
 }
 
+/** Chat: scope 'p' = alle im Projekt, 'g<id>' = eine Gruppe */
+export interface ChatMessagesTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  user_id: number;
+  body: string;
+  created_at: Ms;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -239,5 +249,6 @@ export interface Database {
   audit_log: AuditLogTable;
   gradings: GradingsTable;
   materials: MaterialsTable;
+  chat_messages: ChatMessagesTable;
   kv: KeyValueTable;
 }

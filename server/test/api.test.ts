@@ -400,6 +400,39 @@ describe('Mindmap in Echtzeit', () => {
     expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'x', kind: 'card' } } })).error).toBe('Ungültige Änderung');
   });
 
+  it('Chat: je Gruppe und für alle, Lehrkraft liest alles und löscht', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0], ids[2]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const clara = (await call('POST', '/api/access/redeem', undefined, { code: codes[1].code })).json.token as string;
+    const sa = connect(anna);
+    const sc = connect(clara);
+    const st = connect(t);
+    expect(await emit(sa, 'chat:join', { projectId: project })).toMatchObject({ ok: true, scope: 'g' + g1, scopes: [{ scope: 'p' }, { scope: 'g' + g1 }] });
+    expect((await emit(st, 'chat:join', { projectId: project, scope: 'g' + g1 })).scopes).toHaveLength(3);
+    const seen = new Promise<J>((r) => st.on('chat', r));
+    expect((await emit(sa, 'chat:send', { projectId: project, scope: 'g' + g1, text: '  Hallo Gruppe  ' })).ok).toBe(true);
+    const m = await seen;
+    expect(m.message).toMatchObject({ body: 'Hallo Gruppe', name: 'Anna' });
+    // Clara gehört nicht zur Gruppe
+    expect((await emit(sc, 'chat:join', { projectId: project, scope: 'g' + g1 })).scope).toBeNull();
+    expect((await emit(sc, 'chat:send', { projectId: project, scope: 'g' + g1, text: 'x' })).ok).toBe(false);
+    expect((await emit(sc, 'chat:delete', { projectId: project, id: m.message.id })).ok).toBe(false);
+    // Chat für alle
+    expect((await emit(sc, 'chat:send', { projectId: project, scope: 'p', text: 'Hallo alle' })).ok).toBe(true);
+    expect(((await emit(sa, 'chat:join', { projectId: project, scope: 'p' })).messages as J[]).map((x) => x.body)).toEqual(['Hallo alle']);
+    // Lehrkraft löscht
+    expect((await emit(st, 'chat:delete', { projectId: project, id: m.message.id })).ok).toBe(true);
+    expect((await emit(sa, 'chat:join', { projectId: project, scope: 'g' + g1 })).messages).toEqual([]);
+    // abgeschaltet
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { chatAll: false } })).status).toBe(200);
+    expect((await emit(sa, 'chat:join', { projectId: project })).scopes).toEqual([{ scope: 'g' + g1, title: 'Inflation' }]);
+  });
+
   it('Themen-Mindmap vor den Gruppen: alle arbeiten mit, Gruppe übernimmt sie als Start', async () => {
     const { t, project, ids } = await setup();
     const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes as J[];
