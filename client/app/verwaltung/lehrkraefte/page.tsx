@@ -1,8 +1,9 @@
 'use client';
 /** Lehrkräfte anlegen, Passwort setzen und als Lehrkraft ansehen (wie im Autogra.fi-Portal). */
 import { useEffect, useState } from 'react';
+import { Icon } from '@/components/Icon';
 import { PortalHead, PortalShell } from '@/components/PortalShell';
-import { ApiError, get, href, post } from '@/lib/api';
+import { ApiError, del, get, href, post } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import s from '../../start.module.css';
 import v from '../verwaltung.module.css';
@@ -12,6 +13,7 @@ interface Teacher {
   name: string;
   login: string;
   created_at: number;
+  projects: number;
 }
 
 /** Gut lesbares Startpasswort ohne verwechselbare Zeichen. */
@@ -55,6 +57,18 @@ export default function Lehrkraefte() {
     }
   }
 
+  async function remove(t: Teacher) {
+    if (!confirm(`Konto ${t.login} (${t.name}) löschen? Die Anmeldung ist danach nicht mehr möglich.`)) return;
+    setError('');
+    try {
+      await del(`/api/admin/teachers/${t.id}`);
+      setNote(`Konto ${t.login} gelöscht.`);
+      await load();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
   if (!me) return null;
@@ -81,7 +95,8 @@ export default function Lehrkraefte() {
                 <tr>
                   <th>Kürzel</th>
                   <th>Name</th>
-                  <th>Angelegt</th>
+                  <th className={v.opt}>Projekte</th>
+                  <th className={v.opt}>Angelegt</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
@@ -92,7 +107,8 @@ export default function Lehrkraefte() {
                       <span className={v.chip}>{t.login}</span>
                     </td>
                     <td>{t.name}</td>
-                    <td className="muted">{new Date(Number(t.created_at)).toLocaleDateString('de-DE')}</td>
+                    <td className={v.opt}>{t.projects}</td>
+                    <td className={`muted ${v.opt}`}>{new Date(Number(t.created_at)).toLocaleDateString('de-DE')}</td>
                     <td>
                       <span className={v.acts}>
                         {t.id !== me?.id && (
@@ -103,6 +119,11 @@ export default function Lehrkraefte() {
                         <button className="btn" onClick={() => setPwFor(t)}>
                           Passwort
                         </button>
+                        {t.id !== me?.id && (
+                          <button className="btn icon" onClick={() => remove(t)} disabled={t.projects > 0} title={t.projects > 0 ? 'Erst die Projekte abschließen oder löschen' : 'Konto löschen'} aria-label="Konto löschen">
+                            <Icon name="close" size={14} />
+                          </button>
+                        )}
                       </span>
                     </td>
                   </tr>

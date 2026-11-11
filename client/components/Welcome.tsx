@@ -10,12 +10,12 @@ import { Icon } from './Icon';
 import { ThemeSwitch } from './ThemeSwitch';
 import w from './welcome.module.css';
 
-export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; showLogin?: boolean }) {
+export function Welcome({ onLogin, showLogin = true, forApp = false }: { onLogin?: () => void; showLogin?: boolean; forApp?: boolean }) {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [hello, setHello] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(forApp);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -73,7 +73,14 @@ export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; s
       </div>
 
       <div className={w.card}>
-        {hello ? (
+        {forApp ? (
+          <>
+            <h2>
+              <Icon name="lock" size={18} /> Anmelden mit Collegare
+            </h2>
+            <p className={w.lead}>Eine angebundene App (zum Beispiel Autogra.fi) möchte dich mit deinem Collegare-Konto anmelden. Danach geht es automatisch zurück.</p>
+          </>
+        ) : hello ? (
           <div className={w.hello}>
             <span className={w.check}>
               <Icon name="check" size={28} />
@@ -116,7 +123,11 @@ export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; s
 
         {showLogin && !hello && (
           <>
-            <div className={w.divider}>Lehrkräfte</div>
+            {!forApp && <div className={w.divider}>Lehrkräfte</div>}
+          </>
+        )}
+        {showLogin && !hello && (
+          <>
             {!loginOpen ? (
               <button type="button" className={w.toggle} onClick={() => setLoginOpen(true)}>
                 <Icon name="lock" size={16} /> Zum Login
@@ -146,7 +157,7 @@ export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; s
         )}
       </div>
 
-      {openOffice && !hello && (
+      {openOffice && !hello && !forApp && (
         <section className={w.apps} aria-labelledby="appsTitle">
           <h2 id="appsTitle">Ohne Anmeldung loslegen</h2>
           <p className={w.lead}>Die Office-Programme laufen ganz in deinem Browser. Was du hier schreibst, bleibt auf diesem Gerät, bis du es speicherst oder herunterlädst.</p>

@@ -68,6 +68,71 @@ describe('Anmeldung', () => {
     expect((await call('GET', '/api/public')).json).toEqual({ openOffice: true });
   });
 
+  it('Kontodienst: Autogra.fi meldet sich per OpenID Connect mit PKCE an', async () => {
+    const { at, t: teacherToken } = await setup();
+    const disc = (await call('GET', '/.well-known/openid-configuration')).json;
+    expect(disc.issuer).toBe('http://localhost/collegare');
+    expect(disc.code_challenge_methods_supported).toEqual(['S256']);
+    expect((await call('POST', '/api/admin/apps', teacherToken, { title: 'X', redirectUris: ['https://a.example/cb'] })).status).toBe(403);
+    expect((await call('POST', '/api/admin/apps', at, { title: 'Autogra.fi', redirectUris: ['http://evil.example/cb'] })).status).toBe(400);
+    const reg = (await call('POST', '/api/admin/apps', at, { title: 'Autogra.fi', redirectUris: ['https://autografi.example/oidc/callback'] })).json;
+    const cid = reg.app.clientId as string;
+    const { createHash } = await import('node:crypto');
+    const verifier = 'v'.repeat(50);
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({ response_type: 'code', client_id: cid, redirect_uri: 'https://autografi.example/oidc/callback', scope: 'openid profile', state: 'st1', nonce: 'n1', code_challenge: challenge, code_challenge_method: 'S256' });
+    const get = (token?: string, query = q) => fetch(`${base}/oidc/authorize?${query}`, { redirect: 'manual', headers: token ? { authorization: 'Bearer ' + token } : {} });
+
+    // ohne Anmeldung: zur Startseite mit Rücksprung
+    let r = await get();
+    expect(r.status).toBe(302);
+    expect(r.headers.get('location')).toMatch(/^http:\/\/localhost\/collegare\/\?weiter=%2Foidc%2Fauthorize%3F/);
+    // fremde Rücksprung-Adresse: Fehlerseite, keine Weiterleitung
+    const bad = new URLSearchParams(q);
+    bad.set('redirect_uri', 'https://evil.example/cb');
+    expect((await get(teacherToken, bad)).status).toBe(400);
+
+    r = await get(teacherToken);
+    const back = new URL(r.headers.get('location')!);
+    expect(back.origin + back.pathname).toBe('https://autografi.example/oidc/callback');
+    expect(back.searchParams.get('state')).toBe('st1');
+    const code = back.searchParams.get('code')!;
+
+    const tok = async (body: Record<string, string>) => {
+      const res = await fetch(`${base}/oidc/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body).toString() });
+      return { status: res.status, json: (await res.json()) as J };
+    };
+    const ok = { grant_type: 'authorization_code', code, redirect_uri: 'https://autografi.example/oidc/callback', client_id: cid, client_secret: reg.secret, code_verifier: verifier };
+    expect((await tok({ ...ok, client_secret: 'falsch' })).status).toBe(401);
+    const res = await tok(ok);
+    expect(res.status).toBe(200);
+    const { jwtVerify, createLocalJWKSet } = await import('jose');
+    const jwks = (await call('GET', '/oidc/jwks')).json;
+    const { payload } = await jwtVerify(res.json.id_token, createLocalJWKSet(jwks as any), { issuer: 'http://localhost/collegare', audience: cid });
+    expect(payload).toMatchObject({ name: 'Frau Müller', roles: ['teacher'], nonce: 'n1' });
+    const info = await fetch(`${base}/oidc/userinfo`, { headers: { authorization: 'Bearer ' + res.json.access_token } });
+    expect(await info.json()).toMatchObject({ sub: payload.sub, name: 'Frau Müller' });
+    // Code nur einmal gültig
+    expect((await tok(ok)).json.error).toBe('invalid_grant');
+
+    // falscher PKCE-Verifier
+    const back2 = new URL((await get(teacherToken)).headers.get('location')!);
+    expect((await tok({ ...ok, code: back2.searchParams.get('code')!, code_verifier: 'w'.repeat(50) })).json.error).toBe('invalid_grant');
+  });
+
+  it('Lehrende: Projektzahl, Löschen nur ohne Projekte und nie das eigene Konto', async () => {
+    const { at, project } = await setup();
+    const list = (await call('GET', '/api/admin/teachers', at)).json.teachers as J[];
+    const mue = list.find((x) => x.login === 'mue')!;
+    expect(mue.projects).toBe(1);
+    expect((await call('DELETE', `/api/admin/teachers/${mue.id}`, at)).status).toBe(409);
+    const self = list.find((x) => x.login === 'admin')!;
+    expect((await call('DELETE', `/api/admin/teachers/${self.id}`, at)).status).toBe(400);
+    await s.db.updateTable('projects').set({ archived_at: Date.now() }).where('id', '=', project).execute();
+    expect((await call('DELETE', `/api/admin/teachers/${mue.id}`, at)).status).toBe(200);
+    expect((await call('POST', '/api/auth/login', undefined, { login: 'mue', password: 'passwort-123' })).status).toBe(401);
+  });
+
   it('sperrt nach zu vielen Fehlversuchen', async () => {
     await admin();
     for (let i = 0; i < 10; i++) expect((await call('POST', '/api/auth/login', undefined, { login: 'admin', password: 'falsch' })).status).toBe(401);

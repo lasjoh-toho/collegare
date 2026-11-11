@@ -12,7 +12,7 @@ import { Icon } from './Icon';
 import { ThemeSwitch } from './ThemeSwitch';
 import ps from './portal.module.css';
 
-export type PortalPage = 'overview' | 'new' | 'teachers' | 'frame' | 'moodle' | 'admin' | `class-${number}`;
+export type PortalPage = 'overview' | 'new' | 'teachers' | 'frame' | 'moodle' | 'apps' | 'admin' | `class-${number}`;
 
 export function PortalShell({ me, active, children }: { me: Me; active: PortalPage; children: React.ReactNode }) {
   const teacher = me.teacher || me.admin;
@@ -79,6 +79,7 @@ export function PortalShell({ me, active, children }: { me: Me; active: PortalPa
               {item('teachers', '/verwaltung/lehrkraefte/', 'users', 'Lehrende')}
               {item('frame', '/verwaltung/rahmen/', 'gear', 'Rahmen für Projekte')}
               {item('moodle', '/verwaltung/moodle/', 'present', 'Moodle-Verbindung')}
+              {item('apps', '/verwaltung/apps/', 'key', 'Angebundene Apps')}
             </>
           )}
           {teacher && (

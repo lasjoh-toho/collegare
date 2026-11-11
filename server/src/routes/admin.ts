@@ -24,7 +24,10 @@ const TeacherBody = z.object({ login: z.string().min(2).max(100), name: z.string
 export function adminRoutes(app: FastifyInstance, s: Services) {
   app.get('/api/admin/teachers', async (req, reply) => {
     if (!(await requireAdmin(s, req, reply))) return;
-    return { teachers: await s.accounts.list() };
+    const list = await s.accounts.list();
+    const counts = await s.db.selectFrom('projects').select(['created_by', (eb) => eb.fn.countAll().as('n')]).where('archived_at', 'is', null).groupBy('created_by').execute();
+    const by = new Map(counts.map((c) => [Number(c.created_by), Number(c.n)]));
+    return { teachers: list.map((t) => ({ ...t, projects: by.get(t.id) ?? 0 })) };
   });
 
   app.post('/api/admin/teachers', async (req, reply) => {
@@ -53,6 +56,23 @@ export function adminRoutes(app: FastifyInstance, s: Services) {
     await s.accounts.setPassword(id, body.data.password);
     await s.sessions.destroyAllFor(id);
     await s.audit.append({ actorId: actor, action: 'admin.password_set', data: { userId: id } });
+    return { ok: true };
+  });
+
+  /** Konto löschen: nur ohne laufende Projekte (keine verwaisten Schülerdaten), nie das eigene. */
+  app.delete<{ Params: { id: string } }>('/api/admin/teachers/:id', async (req, reply) => {
+    const actor = await requireAdmin(s, req, reply);
+    if (!actor) return;
+    const id = Number(req.params.id);
+    if (id === actor) return reply.code(400).send({ error: 'Das eigene Konto lässt sich nicht löschen' });
+    const acc = await s.db.selectFrom('local_accounts').select('login').where('user_id', '=', id).executeTakeFirst();
+    if (!acc) return reply.code(404).send({ error: 'Konto nicht gefunden' });
+    const open = await s.db.selectFrom('projects').select((eb) => eb.fn.countAll().as('n')).where('created_by', '=', id).where('archived_at', 'is', null).executeTakeFirst();
+    if (Number(open?.n ?? 0) > 0) return reply.code(409).send({ error: `Diese Lehrkraft hat noch ${open!.n} Projekt(e). Erst die Projekte abschließen oder löschen.` });
+    await s.sessions.destroyAllFor(id);
+    await s.db.deleteFrom('local_accounts').where('user_id', '=', id).execute();
+    await s.db.deleteFrom('memberships').where('user_id', '=', id).execute();
+    await s.audit.append({ actorId: actor, action: 'admin.teacher_deleted', data: { userId: id } });
     return { ok: true };
   });
 

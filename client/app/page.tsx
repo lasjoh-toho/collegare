@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { PortalHead, PortalShell, type PortalPage } from '@/components/PortalShell';
 import { Welcome } from '@/components/Welcome';
-import { get, href, post } from '@/lib/api';
+import { BASE_PATH, get, href, post } from '@/lib/api';
 import { currentPhase, phaseList } from '@/lib/phases';
 import type { Course, Me, ProjectListItem, ProjectSettings, ProjectSummary } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
@@ -12,16 +12,27 @@ import s from './portal-page.module.css';
 /** Für die Phasen-Berechnung im Portal genügen die Phasen; der Rest sind Platzhalter. */
 const DEFAULT_PHASE_SETTINGS = { groupFormation: 'teacher', groupMin: 2, groupMax: 4, choiceDeadline: null, finishLock: true } as unknown as ProjectSettings;
 
+/** Rücksprung zur Anmeldung einer angebundenen App (Konzept 8c); nur dieser eine Pfad, keine fremden Ziele. */
+function oidcContinue(): string | null {
+  if (typeof window === 'undefined') return null;
+  const w = new URLSearchParams(location.search).get('weiter');
+  return w && w.startsWith('/oidc/authorize?') ? w : null;
+}
+
 export default function Start() {
   const [me, reload] = useMe();
+  const weiter = oidcContinue();
 
-  // Lernende mit Zugangscode haben genau ein Projekt: direkt dorthin
   useEffect(() => {
-    if (me?.projectId) location.replace(href(`/projekt/?id=${me.projectId}`));
-  }, [me]);
+    // Angemeldete Lehrkraft kommt von einer App: gleich zurück zur Anmeldung dort
+    if (me && !me.projectId && weiter) location.replace(BASE_PATH + weiter);
+    // Lernende mit Zugangscode haben genau ein Projekt: direkt dorthin
+    else if (me?.projectId && !weiter) location.replace(href(`/projekt/?id=${me.projectId}`));
+  }, [me, weiter]);
 
-  if (me === undefined || me?.projectId) return null;
-  if (me === null) return <Welcome onLogin={reload} />;
+  if (me === undefined || (me && !me.projectId && weiter)) return null;
+  if (me === null || (me.projectId && weiter)) return <Welcome onLogin={() => (weiter ? location.replace(BASE_PATH + weiter) : reload())} forApp={!!weiter} />;
+  if (me.projectId) return null;
   return <Portal me={me} />;
 }
 
