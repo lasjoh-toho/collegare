@@ -72,6 +72,23 @@
 .t :global(label.margin-toggle:not(.sidenote-number)) { display: none; }
 .t :global(label.sidenote-number) { display: inline; cursor: default; }
 
+/* Worterklärungen: Wort nur etwas kräftiger; Erklärung erscheint nach Antippen am Rand (Handy: im Text) */
+.t :global(label.gloss) { font-weight: 600; cursor: pointer; }
+.t :global(label.gloss:hover) { text-decoration: underline dotted; text-underline-offset: 3px; }
+.t :global(input.gloss-toggle) { display: none; }
+.t :global(.glossnote) { display: none; }
+.t :global(input.gloss-toggle:checked + .glossnote) {
+  display: inline;
+  float: right;
+  clear: right;
+  margin-right: -60%;
+  width: 50%;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  font-style: italic;
+}
+
 /* Smartphone: Notizen rücken als eingerückter Kasten in den Text, ohne Antippen */
 @media (max-width: 760px) {
   .t { padding: 1.5rem 16px 2.5rem; font-size: 17px; border-radius: 0; }
@@ -89,4 +106,14 @@
     font-size: 0.88rem;
   }
   .t :global(figure) :global(.marginnote) { margin: 0 0 0.5rem; }
+  .t :global(input.gloss-toggle:checked + .glossnote) {
+    display: block;
+    float: none;
+    width: auto;
+    margin: 0.4rem 0 0.6rem 0.8rem;
+    padding: 0.3rem 0 0.3rem 0.75rem;
+    border-left: 2px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
 }

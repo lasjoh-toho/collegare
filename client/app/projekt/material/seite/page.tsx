@@ -212,6 +212,9 @@ export default function SeitePage() {
               <button className="btn" onClick={() => wrap('^^[', ']', 'Bemerkung')} title="Randbemerkung ohne Nummer">
                 Marginalie
               </button>
+              <button className="btn" onClick={() => wrap('{', '|Erklärung}', 'Wort')} title="Worterklärung: Wort leicht fett, Erklärung erst beim Antippen">
+                Worterklärung
+              </button>
               <button className="btn" onClick={() => line('> ', 'Zitat')} title="Zitat; Zeile „> — Name“ nennt die Quelle">
                 Zitat
               </button>
@@ -257,7 +260,7 @@ export default function SeitePage() {
                   void save();
                 }
               }}
-              placeholder={'## Einstieg\n\nText mit einer Randnotiz^[Steht rechts am Rand, auf dem Handy direkt im Text.]\n\n![Bildunterschrift](https://…)'}
+              placeholder={'## Einstieg\n\nText mit einer Randnotiz^[Steht rechts am Rand, auf dem Handy direkt im Text.] und einer {Hyperinflation|Sehr schnelle Geldentwertung} zum Antippen.\n\n![Bildunterschrift](https://…)'}
               spellCheck
             />
           </div>

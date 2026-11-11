@@ -6,6 +6,7 @@
  *   **fett**, *kursiv*, `Code`, [Text](https://…)
  *   Text^[nummerierte Randnotiz]            Seitennotiz wie bei Tufte
  *   Text^^[Randbemerkung ohne Nummer]       Marginalie
+ *   {Wort|Erklärung}                        Worterklärung: Wort etwas kräftiger, Erklärung erst nach Antippen
  *   ![Bildunterschrift](Adresse)            Abbildung, Unterschrift am Rand
  *   ![!Bildunterschrift](Adresse)           Abbildung über die ganze Breite
  *   > Zitat                                 Zitat; Zeile „> — Name“ wird die Quelle
@@ -80,6 +81,17 @@ function inline(s: string, ctx: Ctx, notes = true): string {
         out += margin
           ? `<label for="${id}" class="margin-toggle">&#8853;</label><input type="checkbox" id="${id}" class="margin-toggle"/><span class="marginnote">${body}</span>`
           : `<label for="${id}" class="margin-toggle sidenote-number"></label><input type="checkbox" id="${id}" class="margin-toggle"/><span class="sidenote">${body}</span>`;
+        i = end + 1;
+        continue;
+      }
+    }
+    // Worterklärung: {Wort|Erklärung}, öffnet sich erst beim Antippen (Lesefluss bleibt ungestört)
+    if (notes && c === '{') {
+      const end = closing(s, i, '{', '}');
+      const bar = end > 0 ? s.indexOf('|', i) : -1;
+      if (end > 0 && bar > i && bar < end) {
+        const id = `gl-${++ctx.n}`;
+        out += `<label for="${id}" class="gloss" title="Erklärung anzeigen">${inline(s.slice(i + 1, bar), ctx, false)}</label><input type="checkbox" id="${id}" class="gloss-toggle"/><span class="glossnote">${inline(s.slice(bar + 1, end), ctx, false)}</span>`;
         i = end + 1;
         continue;
       }
