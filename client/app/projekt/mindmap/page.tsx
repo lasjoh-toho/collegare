@@ -2,9 +2,11 @@
 /** Phase „Orientierung“: Mindmap der Gruppe mit „Gliederung übernehmen“ (Issue #7). */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
+import { BranchMap } from '@/components/BranchMap';
 import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
+import { Icon } from '@/components/Icon';
 import { get, href, projectSocket } from '@/lib/api';
 import type { MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
@@ -35,6 +37,19 @@ export default function MindmapPage() {
   const [scope, setScope] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [outlineOpen, setOutlineOpen] = useState(false);
+  // Ansicht: Äste (wie eine klassische Mindmap) oder Karten-Fläche (brausa); gleiche Daten, Wahl je Gerät
+  const [view, setView] = useState<'aeste' | 'karten'>('aeste');
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('collegare-mindmap-ansicht') === 'karten') setView('karten');
+    } catch {}
+  }, []);
+  const switchView = (v: 'aeste' | 'karten') => {
+    setView(v);
+    try {
+      localStorage.setItem('collegare-mindmap-ansicht', v);
+    } catch {}
+  };
   const sock = useRef<Socket | null>(null);
   const version = useRef(0);
   const scopeRef = useRef<string | null>(null);
@@ -134,6 +149,14 @@ export default function MindmapPage() {
           )}
           {map && (
             <>
+              <span className="seg" role="group" aria-label="Ansicht">
+                <button className={`btn ${view === 'aeste' ? 'on' : ''}`} onClick={() => switchView('aeste')} aria-pressed={view === 'aeste'} title="Äste: Thema in der Mitte">
+                  <Icon name="map" size={14} /> <span className={s.long}>Äste</span>
+                </button>
+                <button className={`btn ${view === 'karten' ? 'on' : ''}`} onClick={() => switchView('karten')} aria-pressed={view === 'karten'} title="Karten frei auf der Fläche">
+                  <Icon name="grid" size={14} /> <span className={s.long}>Karten</span>
+                </button>
+              </span>
               <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
                 Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
               </button>
@@ -151,7 +174,8 @@ export default function MindmapPage() {
             {teacher ? 'Noch keine Gruppen. Bilde zuerst die Gruppen auf dem Board.' : 'Du bist noch keiner Gruppe zugeordnet. Sobald die Gruppen stehen, erscheint hier eure Mindmap.'}
           </div>
         )}
-        {map && <MindMap key={scope} map={map} people={people} canEdit={true} send={send} />}
+        {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={true} send={send} />}
+        {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={join?.scopes?.find((x) => x.scope === scope)?.title || project.title} people={people} canEdit={true} send={send} />}
         {map && outlineOpen && (
           <aside className={s.outline}>
             <div className="row">
@@ -162,7 +186,7 @@ export default function MindmapPage() {
               </button>
             </div>
             {!map.outline ? (
-              <p className="muted">Noch nicht übernommen. Legt Karten in Cluster und tippt auf „Gliederung übernehmen“: Jeder Cluster wird ein Abschnitt, von oben nach unten und links nach rechts.</p>
+              <p className="muted">Noch nicht übernommen. Jeder Hauptast (in der Karten-Ansicht: jeder Cluster) wird ein Abschnitt. Tippt dann auf „Gliederung übernehmen“.</p>
             ) : (
               <>
                 <p className="muted">

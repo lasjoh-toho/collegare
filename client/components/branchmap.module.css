@@ -1,0 +1,34 @@
+/* Ast-Mindmap: neutrale Fläche, Äste in den Spaltenfarben (gestaltung.md 2: Farbe nur für Inhalte/Zustände). */
+.wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--ui-bg); outline: none; cursor: grab; touch-action: none; }
+.wrap:active { cursor: grabbing; }
+.stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.root { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); padding: 14px 22px; border-radius: 999px; background: var(--ui-panel); border: 2px solid var(--ui-text); font-weight: 700; font-size: 18px; white-space: nowrap; max-width: 260px; text-align: center; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
+.root span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.node { position: absolute; display: flex; align-items: baseline; gap: 6px; padding: 0 6px 4px; cursor: pointer; white-space: nowrap; max-width: 260px; }
+.left { flex-direction: row-reverse; }
+.main { font-size: 17px; font-weight: 600; min-width: 150px; }
+.sub { font-size: 14px; min-width: 140px; }
+.text { overflow: hidden; text-overflow: ellipsis; color: var(--ui-text); }
+.left .text { text-align: right; flex: 1; }
+.owner { font-size: 11px; color: var(--c); font-weight: 600; background: color-mix(in srgb, var(--c) 14%, transparent); padding: 1px 6px; border-radius: 999px; }
+.sel .text { background: color-mix(in srgb, var(--c) 20%, transparent); border-radius: 4px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 45%, transparent); }
+.input { font: inherit; width: 200px; padding: 2px 6px; border: 1.5px solid var(--c); border-radius: 6px; background: var(--ui-panel); color: var(--ui-text); }
+.plus { position: absolute; top: 50%; right: -30px; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--c, var(--ui-accent)); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.left .plus { right: auto; left: -30px; }
+.root .plus { right: -34px; background: var(--ui-text); color: var(--ui-panel); }
+/* Formen: der Knoten sitzt mittig auf dem Ast */
+.s_rect, .s_oval, .s_diamond, .s_para { padding: 7px 14px; background: var(--ui-panel); border: 2px solid var(--c); align-items: center; min-width: 0; }
+.s_rect { border-radius: 4px; }
+.s_oval { border-radius: 999px; padding: 8px 20px; }
+.s_diamond { padding: 16px 34px; border: 0; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.s_diamond .text { color: #fff; }
+.s_para { transform-origin: center; border-radius: 2px; }
+.s_para.node { clip-path: polygon(12% 0, 100% 0, 88% 100%, 0 100%); border: 0; background: color-mix(in srgb, var(--c) 22%, var(--ui-panel)); padding: 8px 26px; }
+.loose { position: absolute; left: 0; transform: translateX(-50%); width: 560px; text-align: center; font-size: 13px; color: var(--ui-muted); }
+.bar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); padding: 8px 10px; border-radius: 12px; background: var(--ui-panel); border: 1px solid var(--ui-border); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12); cursor: default; }
+.bar select { font: inherit; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--ui-border); background: var(--ui-panel); color: var(--ui-text); }
+.barTitle { font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colors { display: flex; gap: 4px; }
+.swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ui-panel); box-shadow: 0 0 0 1px var(--ui-border); cursor: pointer; }
+.hint { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); max-width: 520px; padding: 10px 14px; border-radius: 10px; background: var(--ui-panel); border: 1px solid var(--ui-border); font-size: 13px; color: var(--ui-muted); text-align: center; }

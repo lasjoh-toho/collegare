@@ -14,6 +14,9 @@ export const HEADER = 30;
 export const PAD = 10;
 const MAX_CARDS = 500;
 
+export const SHAPES = ['none', 'rect', 'oval', 'diamond', 'para'] as const;
+export type Shape = (typeof SHAPES)[number];
+
 export interface MapCard {
   id: string;
   kind: 'card' | 'cluster';
@@ -27,6 +30,8 @@ export interface MapCard {
   parent: string | null;
   /** zuständige Person (Grundlage der „Fertig“-Sperre je Abschnitt) */
   owner: number | null;
+  /** Form in der Ast-Ansicht (Konzept 4, Mindmap): ohne Form, Rechteck, Oval, Raute, Parallelogramm */
+  shape?: Shape;
   /** Karten im Cluster, hinten nach vorn */
   children: string[];
 }
@@ -76,13 +81,14 @@ export const MapOp = z.discriminatedUnion('type', [
       color: Color.default(null),
       parent: Id.nullable().default(null),
       owner: z.number().int().nullable().default(null),
+      shape: z.enum(SHAPES).optional(),
     }),
   }),
   z.object({
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES) })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),
