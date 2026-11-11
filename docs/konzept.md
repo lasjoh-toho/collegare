@@ -660,13 +660,6 @@ dieselbe Kopplung auch mit einem Schul-Login (IServ, Hamburger Dienst) funktioni
 5. **Fehlende Teile nachziehen**, die Autogra.fi heute schon hat: Lehrende mit eigenem Bereich, Löschen, „Ansehen
    als“, Schutz gegen Fehlversuche, Konten verbinden (8c.3), Protokoll aller Anmeldungen.
 
-### 8c.5 Stand (11. November 2026)
-
-Gebaut in Collegare: Discovery, `/oidc/authorize` (PKCE S256 Pflicht), `/oidc/token`, `/oidc/userinfo`,
-`/oidc/jwks`; Verwaltungsseite „Angebundene Apps“ (Eintragen, neues Geheimnis, Trennen); Startseite meldet an und
-springt zur App zurück; „Lehrende“ mit Projektzahl und Löschen (nur ohne laufende Projekte). Offen: Autogra.fi als
-Client einrichten, Konten verbinden (8c.3), Klassenlisten über die Dienstschnittstelle.
-
 ### 8c.3 Bestehende Konten verbinden, nicht zusammenlegen
 
 Beim ersten „Mit Collegare anmelden“ fragt Autogra.fi, ob ein vorhandenes Kürzel-Konto mit dem Collegare-Konto
@@ -682,6 +675,13 @@ Klausuren in Autogra.fi dürfen nicht an Collegare hängen:
 - Die Administration von Autogra.fi behält ein lokales Notfallkonto.
 - Updates von Collegare zeigen vorher einen Hinweis, wenn in Autogra.fi gerade eine Klausur läuft (über die
   Dienstschnittstelle).
+
+### 8c.5 Stand (11. November 2026)
+
+Gebaut in Collegare: Discovery, `/oidc/authorize` (PKCE S256 Pflicht), `/oidc/token`, `/oidc/userinfo`,
+`/oidc/jwks`; Verwaltungsseite „Angebundene Apps“ (Eintragen, neues Geheimnis, Trennen); Startseite meldet an und
+springt zur App zurück; „Lehrende“ mit Projektzahl und Löschen (nur ohne laufende Projekte). Offen: Autogra.fi als
+Client einrichten, Konten verbinden (8c.3), Klassenlisten über die Dienstschnittstelle.
 
 ## 9. Umsetzungsplan
 
