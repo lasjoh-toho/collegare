@@ -62,6 +62,12 @@ describe('Anmeldung', () => {
     expect((await call('GET', '/api/me', r.json.token)).status).toBe(401);
   });
 
+  it('Startseite erfährt ohne Anmeldung, ob das offene Office angeboten wird', async () => {
+    expect((await call('GET', '/api/public')).json).toEqual({ openOffice: false });
+    await s.frame.set({ ...(await s.frame.get()), openOffice: true });
+    expect((await call('GET', '/api/public')).json).toEqual({ openOffice: true });
+  });
+
   it('sperrt nach zu vielen Fehlversuchen', async () => {
     await admin();
     for (let i = 0; i < 10; i++) expect((await call('POST', '/api/auth/login', undefined, { login: 'admin', password: 'falsch' })).status).toBe(401);

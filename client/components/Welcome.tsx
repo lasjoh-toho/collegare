@@ -5,7 +5,7 @@
  * (docs/gestaltung.md, Abschnitt 2). Das QR-Geheimnis kommt im URL-Fragment (#k=…) und geht nie in Server-Logs.
  */
 import { useEffect, useState } from 'react';
-import { ApiError, href, post } from '@/lib/api';
+import { ApiError, BASE_PATH, get, href, post } from '@/lib/api';
 import { Icon } from './Icon';
 import { ThemeSwitch } from './ThemeSwitch';
 import w from './welcome.module.css';
@@ -20,6 +20,11 @@ export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; s
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [openOffice, setOpenOffice] = useState(false);
+
+  useEffect(() => {
+    get<{ openOffice: boolean }>('/api/public').then((r) => setOpenOffice(r.openOffice), () => {});
+  }, []);
 
   async function redeem(body: { code?: string; secret?: string }) {
     setBusy(true);
@@ -140,6 +145,37 @@ export function Welcome({ onLogin, showLogin = true }: { onLogin?: () => void; s
           </>
         )}
       </div>
+
+      {openOffice && !hello && (
+        <section className={w.apps} aria-labelledby="appsTitle">
+          <h2 id="appsTitle">Ohne Anmeldung loslegen</h2>
+          <p className={w.lead}>Die Office-Programme laufen ganz in deinem Browser. Was du hier schreibst, bleibt auf diesem Gerät, bis du es speicherst oder herunterlädst.</p>
+          <div className={w.appGrid}>
+            {(
+              [
+                ['docx', 'Text', 'doc', 'var(--office-word)'],
+                ['pptx', 'Präsentation', 'slides', 'var(--office-slide)'],
+                ['xlsx', 'Tabelle', 'grid', 'var(--office-cell)'],
+              ] as const
+            ).map(([type, title, icon, color]) => (
+              <a key={type} className={w.app} href={`${BASE_PATH}/office/editor/?new=${type}&lang=de`} style={{ '--app': color } as React.CSSProperties}>
+                <span className={w.appIcon}>
+                  <Icon name={icon} size={22} />
+                </span>
+                <strong>{title}</strong>
+                <small>Neu anlegen</small>
+              </a>
+            ))}
+            <a className={w.app} href={`${BASE_PATH}/office/`} style={{ '--app': 'var(--ui-muted)' } as React.CSSProperties}>
+              <span className={w.appIcon}>
+                <Icon name="outline" size={22} />
+              </span>
+              <strong>Datei öffnen</strong>
+              <small>und zuletzt bearbeitete</small>
+            </a>
+          </div>
+        </section>
+      )}
 
       <section className={w.explain} aria-labelledby="explainTitle">
         <h2 id="explainTitle">So funktioniert Collegare</h2>

@@ -32,6 +32,9 @@ export function authRoutes(app: FastifyInstance, s: Services) {
     return { ok: true };
   });
 
+  /** Öffentliche Angaben für die Startseite (ohne Anmeldung): ob das offene Office angeboten wird (Konzept 7.10). */
+  app.get('/api/public', async () => ({ openOffice: (await s.frame.get()).openOffice }));
+
   app.get('/api/me', async (req, reply) => {
     const sess = requireSession(req, reply);
     if (!sess) return;

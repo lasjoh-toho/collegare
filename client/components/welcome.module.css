@@ -68,3 +68,15 @@
 .feature p { margin: 0; font-size: 0.84rem; line-height: 1.5; color: var(--ui-muted); }
 .foot { margin-top: auto; padding: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.78rem; color: var(--ui-muted); }
 @media (max-width: 480px) { .card { padding: 26px 20px; } }
+
+/* Offenes Office auf der Startseite (Konzept 7.10): Farben der Dokumentart, nie der Markenverlauf (gestaltung.md 2) */
+.apps { width: min(720px, calc(100% - 32px)); margin: 28px auto 40px; text-align: center; }
+.apps h2 { margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; }
+.apps .lead { margin: 0 auto 16px; max-width: 520px; }
+.appGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 10px 14px; border-radius: 14px; background: var(--ui-panel); border: 1px solid var(--ui-border); border-top: 6px solid var(--app); color: var(--ui-text); text-decoration: none; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); }
+.app:hover { box-shadow: 0 0 0 2px var(--app); }
+.appIcon { width: 44px; height: 44px; margin-bottom: 6px; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--app) 14%, transparent); color: var(--app); }
+.app strong { font-size: 0.95rem; }
+.app small { font-size: 0.78rem; color: var(--ui-muted); }
+@media (max-width: 560px) { .appGrid { grid-template-columns: repeat(2, 1fr); } }
