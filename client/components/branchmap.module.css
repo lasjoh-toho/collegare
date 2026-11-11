@@ -3,12 +3,12 @@
 .wrap:active { cursor: grabbing; }
 .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .svg { position: absolute; left: 0; top: 0; overflow: visible; }
-.root { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); padding: 14px 22px; border-radius: 999px; background: var(--ui-panel); border: 2px solid var(--ui-text); font-weight: 700; font-size: 18px; white-space: nowrap; max-width: 260px; text-align: center; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
+.root { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); padding: 14px 22px; border-radius: 10px; background: var(--ui-panel); border: 2px solid var(--ui-text); font-weight: 700; font-size: 18px; white-space: nowrap; max-width: 260px; text-align: center; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
 .root span { display: block; overflow: hidden; text-overflow: ellipsis; }
-.node { position: absolute; display: flex; align-items: baseline; gap: 6px; padding: 0 6px 4px; cursor: pointer; white-space: nowrap; max-width: 260px; }
+.node { position: absolute; display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer; user-select: none; touch-action: none; white-space: nowrap; max-width: 260px; }
 .left { flex-direction: row-reverse; }
-.main { font-size: 17px; font-weight: 600; min-width: 150px; }
-.sub { font-size: 14px; min-width: 140px; }
+.main { font-size: 16px; font-weight: 600; }
+.sub { font-size: 14px; }
 .text { overflow: hidden; text-overflow: ellipsis; color: var(--ui-text); }
 .left .text { text-align: right; flex: 1; }
 .owner { font-size: 11px; color: var(--c); font-weight: 600; background: color-mix(in srgb, var(--c) 14%, transparent); padding: 1px 6px; border-radius: 999px; }
@@ -19,7 +19,8 @@
 .root .plus { right: -34px; background: var(--ui-text); color: var(--ui-panel); }
 /* Formen: der Knoten sitzt mittig auf dem Ast */
 .s_rect, .s_oval, .s_diamond, .s_para { padding: 7px 14px; background: var(--ui-panel); border: 2px solid var(--c); align-items: center; min-width: 0; }
-.s_rect { border-radius: 4px; }
+.s_rect { border-radius: 6px; }
+.main.s_rect { background: color-mix(in srgb, var(--c) 12%, var(--ui-panel)); }
 .s_oval { border-radius: 999px; padding: 8px 20px; }
 .s_diamond { padding: 16px 34px; border: 0; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .s_diamond .text { color: #fff; }
@@ -36,3 +37,10 @@
 /* lockere Idee: Text unterbricht den dünnen grauen Ast (wie „no shape“) */
 .idea .text { color: var(--ui-muted); }
 .adders { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; }
+.bend { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ui-muted); }
+.bend input { width: 90px; }
+.hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
+.handle { position: absolute; width: 14px; height: 14px; transform: translate(-50%, -50%); background: var(--ui-panel); border: 3px solid var(--c); cursor: grab; touch-action: none; z-index: 3; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+.handle:active { cursor: grabbing; }
+.start { border-radius: 50%; }
+.stop { border-radius: 3px; }

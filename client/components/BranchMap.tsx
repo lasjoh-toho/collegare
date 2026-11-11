@@ -1,14 +1,15 @@
 'use client';
 /**
- * Mindmap als Äste (Wunsch Jo, 11. November 2026): Thema in der Mitte, geschwungene farbige Äste, die nach außen
- * dünner werden, Text direkt am Ast, Unteräste in der Farbe ihres Hauptasts, wahlweise eine Form je Knoten.
+ * Mindmap als Äste (Wunsch Jo, 11. November 2026): Thema in der Mitte, Äste als gleichmäßig dicke Linien im
+ * U-Bahn-Stil mit Pfeilspitze; je Ast wählbar: U-Bahn (45°), rechtwinklig, Kurve oder gerade, dazu die Lage des
+ * Knicks. Knoten sind eckige Flächen (andere Formen wählbar) und lassen sich frei ziehen. Lockere Ideen ohne Form.
  * Gleiche Daten wie die Karten-Fläche (MindMap.tsx): Hauptast = Cluster (wird Abschnitt der Gliederung),
  * Unterast = Karte im Cluster (mit zuständiger Person). Die Lage ergibt sich automatisch; x/y der Karten-Fläche
  * bleiben unberührt, damit beide Ansichten nebeneinander funktionieren.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
-import type { MapCard, MapOp, MapShape, MindMap as MapData } from '@/lib/types';
+import type { MapCard, MapOp, MapRoute, MapShape, MapStart, MindMap as MapData } from '@/lib/types';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
 import b from './branchmap.module.css';
@@ -18,6 +19,13 @@ const GAP = 22; // Abstand zwischen Hauptästen
 const MAIN_X = 230; // Abstand Mitte → Hauptast
 const SUB_X = 250; // Abstand Hauptast → Unterast
 const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+const ROUTES: { key: MapRoute; label: string }[] = [
+  { key: 'metro', label: 'U-Bahn (45°)' },
+  { key: 'ortho', label: 'Rechtwinklig' },
+  { key: 'curve', label: 'Kurve' },
+  { key: 'straight', label: 'Gerade' },
+];
 
 const SHAPES: { key: MapShape; label: string }[] = [
   { key: 'none', label: 'Ohne Form' },
@@ -36,8 +44,7 @@ interface Node {
   depth: 1 | 2;
   /** lockere Idee: Karte ohne Ast, wie „no shape“ (Text unterbricht den Ast), noch kein Abschnitt */
   idea: boolean;
-  parentX: number;
-  parentY: number;
+  parentId: string | null;
 }
 
 /** Lesereihenfolge wie die Gliederung: von oben nach unten, dann links nach rechts. */
@@ -45,12 +52,192 @@ function readingOrder(cards: MapCard[]): MapCard[] {
   return [...cards].sort((a, b) => (Math.abs(a.y - b.y) < 60 ? a.x - b.x : a.y - b.y));
 }
 
-/** Getaperter Ast als gefüllte Fläche: dick am Anfang, dünn am Ende. */
-function branch(x0: number, y0: number, x1: number, y1: number, w0: number, w1: number): string {
-  const mx = (x0 + x1) / 2;
-  const top = `M${x0},${y0 - w0 / 2} C${mx},${y0 - w0 / 2} ${mx},${y1 - w1 / 2} ${x1},${y1 - w1 / 2}`;
-  const bottom = `L${x1},${y1 + w1 / 2} C${mx},${y1 + w1 / 2} ${mx},${y0 + w0 / 2} ${x0},${y0 + w0 / 2} Z`;
-  return top + ' ' + bottom;
+/** Linienzug mit abgerundeten Ecken (Radius r), wie auf einem U-Bahn-Plan. */
+function rounded(pts: [number, number][], r = 12): string {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const l1 = Math.hypot(cx - px, cy - py);
+    const l2 = Math.hypot(nx - cx, ny - cy);
+    const rr = Math.min(r, l1 / 2, l2 / 2);
+    if (rr < 0.5) {
+      d += ` L${cx},${cy}`;
+      continue;
+    }
+    const ax = cx - ((cx - px) / l1) * rr;
+    const ay = cy - ((cy - py) / l1) * rr;
+    const bx = cx + ((nx - cx) / l2) * rr;
+    const by = cy + ((ny - cy) / l2) * rr;
+    d += ` L${ax},${ay} Q${cx},${cy} ${bx},${by}`;
+  }
+  const [lx, ly] = pts[pts.length - 1];
+  return d + ` L${lx},${ly}`;
+}
+
+const LEAD = 18; // gerades Stück vor der Pfeilspitze
+
+type V = [number, number];
+interface Box {
+  x: number; // Mitte
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Anschluss an der Form: Der Ast verlässt die Form an der Seite, die zum Ziel zeigt, und dort an der Stelle, die dem
+ * Ziel am nächsten ist (an allen vier Seiten, an jeder Stelle). Ergebnis: Punkt und Richtung nach außen.
+ */
+function port(box: Box, tx: number, ty: number, middle = false): { p: V; dir: V } {
+  const dx = tx - box.x;
+  const dy = ty - box.y;
+  const m = 8; // nicht ganz in die Ecke
+  // Seite nach dem Abstand außerhalb der Form wählen, nicht nach dem Winkel (breite Formen sonst fast nur oben/unten)
+  if (Math.abs(dx) - box.w / 2 >= Math.abs(dy) - box.h / 2) {
+    const s = dx >= 0 ? 1 : -1;
+    const y = middle ? box.y : Math.max(box.y - box.h / 2 + m, Math.min(box.y + box.h / 2 - m, ty));
+    return { p: [box.x + (s * box.w) / 2, y], dir: [s, 0] };
+  }
+  const s = dy >= 0 ? 1 : -1;
+  const x = middle ? box.x : Math.max(box.x - box.w / 2 + m, Math.min(box.x + box.w / 2 - m, tx));
+  return { p: [x, box.y + (s * box.h) / 2], dir: [0, s] };
+}
+
+/** Raute und Oval: Anschluss nur in der Mitte einer Seite, sonst endet der Ast neben der Form. */
+const pointy = (c: MapCard | null, idea: boolean) => !!c && ['diamond', 'oval'].includes(c.shape ?? (idea ? 'none' : 'rect'));
+
+const axis = (v: V): V => (Math.abs(v[0]) >= Math.abs(v[1]) ? [Math.sign(v[0]) || 1, 0] : [0, Math.sign(v[1]) || 1]);
+
+/**
+ * Ein Teilstück von a (Richtung da hinaus) nach e (Richtung de aus e zurück zu a), als Punktfolge.
+ * U-Bahn: gerade, 45° schräg, gerade; bend legt fest, wo die Schräge liegt.
+ */
+function leg(kind: MapRoute, bend: number, a: V, da: V, e: V, de: V): V[] {
+  const horizA = da[0] !== 0;
+  const horizB = de[0] !== 0;
+  const dx = e[0] - a[0];
+  const dy = e[1] - a[1];
+  const sx = Math.sign(dx) || 1;
+  const sy = Math.sign(dy) || 1;
+  if (kind === 'ortho') {
+    if (horizA && horizB) {
+      const mx = a[0] + dx * bend;
+      return [a, [mx, a[1]], [mx, e[1]], e];
+    }
+    if (!horizA && !horizB) {
+      const my = a[1] + dy * bend;
+      return [a, [a[0], my], [e[0], my], e];
+    }
+    return horizA ? [a, [e[0], a[1]], e] : [a, [a[0], e[1]], e];
+  }
+  if (horizA && horizB) {
+    // waagerecht – schräg – waagerecht
+    const free = Math.abs(dx) - Math.abs(dy);
+    if (free < 0) return [a, [a[0] + dx * bend, a[1]], [a[0] + dx * bend, e[1]], e];
+    const x1 = a[0] + sx * free * bend;
+    return [a, [x1, a[1]], [x1 + sx * Math.abs(dy), e[1]], e];
+  }
+  if (!horizA && !horizB) {
+    const free = Math.abs(dy) - Math.abs(dx);
+    if (free < 0) return [a, [a[0], a[1] + dy * bend], [e[0], a[1] + dy * bend], e];
+    const y1 = a[1] + sy * free * bend;
+    return [a, [a[0], y1], [e[0], y1 + sy * Math.abs(dx)], e];
+  }
+  const d = Math.min(Math.abs(dx), Math.abs(dy));
+  // waagerecht hinaus, senkrecht hinein (oder umgekehrt): Schräge dazwischen
+  if (horizA) return [a, [e[0] - sx * d, a[1]], [e[0], a[1] + sy * d], e];
+  return [a, [a[0], e[1] - sy * d], [a[0] + sx * d, e[1]], e];
+}
+
+/**
+ * Weg von Anschluss a (Richtung da nach außen) über die Zwischenstopps zu Anschluss b (Richtung db nach außen aus
+ * dem Ziel). Zwischen zwei Stopps läuft die Linie im gewählten Stil; das letzte Stück zeigt gerade in das Ziel.
+ */
+function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V): string {
+  const end: V = [b[0] + db[0] * LEAD, b[1] + db[1] * LEAD]; // vor der Pfeilspitze
+  if (kind === 'straight') return rounded([a, ...via, b], 10);
+  const stops: V[] = [a, ...via, end];
+  if (kind === 'curve') {
+    // weiche Kurve durch alle Stopps (Tangente an einem Stopp: von davor nach danach)
+    const tan = (i: number): V => {
+      if (i === 0) return da;
+      if (i === stops.length - 1) return [-db[0], -db[1]];
+      const v: V = [stops[i + 1][0] - stops[i - 1][0], stops[i + 1][1] - stops[i - 1][1]];
+      const l = Math.hypot(v[0], v[1]) || 1;
+      return [v[0] / l, v[1] / l];
+    };
+    let d = `M${a[0]},${a[1]}`;
+    for (let i = 0; i < stops.length - 1; i++) {
+      const p = stops[i];
+      const q = stops[i + 1];
+      const dist = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const k = via.length ? dist * (0.15 + 0.35 * bend) : Math.max(40, dist * (0.2 + 0.6 * bend));
+      const tp = tan(i);
+      const tq = tan(i + 1);
+      d += ` C${p[0] + tp[0] * k},${p[1] + tp[1] * k} ${q[0] - tq[0] * k},${q[1] - tq[1] * k} ${q[0]},${q[1]}`;
+    }
+    return d + ` L${b[0]},${b[1]}`;
+  }
+  const pts: V[] = [a];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const p = stops[i];
+    const q = stops[i + 1];
+    const last = i === stops.length - 2;
+    // An Zwischenstopps knickt die Linie nur einmal (L bzw. gerade + 45°), das sieht ruhiger aus als ein Z
+    const dp: V = i === 0 ? da : last ? (db[0] !== 0 ? [0, Math.sign(q[1] - p[1]) || 1] : [Math.sign(q[0] - p[0]) || 1, 0]) : axis([q[0] - p[0], q[1] - p[1]]);
+    const dq: V = last ? db : dp[0] !== 0 ? [0, Math.sign(p[1] - q[1]) || 1] : [Math.sign(p[0] - q[0]) || 1, 0];
+    pts.push(...leg(kind, bend, p, dp, q, dq).slice(1));
+  }
+  return rounded([...pts, b], 14);
+}
+
+/** Von Hand gesetzter Ansatz: Seite und Stelle entlang der Seite. */
+function anchorAt(box: Box, st: MapStart): { p: V; dir: V } {
+  const l = box.x - box.w / 2;
+  const t = box.y - box.h / 2;
+  if (st.side === 'l') return { p: [l, t + st.t * box.h], dir: [-1, 0] };
+  if (st.side === 'r') return { p: [l + box.w, t + st.t * box.h], dir: [1, 0] };
+  if (st.side === 't') return { p: [l + st.t * box.w, t], dir: [0, -1] };
+  return { p: [l + st.t * box.w, t + box.h], dir: [0, 1] };
+}
+
+/** Nächste Stelle am Rand der Form zu einem Punkt (beim Ziehen des Ansatzes). */
+function anchorFrom(box: Box, [x, y]: V): MapStart {
+  const l = box.x - box.w / 2;
+  const r = box.x + box.w / 2;
+  const t = box.y - box.h / 2;
+  const btm = box.y + box.h / 2;
+  const cl = (v: number) => Math.max(0, Math.min(1, v));
+  const tx = cl((x - l) / box.w);
+  const ty = cl((y - t) / box.h);
+  const opts: [MapStart, number][] = [
+    [{ side: 'l', t: ty }, Math.abs(x - l)],
+    [{ side: 'r', t: ty }, Math.abs(x - r)],
+    [{ side: 't', t: tx }, Math.abs(y - t)],
+    [{ side: 'b', t: tx }, Math.abs(y - btm)],
+  ];
+  opts.sort((p, q) => p[1] - q[1]);
+  const st = opts[0][0];
+  return { side: st.side, t: Math.round(st.t * 100) / 100 };
+}
+
+/** Abstand eines Punkts zu einer Strecke (zum Einfügen eines Zwischenstopps an der richtigen Stelle). */
+function segDist([px, py]: V, [ax, ay]: V, [bx, by]: V): number {
+  const l2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+  const t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / l2));
+  return Math.hypot(px - ax - t * (bx - ax), py - ay - t * (by - ay));
+}
+
+const snap = (v: number) => Math.round(v / 10) * 10;
+
+function arrow(x: number, y: number, [dx, dy]: [number, number], size: number): string {
+  const px = -dy;
+  const py = dx;
+  const bx = x - dx * size * 1.6;
+  const by = y - dy * size * 1.6;
+  return `M${x},${y} L${bx + px * size},${by + py * size} L${bx - px * size},${by - py * size} Z`;
 }
 
 const IDEA = '#9a9a94';
@@ -80,14 +267,17 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
       const idea = c.kind === 'card';
       const color = idea ? IDEA : (c.color ?? COLUMN_COLORS[(idx + 1) % COLUMN_COLORS.length]);
       const sz = size(c);
-      const my = y + sz / 2;
-      const mx = side * MAIN_X;
-      nodes.push({ card: c, side, x: mx, y: my, color, depth: 1, idea, parentX: 0, parentY: 0 });
+      const autoY = y + sz / 2;
+      const mx = c.bx ?? side * (MAIN_X + 60);
+      const my = c.by ?? autoY;
+      const s: 1 | -1 = mx >= 0 ? 1 : -1;
+      nodes.push({ card: c, side: s, x: mx, y: my, color, depth: 1, idea, parentId: null });
       const kids = c.children.map((id) => map.cards[id]).filter(Boolean);
       const ordered = [...kids].sort((a, b) => a.y - b.y || a.x - b.x);
       ordered.forEach((k, i) => {
-        const ky = my - ((ordered.length - 1) * ROW) / 2 + i * ROW;
-        nodes.push({ card: k, side, x: mx + side * SUB_X, y: ky, color, depth: 2, idea: false, parentX: mx, parentY: my });
+        const ky = k.by ?? my - ((ordered.length - 1) * ROW) / 2 + i * ROW;
+        const kx = k.bx ?? mx + s * SUB_X;
+        nodes.push({ card: k, side: kx >= mx ? 1 : -1, x: kx, y: ky, color, depth: 2, idea: false, parentId: c.id });
       });
       y += sz;
     });
@@ -108,6 +298,22 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
   const wrap = useRef<HTMLDivElement>(null);
   const pan = useRef<{ sx: number; sy: number; x: number; y: number } | null>(null);
   const selected = sel ? map.cards[sel] : null;
+  const stage = useRef<HTMLDivElement>(null);
+  const [sizes, setSizes] = useState<Record<string, [number, number]>>({});
+  const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
+  const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [hd, setHd] = useState<{ id: string; kind: 'start' | 'via'; i: number; x: number; y: number } | null>(null);
+
+  // Breiten der Knoten messen, damit die Linien genau an den Kanten ansetzen
+  useLayoutEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const next: Record<string, [number, number]> = {};
+    el.querySelectorAll<HTMLElement>('[data-node]').forEach((n) => (next[n.dataset.node!] = [n.offsetWidth, n.offsetHeight]));
+    if (Object.keys(next).length !== Object.keys(sizes).length || Object.entries(next).some(([k, v]) => sizes[k]?.[0] !== v[0] || sizes[k]?.[1] !== v[1])) setSizes(next);
+  });
+
+  const pos = (n: Node) => (dragPos && dragPos.id === n.card.id ? { x: dragPos.x, y: dragPos.y } : { x: n.x, y: n.y });
 
   useEffect(() => {
     if (sel && !map.cards[sel]) setSel(null);
@@ -220,25 +426,113 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     }
   }
 
+  /** Koordinaten in der Mindmap aus einem Zeiger-Ereignis */
+  const toStage = (e: { clientX: number; clientY: number }): V => {
+    const r = wrap.current!.getBoundingClientRect();
+    return [(e.clientX - r.left - cam.x) / cam.k, (e.clientY - r.top - cam.y) / cam.k];
+  };
+
+  // Linien je Ast: Ansatz (automatisch oder von Hand), Zwischenstopps, Ziel
+  const geo = nodes.map((n) => {
+    const parent = n.parentId ? nodes.find((x) => x.card.id === n.parentId) : null;
+    const me = pos(n);
+    const pp = parent ? pos(parent) : { x: 0, y: 0 };
+    const sz = (id: string, d: [number, number]) => sizes[id] ?? d;
+    const [pw, ph] = sz(parent ? parent.card.id : '__root', [160, 48]);
+    const [cw, ch] = sz(n.card.id, [120, 32]);
+    const from: Box = { x: pp.x, y: pp.y, w: pw, h: ph };
+    const to: Box = { x: me.x, y: me.y, w: cw, h: ch };
+    const h = hd && hd.id === n.card.id ? hd : null;
+    const via: V[] = (n.card.via ?? []).map((v, i) => (h && h.kind === 'via' && h.i === i ? [h.x, h.y] : v));
+    const first = via[0] ?? [me.x, me.y];
+    const last = via[via.length - 1] ?? [pp.x, pp.y];
+    const start = h && h.kind === 'start' ? anchorFrom(from, [h.x, h.y]) : n.card.start;
+    const a = start ? anchorAt(from, start) : port(from, first[0], first[1], pointy(parent?.card ?? null, false));
+    const z = port(to, last[0], last[1], pointy(n.card, n.idea));
+    const w = n.idea ? 2 : n.depth === 1 ? 6 : 4;
+    const tip: V = z.p;
+    const stop: V = [tip[0] + z.dir[0] * w * 1.4, tip[1] + z.dir[1] * w * 1.4];
+    const d = route(n.card.route ?? (n.idea ? 'curve' : 'metro'), n.card.bend ?? 0.5, a.p, a.dir, via, stop, z.dir);
+    return { n, from, a, z, via, tip, w, d };
+  });
+  type Geo = (typeof geo)[number];
+  const selGeo = sel ? geo.find((g) => g.n.card.id === sel) ?? null : null;
+
+  /** Zwischenstopp dort einfügen, wo geklickt wurde (zwischen den nächsten beiden Punkten) */
+  async function addVia(g: Geo, at: V) {
+    const pts: V[] = [g.a.p, ...g.via, g.z.p];
+    let best = 0;
+    for (let i = 1; i < pts.length - 1; i++) if (segDist(at, pts[i], pts[i + 1]) < segDist(at, pts[best], pts[best + 1])) best = i;
+    const via = [...(g.n.card.via ?? [])];
+    if (via.length >= 12) return;
+    via.splice(best, 0, [snap(at[0]), snap(at[1])]);
+    setSel(g.n.card.id);
+    await send({ type: 'update', id: g.n.card.id, patch: { via } });
+  }
+
+  /** Griffe für Ansatz und Zwischenstopps */
+  const handleDrag = (g: Geo, kind: 'start' | 'via', i: number) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      e.stopPropagation();
+      const [x, y] = toStage(e);
+      setHd({ id: g.n.card.id, kind, i, x, y });
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!hd) return;
+      const [x, y] = toStage(e);
+      setHd({ ...hd, x: kind === 'via' ? snap(x) : x, y: kind === 'via' ? snap(y) : y });
+    },
+    onPointerUp: () => {
+      const h = hd;
+      if (!h) return;
+      const c = g.n.card;
+      const patch = h.kind === 'start' ? { start: anchorFrom(g.from, [h.x, h.y]) } : { via: (c.via ?? []).map((v, j): [number, number] => (j === h.i ? [h.x, h.y] : v)) };
+      void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
+    },
+  });
+
   const label = (n: Node) => {
     const c = n.card;
-    const shape = c.shape ?? 'none';
+    const shape = c.shape ?? (n.idea ? 'none' : 'rect');
+    const p = pos(n);
     const owner = c.owner != null ? people.find((p) => p.id === c.owner)?.name : null;
     const text = c.title || (n.depth === 1 && !n.idea ? 'Ohne Titel' : '…');
     const isSel = sel === c.id;
     // Text sitzt am Ende des Asts, nach außen ausgerichtet
     const style: React.CSSProperties = {
-      left: n.x,
-      top: n.y,
+      left: p.x,
+      top: p.y,
       ['--c' as string]: n.color,
-      transform: `translate(${n.side === 1 ? '0' : '-100%'}, ${shape === 'none' && !n.idea ? '-100%' : '-50%'})`,
+      transform: 'translate(-50%, -50%)',
     };
     return (
       <div
         key={c.id}
         className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''}`}
         style={style}
-        onPointerDown={(e) => e.stopPropagation()}
+        data-node={c.id}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (!canEdit || edit === c.id) return;
+          drag.current = { id: c.id, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y, moved: false };
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d || d.id !== c.id) return;
+          const mx = (e.clientX - d.sx) / cam.k;
+          const my = (e.clientY - d.sy) / cam.k;
+          if (!d.moved && Math.hypot(mx, my) < 4) return;
+          d.moved = true;
+          setDragPos({ id: c.id, x: d.x + mx, y: d.y + my });
+        }}
+        onPointerUp={() => {
+          const d = drag.current;
+          drag.current = null;
+          if (d?.moved && dragPos) void send({ type: 'update', id: c.id, patch: { bx: Math.round(dragPos.x), by: Math.round(dragPos.y) } }).then(() => setDragPos(null));
+          else setDragPos(null);
+        }}
         onClick={() => (setSel(c.id), wrap.current?.focus({ preventScroll: true }))}
         onDoubleClick={() => startEdit(c.id, c.title)}
       >
@@ -295,22 +589,26 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
         });
       }}
     >
-      <div className={b.stage} style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})` }}>
+      <div ref={stage} className={b.stage} style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})` }}>
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
-          {nodes.map((n) => {
-            const end = n.x + n.side * (n.depth === 1 ? 150 : 140);
-            const start = n.depth === 1 ? n.side * 40 : n.parentX + n.side * 150;
-            const sy = n.depth === 1 ? 0 : n.parentY;
-            return (
-              <g key={n.card.id} fill={n.color}>
-                <path d={branch(start, sy, n.x, n.y, n.idea ? 4 : n.depth === 1 ? 14 : 6, n.idea ? 2 : n.depth === 1 ? 6 : 2.5)} opacity={n.depth === 1 && !n.idea ? 0.95 : 0.8} />
-                {/* Linie unter dem Text: der Ast läuft unter der Beschriftung weiter */}
-                {!n.idea && <path d={branch(n.x, n.y, end, n.y, n.depth === 1 ? 6 : 2.5, n.depth === 1 ? 3 : 1.5)} opacity={n.depth === 1 ? 0.95 : 0.8} />}
-              </g>
-            );
-          })}
+          {geo.map((g) => (
+            <g key={g.n.card.id} style={{ color: g.n.color }}>
+              <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="round" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
+              <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w + 2.5)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
+              {/* breiter unsichtbarer Streifen: Ast anklicken wählt ihn, Doppelklick setzt einen Zwischenstopp */}
+              <path
+                className={b.hit}
+                d={g.d}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => (setSel(g.n.card.id), wrap.current?.focus({ preventScroll: true }))}
+                onDoubleClick={(e) => canEdit && void addVia(g, toStage(e))}
+              >
+                <title>{canEdit ? 'Doppelklick: Zwischenstopp setzen' : ''}</title>
+              </path>
+            </g>
+          ))}
         </svg>
-        <div className={b.root} onPointerDown={(e) => e.stopPropagation()}>
+        <div className={b.root} data-node="__root" onPointerDown={(e) => e.stopPropagation()}>
           <span>{topic}</span>
           {canEdit && (
             <button className={b.plus} title="Neue Idee (Tab)" onClick={addIdea}>
@@ -319,6 +617,27 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           )}
         </div>
         {nodes.map(label)}
+        {selGeo && canEdit && (
+          <>
+            <div
+              className={`${b.handle} ${b.start}`}
+              style={{ left: selGeo.a.p[0], top: selGeo.a.p[1], ['--c' as string]: selGeo.n.color }}
+              title="Ansatz verschieben (Doppelklick: wieder automatisch)"
+              {...handleDrag(selGeo, 'start', -1)}
+              onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { start: null } })}
+            />
+            {selGeo.via.map((v, i) => (
+              <div
+                key={i}
+                className={`${b.handle} ${b.stop}`}
+                style={{ left: v[0], top: v[1], ['--c' as string]: selGeo.n.color }}
+                title="Zwischenstopp ziehen (Doppelklick: entfernen)"
+                {...handleDrag(selGeo, 'via', i)}
+                onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } })}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       {canEdit && (
@@ -334,13 +653,50 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       {selected && canEdit && (
         <div className={b.bar} onPointerDown={(e) => e.stopPropagation()}>
           <span className={b.barTitle}>{selected.title || 'Ohne Titel'}</span>
-          <select value={selected.shape ?? 'none'} onChange={(e) => void send({ type: 'update', id: selected.id, patch: { shape: e.target.value as MapShape } })} title="Form">
+          <select value={selected.shape ?? (selected.kind === 'card' && !selected.parent ? 'none' : 'rect')} onChange={(e) => void send({ type: 'update', id: selected.id, patch: { shape: e.target.value as MapShape } })} title="Form">
             {SHAPES.map((s) => (
               <option key={s.key} value={s.key}>
                 {s.label}
               </option>
             ))}
           </select>
+          <select value={selected.route ?? (selected.kind === 'card' && !selected.parent ? 'curve' : 'metro')} onChange={(e) => void send({ type: 'update', id: selected.id, patch: { route: e.target.value as MapRoute } })} title="Linie">
+            {ROUTES.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          {(selected.route ?? 'metro') !== 'straight' && (
+            <label className={b.bend} title="Wo die Linie abknickt">
+              Knick
+              <input type="range" min={0} max={100} defaultValue={Math.round((selected.bend ?? 0.5) * 100)} key={selected.id + (selected.bend ?? '')} onPointerUp={(e) => void send({ type: 'update', id: selected.id, patch: { bend: Number(e.currentTarget.value) / 100 } })} onKeyUp={(e) => void send({ type: 'update', id: selected.id, patch: { bend: Number(e.currentTarget.value) / 100 } })} />
+            </label>
+          )}
+          {selected.bx != null && (
+            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { bx: null, by: null } })} title="Wieder automatisch anordnen">
+              Lage automatisch
+            </button>
+          )}
+          {selGeo && (
+            <button
+              className="btn"
+              disabled={(selected.via?.length ?? 0) >= 12}
+              title="Zwischenstopp auf dem Ast setzen (auch per Doppelklick auf die Linie), dann ziehen"
+              onClick={() => {
+                const pts: V[] = [selGeo.a.p, ...selGeo.via, selGeo.z.p];
+                const [p, q] = [pts[pts.length - 2], pts[pts.length - 1]];
+                void addVia(selGeo, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]);
+              }}
+            >
+              + Stopp
+            </button>
+          )}
+          {((selected.via?.length ?? 0) > 0 || selected.start) && (
+            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { via: [], start: null } })} title="Zwischenstopps entfernen, Ansatz wieder automatisch">
+              Linie zurücksetzen
+            </button>
+          )}
           {selected.kind === 'cluster' && (
             <span className={b.colors}>
               {COLUMN_COLORS.map((c) => (

@@ -122,8 +122,19 @@ export interface MapCard {
   parent: string | null;
   owner: number | null;
   shape?: MapShape;
+  route?: MapRoute;
+  bend?: number;
+  bx?: number | null;
+  by?: number | null;
+  start?: MapStart | null;
+  via?: [number, number][];
   children: string[];
 }
+export interface MapStart {
+  side: 't' | 'r' | 'b' | 'l';
+  t: number;
+}
+export type MapRoute = 'metro' | 'ortho' | 'curve' | 'straight';
 export type MapShape = 'none' | 'rect' | 'oval' | 'diamond' | 'para';
 export interface MapLink {
   id: string;
@@ -145,7 +156,7 @@ export interface MindMap {
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }

@@ -16,6 +16,10 @@ const MAX_CARDS = 500;
 
 export const SHAPES = ['none', 'rect', 'oval', 'diamond', 'para'] as const;
 export type Shape = (typeof SHAPES)[number];
+export const ROUTES = ['metro', 'ortho', 'curve', 'straight'] as const;
+export type Route = (typeof ROUTES)[number];
+export const SIDES = ['t', 'r', 'b', 'l'] as const;
+export type Side = (typeof SIDES)[number];
 
 export interface MapCard {
   id: string;
@@ -32,6 +36,17 @@ export interface MapCard {
   owner: number | null;
   /** Form in der Ast-Ansicht (Konzept 4, Mindmap): ohne Form, Rechteck, Oval, Raute, Parallelogramm */
   shape?: Shape;
+  /** Linie in der Ast-Ansicht: U-Bahn (45°), rechtwinklig, Kurve, gerade */
+  route?: Route;
+  /** Lage des Knicks auf der Linie, 0 = nah am Ursprung, 1 = nah am Ziel */
+  bend?: number;
+  /** von Hand gesetzte Lage in der Ast-Ansicht (null = automatisch); unabhängig von x/y der Karten-Fläche */
+  bx?: number | null;
+  by?: number | null;
+  /** von Hand gesetzter Ansatz des Asts an der Form davor: Seite und Stelle (0..1) entlang der Seite; null = automatisch */
+  start?: { side: Side; t: number } | null;
+  /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
+  via?: [number, number][];
   /** Karten im Cluster, hinten nach vorn */
   children: string[];
 }
@@ -63,6 +78,8 @@ export const emptyMap = (): MindMap => ({ v: 1, cards: {}, roots: [], links: [],
 
 const Id = z.string().regex(/^[A-Za-z0-9_-]{4,40}$/);
 const Num = z.number().finite().min(-100_000).max(100_000);
+const Start = z.object({ side: z.enum(SIDES), t: z.number().min(0).max(1) }).nullable();
+const Via = z.array(z.tuple([Num, Num])).max(12);
 const Size = z.number().finite().min(60).max(4000);
 const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable();
 
@@ -82,13 +99,19 @@ export const MapOp = z.discriminatedUnion('type', [
       parent: Id.nullable().default(null),
       owner: z.number().int().nullable().default(null),
       shape: z.enum(SHAPES).optional(),
+      route: z.enum(ROUTES).optional(),
+      bend: z.number().min(0).max(1).optional(),
+      bx: Num.nullable().optional(),
+      by: Num.nullable().optional(),
+      start: Start.optional(),
+      via: Via.optional(),
     }),
   }),
   z.object({
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES) })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),
