@@ -54,7 +54,8 @@ function help(key: PhaseKey, s: ProjectSettings, single: boolean): string {
         ? 'Jede Person schreibt ihre Abschnitte im Texteditor. Ist dein Abschnitt fertig, meldest du ihn „fertig“; danach ist er gesperrt.'
         : 'Jede Person schreibt ihre Abschnitte im Texteditor. Ihr könnt alle Abschnitte eurer Gruppe lesen.';
     case 'presentation': {
-      const parts = [s.docTypes.slides && 'die Präsentation', s.docTypes.handout && 'ein Handout', s.docTypes.brochure && 'euren Teil der gemeinsamen Broschüre'].filter(Boolean) as string[];
+      const dt = s.docTypes ?? {};
+      const parts = [dt.slides && 'die Präsentation', dt.handout && 'ein Handout', dt.brochure && 'euren Teil der gemeinsamen Broschüre'].filter(Boolean) as string[];
       return parts.length ? `Macht aus euren Abschnitten ${parts.join(parts.length > 2 ? ', ' : ' und ').replace(/, ([^,]*)$/, ' und $1')}.` : 'Bereitet die Vorstellung eurer Ergebnisse vor.';
     }
   }
