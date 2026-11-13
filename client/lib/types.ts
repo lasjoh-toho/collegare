@@ -136,6 +136,8 @@ export interface MapCard {
   fork?: MapFork | null;
   /** Ast-Ansicht: hängt an dieser Karte (gleicher Cluster), statt direkt am Cluster */
   under?: string | null;
+  /** nur zum Sammeln, nicht in der Gliederung */
+  collect?: boolean;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
   via?: MapVia[];
   children: string[];
@@ -171,7 +173,7 @@ export interface MindMap {
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'via'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'collect' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }

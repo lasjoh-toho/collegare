@@ -79,4 +79,15 @@ describe('Mindmap-Operationen', () => {
     expect(m.cards.clus2.fork).toBeNull();
     expect(() => Schema.parse({ type: 'update', id: 'clus2', patch: { fork: { from: 'clus1', i: 12 } } })).toThrow();
   });
+
+  it('„nur zum Sammeln“ bleibt aus der Gliederung', () => {
+    const m = emptyMap();
+    applyOp(m, add('clus1', 0, 0, { kind: 'cluster' }), 1, people);
+    applyOp(m, add('clus2', 400, 0, { kind: 'cluster' }), 1, people);
+    applyOp(m, add('card1', 0, 0, { parent: 'clus1' }), 1, people);
+    applyOp(m, add('card2', 0, 100, { parent: 'clus1' }), 1, people);
+    applyOp(m, { type: 'update', id: 'clus2', patch: { collect: true } }, 1, people);
+    applyOp(m, { type: 'update', id: 'card2', patch: { collect: true } }, 1, people);
+    expect(buildOutline(m)).toEqual([{ id: 'clus1', title: 'clus1', cards: ['card1'], owners: [] }]);
+  });
 });

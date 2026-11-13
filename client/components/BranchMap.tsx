@@ -729,6 +729,9 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     };
   };
 
+  /** nur zum Sammeln: selbst markiert oder im markierten Hauptast */
+  const collected = (c: MapCard) => !!c.collect || (!!c.parent && !!map.cards[c.parent]?.collect);
+
   const label = (n: Node) => {
     const c = n.card;
     const shape = c.shape ?? (n.idea ? 'none' : 'rect');
@@ -746,7 +749,8 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     return (
       <div
         key={c.id}
-        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''}`}
+        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''} ${collected(c) ? b.collect : ''}`}
+        title={collected(c) ? 'Nur zum Sammeln: kommt nicht in die Gliederung' : undefined}
         style={style}
         data-node={c.id}
         onPointerDown={(e) => {
@@ -1012,6 +1016,16 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
                 </option>
               ))}
             </select>
+          )}
+          {(selected.kind === 'cluster' || selected.parent) && (
+            <button
+              className={`btn ${selected.collect ? 'on' : ''}`}
+              aria-pressed={!!selected.collect}
+              onClick={() => void send({ type: 'update', id: selected.id, patch: { collect: !selected.collect } })}
+              title={selected.kind === 'cluster' ? 'Ast nur zum Sammeln: wird kein Abschnitt der Gliederung' : 'Karte nur zum Sammeln: wird kein Textabschnitt'}
+            >
+              Nur sammeln
+            </button>
           )}
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>
             <Icon name="pen" size={14} /> Umbenennen

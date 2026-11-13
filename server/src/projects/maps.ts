@@ -49,6 +49,8 @@ export interface MapCard {
   fork?: { from: string; i: number } | null;
   /** Ast-Ansicht: Karte hängt an dieser Karte desselben Clusters (beliebig tief); null = direkt am Cluster */
   under?: string | null;
+  /** „nur zum Sammeln“: kommt nicht in die Gliederung (Hauptast/Cluster nicht als Abschnitt, Karte nicht als Dokument) */
+  collect?: boolean;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
   via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
@@ -112,6 +114,7 @@ export const MapOp = z.discriminatedUnion('type', [
       start: Start.optional(),
       fork: Fork.optional(),
       under: Id.nullable().optional(),
+      collect: z.boolean().optional(),
       via: Via.optional(),
     }),
   }),
@@ -119,7 +122,7 @@ export const MapOp = z.discriminatedUnion('type', [
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), via: Via })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), collect: z.boolean(), via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),
@@ -183,9 +186,9 @@ function readingOrder<T extends { x: number; y: number; h: number }>(items: T[])
 }
 
 export function buildOutline(m: MindMap): OutlineSection[] {
-  const clusters = readingOrder(m.roots.map((id) => m.cards[id]).filter((c) => c.kind === 'cluster'));
+  const clusters = readingOrder(m.roots.map((id) => m.cards[id]).filter((c) => c.kind === 'cluster' && !c.collect));
   return clusters.map((k) => {
-    const cards = readingOrder(k.children.map((id) => m.cards[id])).map((c) => c.id);
+    const cards = readingOrder(k.children.map((id) => m.cards[id]).filter((c) => c && !c.collect)).map((c) => c.id);
     const owners = [...new Set(cards.map((id) => m.cards[id].owner).filter((o): o is number => o !== null))];
     return { id: k.id, title: k.title || 'Ohne Titel', cards, owners };
   });

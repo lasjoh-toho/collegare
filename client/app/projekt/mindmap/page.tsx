@@ -386,7 +386,7 @@ export default function MindmapPage() {
               </button>
             </div>
             {!map.outline ? (
-              <p className="muted">Noch nicht übernommen. Jeder Hauptast (in der Karten-Ansicht: jeder Cluster) wird ein Abschnitt. Tippt dann auf „Gliederung übernehmen“.</p>
+              <p className="muted">Noch nicht übernommen. Jeder Hauptast (in der Karten-Ansicht: jeder Cluster) wird ein Abschnitt, außer er ist auf „Nur sammeln“ gestellt. Zuständige Personen sind freiwillig. Tippt dann auf „Gliederung übernehmen“.</p>
             ) : (
               <>
                 <p className="muted">
