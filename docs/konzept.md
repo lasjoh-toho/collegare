@@ -683,6 +683,82 @@ Gebaut in Collegare: Discovery, `/oidc/authorize` (PKCE S256 Pflicht), `/oidc/to
 springt zur App zurück; „Lehrende“ mit Projektzahl und Löschen (nur ohne laufende Projekte). Offen: Autogra.fi als
 Client einrichten, Konten verbinden (8c.3), Klassenlisten über die Dienstschnittstelle.
 
+## 8d. Karten durch alle Phasen und die Pinnwand (13. November 2026)
+
+Wünsche von Jo vom 13. November 2026, als Plan vor dem Bauen.
+
+### 8d.1 Verteilen ist freiwillig
+
+Karten der Mindmap **können** einer Person zugewiesen werden, müssen aber nicht. Ebenso muss nicht jeder Cluster
+oder Hauptast ein Abschnitt werden: Ein Schalter „nur zum Sammeln“ an Hauptast oder Karte nimmt sie aus der
+Gliederung und damit aus Ausarbeitung und Korrektur heraus. Karten ohne zuständige Person bleiben Abschnitte, an
+denen die ganze Gruppe schreiben darf.
+
+### 8d.2 Recherche-Karten im Seiten-Thread
+
+In der Recherche entstehen neue Karten (Notiz, Quelle mit Fundstelle, Foto, Link, Chat-Beitrag). Sie landen in
+**einem** Thread je Gruppe („Notizen und Quellen“, Issue #8), der als Leiste rechts erscheint: in der Mindmap
+und in der Pinnwand (dort als Post-Stream, der in mod_pinnwand schon „Warteraum“ ist). Von dort zieht man sie auf
+die Fläche, an einen Knoten oder in einen Abschnitt. Eine Karte bleibt **ein** Datensatz; Mindmap und Pinnwand
+verweisen nur darauf, damit eine Überarbeitung überall ankommt.
+
+### 8d.3 Karten überarbeiten: einfacher Editor und Einfügen
+
+- Jede Karte öffnet sich in einem **einfachen Editor** (Titel, Text mit Absätzen, Fett/Kursiv, Listen, Link,
+  Quelle). Kein Office, damit es am Handy geht.
+- **Kopieren und Einsetzen innerhalb des Projekts** ist immer erlaubt. Die eingesetzte Stelle merkt sich die
+  Herkunft (Karte, Person, Zeit) und zeigt sie auf Wunsch als Zuschreibung.
+- **Einsetzen von außen** regelt die Lehrkraft in den Einstellungen: erlauben, nach der Herkunft fragen (wie
+  `pasteExplain`) oder nur bis zur Länge `pasteThreshold`. Jedes Einsetzen von außen kommt ins Einfüge-Protokoll
+  (6.1).
+
+### 8d.4 Handschriftliche Notizen mit Autogra.fi
+
+Ist Autogra.fi verbunden (8c), bietet der Thread „Notiz scannen“: Scanner und QR-Kopplung aus Autogra.fi, Texterkennung
+über den Dienst (Abschnitt 8), Überarbeiten des erkannten Texts neben dem Seitenbild. Zurück kommt eine Karte mit
+Bild und Text (8a.6, erstes Modul). Voraussetzung ist die Anmeldung über Collegare in Autogra.fi (8c.5, offen).
+
+### 8d.5 mod_pinnwand als Modul für die Präsentation
+
+**Ja, das geht.** mod_pinnwand steht unter derselben nicht-kommerziellen Lizenz wie der Kern (Entscheidung 9) und
+kann daher in `client/` mitgeliefert werden. Die Oberfläche ist ein einzelnes Skript (`js/app.js`, rund 14 000
+Zeilen, ohne Build) mit impress.js für die Präsentation entlang des Roten Fadens. Mit Moodle spricht es nur über
+**eine** Stelle: `callAjax(methodname, args)` an `lib/ajax/service.php` mit etwa 40 Web-Service-Methoden
+(`classes/external.php`) auf sieben Tabellen und der Moodle File API.
+
+Einbindung als eingebettetes Modul (8a.2):
+
+1. **Eine kleine Änderung in mod_pinnwand:** `callAjax` nutzt einen von außen gesetzten Transport, falls vorhanden
+   (`cfg.transport`), sonst wie bisher Moodle. So bleibt **ein** Quellstand für Moodle und Collegare.
+2. Collegare liefert die Dateien von mod_pinnwand unverändert unter `/module/pinnwand/` aus (Skript holt einen
+   festen Stand) und startet sie im iframe mit dem Transport `collegare/1`.
+3. Collegare bildet die Web-Service-Methoden auf eigene Tabellen ab (siehe Speichern) und prüft Rechte, Phase und
+   Fertig-Sperre selbst (8a.3).
+
+**Erweiterung der Mindmap für die Präsentation:** „Pinnwand aus der Mindmap“ legt für die Gruppe ein Board an.
+Hauptäste werden Rahmen, Karten werden Textfelder (Wortfelder) darin, Bilder aus dem Thread bleiben Bilder. Die
+Reihenfolge der Gliederung wird der **Rote Faden**, aus dem die Pinnwand die Präsentation macht. Danach sind Mindmap
+und Pinnwand getrennte Stände; „neu übernehmen“ ergänzt nur, was fehlt.
+
+**Speichern, angepasst an Collegare:**
+
+| heute in Moodle | in Collegare |
+|---|---|
+| je Aufruf ein Web-Service, sofort in die Tabelle | gleich: je Aufruf eine kleine Änderung, sofort gespeichert (kein Speichern-Knopf) |
+| Tabellen `pinnwand_*` je Kursmodul und Person | ein Produkt „Pinnwand“ je Gruppe (8a.5) mit Objekten, Platzierungen, Faden, Tinte als JSON-Zeilen; Fremdschlüssel sind Produkt und Gruppe statt Kursmodul |
+| Bilder in der Moodle File API | Bilder in der Datenbank wie Material und Dokumente, in mehreren Größen; Grenze aus `maxFileMb` |
+| jede Person eigenes Board, Lehrkraft sieht alle | Board der Gruppe, alle der Gruppe bearbeiten gemeinsam; eigene Boards nur im Einzelmodus |
+| Neuladen zeigt fremde Änderungen | Änderungen gehen per socket.io an alle, die das Board offen haben; bei gleichzeitigem Verschieben gewinnt die letzte Änderung je Objekt |
+| Sicherung über Moodle-Backup | Versionen je Board (Schnappschuss je Sitzung), Archiv in Moodle über 7.9 |
+
+### 8d.6 Reihenfolge (Vorschlag)
+
+1. „Nur zum Sammeln“ (8d.1), klein.
+2. Thread „Notizen und Quellen“ mit Recherche-Karten, in der Mindmap als Leiste (8d.2).
+3. Karten-Editor mit Einfüge-Regeln (8d.3).
+4. Pinnwand als Modul samt Übernahme aus der Mindmap (8d.5), mit der kleinen Änderung in mod_pinnwand.
+5. Notiz scannen mit Autogra.fi (8d.4), sobald die Anmeldung über Collegare steht.
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |
