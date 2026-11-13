@@ -32,6 +32,7 @@ Betrieb: [docs/installation.md](docs/installation.md); Moodle-Anbindung: [docs/m
 
 ```bash
 scripts/onlyoffice-assets.sh 9.3.1 1          # einmalig, braucht Docker (nur zum Holen der Dateien)
+scripts/pinnwand-holen.sh                     # Pinnwand-Modul (mod_pinnwand) in festem Stand
 cd server && pnpm install && CORS_ORIGIN=http://localhost:3000,http://localhost:3001 pnpm dev   # :8787
 COLLEGARE_PASSWORD=… pnpm cli admin:create admin "Administration"   # erstes Konto (in server/)
 cd client && cp .env.example .env.local && pnpm install && pnpm dev    # Projektoberfläche :3001
@@ -56,6 +57,7 @@ Gestaltungsrichtlinie für Autogra.fi und Collegare: [docs/gestaltung.md](docs/g
 | Seitenmenü der Projektseiten | Autogra.fi `/lernen`, Info und Schrittleiste | Name und Klasse oben links öffnen es (gestaltung.md 6); statt der Schrittleiste oben stehen die Phasen nur im Menü, weil Collegare-Oberflächen wie Mindmap und Editor die volle Höhe brauchen. Auf breiten Bildschirmen anheftbar. Auch Lehrkräfte bekommen es, ihre Knöpfe bleiben rechts in der Kopfzeile |
 | Projekt-Übersicht | brausa Projektkacheln | Kacheln je Oberfläche mit den Zuständen aus gestaltung.md 2; oben „Jetzt dran“ mit der Anleitung der aktuellen Phase (wie die Info-Karte in Autogra.fi). Das Board der Gruppenbildung liegt jetzt unter `/projekt/gruppen/` |
 | Ausarbeitung | gestaltung.md 5 | keine Leiste mehr über dem Editor: Titel, Zustand und „Fertig melden“ stehen in der Kopfzeile, darüber nur der 6-px-Streifen in Textblau. Der zarte Verlauf hinter dem OnlyOffice-Menüband fehlt noch (bräuchte eine Änderung in `web/`) |
+| Pinnwand `/projekt/pinnwand/` | mod_pinnwand (Moodle) | unverändert eingebettet (eigene dunkle Oberfläche, Bedienung wie in Moodle), damit dieselbe Pinnwand in Moodle und Collegare gleich bedient wird (Konzept 8d.5). Das Board gehört der Gruppe statt einer Person; Änderungen anderer zeigt Collegare als Hinweis „Neu laden“. Holen mit `scripts/pinnwand-holen.sh` (fester Stand in `scripts/pinnwand.ref`) |
 | Akzentfarbe | brausa Blau `#2f6bff` | neutrales Schieferblau `--ui-accent`, weil gestaltung.md 8 eine neutrale, nicht markenhafte Akzentfarbe verlangt und das kräftige Blau mit Textblau `#2b579a` verwechselt würde |
 
 Gemeinsam bearbeiten: `http://localhost:3000/editor?new=docx&collab=test1&name=Anna` und in einem zweiten

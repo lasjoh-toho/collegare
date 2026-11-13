@@ -463,6 +463,51 @@ describe('Mindmap in Echtzeit', () => {
     expect((await emit(sa, 'notes:delete', { projectId: project, id: add.id })).ok).toBe(true);
   });
 
+  it('Pinnwand als Modul: Board der Gruppe, Dateien nur für die Gruppe', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: ids })).json.codes as J[];
+    const [anna, ben, clara] = await Promise.all(codes.map(async (c) => (await call('POST', '/api/access/redeem', undefined, { code: c.code })).json.token as string));
+    const pin = (tok: string, scope: string, methodname: string, args: J = {}) => call('POST', `/api/projects/${project}/pinnwand/${scope}/call`, tok, { methodname: 'mod_pinnwand_' + methodname, args: { cmid: project, ...args } });
+    const gs = 'g' + g1;
+    expect((await call('GET', `/api/projects/${project}/pinnwand`, anna)).json.scopes).toEqual([{ scope: gs, title: 'Inflation' }]);
+    expect((await call('GET', `/api/projects/${project}/pinnwand/${gs}/start`, anna)).json.config).toMatchObject({ cmid: project, currentuserfullname: 'Inflation', canmanage: false });
+    // 1×1-PNG als Objekt, Anna legt es an, Ben sieht es (gemeinsames Board der Gruppe)
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const saved = (await pin(anna, gs, 'save_photo', { imagedata: png, sourcetitle: '<b>Brot</b>preise' })).json;
+    expect(saved).toMatchObject({ ok: true, data: { photoid: expect.any(Number), count: 1 } });
+    const id = saved.data.photoid;
+    expect((await pin(anna, gs, 'update_layout', { photoid: id, x: 10, y: 20, w: 300, rot: 2, z: 1 })).json.ok).toBe(true);
+    const photos = (await pin(ben, gs, 'get_photos')).json.data.photos as J[];
+    expect(photos).toHaveLength(1);
+    expect(photos[0]).toMatchObject({ id, sourcetitle: 'Brotpreise', canvasx: 10, canvasw: 300, boardplaced: true, userfullname: 'Inflation' });
+    // Adressen für den Browser tragen den Unterordner der Installation (der Reverse-Proxy nimmt ihn ab)
+    expect(photos[0].url).toMatch(/^\/collegare\/api\//);
+    const fileUrl = photos[0].url.replace(/^\/collegare/, '');
+    expect((await call('GET', fileUrl, ben)).status).toBe(200);
+    // Roter Faden und Board-Namen
+    expect((await pin(ben, gs, 'add_thread_item', { itemtype: 'photo', photoid: id })).json.data.items).toHaveLength(1);
+    await pin(ben, gs, 'set_board_name', { boardid: 0, name: 'Ursachen' });
+    expect((await pin(anna, gs, 'get_board_names')).json.data.names).toEqual([{ boardid: 0, name: 'Ursachen' }]);
+    // Clara (andere Gruppe) kommt weder an die Aufrufe noch an die Dateien
+    expect((await pin(clara, gs, 'get_photos')).status).toBe(403);
+    expect((await call('GET', fileUrl, clara)).status).toBe(403);
+    expect((await pin(clara, 'g' + g2, 'get_photos')).json.data.photos).toEqual([]);
+    // unbekannte Methoden und Fehler wie in Moodle
+    expect((await pin(anna, gs, 'nicht_da')).status).toBe(400);
+    expect((await pin(anna, gs, 'restore_photo', { photoid: 999999 })).json).toMatchObject({ ok: false });
+    expect((await pin(anna, gs, 'save_photo', { imagedata: 'data:text/html;base64,PGI+' })).json).toEqual({ ok: false, error: 'Speichern fehlgeschlagen' });
+    // Papierkorb und endgültig löschen
+    expect((await pin(anna, gs, 'delete_photo', { photoid: id })).json.ok).toBe(true);
+    expect((await pin(anna, gs, 'get_trash')).json.data.items).toEqual([expect.objectContaining({ kind: 'object', id })]);
+    expect((await pin(anna, gs, 'permanently_delete_photo', { photoid: id })).json.ok).toBe(true);
+    expect((await call('GET', fileUrl, anna)).status).toBe(404);
+  });
+
   it('Themen-Mindmap vor den Gruppen: alle arbeiten mit, Gruppe übernimmt sie als Start', async () => {
     const { t, project, ids } = await setup();
     const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes as J[];

@@ -223,6 +223,31 @@ export interface ChatMessagesTable {
   created_at: Ms;
 }
 
+/**
+ * Pinnwand als Modul (Konzept 8d.5): die Tabellen von mod_pinnwand (photos, threads, thread_items, board_ink,
+ * board_names, object_placements, prefs) als JSON-Zeilen je Bereich (Gruppe bzw. Person im Einzelmodus).
+ */
+export interface PinnwandRowsTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  tbl: string;
+  data: string;
+}
+
+/** Dateien der Pinnwand (Moodle-Dateibereiche photo, photoorig, photomask, background, backgroundpdf, slidemedia) */
+export interface PinnwandFilesTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  area: string;
+  item_id: number;
+  name: string;
+  mime: string;
+  data: Buffer;
+  created_at: Ms;
+}
+
 /** Notizen und Quellen (Recherche-Karten) je Gruppe bzw. Person im Einzelmodus */
 export interface NotesTable {
   id: Generated<number>;
@@ -267,5 +292,7 @@ export interface Database {
   materials: MaterialsTable;
   chat_messages: ChatMessagesTable;
   notes: NotesTable;
+  pinnwand_rows: PinnwandRowsTable;
+  pinnwand_files: PinnwandFilesTable;
   kv: KeyValueTable;
 }

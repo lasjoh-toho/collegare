@@ -17,6 +17,7 @@ import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
 import { chatSocket } from './routes/chat.js';
 import { notesSocket } from './routes/notes.js';
+import { pinnwandRoutes, pinnwandSocket } from './routes/pinnwand.js';
 import { authorizeDoc, documentRoutes } from './routes/documents.js';
 import { collabId, parseCollabId } from './projects/documents.js';
 import type { Services } from './services.js';
@@ -131,6 +132,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     projectRoutes(http, s, bc);
     gradingRoutes(http, s);
     materialRoutes(http, s);
+    pinnwandRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 
@@ -161,6 +163,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     mapSocket(nsp, s);
     chatSocket(nsp, s);
     notesSocket(nsp, s);
+    pinnwandSocket(nsp, s);
     documentRoutes(http, s, {
       changed: (projectId, scope) => nsp.to('project:' + projectId).emit('docs', { projectId, scope }),
       lockChanged: (docId) => co.disconnectDoc(collabId(docId)),

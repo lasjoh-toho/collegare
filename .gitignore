@@ -14,3 +14,5 @@ client/out/
 client/next-env.d.ts
 client/tsconfig.tsbuildinfo
 dist-release/
+# mod_pinnwand wird mit scripts/pinnwand-holen.sh geholt
+client/public/pinnwand/mod/

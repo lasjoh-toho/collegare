@@ -133,6 +133,7 @@ export const TILES: TileDef[] = [
   { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/mindmap/?id={id}&gliederung=1', sub: 'Abschnitte aus den Clustern' },
   { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', path: '/projekt/notizen/?id={id}', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
   { key: 'sections', phase: 'drafting', title: 'Textabschnitte', icon: 'doc', office: 'word', docType: 'section', path: '/projekt/ausarbeitung/?id={id}', sub: 'Texteditor je Abschnitt' },
+  { key: 'pinnwand', phase: 'presentation', title: 'Pinnwand', icon: 'present', path: '/projekt/pinnwand/?id={id}', sub: 'Bilder, Texte und Roter Faden für die Präsentation' },
   { key: 'slides', phase: 'presentation', title: 'Präsentation', icon: 'slides', office: 'slide', docType: 'slides', sub: 'Folien der Gruppe' },
   { key: 'brochure', phase: 'presentation', title: 'Broschüre', icon: 'doc', office: 'word', docType: 'brochure', sub: 'Gemeinsames Heft aller Gruppen' },
   { key: 'handout', phase: 'presentation', title: 'Handout', icon: 'doc', office: 'word', docType: 'handout', sub: 'Zusammenfassung für die Klasse' },

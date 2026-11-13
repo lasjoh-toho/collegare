@@ -325,6 +325,33 @@ migrations['0008_notes'] = {
   },
 };
 
+migrations['0009_pinnwand'] = {
+  async up(db) {
+    await db.schema
+      .createTable('pinnwand_rows')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('tbl', 'varchar(20)', (c) => c.notNull())
+      .addColumn('data', isMysql(db) ? sql`mediumtext` : sql`text`, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('pinnwand_rows_scope').on('pinnwand_rows').columns(['project_id', 'scope']).execute();
+    await db.schema
+      .createTable('pinnwand_files')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('area', 'varchar(20)', (c) => c.notNull())
+      .addColumn('item_id', 'integer', (c) => c.notNull())
+      .addColumn('name', 'varchar(200)', (c) => c.notNull())
+      .addColumn('mime', 'varchar(100)', (c) => c.notNull())
+      .addColumn('data', blobType(db), (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('pinnwand_files_item').on('pinnwand_files').columns(['project_id', 'scope', 'area', 'item_id']).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

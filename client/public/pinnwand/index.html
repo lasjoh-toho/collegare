@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pinnwand</title>
+<!--
+  Pinnwand als Modul (Konzept 8d.5): startet die unveränderte Oberfläche von mod_pinnwand (geholt mit
+  scripts/pinnwand-holen.sh nach ./mod/pinnwand/) und gibt ihr einen Transport zu Collegare statt Moodle.
+  Läuft im iframe der Seite /projekt/pinnwand/; Adresse: ./?id=<Projekt>&bereich=<g…|u…>
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #101114; color: #f2f3f5; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #status { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
+  #status p { max-width: 460px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="status"><p>Pinnwand wird geladen …</p></div>
+<script>
+(function () {
+  'use strict';
+  var status = document.getElementById('status');
+  function fail(msg) { status.innerHTML = ''; var p = document.createElement('p'); p.textContent = msg; status.appendChild(p); }
+  var q = new URLSearchParams(location.search);
+  var id = q.get('id');
+  var scope = q.get('bereich');
+  // Unterordner der Installation (z. B. /collegare) steht vor /pinnwand/
+  var base = location.pathname.replace(/\/pinnwand(\/.*)?$/, '');
+  var root = base + '/pinnwand';
+  var api = base + '/api/projects/' + encodeURIComponent(id) + '/pinnwand/' + encodeURIComponent(scope);
+  if (!id || !scope) return fail('Für die Pinnwand fehlen Projekt und Gruppe.');
+
+  function json(r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) throw new Error(j.error || ('Fehler ' + r.status));
+      return j;
+    });
+  }
+  function load(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = function () { rej(new Error('Datei fehlt: ' + src)); };
+      document.body.appendChild(s);
+    });
+  }
+
+  // Transport für js/app.js: dieselben Methoden wie die Web-Services in Moodle
+  var transport = {
+    name: 'collegare/1',
+    call: function (methodname, args) {
+      return fetch(api + '/call', {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ methodname: methodname, args: args || {} })
+      }).then(json).then(function (r) {
+        if (!r.ok) throw new Error(r.error || 'Fehler');
+        return r.data;
+      });
+    },
+    slidemedia: function (fields) {
+      if (fields.action !== 'upload' || !fields.file) return Promise.resolve({ error: 'download' });
+      var f = fields.file;
+      return fetch(api + '/medien?name=' + encodeURIComponent(f.name || 'datei') + '&mime=' + encodeURIComponent(f.type || ''), {
+        method: 'POST', credentials: 'include', headers: { 'content-type': 'application/octet-stream' }, body: f
+      }).then(json);
+    }
+  };
+
+  Promise.all([
+    fetch(api + '/start', { credentials: 'include' }).then(json),
+    fetch(root + '/mod/pinnwand/strings.json').then(function (r) {
+      if (!r.ok) throw new Error('Die Pinnwand ist auf diesem Server nicht eingerichtet (scripts/pinnwand-holen.sh).');
+      return r.json();
+    }),
+    fetch(root + '/mod/pinnwand/STAND').then(function (r) { return r.ok ? r.text() : ''; })
+  ]).then(function (res) {
+    var start = res[0], strings = res[1], v = encodeURIComponent((res[2] || '').trim().slice(0, 12));
+    var cfg = start.config;
+    cfg.wwwroot = root;
+    cfg.strings = strings;
+    cfg.transport = transport;
+    window.pinnwandConfig = cfg;
+    var css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = root + '/mod/pinnwand/styles.css?v=' + v;
+    document.head.appendChild(css);
+    var app = document.createElement('div');
+    app.id = 'pinnwand-app'; app.className = 'pinnwand-app'; app.setAttribute('data-title', start.title || 'Pinnwand');
+    document.body.appendChild(app);
+    status.remove();
+    return load(root + '/mod/pinnwand/js/presentation-player.js?v=' + v).then(function () {
+      return load(root + '/mod/pinnwand/js/app.js?v=' + v);
+    });
+  }).catch(function (e) { fail(e.message || String(e)); });
+
+})();
+</script>
+</body>
+</html>
