@@ -687,12 +687,14 @@ Client einrichten, Konten verbinden (8c.3), Klassenlisten über die Dienstschnit
 
 Wünsche von Jo vom 13. November 2026, als Plan vor dem Bauen.
 
-### 8d.1 Verteilen ist freiwillig
+### 8d.1 Übernehmen ist ein aktiver Schritt, Verteilen ist freiwillig
 
-Karten der Mindmap **können** einer Person zugewiesen werden, müssen aber nicht. Ebenso muss nicht jeder Cluster
-oder Hauptast ein Abschnitt werden: Ein Schalter „nur zum Sammeln“ an Hauptast oder Karte nimmt sie aus der
-Gliederung und damit aus Ausarbeitung und Korrektur heraus. Karten ohne zuständige Person bleiben Abschnitte, an
-denen die ganze Gruppe schreiben darf.
+Karten der Mindmap **können** einer Person zugewiesen werden, müssen aber nicht. In die Gliederung (und damit in
+Ausarbeitung und Korrektur) kommt nur, was die Gruppe **aktiv** übernimmt (Jo, 13. November 2026, statt des
+zunächst gebauten Schalters „nur sammeln“): „In die Gliederung“ an Hauptast/Cluster macht ihn zum Abschnitt, an einer
+Karte zum Unterpunkt; eine übernommene Karte bringt ihren Ast mit, „Ganzer Ast“ nimmt alle Karten mit. Ein
+Ansichtsmodus „Hervorheben“ zeigt alles kräftig oder graut wahlweise Übernommenes bzw. noch Offenes aus. Karten ohne
+zuständige Person bleiben Unterpunkte, an denen die ganze Gruppe schreiben darf.
 
 ### 8d.2 Recherche-Karten im Seiten-Thread
 
@@ -753,7 +755,7 @@ und Pinnwand getrennte Stände; „neu übernehmen“ ergänzt nur, was fehlt.
 
 ### 8d.6 Reihenfolge (Vorschlag)
 
-1. „Nur zum Sammeln“ (8d.1), klein.
+1. Aktives Übernehmen in die Gliederung mit „Hervorheben“ (8d.1), klein.
 2. Thread „Notizen und Quellen“ mit Recherche-Karten, in der Mindmap als Leiste (8d.2).
 3. Karten-Editor mit Einfüge-Regeln (8d.3).
 4. Pinnwand als Modul samt Übernahme aus der Mindmap (8d.5), mit der kleinen Änderung in mod_pinnwand.

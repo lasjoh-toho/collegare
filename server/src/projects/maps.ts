@@ -49,8 +49,8 @@ export interface MapCard {
   fork?: { from: string; i: number } | null;
   /** Ast-Ansicht: Karte hängt an dieser Karte desselben Clusters (beliebig tief); null = direkt am Cluster */
   under?: string | null;
-  /** „nur zum Sammeln“: kommt nicht in die Gliederung (Hauptast/Cluster nicht als Abschnitt, Karte nicht als Dokument) */
-  collect?: boolean;
+  /** aktiv in die Gliederung übernommen (Wunsch Jo, 13. November 2026): Hauptast/Cluster wird Abschnitt, Karte Unterpunkt */
+  pick?: boolean;
   /** Karte stammt aus „Notizen und Quellen“: Titel und Text folgen der Notiz (Konzept 8d.2) */
   noteId?: number | null;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
@@ -116,7 +116,7 @@ export const MapOp = z.discriminatedUnion('type', [
       start: Start.optional(),
       fork: Fork.optional(),
       under: Id.nullable().optional(),
-      collect: z.boolean().optional(),
+      pick: z.boolean().optional(),
       noteId: z.number().int().positive().nullable().optional(),
       via: Via.optional(),
     }),
@@ -125,7 +125,7 @@ export const MapOp = z.discriminatedUnion('type', [
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), collect: z.boolean(), via: Via })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), pick: z.boolean(), via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),
@@ -188,10 +188,13 @@ function readingOrder<T extends { x: number; y: number; h: number }>(items: T[])
   return rows.flatMap((r) => r.sort((a, b) => a.x - b.x));
 }
 
+/** In der Gliederung ist nur, was aktiv übernommen wurde; ein Ast zählt auch, wenn eine seiner Karten übernommen ist. */
+export const picked = (m: MindMap, c: MapCard): boolean => !!c.pick || (c.kind === 'cluster' && c.children.some((id) => m.cards[id]?.pick));
+
 export function buildOutline(m: MindMap): OutlineSection[] {
-  const clusters = readingOrder(m.roots.map((id) => m.cards[id]).filter((c) => c.kind === 'cluster' && !c.collect));
+  const clusters = readingOrder(m.roots.map((id) => m.cards[id]).filter((c) => c.kind === 'cluster' && picked(m, c)));
   return clusters.map((k) => {
-    const cards = readingOrder(k.children.map((id) => m.cards[id]).filter((c) => c && !c.collect)).map((c) => c.id);
+    const cards = readingOrder(k.children.map((id) => m.cards[id]).filter((c) => c && c.pick)).map((c) => c.id);
     const owners = [...new Set(cards.map((id) => m.cards[id].owner).filter((o): o is number => o !== null))];
     return { id: k.id, title: k.title || 'Ohne Titel', cards, owners };
   });
@@ -280,7 +283,7 @@ export function applyOp(m: MindMap, op: MapOp, actor: number, people: Set<number
       return;
     case 'outline': {
       const sections = buildOutline(m);
-      if (!sections.length) throw new MapError('Für eine Gliederung zuerst Karten in Cluster legen');
+      if (!sections.length) throw new MapError('Noch nichts für die Gliederung übernommen: Hauptast oder Cluster wählen und „In die Gliederung“ tippen');
       m.outline = { sections, at: now, by: actor };
       return;
     }

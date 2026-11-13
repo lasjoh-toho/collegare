@@ -16,6 +16,11 @@
 .card:hover, .card.sel { overflow: visible; }
 .cluster { background: color-mix(in srgb, var(--c) 7%, var(--bg-elev)); }
 .sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Hervorheben: Karten grau; ein Cluster nur am Rahmen, damit seine Karten ihren eigenen Stand zeigen */
+.dim { filter: grayscale(1); opacity: 0.4; }
+.dimFrame { --c: var(--fg-faint) !important; border-style: dashed; }
+.dimFrame > .head { opacity: 0.55; }
+.mark { font-size: 12px; font-weight: 700; color: color-mix(in srgb, var(--c) 70%, var(--fg)); }
 .drop, .wired {
   outline: 2px dashed var(--accent); outline-offset: 2px;
   background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev));

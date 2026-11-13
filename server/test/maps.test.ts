@@ -50,18 +50,18 @@ describe('Mindmap-Operationen', () => {
 
   it('Gliederung in Lesereihenfolge: Zeilen, dann links nach rechts', () => {
     const m = emptyMap();
-    applyOp(m, add('rechts', 500, 10, { kind: 'cluster', title: 'Folgen' }), 1, people);
-    applyOp(m, add('links', 0, 0, { kind: 'cluster', title: 'Ursachen' }), 1, people);
-    applyOp(m, add('unten', 0, 400, { kind: 'cluster', title: '' }), 1, people);
-    applyOp(m, add('k2', 0, 120, { parent: 'links', owner: 2 }), 1, people);
-    applyOp(m, add('k1', 0, 0, { parent: 'links', owner: 1 }), 1, people);
+    applyOp(m, add('rechts', 500, 10, { kind: 'cluster', title: 'Folgen', pick: true }), 1, people);
+    applyOp(m, add('links', 0, 0, { kind: 'cluster', title: 'Ursachen', pick: true }), 1, people);
+    applyOp(m, add('unten', 0, 400, { kind: 'cluster', title: '', pick: true }), 1, people);
+    applyOp(m, add('k2', 0, 120, { parent: 'links', owner: 2, pick: true }), 1, people);
+    applyOp(m, add('k1', 0, 0, { parent: 'links', owner: 1, pick: true }), 1, people);
     applyOp(m, add('lose', 900, 900), 1, people);
     const o = buildOutline(m);
     expect(o.map((x) => x.title)).toEqual(['Ursachen', 'Folgen', 'Ohne Titel']);
     expect(o[0]).toMatchObject({ cards: ['k1', 'k2'], owners: [1, 2] });
     applyOp(m, { type: 'outline' }, 2, people, 1234);
     expect(m.outline).toMatchObject({ at: 1234, by: 2 });
-    expect(() => applyOp(emptyMap(), { type: 'outline' }, 1, people)).toThrow('Cluster');
+    expect(() => applyOp(emptyMap(), { type: 'outline' }, 1, people)).toThrow('übernommen');
   });
 
   it('Ast-Ansicht: Idee an einer Karte, Abzweigung an einem Zwischenstopp', async () => {
@@ -80,14 +80,22 @@ describe('Mindmap-Operationen', () => {
     expect(() => Schema.parse({ type: 'update', id: 'clus2', patch: { fork: { from: 'clus1', i: 12 } } })).toThrow();
   });
 
-  it('„nur zum Sammeln“ bleibt aus der Gliederung', () => {
+  it('in die Gliederung kommt nur, was aktiv übernommen ist', () => {
     const m = emptyMap();
     applyOp(m, add('clus1', 0, 0, { kind: 'cluster' }), 1, people);
     applyOp(m, add('clus2', 400, 0, { kind: 'cluster' }), 1, people);
     applyOp(m, add('card1', 0, 0, { parent: 'clus1' }), 1, people);
     applyOp(m, add('card2', 0, 100, { parent: 'clus1' }), 1, people);
-    applyOp(m, { type: 'update', id: 'clus2', patch: { collect: true } }, 1, people);
-    applyOp(m, { type: 'update', id: 'card2', patch: { collect: true } }, 1, people);
-    expect(buildOutline(m)).toEqual([{ id: 'clus1', title: 'clus1', cards: ['card1'], owners: [] }]);
+    applyOp(m, add('clus3', 800, 0, { kind: 'cluster' }), 1, people);
+    applyOp(m, add('card3', 0, 0, { parent: 'clus3' }), 1, people);
+    expect(buildOutline(m)).toEqual([]);
+    applyOp(m, { type: 'update', id: 'clus1', patch: { pick: true } }, 1, people);
+    applyOp(m, { type: 'update', id: 'card1', patch: { pick: true } }, 1, people);
+    // eine übernommene Karte bringt ihren Ast mit
+    applyOp(m, { type: 'update', id: 'card3', patch: { pick: true } }, 1, people);
+    expect(buildOutline(m).map((x) => [x.id, x.cards])).toEqual([
+      ['clus1', ['card1']],
+      ['clus3', ['card3']],
+    ]);
   });
 });

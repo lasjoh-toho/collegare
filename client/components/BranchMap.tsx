@@ -9,7 +9,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
-import type { MapCard, MapFork, MapOp, MapRoute, MapShape, MapStart, MapVia, MindMap as MapData } from '@/lib/types';
+import { isDimmed, isPicked, pickOps, type MapCard, type MapDim, type MapFork, type MapOp, type MapRoute, type MapShape, type MapStart, type MapVia, type MindMap as MapData } from '@/lib/types';
 import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
@@ -378,7 +378,7 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   return { nodes, height: Math.max(hr, hl, 200) };
 }
 
-export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean> }) {
+export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean>; dim?: MapDim }) {
   const { nodes, height } = useMemo(() => layout(map), [map]);
   const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
@@ -729,8 +729,12 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     };
   };
 
-  /** nur zum Sammeln: selbst markiert oder im markierten Hauptast */
-  const collected = (c: MapCard) => !!c.collect || (!!c.parent && !!map.cards[c.parent]?.collect);
+  /** Ast oder Karte aktiv in die Gliederung nehmen bzw. herausnehmen (ein Rückgängig-Schritt) */
+  async function togglePick(c: MapCard, whole = false) {
+    const ops = pickOps(map, c, whole);
+    for (let i = 0; i < ops.length; i++) if (!(await send(ops[i], i > 0))) return;
+  }
+
 
   const label = (n: Node) => {
     const c = n.card;
@@ -749,8 +753,8 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     return (
       <div
         key={c.id}
-        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''} ${collected(c) ? b.collect : ''}`}
-        title={collected(c) ? 'Nur zum Sammeln: kommt nicht in die Gliederung' : undefined}
+        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''} ${isDimmed(map, c, dim) ? b.dim : ''}`}
+        title={isPicked(map, c) ? 'In der Gliederung' : undefined}
         style={style}
         data-node={c.id}
         onPointerDown={(e) => {
@@ -794,6 +798,11 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           />
         ) : (
           <span className={b.text}>{text}</span>
+        )}
+        {isPicked(map, c) && (
+          <span className={b.mark} aria-label="in der Gliederung">
+            ✓
+          </span>
         )}
         {owner && <span className={b.owner}>{owner}</span>}
         {isSel && canEdit && edit !== c.id && (
@@ -846,7 +855,7 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
       <div ref={stage} className={b.stage} style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})` }}>
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
           {geo.map((g) => (
-            <g key={g.n.card.id} style={{ color: g.color }}>
+            <g key={g.n.card.id} style={{ color: g.color }} className={isDimmed(map, g.n.card, dim) ? b.dimLine : undefined}>
               <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
               <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
               {sel === g.n.card.id && canEdit && g.hv.map((h, i) => (
@@ -1019,12 +1028,17 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
           )}
           {(selected.kind === 'cluster' || selected.parent) && (
             <button
-              className={`btn ${selected.collect ? 'on' : ''}`}
-              aria-pressed={!!selected.collect}
-              onClick={() => void send({ type: 'update', id: selected.id, patch: { collect: !selected.collect } })}
-              title={selected.kind === 'cluster' ? 'Ast nur zum Sammeln: wird kein Abschnitt der Gliederung' : 'Karte nur zum Sammeln: wird kein Textabschnitt'}
+              className={`btn ${isPicked(map, selected) ? 'on' : ''}`}
+              aria-pressed={isPicked(map, selected)}
+              onClick={() => void togglePick(selected)}
+              title={selected.kind === 'cluster' ? 'Dieser Ast wird ein Abschnitt der Gliederung' : 'Diese Karte wird ein Unterpunkt in ihrem Abschnitt'}
             >
-              Nur sammeln
+              {isPicked(map, selected) ? '✓ In der Gliederung' : 'In die Gliederung'}
+            </button>
+          )}
+          {selected.kind === 'cluster' && selected.children.some((id) => !map.cards[id]?.pick) && (
+            <button className="btn" onClick={() => void togglePick(selected, true)} title="Ast mit allen seinen Karten übernehmen">
+              Ganzer Ast
             </button>
           )}
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>

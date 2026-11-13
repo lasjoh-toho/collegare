@@ -53,5 +53,6 @@
 .auto { background: var(--ui-panel); color: var(--ui-text); font-size: 11px; font-weight: 700; line-height: 1; display: inline-grid; place-items: center; }
 @media (max-width: 700px) { .bar { bottom: 62px; } }
 .picked { outline: 3px solid color-mix(in srgb, var(--c) 45%, transparent); outline-offset: 2px; }
-.collect { border-style: dashed !important; opacity: 0.72; }
-.collect.main { background: transparent; }
+.dim { filter: grayscale(1); opacity: 0.38; }
+.dimLine { filter: grayscale(1); opacity: 0.3; }
+.mark { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--c); }

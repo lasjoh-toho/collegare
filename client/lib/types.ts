@@ -136,8 +136,8 @@ export interface MapCard {
   fork?: MapFork | null;
   /** Ast-Ansicht: hängt an dieser Karte (gleicher Cluster), statt direkt am Cluster */
   under?: string | null;
-  /** nur zum Sammeln, nicht in der Gliederung */
-  collect?: boolean;
+  /** aktiv in die Gliederung übernommen */
+  pick?: boolean;
   /** folgt dieser Notiz aus „Notizen und Quellen“ */
   noteId?: number | null;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
@@ -175,9 +175,39 @@ export interface MindMap {
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'collect' | 'via'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'pick' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }
   | { type: 'unlink'; id: string }
   | { type: 'outline' };
+
+/** Hervorheben in der Mindmap: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen */
+export type MapDim = 'none' | 'open' | 'picked';
+
+/** In der Gliederung ist nur, was aktiv übernommen wurde; ein Ast zählt auch, wenn eine seiner Karten übernommen ist (wie im Server). */
+export function isPicked(m: MindMap, c: MapCard): boolean {
+  return !!c.pick || (c.kind === 'cluster' && c.children.some((id) => m.cards[id]?.pick));
+}
+
+/** grau, weil gerade das andere hervorgehoben ist; lose Ideen ohne Ast zählen als offen */
+export function isDimmed(m: MindMap, c: MapCard, dim: MapDim): boolean {
+  if (dim === 'none') return false;
+  const p = isPicked(m, c);
+  return dim === 'open' ? !p : p;
+}
+
+/**
+ * Schritte für „In die Gliederung“ (ein Rückgängig-Schritt): Karte übernehmen bringt ihren Ast mit, Ast herausnehmen
+ * nimmt seine Karten mit heraus, „ganzer Ast“ übernimmt den Ast samt allen Karten.
+ */
+export function pickOps(m: MindMap, c: MapCard, whole = false): MapOp[] {
+  const set = (id: string, pick: boolean): MapOp => ({ type: 'update', id, patch: { pick } });
+  if (whole) return [c.id, ...c.children].filter((id) => !m.cards[id]?.pick).map((id) => set(id, true));
+  const on = !isPicked(m, c);
+  const ops = [set(c.id, on)];
+  const p = c.parent ? m.cards[c.parent] : null;
+  if (on && p && !p.pick) ops.push(set(p.id, true));
+  if (!on) for (const id of c.children) if (m.cards[id]?.pick) ops.push(set(id, false));
+  return ops;
+}

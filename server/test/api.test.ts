@@ -522,9 +522,9 @@ describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
     // Mindmap mit einem Cluster und zwei Karten, Gliederung übernehmen (über den Speicher, Echtzeit ist oben geprüft)
     const people = new Set([ids[0], ids[1]]);
     const add = (id: string, extra: J) => s.maps.apply(project, 'g' + g1, { type: 'add', card: { id, kind: 'card', title: id, text: '', x: 0, y: 0, w: 160, h: 90, color: null, parent: null, owner: null, ...extra } } as never, ids[0], people);
-    await add('clus1', { kind: 'cluster', title: 'Ursachen' });
-    await add('karteA', { parent: 'clus1', title: 'Reparationen', owner: ids[0] });
-    await add('karteB', { parent: 'clus1', y: 120, title: 'Ruhrbesetzung', owner: ids[1] });
+    await add('clus1', { kind: 'cluster', title: 'Ursachen', pick: true });
+    await add('karteA', { parent: 'clus1', title: 'Reparationen', owner: ids[0], pick: true });
+    await add('karteB', { parent: 'clus1', y: 120, title: 'Ruhrbesetzung', owner: ids[1], pick: true });
     expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1 })).status).toBe(400);
     await s.maps.apply(project, 'g' + g1, { type: 'outline' }, ids[0], people);
     expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1 })).json).toEqual({ created: 2, total: 2 });

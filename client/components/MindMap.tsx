@@ -11,7 +11,7 @@ import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
 import { renderMarkdown } from '@/lib/markdown';
-import type { MapCard, MapOp, MindMap as MapData } from '@/lib/types';
+import { isDimmed, isPicked, pickOps, type MapCard, type MapDim, type MapOp, type MindMap as MapData } from '@/lib/types';
 import m from './mindmap.module.css';
 
 export const HEADER = 30;
@@ -91,11 +91,13 @@ export function MindMap({
   people,
   canEdit,
   send,
+  dim = 'none',
 }: {
   map: MapData;
   people: Person[];
   canEdit: boolean;
-  send: (op: MapOp) => Promise<boolean>;
+  send: (op: MapOp, join?: boolean) => Promise<boolean>;
+  dim?: MapDim;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const [cam, setCam] = useState<Cam>({ x: 40, y: 40, k: 1 });
@@ -370,13 +372,18 @@ export function MindMap({
     return [{ l, p, q }];
   });
 
+  async function togglePick(c: MapCard, whole = false) {
+    const ops = pickOps(map, c, whole);
+    for (let i = 0; i < ops.length; i++) if (!(await send(ops[i], i > 0))) return;
+  }
+
   function renderCard(id: string): React.ReactNode {
     const c = shown.cards[id];
     const moving = g?.kind === 'move' && g.id === id && g.moved;
     const size = g?.kind === 'resize' && g.id === id ? { w: g.nw, h: g.nh } : { w: c.w, h: c.h };
     const color = c.color ?? 'var(--line)';
     const owner = c.owner != null ? personName.get(c.owner) : undefined;
-    const cls = [m.card, c.kind === 'cluster' ? m.cluster : '', sel === id ? m.sel : '', moving ? m.moving : '', g?.kind === 'wire' && g.to === id ? m.wired : '', g?.kind === 'move' && g.moved && g.over === id ? m.drop : ''].join(' ');
+    const cls = [m.card, c.kind === 'cluster' ? m.cluster : '', sel === id ? m.sel : '', moving ? m.moving : '', g?.kind === 'wire' && g.to === id ? m.wired : '', g?.kind === 'move' && g.moved && g.over === id ? m.drop : '', isDimmed(map, c, dim) ? (c.kind === 'cluster' ? m.dimFrame : m.dim) : ''].join(' ');
     return (
       <div
         key={id}
@@ -395,6 +402,11 @@ export function MindMap({
       >
         <div className={m.head} style={{ height: HEADER }}>
           <span className={m.t}>{c.title || (c.kind === 'cluster' ? 'Cluster ohne Titel' : 'Ohne Titel')}</span>
+          {isPicked(map, c) && (
+            <span className={m.mark} title="In der Gliederung">
+              ✓
+            </span>
+          )}
           {owner && (
             <span className={m.owner} title={`zuständig: ${owner}`}>
               {initials(owner)}
@@ -528,6 +540,21 @@ export function MindMap({
                     </option>
                   ))}
                 </select>
+              )}
+              {(selCard.kind === 'cluster' || selCard.parent) && (
+                <button
+                  className={`btn ${isPicked(map, selCard) ? 'on' : ''}`}
+                  aria-pressed={isPicked(map, selCard)}
+                  title={selCard.kind === 'cluster' ? 'Dieser Cluster wird ein Abschnitt der Gliederung' : 'Diese Karte wird ein Unterpunkt in ihrem Abschnitt'}
+                  onClick={() => void togglePick(selCard)}
+                >
+                  {isPicked(map, selCard) ? '✓ Gliederung' : 'In die Gliederung'}
+                </button>
+              )}
+              {selCard.kind === 'cluster' && selCard.children.some((id) => !map.cards[id]?.pick) && (
+                <button className="btn" onClick={() => void togglePick(selCard, true)} title="Cluster mit allen seinen Karten übernehmen">
+                  Ganzer Cluster
+                </button>
               )}
               <button className="btn" onClick={() => setEditing(selCard.id)}>
                 Bearbeiten

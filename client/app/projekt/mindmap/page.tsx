@@ -11,7 +11,7 @@ import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { Icon } from '@/components/Icon';
 import { get, href, projectSocket } from '@/lib/api';
-import type { MapCard, MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
+import type { MapCard, MapDim, MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import p from '../projekt.module.css';
 import s from './mindmap-page.module.css';
@@ -22,6 +22,7 @@ function fieldDefault(c: MapCard, k: string): unknown {
   if (k === 'shape') return c.kind === 'card' && !c.parent ? 'none' : 'rect';
   if (k === 'route') return c.kind === 'card' && !c.parent ? 'curve' : 'metro';
   if (k === 'bend') return 0.5;
+  if (k === 'pick') return false;
   return null;
 }
 
@@ -86,6 +87,8 @@ export default function MindmapPage() {
   const [scope, setScope] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [outlineOpen, setOutlineOpen] = useState(false);
+  // Hervorheben: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen (Wunsch Jo, 13. November 2026)
+  const [dim, setDim] = useState<MapDim>('none');
   // Ansicht: Äste (wie eine klassische Mindmap) oder Karten-Fläche (brausa); gleiche Daten, Wahl je Gerät
   const [view, setView] = useState<'aeste' | 'karten'>('aeste');
   useEffect(() => {
@@ -286,8 +289,8 @@ export default function MindmapPage() {
             : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
           : canEdit
             ? view === 'karten'
-              ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster; jeder Cluster wird ein Abschnitt der Gliederung. Strg+Z nimmt zurück.'
-              : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Jeder Abschnitt wird Teil der Gliederung. Strg+Z nimmt zurück.'
+              ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
+              : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
             : 'Hier seht ihr die Mindmap der Gruppe.');
   const helpClosed = closedHelp.includes(helpText);
   const center = isTopic ? project.title : join?.scopes?.find((x) => x.scope === scope)?.title || project.title;
@@ -327,10 +330,15 @@ export default function MindmapPage() {
               )}
               {!isTopic && (
                 <>
+                  <select className={s.scope} value={dim} onChange={(e) => setDim(e.target.value as MapDim)} title="Was soll kräftig erscheinen?" aria-label="Hervorheben">
+                    <option value="none">Alles kräftig</option>
+                    <option value="picked">Offenes hervorheben</option>
+                    <option value="open">Übernommenes hervorheben</option>
+                  </select>
                   <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
                     Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
                   </button>
-                  <button className="btn primary" onClick={takeOutline} title="Jeder Cluster wird ein Abschnitt, in Lesereihenfolge">
+                  <button className="btn primary" onClick={takeOutline} title="Was ihr „In die Gliederung“ genommen habt, wird in Lesereihenfolge zu Abschnitten">
                     <span className={s.long}>Gliederung </span>übernehmen
                   </button>
                 </>
@@ -374,8 +382,8 @@ export default function MindmapPage() {
             </button>
           </div>
         )}
-        {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} />}
-        {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} />}
+        {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} />}
+        {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} />}
         {map && outlineOpen && !isTopic && (
           <aside className={s.outline}>
             <div className="row">
@@ -386,7 +394,7 @@ export default function MindmapPage() {
               </button>
             </div>
             {!map.outline ? (
-              <p className="muted">Noch nicht übernommen. Jeder Hauptast (in der Karten-Ansicht: jeder Cluster) wird ein Abschnitt, außer er ist auf „Nur sammeln“ gestellt. Zuständige Personen sind freiwillig. Tippt dann auf „Gliederung übernehmen“.</p>
+              <p className="muted">Noch nicht übernommen. Wählt einen Hauptast (in der Karten-Ansicht: einen Cluster) und tippt „In die Gliederung“, für Unterpunkte ebenso bei den Karten. Nicht alles muss hinein, und Zuständige sind freiwillig. Mit „Hervorheben“ seht ihr, was schon drin ist. Tippt dann auf „Gliederung übernehmen“.</p>
             ) : (
               <>
                 <p className="muted">

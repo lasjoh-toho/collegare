@@ -46,7 +46,7 @@ function help(key: PhaseKey, s: ProjectSettings, single: boolean): string {
         (s.choiceDeadline ? `. Wählen bis ${fmtDayTime(s.choiceDeadline)}.` : '.')
       );
     case 'orientation':
-      return 'Sammelt in der Mindmap Ideen und Fragen als Karten und legt Zusammengehöriges in Cluster. Steht die Ordnung, tippt auf „Gliederung übernehmen“: Jeder Cluster wird ein Abschnitt.';
+      return 'Sammelt in der Mindmap Ideen und Fragen als Karten und legt Zusammengehöriges in Cluster. Was in die Arbeit soll, nehmt ihr aktiv „In die Gliederung“ auf, nicht alles muss hinein. Dann „Gliederung übernehmen“: Jeder übernommene Ast wird ein Abschnitt.';
     case 'research':
       return 'Haltet in „Notizen und Quellen“ Absprachen, Fragen und Quellen mit Fundstelle fest und ordnet sie euren Abschnitten zu.';
     case 'drafting':
