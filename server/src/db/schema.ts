@@ -223,6 +223,22 @@ export interface ChatMessagesTable {
   created_at: Ms;
 }
 
+/** Notizen und Quellen (Recherche-Karten) je Gruppe bzw. Person im Einzelmodus */
+export interface NotesTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  user_id: number;
+  kind: 'note' | 'source' | 'link';
+  title: string;
+  body: string;
+  /** Fundstelle einer Quelle (Autor, Titel, Seite …) */
+  source: string;
+  url: string | null;
+  created_at: Ms;
+  updated_at: Ms;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -250,5 +266,6 @@ export interface Database {
   gradings: GradingsTable;
   materials: MaterialsTable;
   chat_messages: ChatMessagesTable;
+  notes: NotesTable;
   kv: KeyValueTable;
 }

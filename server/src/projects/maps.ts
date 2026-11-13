@@ -51,6 +51,8 @@ export interface MapCard {
   under?: string | null;
   /** „nur zum Sammeln“: kommt nicht in die Gliederung (Hauptast/Cluster nicht als Abschnitt, Karte nicht als Dokument) */
   collect?: boolean;
+  /** Karte stammt aus „Notizen und Quellen“: Titel und Text folgen der Notiz (Konzept 8d.2) */
+  noteId?: number | null;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
   via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
@@ -115,6 +117,7 @@ export const MapOp = z.discriminatedUnion('type', [
       fork: Fork.optional(),
       under: Id.nullable().optional(),
       collect: z.boolean().optional(),
+      noteId: z.number().int().positive().nullable().optional(),
       via: Via.optional(),
     }),
   }),
@@ -338,6 +341,24 @@ export class MapStore {
       if (this.queues.get(key) === tail) this.queues.delete(key);
     });
     return next;
+  }
+
+  /** Überarbeitete Notiz in alle Karten übernehmen, die auf sie verweisen; null, wenn keine Karte betroffen ist. */
+  syncNote(projectId: number, scope: string, noteId: number, title: string, text: string, gone = false): Promise<{ map: MindMap; version: number } | null> {
+    return this.queue(projectId, scope, async () => {
+      const { map, version } = await this.get(projectId, scope);
+      const hit = Object.values(map.cards).filter((c) => c.noteId === noteId);
+      if (!hit.length) return null;
+      for (const c of hit) {
+        if (gone) c.noteId = null;
+        else {
+          c.title = title.slice(0, 200);
+          c.text = text.slice(0, 5000);
+        }
+      }
+      await this.save(projectId, scope, map, version);
+      return { map, version: version + 1 };
+    });
   }
 
   apply(projectId: number, scope: string, op: MapOp, actor: number, people: Set<number>): Promise<{ map: MindMap; version: number }> {

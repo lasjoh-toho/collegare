@@ -304,6 +304,27 @@ migrations['0007_chat'] = {
   },
 };
 
+// Notizen und Quellen je Gruppe: Recherche-Karten im Seiten-Thread (Konzept 8d.2, Issue #8)
+migrations['0008_notes'] = {
+  async up(db) {
+    await db.schema
+      .createTable('notes')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('kind', 'varchar(10)', (c) => c.notNull())
+      .addColumn('title', 'varchar(200)', (c) => c.notNull())
+      .addColumn('body', sql`text`, (c) => c.notNull())
+      .addColumn('source', 'varchar(500)', (c) => c.notNull())
+      .addColumn('url', 'varchar(2000)')
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .addColumn('updated_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('notes_project_scope').on('notes').columns(['project_id', 'scope', 'id']).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

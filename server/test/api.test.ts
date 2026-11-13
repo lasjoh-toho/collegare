@@ -433,6 +433,36 @@ describe('Mindmap in Echtzeit', () => {
     expect((await emit(sa, 'chat:join', { projectId: project })).scopes).toEqual([{ scope: 'g' + g1, title: 'Inflation' }]);
   });
 
+  it('Notizen und Quellen: Thread der Gruppe, Karte folgt der Notiz', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0], ids[2]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const clara = (await call('POST', '/api/access/redeem', undefined, { code: codes[1].code })).json.token as string;
+    const sa = connect(anna);
+    const sc = connect(clara);
+    expect(await emit(sa, 'notes:join', { projectId: project })).toMatchObject({ ok: true, scope: 'g' + g1, notes: [] });
+    const add = await emit(sa, 'notes:add', { projectId: project, scope: 'g' + g1, note: { kind: 'source', title: 'Brotpreise 1923', body: 'Im November 233 Mrd. Mark', source: 'DHM, LeMO' } });
+    expect(add.ok).toBe(true);
+    expect((await emit(sa, 'notes:add', { projectId: project, scope: 'g' + g1, note: { url: 'javascript:alert(1)' } })).ok).toBe(false);
+    // Clara (andere Gruppe) sieht und ändert nichts
+    expect((await emit(sc, 'notes:join', { projectId: project, scope: 'g' + g1 })).scope).toBeNull();
+    expect((await emit(sc, 'notes:update', { projectId: project, id: add.id, note: { title: 'x' } })).ok).toBe(false);
+    // Karte aus der Notiz in der Mindmap; Überarbeiten der Notiz zieht die Karte nach
+    await emit(sa, 'map:join', { projectId: project, scope: 'g' + g1 });
+    const card = { id: 'notiz1', kind: 'card', title: 'Brotpreise 1923', x: 0, y: 0, w: 160, h: 90, owner: null, noteId: add.id };
+    expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card } })).ok).toBe(true);
+    const seen = new Promise<J>((r) => sa.on('map', r));
+    expect((await emit(sa, 'notes:update', { projectId: project, id: add.id, note: { kind: 'source', title: 'Brotpreis November 1923', body: '233 Mrd. Mark', source: 'DHM' } })).ok).toBe(true);
+    const m = await seen;
+    expect(m.map.cards.notiz1).toMatchObject({ title: 'Brotpreis November 1923', text: '233 Mrd. Mark\n\nFundstelle: DHM' });
+    expect(((await emit(sa, 'notes:join', { projectId: project })).notes as J[])[0]).toMatchObject({ kind: 'source', name: 'Anna' });
+    expect((await emit(sa, 'notes:delete', { projectId: project, id: add.id })).ok).toBe(true);
+  });
+
   it('Themen-Mindmap vor den Gruppen: alle arbeiten mit, Gruppe übernimmt sie als Start', async () => {
     const { t, project, ids } = await setup();
     const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]] })).json.codes as J[];

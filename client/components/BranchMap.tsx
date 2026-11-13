@@ -469,12 +469,12 @@ export function BranchMap({ map, topic, people, canEdit, send }: { map: MapData;
     const d = readChatDrop(e);
     if (!d || !canEdit) return;
     e.preventDefault();
-    const { title, text } = cardFromChat(d);
+    const { title, text, noteId } = cardFromChat(d);
     const at = toStage(e);
     const onId = (e.target as HTMLElement).closest<HTMLElement>('[data-node]')?.dataset.node;
     const on = onId && onId !== '__root' ? map.cards[onId] : null;
     const id = newId();
-    const base = { id, kind: 'card' as const, title, text, w: 180, h: 100, color: null, owner: null };
+    const base = { id, kind: 'card' as const, title, text, w: 180, h: 100, color: null, owner: null, ...(noteId ? { noteId } : {}) };
     let ok: boolean;
     if (on?.kind === 'cluster') {
       const y = on.children.reduce((m, c) => Math.max(m, (map.cards[c]?.y ?? 0) + (map.cards[c]?.h ?? 0) + 10), 0);

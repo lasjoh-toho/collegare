@@ -131,7 +131,7 @@ export const TILES: TileDef[] = [
   { key: 'groups', phase: 'groups', title: 'Gruppen', icon: 'users', path: '/projekt/gruppen/?id={id}', sub: 'Board der Gruppenbildung' },
   { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}', sub: 'Ideen sammeln und ordnen' },
   { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/mindmap/?id={id}&gliederung=1', sub: 'Abschnitte aus den Clustern' },
-  { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
+  { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', path: '/projekt/notizen/?id={id}', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
   { key: 'sections', phase: 'drafting', title: 'Textabschnitte', icon: 'doc', office: 'word', docType: 'section', path: '/projekt/ausarbeitung/?id={id}', sub: 'Texteditor je Abschnitt' },
   { key: 'slides', phase: 'presentation', title: 'Präsentation', icon: 'slides', office: 'slide', docType: 'slides', sub: 'Folien der Gruppe' },
   { key: 'brochure', phase: 'presentation', title: 'Broschüre', icon: 'doc', office: 'word', docType: 'brochure', sub: 'Gemeinsames Heft aller Gruppen' },

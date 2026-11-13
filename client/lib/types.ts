@@ -138,6 +138,8 @@ export interface MapCard {
   under?: string | null;
   /** nur zum Sammeln, nicht in der Gliederung */
   collect?: boolean;
+  /** folgt dieser Notiz aus „Notizen und Quellen“ */
+  noteId?: number | null;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
   via?: MapVia[];
   children: string[];

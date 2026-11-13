@@ -4,6 +4,8 @@ export const CHAT_MIME = 'application/x-collegare-chat';
 export interface ChatDrop {
   name: string;
   body: string;
+  /** aus „Notizen und Quellen“: Karte folgt der Notiz */
+  note?: { id: number; title: string; text: string };
 }
 
 export function setChatDrag(e: React.DragEvent, d: ChatDrop) {
@@ -24,7 +26,8 @@ export function readChatDrop(e: React.DragEvent): ChatDrop | null {
 }
 
 /** Titel und Text einer Karte aus einem Beitrag: erste Zeile (gekürzt) als Titel, der Rest als Text. */
-export function cardFromChat(d: ChatDrop): { title: string; text: string } {
+export function cardFromChat(d: ChatDrop): { title: string; text: string; noteId?: number } {
+  if (d.note) return { title: d.note.title.slice(0, 200), text: d.note.text.slice(0, 5000), noteId: d.note.id };
   const body = d.body.trim();
   const nl = body.indexOf('\n');
   const first = (nl >= 0 ? body.slice(0, nl) : body).trim();
