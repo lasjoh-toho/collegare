@@ -501,6 +501,19 @@ describe('Mindmap in Echtzeit', () => {
     expect((await pin(anna, gs, 'nicht_da')).status).toBe(400);
     expect((await pin(anna, gs, 'restore_photo', { photoid: 999999 })).json).toMatchObject({ ok: false });
     expect((await pin(anna, gs, 'save_photo', { imagedata: 'data:text/html;base64,PGI+' })).json).toEqual({ ok: false, error: 'Speichern fehlgeschlagen' });
+    // Pinnwand aus der Mindmap: nur Übernommenes, erneut übernehmen ergänzt nur
+    const add = (id: string, extra: J) => s.maps.apply(project, gs, { type: 'add', card: { id, kind: 'card', title: id, text: '', x: 0, y: 0, w: 160, h: 90, color: null, parent: null, owner: null, ...extra } } as never, ids[0], new Set([ids[0], ids[1]]));
+    expect((await call('POST', `/api/projects/${project}/pinnwand/${gs}/aus-mindmap`, anna)).status).toBe(400);
+    await add('clus1', { kind: 'cluster', title: 'Ursachen', pick: true });
+    await add('k1', { parent: 'clus1', title: 'Reparationen', text: 'Versailles', pick: true });
+    await add('k2', { parent: 'clus1', y: 100, title: 'nur gesammelt' });
+    expect((await call('POST', `/api/projects/${project}/pinnwand/${gs}/aus-mindmap`, anna)).json).toEqual({ ok: true, frames: 1, notes: 1 });
+    expect((await call('POST', `/api/projects/${project}/pinnwand/${gs}/aus-mindmap`, anna)).json).toEqual({ ok: true, frames: 0, notes: 0 });
+    const th = (await pin(anna, gs, 'get_threads')).json.data.threads[0];
+    expect(th.items.find((x: J) => x.itemtype === 'frame')).toMatchObject({ framelabel: 'Ursachen' });
+    const notes = ((await pin(anna, gs, 'get_photos')).json.data.photos as J[]).filter((p) => p.wordfielddata);
+    expect(notes).toHaveLength(1);
+    expect(JSON.parse(notes[0].wordfielddata).texts[0].text).toBe('Reparationen\nVersailles');
     // Papierkorb und endgültig löschen
     expect((await pin(anna, gs, 'delete_photo', { photoid: id })).json.ok).toBe(true);
     expect((await pin(anna, gs, 'get_trash')).json.data.items).toEqual([expect.objectContaining({ kind: 'object', id })]);

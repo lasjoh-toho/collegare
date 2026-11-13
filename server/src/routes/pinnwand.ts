@@ -4,7 +4,8 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { requireSession } from '../http/auth.js';
-import { INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx } from '../pinnwand/api.js';
+import { fromMap, INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx } from '../pinnwand/api.js';
+import { buildOutline } from '../projects/maps.js';
 import { PinError } from '../pinnwand/store.js';
 import type { Services } from '../services.js';
 import { mapScopes } from './maps.js';
@@ -112,6 +113,18 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services) {
       if (e instanceof PinError) return { ok: false, error: MESSAGES[e.message.split(':')[0]] ?? e.message };
       throw e;
     }
+  });
+
+  // „Pinnwand aus der Mindmap“: übernommene Äste werden Rahmen im Roten Faden, ihre Karten Zettel darin
+  app.post<{ Params: P }>('/api/projects/:id/pinnwand/:scope/aus-mindmap', async (req, reply) => {
+    const a = await access(req, reply);
+    if (!a) return;
+    const { map } = await s.maps.get(a.projectId, a.scope.scope);
+    const sections = buildOutline(map).map((x) => ({ id: x.id, title: x.title, cards: x.cards.map((id) => ({ id, title: map.cards[id]?.title ?? '', text: map.cards[id]?.text ?? '' })) }));
+    if (!sections.length) return reply.code(400).send({ error: 'In der Mindmap ist noch nichts „In die Gliederung“ übernommen.' });
+    const r = await s.pinnwand.run(a.projectId, a.scope.scope, (sc) => fromMap(ctx(a, sc), sections));
+    s.pinnwandEvents.emit('changed', { projectId: a.projectId, scope: a.scope.scope, by: a.userId, method: 'aus_mindmap' });
+    return { ok: true, ...r };
   });
 
   // Folien-Medien hochladen (slidemedia.php, action=upload); die Datei kommt als rohe Bytes

@@ -938,3 +938,121 @@ export async function slideMedia(c: PinCtx, name: string, mime: string, data: Bu
   if (!c.s.fileByName('slidemedia', file)) await c.s.putFile('slidemedia', 0, file, m, data);
   return { file, mimetype: m, size: data.length };
 }
+
+export interface MapSection {
+  id: string;
+  title: string;
+  cards: { id: string; title: string; text: string }[];
+}
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+
+/** Vorschaubild eines Zettels (die Pinnwand zeichnet Wortfelder selbst aus wordfielddata, das Bild dient Listen) */
+function noteSvg(w: number, h: number, title: string, body: string): string {
+  const wrap = (t: string, n: number) => {
+    const out: string[] = [];
+    for (const para of t.split('\n')) {
+      let line = '';
+      for (const word of para.split(/\s+/).filter(Boolean)) {
+        if ((line + ' ' + word).trim().length > n && line) {
+          out.push(line);
+          line = word;
+        } else line = (line + ' ' + word).trim();
+      }
+      out.push(line);
+    }
+    return out;
+  };
+  const lines = [...wrap(title, 18).map((l) => ({ l, b: true })), ...wrap(body, 30).map((l) => ({ l, b: false }))].slice(0, 9);
+  const tspans = lines.map((x, i) => `<text x="${w / 2}" y="${40 + i * 24}" text-anchor="middle" font-family="sans-serif" font-size="${x.b ? 22 : 15}" font-weight="${x.b ? 700 : 400}" fill="#111">${esc(x.l)}</text>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" rx="16" fill="#ffffff"/>${tspans}</svg>`;
+}
+
+/**
+ * „Pinnwand aus der Mindmap“ (Konzept 8d.5): Jeder übernommene Ast wird ein Rahmen (Folie) im Roten Faden, in der
+ * Reihenfolge der Gliederung; seine Karten werden Zettel darin. Erneut übernehmen ergänzt nur, was fehlt.
+ */
+export async function fromMap(c: PinCtx, sections: MapSection[]): Promise<{ frames: number; notes: number }> {
+  const s = c.s;
+  const thread = await ownThread(c);
+  const t = sec(s);
+  let frames = 0;
+  let notes = 0;
+  const FW = 1200;
+  const FH = 760;
+  const items = () => s.all('thread_items', { threadid: thread.id });
+  for (let i = 0; i < sections.length; i++) {
+    const sec_ = sections[i];
+    let frame = items().find((it) => it.itemtype === 'frame' && it.mapcard === sec_.id);
+    if (!frame) {
+      const maxorder = Math.max(0, ...items().map((it) => int(it.sortorder)));
+      const maxz = Math.max(0, ...items().map((it) => int(it.framez)));
+      // Rahmen nebeneinander, jeweils rechts vom letzten aus der Mindmap
+      const placed = items().filter((it) => it.mapcard);
+      const x = placed.length ? Math.max(...placed.map((it) => num(it.framex) + num(it.framew))) + 120 : 80;
+      const id = await s.insert('thread_items', {
+        threadid: thread.id,
+        sortorder: maxorder + 1,
+        itemtype: 'frame',
+        photoid: null,
+        boardid: 0,
+        framex: x,
+        framey: 80,
+        framew: FW,
+        frameh: FH,
+        framerot: 0,
+        framez: maxz + 1,
+        framelabel: text(sec_.title).slice(0, 255),
+        mapcard: sec_.id,
+        timecreated: t,
+      });
+      frame = s.get('thread_items', id)!;
+      frames++;
+    }
+    const inFrame = s.all('photos').filter((p) => p.mapframe === sec_.id).length;
+    let k = inFrame;
+    for (const card of sec_.cards) {
+      if (s.all('photos').some((p) => p.mapcard === card.id && p.status !== 'trash')) continue;
+      const w = 320;
+      const h = 220;
+      const body = card.text.trim();
+      const tf = { w, h, preset: 'paper', isWordArt: false, texts: [{ id: 1, text: (card.title + (body ? '\n' + body : '')).slice(0, 600), font: 'sans', size: 26, x: 0.5, y: 0.5, fontWeight: 600 }] };
+      const svg = noteSvg(w, h, card.title, body);
+      const col = k % 3;
+      const row = Math.floor(k / 3);
+      const pid = await s.insert('photos', {
+        userid: ME,
+        sortorder: s.all('photos', { userid: ME }).length,
+        gridtype: 'none',
+        gridvalue: 0,
+        consent: 0,
+        hiddenfromboard: 0,
+        annotationonboard: 1,
+        sourcetitle: text(card.title).slice(0, 255),
+        sourceauthor: '',
+        sourceyear: '',
+        sourceepoch: '',
+        sourceplace: '',
+        sourceorigauthor: '',
+        canvasx: num(frame.framex) + 60 + col * 380,
+        canvasy: num(frame.framey) + 80 + row * 260,
+        canvasw: 330,
+        canvasrot: 0,
+        canvasz: k + 1,
+        boardid: 0,
+        wordfielddata: JSON.stringify(tf),
+        status: 'active',
+        boardplaced: 1,
+        showingback: 0,
+        mapcard: card.id,
+        mapframe: sec_.id,
+        timecreated: t,
+        timemodified: t,
+      });
+      await s.putFile('photo', pid, `photo_${pid}.svg`, 'image/svg+xml', Buffer.from(svg));
+      k++;
+      notes++;
+    }
+  }
+  return { frames, notes };
+}
