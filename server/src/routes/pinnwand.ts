@@ -4,7 +4,11 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { requireSession } from '../http/auth.js';
-import { fromMap, INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx } from '../pinnwand/api.js';
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { exportHtml } from '../pinnwand/exportHtml.js';
+import { fetchMedia, mediaMime } from '../pinnwand/fetchMedia.js';
+import { exportPresentation, fromMap, INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx } from '../pinnwand/api.js';
 import { buildOutline } from '../projects/maps.js';
 import { PinError } from '../pinnwand/store.js';
 import type { Services } from '../services.js';
@@ -20,7 +24,7 @@ const MESSAGES: Record<string, string> = {
 
 type P = { id: string; scope: string };
 
-export function pinnwandRoutes(app: FastifyInstance, s: Services) {
+export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: string) {
   const base = (() => {
     try {
       return new URL(s.config.appUrl).pathname.replace(/\/$/, '');
@@ -90,7 +94,7 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services) {
         currentuserfullname: a.scope.title,
         username: me?.name ?? '',
         managerurl: null,
-        exportpresentationurl: null,
+        exportpresentationurl: `${base}/api/projects/${a.projectId}/pinnwand/${a.scope.scope}/export?v=1`,
         courseurl: `${base}/projekt/?id=${a.projectId}`,
         isediting: false,
         settingsurl: null,
@@ -134,6 +138,50 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services) {
     const body = req.body;
     if (!Buffer.isBuffer(body)) return { error: 'failed' };
     return s.pinnwand.run(a.projectId, a.scope.scope, (sc) => slideMedia(ctx(a, sc), String(req.query.name ?? 'datei'), String(req.query.mime ?? ''), body));
+  });
+
+  // Folien-Medien von einer Adresse übernehmen (slidemedia.php, action=url); limit kleiner als die Grenze, z. B. für Audio
+  app.post<{ Params: P; Body: { url?: unknown; limit?: unknown } }>('/api/projects/:id/pinnwand/:scope/medien-url', async (req, reply) => {
+    const a = await access(req, reply);
+    if (!a) return;
+    const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    if (!/^https?:\/\/\S+$/i.test(url) || url.length > 2000) return { error: 'invalid' };
+    const limit = Number(req.body?.limit);
+    const max = Number.isFinite(limit) && limit > 0 ? Math.min(limit, a.maxBytes) : a.maxBytes;
+    const got = await fetchMedia(url, max);
+    if ('error' in got) return got.error === 'toolarge' ? { error: 'toolarge', maxbytes: max } : { error: got.error };
+    const mime = mediaMime(got.mime, got.name);
+    return s.pinnwand.run(a.projectId, a.scope.scope, (sc) => slideMedia(ctx(a, sc), got.name, mime, got.data));
+  });
+
+  // Präsentation als eigenständige HTML-Datei (export_presentation.php): Abspiel-Logik und Texte kommen aus den
+  // mitgelieferten Dateien von mod_pinnwand, Bilder sind eingebettet
+  app.get<{ Params: P; Querystring: { boardid?: string; annot?: string; ink?: string } }>('/api/projects/:id/pinnwand/:scope/export', async (req, reply) => {
+    const a = await access(req, reply);
+    if (!a) return;
+    const dir = clientDir ? join(resolve(clientDir), 'pinnwand', 'mod', 'pinnwand') : '';
+    let player = '';
+    let labels: Record<string, string> = {};
+    try {
+      player = await readFile(join(dir, 'js', 'presentation-player.js'), 'utf8');
+      labels = JSON.parse(await readFile(join(dir, 'strings.json'), 'utf8'));
+    } catch {
+      return reply.code(503).type('text/plain; charset=utf-8').send('Die Pinnwand ist auf diesem Server nicht eingerichtet (scripts/pinnwand-holen.sh).');
+    }
+    const opts = { boardid: Math.max(0, Math.trunc(Number(req.query.boardid ?? 0)) || 0), annot: req.query.annot === '1', ink: req.query.ink === '1' };
+    const data = await s.pinnwand.run(a.projectId, a.scope.scope, (sc) => exportPresentation(ctx(a, sc), opts, labels));
+    if (!data) return reply.code(404).type('text/plain; charset=utf-8').send(labels.nothreadtoexport ?? 'Kein Roter Faden zum Exportieren.');
+    const project = await s.projects.get(a.projectId);
+    const name = `${project?.title ?? 'Pinnwand'} – ${a.scope.title}`;
+    // Schrägstriche maskieren, damit "</script" im Datenblock nicht vorkommen kann (wie json_encode in PHP)
+    const json = JSON.stringify(data).replace(/\//g, '\\/');
+    const esc = (t: string) => t.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+    const html = exportHtml(esc(name + ' - Präsentation'), json, player.replace(/<\/script/gi, '<\\/script'));
+    const file = (name.replace(/[^\p{L}\p{N} ._-]+/gu, '').trim().replace(/\s+/g, '-') || 'pinnwand') + '-praesentation.html';
+    return reply
+      .header('content-type', 'text/html; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${file.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(file)}`)
+      .send(html);
   });
 
   const send = (reply: FastifyReply, f: { name: string; mime: string; data: Buffer } | null) => {

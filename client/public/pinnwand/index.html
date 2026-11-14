@@ -59,7 +59,13 @@
       });
     },
     slidemedia: function (fields) {
-      if (fields.action !== 'upload' || !fields.file) return Promise.resolve({ error: 'download' });
+      if (fields.action === 'url') {
+        return fetch(api + '/medien-url', {
+          method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: fields.url, limit: fields.limit || 0 })
+        }).then(json);
+      }
+      if (fields.action !== 'upload' || !fields.file) return Promise.resolve({ error: 'invalid' });
       var f = fields.file;
       return fetch(api + '/medien?name=' + encodeURIComponent(f.name || 'datei') + '&mime=' + encodeURIComponent(f.type || ''), {
         method: 'POST', credentials: 'include', headers: { 'content-type': 'application/octet-stream' }, body: f

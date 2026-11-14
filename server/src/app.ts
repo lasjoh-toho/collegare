@@ -133,7 +133,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     projectRoutes(http, s, bc);
     gradingRoutes(http, s);
     materialRoutes(http, s);
-    pinnwandRoutes(http, s);
+    pinnwandRoutes(http, s, opts.clientDir);
     pasteRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);

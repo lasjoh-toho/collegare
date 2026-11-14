@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { io as ioc, type Socket } from 'socket.io-client';
 import type { AddressInfo } from 'node:net';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildApp, type App } from '../src/app.js';
 import { createServices, type Services } from '../src/services.js';
+
+// Oberfläche mit den Dateien von mod_pinnwand, die der Export der Präsentation braucht
+const clientDir = mkdtempSync(join(tmpdir(), 'cg-client-'));
+mkdirSync(join(clientDir, 'pinnwand/mod/pinnwand/js'), { recursive: true });
+writeFileSync(join(clientDir, 'pinnwand/mod/pinnwand/js/presentation-player.js'), 'var PinnwandPresentation = {}; // "</script>" darf nicht durchkommen');
+writeFileSync(join(clientDir, 'pinnwand/mod/pinnwand/strings.json'), JSON.stringify({ present_show: 'Einblenden', nothreadtoexport: 'Kein Faden' }));
 
 let app: App;
 let s: Services;
@@ -11,7 +20,7 @@ const sockets: Socket[] = [];
 
 beforeEach(async () => {
   s = await createServices({ databaseUrl: 'sqlite::memory:', appUrl: 'http://localhost/collegare', cookieSecure: false, accessCodeDays: 14 });
-  app = await buildApp({ services: s });
+  app = await buildApp({ services: s, clientDir });
   await app.http.listen({ port: 0, host: '127.0.0.1' });
   base = `http://127.0.0.1:${(app.http.server.address() as AddressInfo).port}`;
 });
@@ -486,6 +495,31 @@ describe('Mindmap in Echtzeit', () => {
     expect((await call('POST', `/api/projects/${project}/einfuegen/${id}`, anna, { answer: 'quote', note: 'Schulbuch S. 42' })).status).toBe(200);
     own = (await call('GET', `/api/projects/${project}/einfuegen`, t)).json.pastes as J[];
     expect(own[0]).toMatchObject({ answer: 'quote', note: 'Schulbuch S. 42', scope: 'g' + g1 });
+  });
+
+  it('Pinnwand: Präsentation als eigenständige Datei', async () => {
+    const { t, project } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const gs = 'g' + g1;
+    const pin = (methodname: string, args: J = {}) => call('POST', `/api/projects/${project}/pinnwand/${gs}/call`, t, { methodname: 'mod_pinnwand_' + methodname, args: { cmid: project, ...args } });
+    const start = (await call('GET', `/api/projects/${project}/pinnwand/${gs}/start`, t)).json.config;
+    expect(start.exportpresentationurl).toMatch(/\/export\?v=1$/);
+    const url = `/api/projects/${project}/pinnwand/${gs}/export?v=1&boardid=0&annot=0&ink=0`;
+    expect((await fetch(base + url, { headers: { authorization: 'Bearer ' + t } })).status).toBe(404);
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const id = (await pin('save_photo', { imagedata: png, sourcetitle: 'Brot' })).json.data.photoid;
+    await pin('update_layout', { photoid: id, x: 10, y: 20, w: 300, rot: 2, z: 1 });
+    await pin('add_thread_item', { itemtype: 'photo', photoid: id });
+    const res = await fetch(base + url, { headers: { authorization: 'Bearer ' + t } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toMatch(/attachment; filename=.*praesentation\.html/);
+    const html = await res.text();
+    expect(html).not.toMatch(/"<\/script>"/);
+    const data = JSON.parse(/<script type="application\/json" id="pinnwand-export-data">\n([\s\S]*?)\n<\/script>/.exec(html)![1]);
+    expect(data).toMatchObject({ formatVersion: 1, boardWidth: 1400, labels: { show: 'Einblenden' } });
+    expect(data.thread.items).toHaveLength(1);
+    expect(data.thread.items[0].photo).toMatchObject({ id, canvasx: 10, canvasw: 300 });
+    expect(data.boardPhotos[0].url).toMatch(/^data:image\/png;base64,/);
   });
 
   it('Pinnwand als Modul: Board der Gruppe, Dateien nur für die Gruppe', async () => {

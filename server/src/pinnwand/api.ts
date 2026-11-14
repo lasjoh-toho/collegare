@@ -1056,3 +1056,229 @@ export async function fromMap(c: PinCtx, sections: MapSection[]): Promise<{ fram
   }
   return { frames, notes };
 }
+
+// ---- Präsentation als eigenständige Datei (export_presentation.php) ----
+
+/** Anzahl der Animationsschritte einer Folie, wie slideAnimMap() in js/app.js */
+function animSteps(tf: A): number {
+  const exists = new Set<string>();
+  for (const t of tf.texts ?? []) exists.add('t' + (t?.id ?? ''));
+  for (const sh of tf.shapes ?? []) if (!sh?.main) exists.add('s' + (sh?.id ?? ''));
+  for (const st of tf.ink ?? []) exists.add('i' + (st?.id ?? ''));
+  for (const md of tf.media ?? []) exists.add('m' + (md?.id ?? ''));
+  let steps = 0;
+  const seen = new Set<string>();
+  for (const a of tf.anim ?? []) {
+    const key = a && typeof a === 'object' ? String(a.key ?? '') : '';
+    if (!key || !exists.has(key) || seen.has(key)) continue;
+    if (!(a.withPrev && steps > 0)) steps++;
+    seen.add(key);
+  }
+  return steps;
+}
+
+const parse = (s: unknown): any => {
+  try {
+    return JSON.parse(String(s ?? ''));
+  } catch {
+    return null;
+  }
+};
+
+async function dataUrlOf(c: PinCtx, f: PinFile | undefined, fallbackMime: string): Promise<{ url: string; bin: Buffer } | null> {
+  if (!f) return null;
+  const bin = await c.s.fileData(f);
+  return bin ? { url: `data:${f.mime || fallbackMime};base64,${bin.toString('base64')}`, bin } : null;
+}
+
+export interface ExportOptions {
+  boardid: number;
+  annot: boolean;
+  ink: boolean;
+}
+
+/** Datenblock der exportierten Präsentation (formatVersion 1 wie in Moodle) oder null ohne eigenen Roten Faden */
+export async function exportPresentation(c: PinCtx, o: ExportOptions, labels: A): Promise<A | null> {
+  const thread = c.s.first('threads', { userid: ME });
+  if (!thread) return null;
+  const items = c.s
+    .all('thread_items', { threadid: thread.id })
+    .filter((it) => int(it.boardid) === o.boardid)
+    .sort((a, b) => int(a.sortorder) - int(b.sortorder) || a.id - b.id);
+  const cache = new Map<number, A | null>();
+
+  async function photoData(id: number): Promise<A | null> {
+    if (id <= 0) return null;
+    if (cache.has(id)) return cache.get(id)!;
+    const p = c.s.get('photos', id);
+    const file = p ? await dataUrlOf(c, photoFile(c, id), 'image/svg+xml') : null;
+    if (!p || !file) {
+      cache.set(id, null);
+      return null;
+    }
+    const r: A = {
+      id: p.id,
+      url: file.url,
+      canvasx: num(p.canvasx),
+      canvasy: num(p.canvasy),
+      canvasw: num(p.canvasw),
+      canvasrot: num(p.canvasrot),
+      canvasz: int(p.canvasz),
+      iswordart: !!p.wordfielddata,
+      blendmode: raw(p.blendmode),
+    };
+    if (o.annot && p.annotationonboard && p.annotationdata) {
+      const strokes = parse(p.annotationdata);
+      if (Array.isArray(strokes) && strokes.length) r.annotation = strokes;
+    }
+    if (p.wordfielddata) {
+      const tf = parse(p.wordfielddata);
+      if (tf && typeof tf === 'object' && tf.w && tf.h) {
+        r.tfw = num(tf.w);
+        r.tfh = num(tf.h);
+        let wordart = !!tf.isWordArt || (tf.texts ?? []).some((t: A) => t?.wordartStyle && t.wordartStyle !== 'none');
+        if (tf.isSlide) {
+          wordart = false;
+          r.slide = true;
+          r.animsteps = animSteps(tf);
+        }
+        r.wordartframe = wordart;
+        const m = /<svg\b[^>]*\sviewBox="([^"]+)"/i.exec(file.bin.toString('utf8', 0, Math.min(file.bin.length, 4000)));
+        if (m) {
+          const vb = m[1].trim().split(/[\s,]+/).map(Number);
+          if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) r.vb = vb;
+        }
+      }
+    }
+    cache.set(id, r);
+    return r;
+  }
+
+  const hex = (x: unknown) => (/^#[0-9a-fA-F]{6}$/.test(String(x ?? '')) ? String(x) : '#000000');
+  const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+  const exportItems: A[] = [];
+  for (const it of items) {
+    const e: A = {
+      itemtype: it.itemtype,
+      framex: num(it.framex),
+      framey: num(it.framey),
+      framew: num(it.framew),
+      frameh: num(it.frameh),
+      framerot: num(it.framerot),
+      framez: int(it.framez),
+      framelabel: raw(it.framelabel),
+    };
+    if (it.itemtype === 'photo' && it.photoid) e.photo = await photoData(int(it.photoid));
+    if (it.itemtype === 'frame' && it.framedata && it.framesvg) {
+      const ftf = parse(it.framedata);
+      if (ftf && typeof ftf === 'object') {
+        e.framesvg = String(it.framesvg);
+        e.animsteps = animSteps(ftf);
+        e.blend = ['multiply', 'difference', 'color-burn', 'invert'].includes(ftf.blend) ? ftf.blend : '';
+        const sbg = ftf.slideBg && typeof ftf.slideBg === 'object' ? ftf.slideBg : {};
+        const sfill = sbg.fill && typeof sbg.fill === 'object' ? sbg.fill : {};
+        let fmode = ['gradient', 'mesh'].includes(sfill.mode) ? sfill.mode : 'solid';
+        const fstops = (Array.isArray(sfill.stops) ? sfill.stops.slice(0, 12) : []).map((st: A) => ({ color: hex(st?.color), pos: clamp(num(st?.pos), 0, 1) }));
+        const fpoints = (Array.isArray(sfill.points) ? sfill.points.slice(0, 8) : []).map((pt: A) => ({ x: clamp(num(pt?.x, 0.5), 0, 1), y: clamp(num(pt?.y, 0.5), 0, 1), color: hex(pt?.color) }));
+        if (fmode === 'gradient' && fstops.length < 2) fmode = 'solid';
+        if (fmode === 'mesh' && !fpoints.length) fmode = 'solid';
+        e.slidebg = {
+          color: hex(sbg.color),
+          opacity: clamp(int(sbg.opacity), 0, 100),
+          blur: clamp(int(sbg.blur), 0, 30),
+          invert: clamp(int(sbg.invert), 0, 100),
+          brightness: clamp(int(sbg.brightness, 100), 0, 200),
+          fill: { mode: fmode, stops: fstops, points: fpoints, angle: int(sfill.angle, 135), radial: !!sfill.radial, grain: clamp(int(sfill.grain), 0, 100) },
+        };
+        // Bild als Folien-Hintergrund: in der Datei eingebettet statt verlinkt (Collegare ist von außen nicht erreichbar)
+        const simg = sbg.image && typeof sbg.image === 'object' ? sbg.image : {};
+        if (typeof simg.file === 'string' && simg.file) {
+          const f = c.s.fileByName('slidemedia', simg.file.replace(/[^\w.-]/g, ''));
+          const d = f ? await dataUrlOf(c, f, 'image/jpeg') : null;
+          if (d) e.slidebg.image = d.url;
+        } else if (/^https?:\/\//i.test(String(simg.url ?? ''))) e.slidebg.image = String(simg.url);
+        e.bgfull = !('full' in sbg) || !!sbg.full;
+        e.elemhidebefore = !!ftf.elemHideBefore;
+        e.elemhideafter = !!ftf.elemHideAfter;
+        e.bgpersist = !!ftf.bgPersist;
+        e.bgshowbefore = !!ftf.bgShowBefore;
+        e.linked = (Array.isArray(ftf.linked) ? ftf.linked : []).map((x: unknown) => int(x));
+      }
+    }
+    exportItems.push(e);
+  }
+
+  // alle sichtbar platzierten Objekte dieses Boards, auch weitere Platzierungen (geklonte Boards)
+  const boardPhotos: A[] = [];
+  const seen = new Set<number>();
+  for (const r of c.s.all('photos', { userid: ME, boardid: o.boardid })) {
+    if (!r.boardplaced || int(r.hiddenfromboard) || (r.status ?? 'active') !== 'active') continue;
+    const d = await photoData(r.id);
+    if (d) {
+      boardPhotos.push(d);
+      seen.add(r.id);
+    }
+  }
+  for (const pl of c.s.all('object_placements', { boardid: o.boardid })) {
+    if ((pl.status ?? 'active') !== 'active' || !pl.boardplaced || seen.has(int(pl.photoid))) continue;
+    const p = c.s.get('photos', int(pl.photoid));
+    if (!p || (p.status ?? 'active') !== 'active') continue;
+    const d = await photoData(p.id);
+    if (!d) continue;
+    boardPhotos.push({ ...d, canvasx: num(pl.canvasx), canvasy: num(pl.canvasy), canvasw: num(pl.canvasw), canvasrot: num(pl.canvasrot), canvasz: int(pl.canvasz) });
+    seen.add(p.id);
+  }
+
+  // Hintergrund: Bilder eingebettet, ein verlinkter Hintergrund bleibt verlinkt
+  const bg = backgroundData(c);
+  const background: A = { type: 'color', color: bg.color, url: null, brightness: bg.brightness, saturation: bg.saturation, invert: bg.invert, fit: bg.fit, fx: bg.fx };
+  if (bg.type === 'image' && bg.photoid) {
+    const d = await dataUrlOf(c, photoFile(c, bg.photoid), 'image/jpeg');
+    if (d) Object.assign(background, { type: 'image', url: d.url });
+  } else if (bg.type === 'upload') {
+    const d = await dataUrlOf(c, c.s.areaFiles('background', ME)[0], 'image/jpeg');
+    if (d) Object.assign(background, { type: 'upload', url: d.url });
+  } else if (bg.type === 'url' && bg.url) Object.assign(background, { type: 'url', url: bg.url });
+
+  let boardInk: unknown[] = [];
+  if (o.ink) {
+    const row = c.s.first('board_ink', { userid: ME, boardid: o.boardid });
+    const d = row ? parse(row.strokedata) : null;
+    if (Array.isArray(d)) boardInk = d;
+  }
+
+  const L = (k: string, d = '') => String(labels[k] ?? d);
+  return {
+    formatVersion: 1,
+    exportedAt: sec(c.s),
+    pluginVersion: 'collegare',
+    boardid: o.boardid,
+    boardWidth: 1400,
+    startMode: bg.startmode === 'slide' || (!bg.startmode && INSTANCE.startmode === 'slide') ? 'slide' : 'overview',
+    boardHeight: 1000,
+    background,
+    thread: { color: thread.color, linewidth: num(thread.linewidth), bgmoves: !!thread.bgmoves, items: exportItems },
+    boardPhotos,
+    boardInk,
+    labels: {
+      ink: L('present_toggle_ink'),
+      annot: L('present_toggle_annot'),
+      pen: L('present_pen'),
+      penDraw: L('present_pen_draw'),
+      penText: L('present_pen_text'),
+      penErase: L('present_pen_erase'),
+      penSize: L('present_pen_size'),
+      penClear: L('present_pen_clear'),
+      penShapes: L('ink_tool_shapes'),
+      shapes: { rect: L('ink_shape_rect'), ellipse: L('ink_shape_ellipse'), line: L('ink_shape_line'), poly: L('ink_shape_poly'), curve: L('ink_shape_curve') },
+      show: L('present_show'),
+      hide: L('present_hide'),
+      hint: L('present_hint'),
+      prev: L('present_prev'),
+      next: L('present_next'),
+      overview: L('present_overview'),
+      frame: L('present_frame'),
+      empty: L('present_empty'),
+    },
+  };
+}

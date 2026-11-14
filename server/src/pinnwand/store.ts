@@ -101,6 +101,10 @@ export class Scope {
     const row = await this.db.selectFrom('pinnwand_files').select('data').where('id', '=', from.id).executeTakeFirst();
     return row ? this.putFile(area, itemId, from.name, from.mime, Buffer.from(row.data)) : null;
   }
+  async fileData(f: PinFile): Promise<Buffer | null> {
+    const row = await this.db.selectFrom('pinnwand_files').select('data').where('id', '=', f.id).executeTakeFirst();
+    return row ? Buffer.from(row.data) : null;
+  }
   fileByName(area: string, name: string): PinFile | null {
     return this.files.find((f) => f.area === area && f.name === name) ?? null;
   }
