@@ -41,21 +41,26 @@ export interface MaterialView {
   mime: string | null;
   size: number | null;
   position: number;
+  /** Für Lernende freigegeben */
+  visible: boolean;
   createdAt: number;
 }
 
 export class Materials {
   constructor(private db: Db, private now: () => number = Date.now) {}
 
-  async list(projectId: number): Promise<MaterialView[]> {
-    const rows = await this.db
+  /** Alles des Projekts; mit onlyVisible nur, was Lernende sehen dürfen */
+  async list(projectId: number, onlyVisible = false): Promise<MaterialView[]> {
+    let q = this.db
       .selectFrom('materials')
-      .select(['id', 'kind', 'title', 'url', 'note', 'file_name', 'mime', 'size', 'position', 'created_at'])
-      .where('project_id', '=', projectId)
+      .select(['id', 'kind', 'title', 'url', 'note', 'file_name', 'mime', 'size', 'position', 'visible', 'created_at'])
+      .where('project_id', '=', projectId);
+    if (onlyVisible) q = q.where('visible', '=', 1);
+    const rows = await q
       .orderBy('position')
       .orderBy('id')
       .execute();
-    return rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, url: r.url, note: r.note, fileName: r.file_name, mime: r.mime, size: r.size, position: r.position, createdAt: Number(r.created_at) }));
+    return rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, url: r.url, note: r.note, fileName: r.file_name, mime: r.mime, size: r.size, position: r.position, visible: !!r.visible, createdAt: Number(r.created_at) }));
   }
 
   private async nextPosition(projectId: number) {
@@ -105,11 +110,12 @@ export class Materials {
   async page(projectId: number, id: number): Promise<(MaterialView & { body: string }) | null> {
     const r = await this.db.selectFrom('materials').selectAll().where('id', '=', id).where('project_id', '=', projectId).where('kind', '=', 'page').executeTakeFirst();
     if (!r) return null;
-    return { id: r.id, kind: 'page', title: r.title, url: null, note: r.note, fileName: null, mime: null, size: r.size, position: r.position, createdAt: Number(r.created_at), body: r.body ?? '' };
+    return { id: r.id, kind: 'page', title: r.title, url: null, note: r.note, fileName: null, mime: null, size: r.size, position: r.position, visible: !!r.visible, createdAt: Number(r.created_at), body: r.body ?? '' };
   }
 
-  async update(projectId: number, id: number, patch: { title?: string; note?: string; position?: number; body?: string }) {
+  async update(projectId: number, id: number, patch: { title?: string; note?: string; position?: number; body?: string; visible?: boolean }) {
     const set: Record<string, unknown> = {};
+    if (patch.visible !== undefined) set.visible = patch.visible ? 1 : 0;
     if (patch.body !== undefined) {
       set.body = patch.body;
       set.size = patch.body.length;
@@ -131,9 +137,9 @@ export class Materials {
     await this.db.deleteFrom('materials').where('id', '=', id).where('project_id', '=', projectId).execute();
   }
 
-  async file(id: number): Promise<{ projectId: number; name: string; mime: string; data: Buffer } | null> {
-    const r = await this.db.selectFrom('materials').select(['project_id', 'file_name', 'mime', 'data']).where('id', '=', id).executeTakeFirst();
+  async file(id: number): Promise<{ projectId: number; name: string; mime: string; data: Buffer; visible: boolean } | null> {
+    const r = await this.db.selectFrom('materials').select(['project_id', 'file_name', 'mime', 'data', 'visible']).where('id', '=', id).executeTakeFirst();
     if (!r?.data || !r.mime) return null;
-    return { projectId: r.project_id, name: r.file_name ?? 'datei', mime: r.mime, data: Buffer.from(r.data) };
+    return { projectId: r.project_id, name: r.file_name ?? 'datei', mime: r.mime, data: Buffer.from(r.data), visible: !!r.visible };
   }
 }

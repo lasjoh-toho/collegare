@@ -65,14 +65,16 @@ export default function Gruppen() {
     <ProjectShell me={me} project={project} where="Gruppen" phase="groups" actions={teacher && <TeacherActions project={project} onChanged={load} />}>
       <div className={p.main}>
         {!teacher && <p className={p.brief}>{ph.help}</p>}
-        {project.board.members.length === 0 && teacher ? (
+        {project.board.members.length === 0 && teacher && (
           <div className={`panel ${p.empty}`}>
             <h2>Noch keine Lernenden</h2>
-            <p className="muted">Trage die Namen oben mit „+ Lernende“ ein (eine Zeile je Person) oder übernimm sie aus Moodle.</p>
+            <p className="muted">
+              Du kannst die Gruppen schon vorbereiten, auch aus den Themen der Themen-Mindmap. Lernende trägst du oben mit „+ Lernende“ ein (eine Zeile je Person), oder
+              sie kommen beim Start aus Moodle dazu.
+            </p>
           </div>
-        ) : (
-          <GroupBoard projectId={project.id} board={project.board} settings={project.settings} role={project.role} meId={me.id} onError={show} />
         )}
+        <GroupBoard projectId={project.id} board={project.board} settings={project.settings} role={project.role} meId={me.id} onError={show} />
       </div>
       {toast && <div className={p.toast}>{toast}</div>}
     </ProjectShell>

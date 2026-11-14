@@ -193,8 +193,8 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
         )}
 
         <nav className={sh.phases} aria-label="Phasen">
-          <a className={`${sh.overview} ${phase === null && where === 'Übersicht' ? sh.here : ''}`} href={href(`/projekt/?id=${project.id}`)}>
-            <Icon name="grid" size={16} /> Übersicht aller Oberflächen
+          <a className={`${sh.overview} ${phase === null && where === 'Arbeitsprozess' ? sh.here : ''}`} href={href(`/projekt/?id=${project.id}`)}>
+            <Icon name="grid" size={16} /> Arbeitsprozess im Überblick
           </a>
           <a className={`${sh.overview} ${where === 'Material' ? sh.here : ''}`} href={href(`/projekt/material/?id=${project.id}`)}>
             <Icon name="info" size={16} /> Material zum Einarbeiten

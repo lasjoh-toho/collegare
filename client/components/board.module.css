@@ -46,3 +46,6 @@
   position: fixed; z-index: 50; padding: 6px 10px; border-radius: 8px; background: var(--bg-elev);
   box-shadow: var(--shadow); pointer-events: none; font-weight: 600;
 }
+.add { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.fromMap { display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.fromMapRow { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }

@@ -68,7 +68,7 @@ export default function PastesPage() {
     <ProjectShell
       me={me}
       project={project}
-      where="Quellen"
+      where="Herkunft von Texten"
       phase="research"
       actions={
         teacher && data && data.scopes.length > 1 ? (

@@ -18,3 +18,9 @@
   .fields { grid-template-columns: 1fr; }
 }
 .span { grid-column: 1 / -1; margin: 0; }
+/* noch nicht freigegeben: gestrichelt wie die Kacheln, die Lernende nicht sehen */
+.hidden { outline: 2px dashed color-mix(in srgb, var(--attr) 55%, transparent); outline-offset: -2px; box-shadow: none; background: color-mix(in srgb, var(--bg-elev) 70%, transparent); }
+.hiddenChip { background: var(--attr-soft); color: var(--attr); }
+.shownChip { background: color-mix(in srgb, var(--state-done) 14%, transparent); color: var(--state-done); }
+.hint { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted); }

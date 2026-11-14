@@ -241,6 +241,37 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
     return { id };
   });
 
+  // Gruppen aus der Themen-Mindmap vorbereiten (Wunsch Jo, 14. November 2026): Cluster und lose Karten als Vorschläge,
+  // auch bevor es Lernende gibt; die Titel lassen sich danach im Board anpassen
+  app.get<P>('/api/projects/:id/groups/vorschlaege', async (req, reply) => {
+    const a = await access(req, reply, 'teacher');
+    if (!a) return;
+    const { map } = await s.maps.get(a.projectId, 'p');
+    const board = await s.projects.board(a.projectId);
+    const have = new Set(board.groups.map((g) => g.title.trim().toLowerCase()));
+    const roots = map.roots.map((id) => map.cards[id]).filter(Boolean);
+    const seen = new Set<string>();
+    const out: { title: string; kind: 'cluster' | 'card'; exists: boolean }[] = [];
+    for (const c of [...roots.filter((c) => c.kind === 'cluster'), ...roots.filter((c) => c.kind === 'card')]) {
+      const title = c.title.trim();
+      if (!title || seen.has(title.toLowerCase())) continue;
+      seen.add(title.toLowerCase());
+      out.push({ title: title.slice(0, 255), kind: c.kind, exists: have.has(title.toLowerCase()) });
+    }
+    return { suggestions: out };
+  });
+
+  app.post<P>('/api/projects/:id/groups/viele', async (req, reply) => {
+    const a = await access(req, reply, 'teacher');
+    if (!a) return;
+    const body = z.object({ titles: z.array(z.string().trim().min(1).max(255)).min(1).max(60) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Keine Themen gewählt' });
+    for (const t of body.data.titles) await s.projects.createGroup(a.projectId, t);
+    await s.audit.append({ actorId: a.userId, action: 'project.groups_from_map', projectId: a.projectId, data: { count: body.data.titles.length } });
+    await bc.push(a.projectId);
+    return { ok: true, count: body.data.titles.length };
+  });
+
   app.patch<{ Params: { id: string; gid: string } }>('/api/projects/:id/groups/:gid', async (req, reply) => {
     const a = await access(req as unknown as FastifyRequest<P>, reply, 'member');
     if (!a) return;

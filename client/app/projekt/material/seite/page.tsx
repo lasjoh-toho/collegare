@@ -1,13 +1,17 @@
 'use client';
 /**
- * Lernseite (Material, Art „page“): Lernende lesen im Tufte-Stil, Lehrkräfte schreiben daneben mit Vorschau.
+ * Lernseite (Material, Art „page“): Lernende lesen im Tufte-Stil, Lehrkräfte schreiben „wie in Word“ (Werkzeuge über
+ * der Markierung, anheftbar) mit Vorschau daneben; Markdown nur über den Knopf „Markdown“ für Profis.
  * Word-Dateien lassen sich übernehmen (mammoth im Browser, nichts verlässt das Gerät); Bilder werden verkleinert
  * und in die Seite eingebettet.
  */
 import { useEffect, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
+import { RichText, type EditorApi } from '@/components/RichText';
 import { TufteView } from '@/components/TufteView';
+import { editToTufte, glossHtml, imageHtml, noteHtml, tufteToEdit, videoHtml } from '@/lib/tufteEdit';
+import { videoEmbed } from '@/lib/tufte';
 import { ApiError, get, href, patch } from '@/lib/api';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
@@ -78,6 +82,43 @@ export default function SeitePage() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
+  const [markdown, setMarkdown] = useState(false);
+  // Baustein, der gerade geändert wird (Randnotiz, Worterklärung, Bild, Video)
+  const [atom, setAtom] = useState<{ el: HTMLElement; api: EditorApi; text: string; extra: string; full: boolean } | null>(null);
+  useEffect(() => {
+    try {
+      setMarkdown(localStorage.getItem('collegare-seite-markdown') === '1');
+    } catch {
+      /* WYSIWYG */
+    }
+  }, []);
+  function toggleMarkdown() {
+    setMarkdown(!markdown);
+    try {
+      localStorage.setItem('collegare-seite-markdown', markdown ? '0' : '1');
+    } catch {
+      /* egal */
+    }
+  }
+  function openAtom(el: HTMLElement, api: EditorApi) {
+    if (el.classList.contains('ed-note')) setAtom({ el, api, text: el.dataset.text ?? '', extra: '', full: false });
+    else if (el.classList.contains('ed-gloss')) setAtom({ el, api, text: el.textContent ?? '', extra: el.dataset.explain ?? '', full: false });
+    else if (el.classList.contains('ed-img')) setAtom({ el, api, text: el.dataset.cap ?? '', extra: '', full: !!el.dataset.full });
+    else if (el.classList.contains('ed-video')) setAtom({ el, api, text: el.dataset.url ?? '', extra: '', full: false });
+  }
+  function saveAtom(remove = false) {
+    if (!atom) return;
+    const { el, api, text, extra, full } = atom;
+    const tpl = document.createElement('template');
+    if (remove) el.remove();
+    else if (el.classList.contains('ed-note')) tpl.innerHTML = noteHtml(el.dataset.kind === 'margin' ? 'margin' : 'note', text.trim());
+    else if (el.classList.contains('ed-gloss')) tpl.innerHTML = glossHtml(text.trim(), extra.trim());
+    else if (el.classList.contains('ed-img')) tpl.innerHTML = imageHtml(el.dataset.src ?? '', text.trim(), full);
+    else if (el.classList.contains('ed-video')) tpl.innerHTML = videoHtml(text.trim());
+    if (!remove && tpl.content.firstChild) el.replaceWith(tpl.content.firstChild);
+    api.emit();
+    setAtom(null);
+  }
   const dirty = !!page && (title !== page.title || body !== page.body);
 
   useEffect(() => {
@@ -161,6 +202,53 @@ export default function SeitePage() {
     }
   }
 
+  const extraTools = (api: EditorApi) => (
+    <>
+      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('note', 'Randnotiz'))} title="Nummerierte Randnotiz (Tufte-Seitennotiz); antippen zum Ändern">
+        Randnotiz
+      </button>
+      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('margin', 'Bemerkung'))} title="Randbemerkung ohne Nummer">
+        Marginalie
+      </button>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          const w = api.selectedText().trim() || 'Wort';
+          api.insertHtml(glossHtml(w, 'Erklärung'));
+        }}
+        title="Worterklärung: Wort leicht fett, Erklärung erst beim Antippen"
+      >
+        Worterklärung
+      </button>
+      <label className="btn" title="Bild einfügen; die Unterschrift steht am Rand">
+        Bild
+        <input
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) api.insertHtml(imageHtml(await shrink(f), '', false), true);
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          const u = prompt('Adresse des Videos (YouTube oder Vimeo)')?.trim();
+          if (!u) return;
+          if (!videoEmbed(u)) return setError('Nur Videos von YouTube oder Vimeo lassen sich einbetten; andere bitte als Link setzen.');
+          api.insertHtml(videoHtml(u), true);
+        }}
+      >
+        Video
+      </button>
+    </>
+  );
+
   if (!me || !project) return <Topbar me={me ?? null} />;
   return (
     <ProjectShell
@@ -196,6 +284,19 @@ export default function SeitePage() {
         <div className={st.split}>
           <div className={st.editor}>
             <input className={st.titleIn} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titel der Seite" />
+            <div className={st.tools}>
+              <label className="btn" title="Word-Datei (DOCX) als Lernseite übernehmen; Fußnoten werden Randnotizen">
+                Word übernehmen
+                <input type="file" accept=".docx" hidden onChange={(e) => e.target.files?.[0] && void importDocx(e.target.files[0])} />
+              </label>
+              {msg && <span className={st.msg}>{msg}</span>}
+              <span className="grow" />
+              <button type="button" className={`btn ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Seite als Markdown bearbeiten (für Profis)">
+                Markdown
+              </button>
+            </div>
+            {markdown ? (
+              <>
             <div className={st.tools}>
               <button className="btn" onClick={() => line('## ', 'Abschnitt')} title="Abschnitt">
                 Abschnitt
@@ -243,11 +344,6 @@ export default function SeitePage() {
               >
                 Video
               </button>
-              <label className="btn" title="Word-Datei (DOCX) als Lernseite übernehmen; Fußnoten werden Randnotizen">
-                Word übernehmen
-                <input type="file" accept=".docx" hidden onChange={(e) => e.target.files?.[0] && void importDocx(e.target.files[0])} />
-              </label>
-              {msg && <span className={st.msg}>{msg}</span>}
             </div>
             <textarea
               ref={area}
@@ -263,6 +359,80 @@ export default function SeitePage() {
               placeholder={'## Einstieg\n\nText mit einer Randnotiz^[Steht rechts am Rand, auf dem Handy direkt im Text.] und einer {Hyperinflation|Sehr schnelle Geldentwertung} zum Antippen.\n\n![Bildunterschrift](https://…)'}
               spellCheck
             />
+              </>
+            ) : (
+              <div
+                className={st.rich}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    void save();
+                  }
+                }}
+              >
+                <RichText
+                  value={body}
+                  onChange={setBody}
+                  max={4_000_000}
+                  label="Text der Lernseite"
+                  render={tufteToEdit}
+                  serialize={editToTufte}
+                  tools={['heading', 'bold', 'italic', 'ul', 'ol', 'quote', 'link']}
+                  headingTag="h2"
+                  extraTools={extraTools}
+                  pinKey="collegare-editor-leiste-seite"
+                  onAtom={openAtom}
+                  placeholder="Schreib hier deine Seite. Markiere Text, dann erscheinen die Werkzeuge darüber."
+                />
+              </div>
+            )}
+            {atom && (
+              <form
+                className={st.atom}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveAtom();
+                }}
+              >
+                <strong>
+                  {atom.el.classList.contains('ed-note')
+                    ? atom.el.dataset.kind === 'margin'
+                      ? 'Marginalie'
+                      : 'Randnotiz'
+                    : atom.el.classList.contains('ed-gloss')
+                      ? 'Worterklärung'
+                      : atom.el.classList.contains('ed-img')
+                        ? 'Bild'
+                        : 'Video'}
+                </strong>
+                {atom.el.classList.contains('ed-gloss') && <input value={atom.text} onChange={(e) => setAtom({ ...atom, text: e.target.value })} aria-label="Wort" placeholder="Wort" />}
+                <textarea
+                  autoFocus
+                  rows={atom.el.classList.contains('ed-video') ? 1 : 3}
+                  value={atom.el.classList.contains('ed-gloss') ? atom.extra : atom.text}
+                  onChange={(e) => setAtom(atom.el.classList.contains('ed-gloss') ? { ...atom, extra: e.target.value } : { ...atom, text: e.target.value })}
+                  placeholder={atom.el.classList.contains('ed-img') ? 'Bildunterschrift (steht am Rand)' : atom.el.classList.contains('ed-video') ? 'https://youtu.be/…' : atom.el.classList.contains('ed-gloss') ? 'Erklärung' : 'Text am Rand'}
+                  aria-label="Inhalt"
+                />
+                {atom.el.classList.contains('ed-img') && (
+                  <label className={st.check}>
+                    <input type="checkbox" checked={atom.full} onChange={(e) => setAtom({ ...atom, full: e.target.checked })} /> über die ganze Breite
+                  </label>
+                )}
+                <div className="row">
+                  <button type="button" className="btn danger" onClick={() => saveAtom(true)}>
+                    Entfernen
+                  </button>
+                  <span className="grow" />
+                  <button type="button" className="btn" onClick={() => setAtom(null)}>
+                    Abbrechen
+                  </button>
+                  <button type="submit" className="btn primary">
+                    Übernehmen
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
           <div className={st.preview}>
             <TufteView title={title || 'Ohne Titel'} body={body} />

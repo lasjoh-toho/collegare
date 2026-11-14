@@ -172,7 +172,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
                 <textarea ref={area} rows={8} value={text} onChange={(ev) => setText(ev.target.value)} onPaste={onPaste} maxLength={5000} className={e.md} />
               </>
             ) : (
-              <RichText value={text} onChange={setText} onPaste={onPaste} label="Text der Karte" />
+              <RichText value={text} onChange={setText} onPaste={onPaste} label="Text der Karte" pinKey="collegare-editor-leiste-karte" defaultPinned />
             )}
           </div>
         )}
@@ -209,7 +209,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
         )}
         {ask && !ask.open && (
           <div className={e.note} role="status">
-            <span>Eingesetzter Text von außen steht unter „Quellen“.</span>
+            <span>Eingesetzter Text von außen steht unter „Herkunft von Texten“.</span>
             <button type="button" className="btn" onClick={() => setAsk({ ...ask, open: true })}>
               Herkunft angeben
             </button>
@@ -233,7 +233,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
               </label>
             )}
             <div className="row">
-              <span className="muted">Du kannst auch später antworten (unter „Quellen“).</span>
+              <span className="muted">Du kannst auch später antworten (unter „Herkunft von Texten“).</span>
               <span className="grow" />
               <button type="button" className="btn" onClick={() => setAsk(null)}>
                 Später

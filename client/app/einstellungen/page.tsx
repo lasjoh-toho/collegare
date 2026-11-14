@@ -350,7 +350,7 @@ export default function Einstellungen() {
             <Check key={k} label={l} checked={s.docTypes[k]} disabled={f.docTypes[k] === false} onChange={(v) => flag('docTypes', k, v)} />
           ))}
           <h4>Was importiert werden darf</h4>
-          <p className="muted">Ein Import gilt wie ein großes Einfügen und steht unter „Quellen“.</p>
+          <p className="muted">Ein Import gilt wie ein großes Einfügen und steht unter „Herkunft von Texten“.</p>
           {Object.entries(IMPORT_LABELS).map(([k, l]) => (
             <Check key={k} label={l} checked={s.importTypes[k]} disabled={f.importTypes[k] === false} onChange={(v) => flag('importTypes', k, v)} />
           ))}

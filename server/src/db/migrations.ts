@@ -373,6 +373,13 @@ migrations['0010_pastes'] = {
   },
 };
 
+// Material unsichtbar vorbereiten (Wunsch Jo, 14. November 2026); was es schon gibt, bleibt sichtbar
+migrations['0011_material_visible'] = {
+  async up(db) {
+    await db.schema.alterTable('materials').addColumn('visible', 'integer', (c) => c.notNull().defaultTo(1)).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

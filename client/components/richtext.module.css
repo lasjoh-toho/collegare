@@ -22,3 +22,19 @@
 .link { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .link input { flex: 1; min-width: 180px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-elev); }
 .long { font-size: 12px; color: var(--danger); }
+.tip { font-size: 11.5px; color: var(--fg-faint); }
+.box blockquote { margin: 6px 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--fg-muted); }
+/* Bausteine der Lernseite (lib/tufteEdit.ts) */
+.box :global(.ed-note) {
+  display: inline-block; max-width: 22em; margin: 0 2px; padding: 0 6px; border-radius: 6px; font-size: 0.85em; line-height: 1.5; vertical-align: baseline;
+  background: var(--accent-soft); color: var(--fg); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;
+}
+.box :global(.ed-note)::before { content: '↦ '; color: var(--accent); }
+.box :global(.ed-margin)::before { content: '⊕ '; }
+.box :global(.ed-gloss) { font-weight: 600; border-bottom: 2px dotted var(--accent); cursor: pointer; }
+.box :global(.ed-img) { margin: 8px 0; cursor: pointer; user-select: none; }
+.box :global(.ed-img img) { max-width: 100%; max-height: 260px; border-radius: 6px; display: block; }
+.box :global(.ed-img figcaption) { font-size: 12px; color: var(--fg-muted); margin-top: 3px; }
+.box :global(.ed-video) { margin: 8px 0; padding: 14px; border-radius: 8px; background: var(--bg-sunken); color: var(--fg-muted); cursor: pointer; user-select: none; overflow-wrap: anywhere; }
+.box :global(.ed-who) { font-size: 0.9em; }
+.box h2 { font-size: 18px; margin: 12px 0 6px; }

@@ -194,6 +194,15 @@ describe('Anmeldung', () => {
     expect((await call('PATCH', `/api/projects/${project}/materials/${pg.json.id}`, t, { body: 'Neu' })).status).toBe(200);
     expect((await call('GET', `/api/projects/${project}/materials/${pg.json.id}`, anna)).json).toMatchObject({ canEdit: false, page: { title: 'Die Inflation 1923', body: 'Neu' } });
     expect((await call('PATCH', `/api/projects/${project}/materials/${pg.json.id}`, anna, { body: 'x' })).status).toBe(403);
+    // unsichtbar vorbereiten: Lernende sehen es weder in der Liste noch direkt, bis es freigegeben ist
+    const hid = await call('POST', `/api/projects/${project}/materials/page`, t, { title: 'Entwurf', body: 'geheim', visible: false });
+    expect((await call('GET', `/api/projects/${project}/materials`, anna)).json.materials.some((m: J) => m.title === 'Entwurf')).toBe(false);
+    expect((await call('GET', `/api/projects/${project}/materials/${hid.json.id}`, anna)).status).toBe(404);
+    expect((await call('GET', `/api/projects/${project}/materials`, t)).json.materials.find((m: J) => m.title === 'Entwurf')).toMatchObject({ visible: false });
+    const hf = await fetch(`${base}/api/projects/${project}/materials/file?name=x.pdf&sichtbar=0`, { method: 'POST', headers: { authorization: 'Bearer ' + t, 'content-type': 'application/octet-stream' }, body: pdf });
+    expect((await fetch(`${base}/api/projects/${project}/materials/${((await hf.json()) as J).id}/datei`, { headers: { authorization: 'Bearer ' + anna } })).status).toBe(404);
+    expect((await call('PATCH', `/api/projects/${project}/materials/${hid.json.id}`, t, { visible: true })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/materials/${hid.json.id}`, anna)).json).toMatchObject({ page: { title: 'Entwurf' } });
     // ohne Anmeldung nichts
     expect((await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`)).status).toBe(401);
   });
@@ -596,6 +605,11 @@ describe('Mindmap in Echtzeit', () => {
     expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { topicMapEdit: 'teacher' } })).status).toBe(200);
     expect(await emit(sa, 'map:join', { projectId: project, scope: 'p' })).toMatchObject({ readOnly: true });
     expect((await emit(sa, 'map:op', { projectId: project, scope: 'p', op: { type: 'remove', ids: ['idee01'] } })).ok).toBe(false);
+    // Gruppen aus den Themen vorschlagen (nur Lehrkraft) und mehrere auf einmal anlegen
+    expect((await call('GET', `/api/projects/${project}/groups/vorschlaege`, t)).json.suggestions).toEqual([{ title: 'Hyperinflation', kind: 'card', exists: false }]);
+    expect((await call('GET', `/api/projects/${project}/groups/vorschlaege`, anna)).status).toBe(403);
+    expect((await call('POST', `/api/projects/${project}/groups/viele`, t, { titles: ['Hyperinflation', 'Ruhrbesetzung'] })).json).toMatchObject({ count: 2 });
+    expect((await call('GET', `/api/projects/${project}/groups/vorschlaege`, t)).json.suggestions[0]).toMatchObject({ exists: true });
     // Gruppe bilden und die Themen-Mindmap übernehmen (nur in eine leere Mindmap)
     const g = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
     await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g, position: 0 });

@@ -1,7 +1,8 @@
 'use client';
 /**
  * Material zum Einarbeiten (Wunsch Jo, 11. November 2026): Lehrkräfte veröffentlichen Webseiten, Videos, PDFs und
- * Dokumente; Lernende sehen sie von Anfang an, auch beim Start aus Moodle. Videos von YouTube und Vimeo werden
+ * Dokumente, auch beim Start aus Moodle. Neues Material ist zuerst nur für die Lehrkraft sichtbar und wird mit
+ * „Freigeben“ für die Lernenden sichtbar (Wunsch Jo, 14. November 2026). Videos von YouTube und Vimeo werden
  * eingebettet (YouTube ohne Cookies), PDFs, Bilder und Videodateien im Browser angezeigt, Dokumente heruntergeladen.
  */
 import { useEffect, useState } from 'react';
@@ -22,6 +23,7 @@ interface Material {
   fileName: string | null;
   mime: string | null;
   size: number | null;
+  visible: boolean;
 }
 
 /** Einbettbare Adresse für YouTube und Vimeo, sonst null. */
@@ -84,6 +86,10 @@ export default function MaterialPage() {
     await del(`/api/projects/${id}/materials/${x.id}`).then(load, fail);
   }
 
+  async function setVisible(x: Material, visible: boolean) {
+    await patch(`/api/projects/${id}/materials/${x.id}`, { visible }).then(load, fail);
+  }
+
   const toggle = (mid: number) => setOpen((o) => (o.has(mid) ? new Set([...o].filter((y) => y !== mid)) : new Set([...o, mid])));
 
   if (!me || !project) return <Topbar me={me ?? null} />;
@@ -94,7 +100,7 @@ export default function MaterialPage() {
           <h1>Material zum Einarbeiten</h1>
           <p className="muted">
             {canEdit
-              ? 'Was du hier veröffentlichst, sehen alle Lernenden des Projekts von Anfang an, auch beim Start aus Moodle.'
+              ? 'Neues Material sehen zuerst nur Lehrkräfte. Erst mit „Freigeben“ sehen es alle Lernenden des Projekts, auch beim Start aus Moodle.'
               : 'Hier hat deine Lehrkraft Material zusammengestellt, mit dem du dich in das Thema einarbeitest.'}
           </p>
         </header>
@@ -107,10 +113,15 @@ export default function MaterialPage() {
             const viewable = x.kind === 'video' || (x.mime ?? '').startsWith('image/') || x.mime === 'application/pdf';
             const shown = open.has(x.id) || x.kind === 'video' || (x.mime ?? '').startsWith('image/');
             return (
-              <li key={x.id} className={`panel ${m.item}`}>
+              <li key={x.id} className={`panel ${m.item} ${canEdit && !x.visible ? m.hidden : ''}`}>
                 <div className={m.row}>
                   <span className={m.kind}>{x.kind === 'page' ? 'Lernseite' : x.kind === 'link' ? 'Webseite' : x.kind === 'video' ? 'Video' : x.mime === 'application/pdf' ? 'PDF' : (x.mime ?? '').startsWith('image/') ? 'Bild' : 'Dokument'}</span>
                   <strong className={m.title}>{x.title}</strong>
+                  {canEdit && (
+                    <span className={`chip ${x.visible ? m.shownChip : m.hiddenChip}`} title={x.visible ? 'Die Lernenden sehen dieses Material' : 'Nur Lehrkräfte sehen dieses Material'}>
+                      {x.visible ? 'für Lernende sichtbar' : 'noch unsichtbar'}
+                    </span>
+                  )}
                   <span className="grow" />
                   {x.kind === 'page' && (
                     <>
@@ -143,6 +154,11 @@ export default function MaterialPage() {
                     <a className="btn" href={fileUrl(id, x.id, !viewable)} target={viewable ? '_blank' : undefined} rel="noopener">
                       {viewable ? 'In neuem Tab' : `Herunterladen (${mb(x.size)})`}
                     </a>
+                  )}
+                  {canEdit && (
+                    <button className={`btn ${x.visible ? '' : 'primary'}`} onClick={() => setVisible(x, !x.visible)} title={x.visible ? 'Wieder unsichtbar für die Lernenden' : 'Für alle Lernenden des Projekts sichtbar machen'}>
+                      {x.visible ? 'Verbergen' : 'Freigeben'}
+                    </button>
                   )}
                   {canEdit && (
                     <span className={m.tools}>
@@ -187,18 +203,19 @@ function AddForm({ projectId, maxMb, onAdded, onError }: { projectId: number; ma
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   async function add() {
     setBusy(true);
     try {
       if (kind === 'page') {
-        const r = await post<{ id: number }>(`/api/projects/${projectId}/materials/page`, { title, note });
+        const r = await post<{ id: number }>(`/api/projects/${projectId}/materials/page`, { title, note, visible });
         location.href = href(`/projekt/material/seite/?id=${projectId}&m=${r.id}&bearbeiten=1`);
         return;
       }
       if (kind === 'file' || (kind === 'video' && file)) {
         if (!file) return;
-        const res = await fetch(`${API_URL}${BASE_PATH}/api/projects/${projectId}/materials/file?name=${encodeURIComponent(file.name)}&title=${encodeURIComponent(title)}`, {
+        const res = await fetch(`${API_URL}${BASE_PATH}/api/projects/${projectId}/materials/file?name=${encodeURIComponent(file.name)}&title=${encodeURIComponent(title)}&sichtbar=${visible ? 1 : 0}`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'content-type': 'application/octet-stream' },
@@ -207,7 +224,7 @@ function AddForm({ projectId, maxMb, onAdded, onError }: { projectId: number; ma
         const j = (await res.json().catch(() => ({}))) as { error?: string; id?: number };
         if (!res.ok) throw new ApiError(j.error ?? `Fehler ${res.status}`, res.status);
         if (note.trim() && j.id) await patch(`/api/projects/${projectId}/materials/${j.id}`, { note });
-      } else await post(`/api/projects/${projectId}/materials`, { kind, url: url.trim(), title, note });
+      } else await post(`/api/projects/${projectId}/materials`, { kind, url: url.trim(), title, note, visible });
       setUrl('');
       setTitle('');
       setNote('');
@@ -229,7 +246,7 @@ function AddForm({ projectId, maxMb, onAdded, onError }: { projectId: number; ma
             ['page', 'Lernseite schreiben'],
             ['link', 'Webseite verlinken'],
             ['video', 'Video'],
-            ['file', 'PDF oder Dokument (Notlösung)'],
+            ['file', 'PDF oder Dokument'],
           ] as const
         ).map(([k, l]) => (
           <button key={k} className={`btn ${kind === k ? 'on' : ''}`} onClick={() => (setKind(k), setFile(null))}>
@@ -241,6 +258,12 @@ function AddForm({ projectId, maxMb, onAdded, onError }: { projectId: number; ma
         {kind === 'page' && (
           <p className={`muted ${m.span}`}>
             Eine eigene Seite im Tufte-Stil: gut lesbar, mit Randnotizen, Bildern und Videos. Word-Dateien lassen sich im nächsten Schritt übernehmen.
+          </p>
+        )}
+        {kind === 'file' && (
+          <p className={`${m.hint} ${m.span}`}>
+            Überleg dir, auf welchen Geräten die Lernenden das Material ansehen werden. PDFs und Word-Dateien sind am Handy oft mühsam zu lesen; eine Lernseite passt sich
+            jedem Bildschirm an.
           </p>
         )}
         {(kind === 'link' || kind === 'video') && (
@@ -269,9 +292,12 @@ function AddForm({ projectId, maxMb, onAdded, onError }: { projectId: number; ma
         </div>
       </div>
       <div className="row">
+        <label className={m.check}>
+          <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} /> gleich für die Lernenden freigeben
+        </label>
         <span className="grow" />
         <button className="btn primary" disabled={!ready || busy} onClick={add}>
-          {busy ? 'Lädt …' : kind === 'page' ? 'Seite anlegen' : 'Veröffentlichen'}
+          {busy ? 'Lädt …' : kind === 'page' ? 'Seite anlegen' : visible ? 'Veröffentlichen' : 'Anlegen (noch unsichtbar)'}
         </button>
       </div>
     </section>

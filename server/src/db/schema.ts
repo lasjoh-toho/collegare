@@ -209,6 +209,8 @@ export interface MaterialsTable {
   size: number | null;
   data: Buffer | null;
   position: number;
+  /** 1 = Lernende sehen es, 0 = nur Lehrkräfte (in Vorbereitung) */
+  visible: Generated<number>;
   created_by: number;
   created_at: Ms;
 }

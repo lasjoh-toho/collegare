@@ -8,7 +8,7 @@
  * Ohne Ziehen geht alles auch über „Verschieben nach …“ in der Karten-Ansicht (Tastatur, Screenreader).
  */
 import { useRef, useState } from 'react';
-import { ApiError, del, patch, post } from '@/lib/api';
+import { ApiError, del, get, patch, post } from '@/lib/api';
 import { COLUMN_COLORS, groupColor } from '@/lib/colors';
 import type { Board, BoardMember, ProjectSettings } from '@/lib/types';
 import k from './board.module.css';
@@ -45,6 +45,21 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
   const [newTitle, setNewTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  // Themen aus der Themen-Mindmap als Gruppen übernehmen (Wunsch Jo, 14. November 2026)
+  const [fromMap, setFromMap] = useState<{ title: string; kind: 'cluster' | 'card'; exists: boolean; on: boolean }[] | null>(null);
+  async function openFromMap() {
+    try {
+      const r = await get<{ suggestions: { title: string; kind: 'cluster' | 'card'; exists: boolean }[] }>(`/api/projects/${projectId}/groups/vorschlaege`);
+      setFromMap(r.suggestions.map((x) => ({ ...x, on: !x.exists && x.kind === 'cluster' })));
+    } catch (e) {
+      onError(e instanceof ApiError ? e.message : String(e));
+    }
+  }
+  async function takeFromMap() {
+    const titles = (fromMap ?? []).filter((x) => x.on && x.title.trim()).map((x) => x.title.trim());
+    setFromMap(null);
+    if (titles.length) await run(post(`/api/projects/${projectId}/groups/viele`, { titles }));
+  }
 
   const columns = [{ id: POOL, title: 'Noch ohne Gruppe', color: '#a3a39e', groupId: null as number | null }, ...board.groups.map((g, i) => ({ id: String(g.id), title: g.title, color: groupColor(g.color, i), groupId: g.id as number | null }))];
   const membersOf = (gid: number | null) => board.members.filter((m) => m.groupId === gid).sort((a, b) => a.position - b.position);
@@ -233,14 +248,57 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
                   onBlur={() => void addGroup()}
                 />
               ) : (
-                <button className="btn" onClick={() => setAdding(true)}>
-                  + {teacher ? 'Gruppe' : 'Neue Gruppe'}
-                </button>
+                <>
+                  <button className="btn" onClick={() => setAdding(true)}>
+                    + {teacher ? 'Gruppe' : 'Neue Gruppe'}
+                  </button>
+                  {teacher && (
+                    <button className="btn" onClick={() => void openFromMap()} title="Cluster und Karten der Themen-Mindmap als Gruppen anlegen; die Titel lassen sich danach ändern">
+                      Aus der Themen-Mindmap …
+                    </button>
+                  )}
+                </>
               ))}
           </div>
         </div>
 
       </div>
+
+      {fromMap && (
+        <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && setFromMap(null)}>
+          <div className="modal" role="dialog" aria-label="Gruppen aus der Themen-Mindmap">
+            <h2>Gruppen aus der Themen-Mindmap</h2>
+            {fromMap.length === 0 ? (
+              <p className="muted">Die Themen-Mindmap hat noch keine Cluster oder Karten.</p>
+            ) : (
+              <>
+                <p className="muted">Wähle die Themen, aus denen Gruppen werden. Du kannst sie hier umbenennen und später im Board weiter anpassen.</p>
+                <div className={k.fromMap}>
+                  {fromMap.map((x, i) => (
+                    <label key={i} className={k.fromMapRow}>
+                      <input type="checkbox" checked={x.on} onChange={(e) => setFromMap(fromMap.map((y, j) => (j === i ? { ...y, on: e.target.checked } : y)))} />
+                      <input className="input" value={x.title} maxLength={255} onChange={(e) => setFromMap(fromMap.map((y, j) => (j === i ? { ...y, title: e.target.value, on: true } : y)))} />
+                      <span className="muted">{x.kind === 'cluster' ? 'Cluster' : 'Karte'}{x.exists ? ' · gibt es schon' : ''}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="row">
+              <span className="grow" />
+              <button className="btn" onClick={() => setFromMap(null)}>
+                Abbrechen
+              </button>
+              <button className="btn primary" disabled={!fromMap.some((x) => x.on)} onClick={() => void takeFromMap()}>
+                {(() => {
+                  const n = fromMap.filter((x) => x.on).length;
+                  return n === 1 ? 'Eine Gruppe anlegen' : `${n} Gruppen anlegen`;
+                })()}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {drag && (
         <div className={k.float} style={{ left: drag.x + 8, top: drag.y + 8 }}>
