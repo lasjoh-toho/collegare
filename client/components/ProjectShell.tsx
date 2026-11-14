@@ -5,6 +5,7 @@
  * Vorbild ist die Info aus /lernen in Autogra.fi. Auf breiten Bildschirmen lässt sich das Menü anheften.
  */
 import { useEffect, useState } from 'react';
+import { watchCopy } from '@/lib/clip';
 import { get, href, post } from '@/lib/api';
 import { groupColor } from '@/lib/colors';
 import { currentPhase, phaseDone, phaseList, phasePath, type DocSummary, type PhaseKey } from '@/lib/phases';
@@ -42,6 +43,8 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   const [ownDocs, setOwnDocs] = useState<DocSummary | null>(null);
   // Chat oder Notizen als Leiste am rechten Rand (immer nur eine), je Gerät gemerkt
   const [side, setSide] = useState<Side>(null);
+  // Herkunftsmarke beim Kopieren innerhalb des Projekts (Karten-Editor, Konzept 8d.3)
+  useEffect(() => watchCopy(project.id, me.name), [project.id, me.name]);
   useEffect(() => {
     try {
       const v = localStorage.getItem(SIDE_KEY) ?? (localStorage.getItem('collegare-chat-offen') === '1' ? 'chat' : '');

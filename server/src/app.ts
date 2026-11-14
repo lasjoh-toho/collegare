@@ -18,6 +18,7 @@ import { mapSocket } from './routes/maps.js';
 import { chatSocket } from './routes/chat.js';
 import { notesSocket } from './routes/notes.js';
 import { pinnwandRoutes, pinnwandSocket } from './routes/pinnwand.js';
+import { pasteRoutes } from './routes/pastes.js';
 import { authorizeDoc, documentRoutes } from './routes/documents.js';
 import { collabId, parseCollabId } from './projects/documents.js';
 import type { Services } from './services.js';
@@ -133,6 +134,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     gradingRoutes(http, s);
     materialRoutes(http, s);
     pinnwandRoutes(http, s);
+    pasteRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 

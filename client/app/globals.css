@@ -176,3 +176,4 @@ a { color: var(--accent); text-decoration: none; }
   .topbar, .no-print { display: none !important; }
   body { background: #fff; }
 }
+.md-source { font-size: 0.9em; font-style: italic; opacity: 0.8; }

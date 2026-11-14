@@ -1,0 +1,9 @@
+.modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.tools :global(.btn) { height: 28px; padding: 0 9px; font-size: 12.5px; }
+.note { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg-soft, rgba(127, 127, 127, 0.1)); font-size: 13px; }
+.note > span { flex: 1; min-width: 180px; }
+.warn { background: color-mix(in srgb, #d9822b 16%, transparent); }
+.ask { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.ask legend { padding: 0 4px; font-weight: 600; }
+.opt { display: flex; align-items: center; gap: 6px; }

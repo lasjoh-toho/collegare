@@ -264,6 +264,25 @@ export interface NotesTable {
   updated_at: Ms;
 }
 
+/** Einfüge-Protokoll (Konzept 6.1, 8d.3): Einsetzen von außen ab der Schwelle, mit Antwort auf „Woher?“ */
+export interface PastesTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  user_id: number;
+  /** wohin eingesetzt wurde, z. B. Karte „Inflation“ */
+  place: string;
+  chars: number;
+  /** Anfang des Texts und Prüfsumme, nicht der ganze Text */
+  sample: string;
+  hash: string;
+  /** quote, draft, ai, other; null = noch offen („später“) */
+  answer: string | null;
+  note: string;
+  created_at: Ms;
+  answered_at: Ms | null;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -294,5 +313,6 @@ export interface Database {
   notes: NotesTable;
   pinnwand_rows: PinnwandRowsTable;
   pinnwand_files: PinnwandFilesTable;
+  pastes: PastesTable;
   kv: KeyValueTable;
 }

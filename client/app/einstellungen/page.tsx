@@ -391,10 +391,18 @@ export default function Einstellungen() {
 
         <AccBox open={open.has('log')} onToggle={toggle} id="log" title="Protokoll und Logbuch">
           <div className="field" style={{ maxWidth: 260 }}>
-            <label>Einfügen protokollieren ab (Zeichen)</label>
+            <label>Einfügen von außen protokollieren ab (Zeichen)</label>
             <input type="number" min={20} value={s.pasteThreshold} onChange={(ev) => set('pasteThreshold', Number(ev.target.value))} />
           </div>
-          <Check label="Beim Einfügen nach der Herkunft fragen" checked={s.pasteExplain} onChange={(v) => set('pasteExplain', v)} />
+          <div className="field" style={{ maxWidth: 420 }}>
+            <label>Einsetzen von außen (ab dieser Länge)</label>
+            <select value={s.pasteOutside} onChange={(ev) => set('pasteOutside', ev.target.value as typeof s.pasteOutside)}>
+              <option value="allow">Erlauben und protokollieren</option>
+              <option value="ask">Nach der Herkunft fragen</option>
+              <option value="limit">Nur kürzere Stellen erlauben</option>
+            </select>
+          </div>
+          <p className="muted">Kopieren und Einsetzen innerhalb des Projekts ist immer erlaubt; die Herkunft lässt sich als Zuschreibung anfügen.</p>
           <Check label="Logbuch verpflichtend" checked={s.logbookRequired} onChange={(v) => set('logbookRequired', v)} />
           {f.typingHints === 'off' && <p className="muted">Tippfluss-Hinweise sind von der Administration abgeschaltet.</p>}
         </AccBox>

@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
 import { isDimmed, isPicked, pickOps, type MapCard, type MapDim, type MapFork, type MapOp, type MapRoute, type MapShape, type MapStart, type MapVia, type MindMap as MapData } from '@/lib/types';
 import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
+import { CardEditor } from './CardEditor';
 import { Icon } from './Icon';
 import type { Person } from './MindMap';
 import b from './branchmap.module.css';
@@ -383,6 +384,8 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
   const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
+  // Karten-Editor (Titel und Text) für die gewählte Idee
+  const [editor, setEditor] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [cam, setCam] = useState({ x: 0, y: 0, k: 1 });
   const wrap = useRef<HTMLDivElement>(null);
@@ -545,7 +548,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
   }
 
   function onKey(e: React.KeyboardEvent) {
-    if (edit || !selected || !canEdit) return;
+    if (edit || editor || !selected || !canEdit) return;
     if (e.key === 'Tab') {
       e.preventDefault();
       void addUnder(selected.id);
@@ -757,6 +760,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
         title={isPicked(map, c) ? 'In der Gliederung' : undefined}
         style={style}
         data-node={c.id}
+        data-clip={`Idee „${c.title || 'Ohne Titel'}“`}
         onPointerDown={(e) => {
           e.stopPropagation();
           // Plus-Knopf im Knoten: nicht einfangen, sonst landet sein Klick beim Knoten statt beim Knopf
@@ -843,6 +847,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
       }}
       onPointerUp={() => (pan.current = null)}
       onWheel={(e) => {
+        if ((e.target as HTMLElement).closest('[data-ui]')) return;
         const r = wrap.current!.getBoundingClientRect();
         const mx = e.clientX - r.left;
         const my = e.clientY - r.top;
@@ -1044,6 +1049,11 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>
             <Icon name="pen" size={14} /> Umbenennen
           </button>
+          {selected.kind === 'card' && (
+            <button className="btn" onClick={() => setEditor(selected.id)} title="Karte mit Text, Listen, Link und Quelle bearbeiten">
+              Text{selected.text ? ' ✎' : ''}
+            </button>
+          )}
           <button className="btn" onClick={() => void addUnder(selected.id)} title="Neue Idee an diesem Knoten (Tab)">
             + Unterast
           </button>
@@ -1052,6 +1062,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
           </button>
         </div>
       )}
+      {editor && map.cards[editor] && <CardEditor card={map.cards[editor]} onClose={() => setEditor(null)} send={send} />}
     </div>
   );
 }

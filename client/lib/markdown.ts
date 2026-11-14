@@ -1,5 +1,6 @@
 /**
- * Kleines, sicheres Markdown für Kartentexte: Überschriften, Listen, fett, kursiv, Code.
+ * Kleines, sicheres Markdown für Kartentexte: Überschriften, Listen, fett, kursiv, Code, Links [Text](https://…) und
+ * Zeilen „Quelle: …“ (Karten-Editor, Konzept 8d.3).
  * Erst wird alles maskiert, dann werden nur diese Auszeichnungen erzeugt; HTML aus dem Text kommt nie durch.
  */
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -7,6 +8,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 function inline(s: string): string {
   return esc(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
 }
@@ -35,6 +37,7 @@ export function renderMarkdown(text: string): string {
     }
     close();
     if (h) out.push(`<h${h[1].length + 2}>${inline(h[2])}</h${h[1].length + 2}>`);
+    else if (/^Quelle:\s/.test(line)) out.push(`<p class="md-source">${inline(line)}</p>`);
     else if (line) out.push(`<p>${inline(line)}</p>`);
   }
   close();

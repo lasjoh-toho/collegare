@@ -11,6 +11,7 @@ import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COLUMN_COLORS } from '@/lib/colors';
 import { renderMarkdown } from '@/lib/markdown';
+import { CardEditor } from './CardEditor';
 import { isDimmed, isPicked, pickOps, type MapCard, type MapDim, type MapOp, type MindMap as MapData } from '@/lib/types';
 import m from './mindmap.module.css';
 
@@ -389,6 +390,7 @@ export function MindMap({
         key={id}
         className={cls}
         data-card={id}
+        data-clip={`${c.kind === 'cluster' ? 'Cluster' : 'Karte'} „${c.title || 'Ohne Titel'}“`}
         style={
           {
             left: c.x,
@@ -568,45 +570,6 @@ export function MindMap({
       )}
 
       {editing && shown.cards[editing] && <CardEditor card={shown.cards[editing]} onClose={() => setEditing(null)} send={send} />}
-    </div>
-  );
-}
-
-function CardEditor({ card, onClose, send }: { card: MapCard; onClose: () => void; send: (op: MapOp) => Promise<boolean> }) {
-  const [title, setTitle] = useState(card.title);
-  const [text, setText] = useState(card.text);
-  async function save() {
-    if (title !== card.title || text !== card.text) {
-      const ok = await send({ type: 'update', id: card.id, patch: card.kind === 'card' ? { title, text } : { title } });
-      if (!ok) return;
-    }
-    onClose();
-  }
-  return (
-    <div className="modal-bg" data-ui onPointerDown={(e) => (e.stopPropagation(), e.target === e.currentTarget && void save())}>
-      <div className="modal" role="dialog" aria-label={card.kind === 'cluster' ? 'Cluster benennen' : 'Karte bearbeiten'} onKeyDown={(e) => (e.key === 'Enter' && (e.ctrlKey || e.metaKey) ? void save() : e.key === 'Escape' && onClose())}>
-        <h2>{card.kind === 'cluster' ? 'Cluster benennen' : 'Karte'}</h2>
-        <div className="field">
-          <label>Titel</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus onKeyDown={(e) => e.key === 'Enter' && card.kind === 'cluster' && void save()} />
-        </div>
-        {card.kind === 'card' && (
-          <div className="field">
-            <label>Text (Markdown: **fett**, *kursiv*, - Liste)</label>
-            <textarea rows={7} value={text} onChange={(e) => setText(e.target.value)} maxLength={5000} />
-          </div>
-        )}
-        <div className="row">
-          <span className="muted">Strg+Enter speichert</span>
-          <span className="grow" />
-          <button className="btn" onClick={onClose}>
-            Abbrechen
-          </button>
-          <button className="btn primary" onClick={() => void save()}>
-            Fertig
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

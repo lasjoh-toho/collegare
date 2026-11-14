@@ -352,6 +352,27 @@ migrations['0009_pinnwand'] = {
   },
 };
 
+migrations['0010_pastes'] = {
+  async up(db) {
+    await db.schema
+      .createTable('pastes')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('place', 'varchar(300)', (c) => c.notNull())
+      .addColumn('chars', 'integer', (c) => c.notNull())
+      .addColumn('sample', 'varchar(400)', (c) => c.notNull())
+      .addColumn('hash', 'varchar(64)', (c) => c.notNull())
+      .addColumn('answer', 'varchar(10)')
+      .addColumn('note', 'varchar(1000)', (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .addColumn('answered_at', ms)
+      .execute();
+    await db.schema.createIndex('pastes_project').on('pastes').columns(['project_id', 'scope', 'id']).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

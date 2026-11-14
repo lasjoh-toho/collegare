@@ -4,6 +4,7 @@ import { Gradings } from './projects/gradings.js';
 import { Materials } from './projects/materials.js';
 import { Chat } from './projects/chat.js';
 import { Notes } from './projects/notes.js';
+import { Pastes } from './projects/pastes.js';
 import { EventEmitter } from 'node:events';
 import { PinStore } from './pinnwand/store.js';
 import { OidcProvider } from './identity/oidcProvider.js';
@@ -56,6 +57,7 @@ export interface Services {
   materials: Materials;
   chat: Chat;
   notes: Notes;
+  pastes: Pastes;
   pinnwand: PinStore;
   /** Änderungen an Pinnwänden (für die Echtzeit im Socket) */
   pinnwandEvents: EventEmitter;
@@ -96,6 +98,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     materials: new Materials(db, now),
     chat: new Chat(db, now),
     notes: new Notes(db, now),
+    pastes: new Pastes(db, now),
     pinnwand: new PinStore(db, now),
     pinnwandEvents: new EventEmitter(),
     oidc: new OidcProvider(db, toolKey, users, contexts, config.appUrl, now),

@@ -463,6 +463,31 @@ describe('Mindmap in Echtzeit', () => {
     expect((await emit(sa, 'notes:delete', { projectId: project, id: add.id })).ok).toBe(true);
   });
 
+  it('Einfüge-Protokoll: eigene Einträge, Antwort später, Lehrkraft sieht alle', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: ids })).json.codes as J[];
+    const [anna, ben] = await Promise.all(codes.map(async (c) => (await call('POST', '/api/access/redeem', undefined, { code: c.code })).json.token as string));
+    const text = 'Die Hyperinflation erreichte im November 1923 ihren Höhepunkt. '.repeat(10);
+    expect((await call('POST', `/api/projects/${project}/einfuegen`, anna, { scope: 'g' + g2, place: 'Karte', text })).status).toBe(403);
+    const id = (await call('POST', `/api/projects/${project}/einfuegen`, anna, { scope: 'g' + g1, place: 'Karte „Ursachen“', text })).json.id;
+    expect(id).toEqual(expect.any(Number));
+    let own = (await call('GET', `/api/projects/${project}/einfuegen`, anna)).json.pastes as J[];
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatchObject({ place: 'Karte „Ursachen“', chars: [...text].length, answer: null });
+    expect(own[0].sample).toHaveLength(300);
+    // Ben sieht Annas Einträge nicht und kann sie nicht beantworten
+    expect((await call('GET', `/api/projects/${project}/einfuegen`, ben)).json.pastes).toEqual([]);
+    expect((await call('POST', `/api/projects/${project}/einfuegen/${id}`, ben, { answer: 'quote', note: 'x' })).status).toBe(404);
+    expect((await call('POST', `/api/projects/${project}/einfuegen/${id}`, anna, { answer: 'quote', note: 'Schulbuch S. 42' })).status).toBe(200);
+    own = (await call('GET', `/api/projects/${project}/einfuegen`, t)).json.pastes as J[];
+    expect(own[0]).toMatchObject({ answer: 'quote', note: 'Schulbuch S. 42', scope: 'g' + g1 });
+  });
+
   it('Pinnwand als Modul: Board der Gruppe, Dateien nur für die Gruppe', async () => {
     const { t, project, ids } = await setup();
     const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;

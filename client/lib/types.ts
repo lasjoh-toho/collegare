@@ -85,7 +85,7 @@ export interface ProjectSettings {
   finishLock: boolean;
   reopenBy: 'teacher' | 'group';
   pasteThreshold: number;
-  pasteExplain: boolean;
+  pasteOutside: 'allow' | 'ask' | 'limit';
   logbookRequired: boolean;
   aiFeedback: boolean;
   aiDailyLimit: number;

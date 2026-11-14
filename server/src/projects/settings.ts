@@ -67,7 +67,8 @@ export const SettingsSchema = z.object({
   finishLock: z.boolean(),
   reopenBy: z.enum(['teacher', 'group']),
   pasteThreshold: z.number().int().min(20).max(100_000),
-  pasteExplain: z.boolean(),
+  /** Einsetzen von außen (Konzept 8d.3): erlauben, nach der Herkunft fragen, nur bis pasteThreshold Zeichen */
+  pasteOutside: z.enum(['allow', 'ask', 'limit']),
   logbookRequired: z.boolean(),
   aiFeedback: z.boolean(),
   aiDailyLimit: z.number().int().min(0).max(100),
@@ -101,7 +102,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   finishLock: true,
   reopenBy: 'teacher',
   pasteThreshold: 200,
-  pasteExplain: false,
+  pasteOutside: 'allow',
   logbookRequired: true,
   aiFeedback: false,
   aiDailyLimit: 5,
@@ -111,7 +112,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
 export const PRESETS: Record<string, { title: string; patch: Partial<ProjectSettings> }> = {
   referat: {
     title: 'Gruppenreferat',
-    patch: { groupFormation: 'choice', docTypes: { ...DEFAULT_SETTINGS.docTypes, slides: true, handout: true }, logbookRequired: true, aiFeedback: true, pasteExplain: false },
+    patch: { groupFormation: 'choice', docTypes: { ...DEFAULT_SETTINGS.docTypes, slides: true, handout: true }, logbookRequired: true, aiFeedback: true, pasteOutside: 'allow' },
   },
   seminar: {
     title: 'Seminararbeit in Gruppen',
@@ -123,7 +124,7 @@ export const PRESETS: Record<string, { title: string; patch: Partial<ProjectSett
   },
   pruefung: {
     title: 'Präsentationsprüfung',
-    patch: { groupFormation: 'teacher', aiFeedback: false, pasteExplain: true, pasteThreshold: 50, logbookRequired: true, reopenBy: 'teacher' },
+    patch: { groupFormation: 'teacher', aiFeedback: false, pasteOutside: 'ask', pasteThreshold: 50, logbookRequired: true, reopenBy: 'teacher' },
   },
 };
 
@@ -158,6 +159,8 @@ export function parseSettings(json: string | null | undefined): ProjectSettings 
   } catch {
     raw = {};
   }
+  // bis 0.6.1 hieß „nach der Herkunft fragen“ pasteExplain
+  if (!('pasteOutside' in raw) && raw.pasteExplain === true) raw.pasteOutside = 'ask';
   const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
   for (const [k, def] of Object.entries(DEFAULT_SETTINGS)) {
     if (!(k in raw)) continue;
