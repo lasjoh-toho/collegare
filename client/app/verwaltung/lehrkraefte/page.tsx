@@ -112,7 +112,7 @@ export default function Lehrkraefte() {
                     <td>
                       <span className={v.acts}>
                         {t.id !== me?.id && (
-                          <button className="btn" onClick={() => viewAs(t)} title="Collegare so sehen wie diese Lehrkraft (wird protokolliert)">
+                          <button className="btn" onClick={() => viewAs(t)} title="Als diese Lehrkraft ansehen">
                             Übersicht
                           </button>
                         )}

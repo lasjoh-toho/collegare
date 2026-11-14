@@ -74,6 +74,11 @@ export const SettingsSchema = z.object({
   aiDailyLimit: z.number().int().min(0).max(100),
   /** Folien: Lernende dürfen PowerPoint, Bento-Dateien und JSON importieren (Wunsch Jo: standardmäßig aus) */
   slidesImportStudents: z.boolean(),
+  /**
+   * Erklärungen hinter den i-Knöpfen der Seiten (Wunsch Jo, 14. November 2026): je Schlüssel eigener Text der
+   * Lehrkraft (leer = Standardtext) und ob die Erklärung beim ersten Öffnen von selbst aufgeht.
+   */
+  infos: z.record(z.string().max(40), z.object({ text: z.string().max(2000), start: z.boolean() })),
 });
 export type ProjectSettings = z.infer<typeof SettingsSchema>;
 
@@ -109,6 +114,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   aiFeedback: false,
   aiDailyLimit: 5,
   slidesImportStudents: false,
+  infos: {},
 };
 
 /** Voreinstellungen der Leiste oben auf der Einstellungsseite: setzen nur die genannten Felder. */
@@ -164,6 +170,10 @@ export function parseSettings(json: string | null | undefined): ProjectSettings 
   }
   // bis 0.6.1 hieß „nach der Herkunft fragen“ pasteExplain
   if (!('pasteOutside' in raw) && raw.pasteExplain === true) raw.pasteOutside = 'ask';
+  // bis 0.7.0 hatte nur die Mindmap eine Erklärblase (mapHelp, mapHelpText)
+  if (!('infos' in raw) && (raw.mapHelp === false || (typeof raw.mapHelpText === 'string' && raw.mapHelpText.trim()))) {
+    raw.infos = { mindmap: { text: typeof raw.mapHelpText === 'string' ? raw.mapHelpText.slice(0, 2000) : '', start: raw.mapHelp !== false } };
+  }
   const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
   for (const [k, def] of Object.entries(DEFAULT_SETTINGS)) {
     if (!(k in raw)) continue;

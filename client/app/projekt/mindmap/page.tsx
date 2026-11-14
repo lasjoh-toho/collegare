@@ -117,20 +117,7 @@ export default function MindmapPage() {
   const [hist, setHist] = useState({ u: 0, r: 0 });
   const syncHist = () => setHist({ u: undoStack.current.length, r: redoStack.current.length });
   // geschlossene Erklärblase: gemerkt wird ihr Text, damit ein neuer Text der Lehrkraft wieder erscheint
-  const [closedHelp, setClosedHelp] = useState<string[]>([]);
-  const helpStore = `collegare-mindmap-blase-${idParam ?? ''}`;
-  useEffect(() => {
-    try {
-      setClosedHelp(JSON.parse(localStorage.getItem(helpStore) ?? '[]'));
-    } catch {}
-  }, [helpStore]);
-  const closeHelp = (text: string, closed: boolean) => {
-    const next = closed ? [...closedHelp.filter((t) => t !== text), text].slice(-5) : closedHelp.filter((t) => t !== text);
-    setClosedHelp(next);
-    try {
-      localStorage.setItem(helpStore, JSON.stringify(next));
-    } catch {}
-  };
+
 
   useEffect(() => {
     if (me === null) location.replace(href('/'));
@@ -280,22 +267,18 @@ export default function MindmapPage() {
   const canEdit = !join?.readOnly;
   const hasTopic = !!join?.scopes?.some((x) => x.scope === 'p');
   const empty = !!map && Object.keys(map.cards).length === 0;
-  // Erklärblase: Text der Lehrkraft aus den Einstellungen oder Standardtext; je Person mit × schließbar
+  // Erklärung hinter dem i-Knopf (früher eine Blase über der Fläche); Text anpassbar durch die Lehrkraft
   const settings = project.settings;
-  const helpText =
-    settings.mapHelp === false
-      ? ''
-      : settings.mapHelpText?.trim() ||
-        (isTopic
-          ? canEdit
-            ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
-            : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
-          : canEdit
-            ? view === 'karten'
-              ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
-              : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
-            : 'Hier seht ihr die Mindmap der Gruppe.');
-  const helpClosed = closedHelp.includes(helpText);
+  const helpText = isTopic
+    ? canEdit
+      ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
+      : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
+    : canEdit
+      ? view === 'karten'
+        ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
+        : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
+      : 'Hier seht ihr die Mindmap der Gruppe.';
+  const info = isTopic ? { key: 'mindmap-topic', title: 'Themen-Mindmap', text: helpText, start: true } : { key: 'mindmap', title: 'Mindmap der Gruppe', text: helpText, start: true };
   const center = isTopic ? project.title : join?.scopes?.find((x) => x.scope === scope)?.title || project.title;
 
   const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold } : null;
@@ -308,10 +291,11 @@ export default function MindmapPage() {
         where={outlineOpen ? 'Mindmap und Gliederung' : 'Mindmap'}
         phase={isTopic ? 'topic' : 'orientation'}
         fill
+        info={info}
         actions={
           <>
             {join?.scopes && join.scopes.length > 1 && (
-              <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Themen-Mindmap oder Mindmap welcher Gruppe?">
+              <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Welche Mindmap?">
                 {join.scopes.map((x) => (
                   <option key={x.scope} value={x.scope}>
                     {x.title}
@@ -329,11 +313,6 @@ export default function MindmapPage() {
                     <Icon name="grid" size={14} /> <span className={s.long}>Karten</span>
                   </button>
                 </span>
-                {helpText && helpClosed && (
-                  <button className="btn icon" onClick={() => closeHelp(helpText, false)} title="Erklärung wieder zeigen" aria-label="Erklärung zeigen">
-                    ?
-                  </button>
-                )}
                 {!isTopic && (
                   <>
                     <select className={s.scope} value={dim} onChange={(e) => setDim(e.target.value as MapDim)} title="Was soll kräftig erscheinen?" aria-label="Hervorheben">
@@ -344,7 +323,7 @@ export default function MindmapPage() {
                     <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
                       Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
                     </button>
-                    <button className="btn primary" onClick={takeOutline} title="Was ihr „In die Gliederung“ genommen habt, wird in Lesereihenfolge zu Abschnitten">
+                    <button className="btn primary" onClick={takeOutline} title="Übernommenes wird zu Abschnitten">
                       <span className={s.long}>Gliederung </span>übernehmen
                     </button>
                   </>
@@ -361,14 +340,6 @@ export default function MindmapPage() {
             </div>
           )}
           <div className={s.notes}>
-            {map && helpText && !helpClosed && (
-              <div className={`panel ${s.banner} ${s.help}`} role="note">
-                <button className={`btn icon ${s.helpX}`} onClick={() => closeHelp(helpText, true)} title="Erklärung schließen" aria-label="Erklärung schließen">
-                  ×
-                </button>
-                <span>{helpText}</span>
-              </div>
-            )}
             {!isTopic && empty && hasTopic && canEdit && (
               <div className={`panel ${s.banner}`}>
                 Eure Mindmap ist noch leer.
@@ -383,7 +354,7 @@ export default function MindmapPage() {
               <button className="btn icon" onClick={undo} disabled={!hist.u} title="Rückgängig (Strg+Z)" aria-label="Rückgängig">
                 ↶
               </button>
-              <button className="btn icon" onClick={redo} disabled={!hist.r} title="Wiederholen (Strg+Umschalt+Z oder Strg+Y)" aria-label="Wiederholen">
+              <button className="btn icon" onClick={redo} disabled={!hist.r} title="Wiederholen (Strg+Y)" aria-label="Wiederholen">
                 ↷
               </button>
             </div>

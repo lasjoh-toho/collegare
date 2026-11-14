@@ -90,6 +90,7 @@ export interface ProjectSettings {
   aiFeedback: boolean;
   aiDailyLimit: number;
   slidesImportStudents: boolean;
+  infos: Record<string, { text: string; start: boolean }>;
 }
 
 export interface ProjectView {

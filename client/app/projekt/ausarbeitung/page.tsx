@@ -194,7 +194,7 @@ export default function Ausarbeitung() {
                 </p>
               )}
               {data.outlineAt && (
-                <button className={`btn ${sections.length ? '' : 'primary'}`} onClick={sync} title="Neue Karten der Gliederung werden zu Abschnitten; Titel und Reihenfolge werden übernommen">
+                <button className={`btn ${sections.length ? '' : 'primary'}`} onClick={sync} title="Gliederung übernehmen">
                   {sections.length ? 'Mit der Gliederung abgleichen' : 'Abschnitte anlegen'}
                 </button>
               )}

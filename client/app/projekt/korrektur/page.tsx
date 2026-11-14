@@ -342,7 +342,7 @@ function Workspace(props: {
             <button
               className="btn"
               disabled={g.points === null}
-              title="Note und Rückmeldung als Vorschlag für die anderen der Gruppe übernehmen; danach je Person anpassen"
+              title="Für die ganze Gruppe übernehmen"
               onClick={async () => {
                 await props.onCopy(g);
                 setCopied(`Für ${others} weitere übernommen`);

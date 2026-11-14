@@ -22,7 +22,7 @@ export default function ChatPage() {
   }, [id]);
   if (!me || !project) return <Topbar me={me ?? null} />;
   return (
-    <ProjectShell me={me} project={project} where="Chat" fill>
+    <ProjectShell me={me} project={project} info={{ key: 'chat', title: 'Chat', text: 'Hier sprecht ihr euch ab. Beiträge lassen sich in die Mindmap ziehen.' }} where="Chat" fill>
       <ChatPanel me={me} project={project} wanted={wanted} />
     </ProjectShell>
   );

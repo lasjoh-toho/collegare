@@ -116,6 +116,7 @@ export default function Folien() {
       me={me}
       project={project}
       where="Folien"
+      info={{ key: 'folien', title: 'Folien', text: 'Eure Präsentation, bedient wie PowerPoint: Oben stehen Datei, Start, Einfügen und die anderen Registerkarten, rechts der Formatbereich zur gewählten Registerkarte. Gespeichert wird von selbst. Unter „Datei“ lässt sich die Präsentation als PowerPoint, Bento-Datei oder JSON herunterladen.' }}
       phase="presentation"
       fill
       actions={

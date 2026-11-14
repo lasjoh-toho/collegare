@@ -29,7 +29,7 @@ export function TeacherActions({ project, onChanged }: { project: ProjectView; o
     <>
       <div className={p.actions}>
         {project.course.moodle ? (
-          <button className="btn" onClick={moodleImport} title="Teilnehmende des Moodle-Kurses übernehmen">
+          <button className="btn" onClick={moodleImport} title="Aus Moodle übernehmen">
             ↻ <span className={p.label}>Aus Moodle</span>
           </button>
         ) : (

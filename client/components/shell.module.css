@@ -1,20 +1,22 @@
 /* Rahmen der Projektseiten: Kopfzeile, Seitenmenü (docs/gestaltung.md, Abschnitt 6). Neutral grau, keine Markenfarbe. */
-.shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+.shell { --head-h: 40px; min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
 .shell.fill { height: 100dvh; min-height: 0; }
 .head {
   grid-column: 1 / -1; position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 10px;
-  min-height: 52px; padding: 0 12px 0 6px; border-bottom: 1px solid var(--ui-border);
+  height: var(--head-h); padding: 0 10px 0 4px; border-bottom: 1px solid var(--ui-border);
   background: linear-gradient(180deg, var(--ui-panel), color-mix(in srgb, var(--ui-panel) 70%, var(--ui-bg)));
 }
 .who {
-  flex: 0 1 auto; display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 42vw; padding: 5px 10px 5px 8px; border-radius: 10px;
+  flex: 0 1 auto; display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 42vw; padding: 2px 8px 2px 6px; border-radius: 8px;
   text-align: left; color: var(--ui-text);
 }
 .who:hover, .who[aria-expanded='true'] { background: var(--ui-sunken); }
-.whoText { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.whoText { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.whoName { font-size: 13px; }
 .whoName { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.whoClass { font-size: 11.5px; color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.where { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; }
+.whoClass { font-size: 11px; color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.whereBox { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.where { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; }
 .where strong { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
 .project { color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }
 .sep { color: var(--ui-faint); }
@@ -66,7 +68,7 @@ div.phase { opacity: 0.75; }
 
 /* angeheftet oder aufgeklappt auf breiten Bildschirmen (ProjectShell): Menü als Spalte links, Inhalt rückt zur Seite */
 .pushed { grid-template-columns: 340px minmax(0, 1fr); }
-.pushed .menu { position: sticky; top: 52px; height: calc(100dvh - 52px); width: auto; transform: none; visibility: visible; box-shadow: none; z-index: 5; }
+.pushed .menu { position: sticky; top: var(--head-h); height: calc(100dvh - var(--head-h)); width: auto; transform: none; visibility: visible; box-shadow: none; z-index: 5; }
 .pushed.fill .menu { height: auto; }
 .pinned .closeBtn { display: none; }
 .pinBtn { color: var(--ui-muted); }
@@ -89,12 +91,16 @@ div.phase { opacity: 0.75; }
 @media (max-width: 560px) {
   .actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
   .where { display: none; }
+  .whereBox { flex: 0 0 auto; }
 }
 
 /* Chat als Leiste am rechten Rand (zuschaltbar in der Kopfzeile); schmal: über dem Inhalt */
 .chat {
-  position: fixed; right: 0; top: 52px; bottom: 0; z-index: 20; width: 360px; display: flex; flex-direction: column;
+  position: fixed; right: 0; top: var(--head-h); bottom: 0; z-index: 20; width: var(--side-w, 360px); display: flex; flex-direction: column;
   border-left: 1px solid var(--ui-border); box-shadow: -6px 0 18px rgba(0, 0, 0, 0.06); background: var(--ui-bg);
 }
-@media (min-width: 900px) { .chatOpen .body { margin-right: 360px; } }
-@media (max-width: 899px) { .chat { width: min(380px, 100vw); box-shadow: var(--shadow); } }
+@media (min-width: 900px) { .chatOpen .body { margin-right: var(--side-w, 360px); } }
+/* Griff am linken Rand der Leiste: Breite ziehen */
+.sideGrip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; touch-action: none; }
+.sideGrip:hover, .sideGrip:active { background: linear-gradient(90deg, transparent 3px, var(--ui-accent) 3px, var(--ui-accent) 5px, transparent 5px); }
+@media (max-width: 899px) { .chat { width: min(var(--side-w, 380px), 100vw); box-shadow: var(--shadow); } }

@@ -897,7 +897,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
             <div
               className={`${b.handle} ${b.start} ${selGeo.fork ? b.forked : ''} ${pick?.kind === 'start' ? b.picked : ''}`}
               style={{ left: selGeo.a.p[0], top: selGeo.a.p[1], ['--c' as string]: selGeo.color }}
-              title="Ansatz verschieben; auf einen Stopp eines anderen Asts ziehen: dort abzweigen (Doppelklick: wieder automatisch)"
+              title="Ansatz ziehen"
               {...handleDrag(selGeo, 'start', -1)}
               onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { start: null, fork: null } })}
             />
@@ -906,7 +906,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
                 key={i}
                 className={`${b.handle} ${b.stop} ${pick?.kind === 'via' && pick.i === i ? b.picked : ''}`}
                 style={{ left: v[0], top: v[1], ['--c' as string]: selGeo.color }}
-                title="Zwischenstopp ziehen (antippen und Entf oder Doppelklick: entfernen)"
+                title="Zwischenstopp ziehen"
                 {...handleDrag(selGeo, 'via', i)}
                 onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } }).then((ok) => void (ok && shiftForks(selGeo.n.card.id, i, -1)))}
               />
@@ -917,7 +917,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
                   key={`h${i}${sg}`}
                   className={`${b.handle} ${b.hand} ${pick?.kind === 'hand' && pick.i === i ? b.picked : ''}`}
                   style={{ left: selGeo.via[i][0] + sg * h[0], top: selGeo.via[i][1] + sg * h[1], ['--c' as string]: selGeo.color }}
-                  title="Bézier-Griff: Richtung und Schwung der Kurve (antippen und Entf oder Doppelklick: wieder automatisch)"
+                  title="Kurve formen"
                   {...handleDrag(selGeo, 'hand', i, sg)}
                   onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.map((v, j): MapVia => (j === i ? [v[0], v[1]] : v)) } })}
                 />
@@ -969,7 +969,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
             <button
               className="btn"
               disabled={(selected.via?.length ?? 0) >= 12}
-              title="Zwischenstopp auf dem Ast setzen (auch per Doppelklick auf die Linie), dann ziehen"
+              title="Zwischenstopp setzen"
               onClick={() => {
                 const pts: V[] = [selGeo.a.p, ...selGeo.via, selGeo.z.p];
                 const [p, q] = [pts[pts.length - 2], pts[pts.length - 1]];
@@ -980,7 +980,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
             </button>
           )}
           {((selected.via?.length ?? 0) > 0 || selected.start || selected.fork) && (
-            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { via: [], start: null, fork: null } }).then((ok) => void (ok && shiftForks(selected.id, null, -1)))} title="Zwischenstopps und Abzweigung entfernen, Ansatz wieder automatisch">
+            <button className="btn" onClick={() => void send({ type: 'update', id: selected.id, patch: { via: [], start: null, fork: null } }).then((ok) => void (ok && shiftForks(selected.id, null, -1)))} title="Ast zurücksetzen">
               Linie zurücksetzen
             </button>
           )}
@@ -989,7 +989,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
               <button key={c} className={b.swatch} style={{ background: c }} title="Farbe des Asts" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: c } })} />
             ))}
             {selected.color && selected.kind === 'card' && (
-              <button className={`${b.swatch} ${b.auto}`} title="Farbe automatisch: leicht abgewandelt vom Ast davor" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: null } })}>
+              <button className={`${b.swatch} ${b.auto}`} title="Farbe automatisch" onClick={() => void send({ type: 'update', id: selected.id, patch: { color: null } })}>
                 A
               </button>
             )}
@@ -1042,7 +1042,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
             </button>
           )}
           {selected.kind === 'cluster' && selected.children.some((id) => !map.cards[id]?.pick) && (
-            <button className="btn" onClick={() => void togglePick(selected, true)} title="Ast mit allen seinen Karten übernehmen">
+            <button className="btn" onClick={() => void togglePick(selected, true)} title="Ast übernehmen">
               Ganzer Ast
             </button>
           )}
@@ -1050,7 +1050,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
             <Icon name="pen" size={14} /> Umbenennen
           </button>
           {selected.kind === 'card' && (
-            <button className="btn" onClick={() => setEditor(selected.id)} title="Karte mit Text, Listen, Link und Quelle bearbeiten">
+            <button className="btn" onClick={() => setEditor(selected.id)} title="Karte bearbeiten">
               Text{selected.text ? ' ✎' : ''}
             </button>
           )}

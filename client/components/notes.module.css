@@ -1,7 +1,11 @@
 .wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--ui-bg); }
-.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
-.bar select { height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; padding: 0 8px; max-width: 220px; }
-.barTitle { font-size: 14px; }
+.bar { position: relative; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 36px 4px 12px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
+.bar select { min-width: 0; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; padding: 0 8px; max-width: 220px; }
+.barTitle { font-size: 14px; white-space: nowrap; }
+.barScope { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.add { flex: none; font-size: 18px; font-weight: 500; color: var(--ui-accent); }
+/* Schließen ganz oben rechts an der Kante (Wunsch Jo), nicht in einer umbrochenen zweiten Zeile */
+.close { position: absolute; top: 4px; right: 6px; }
 .notice { margin: 20px; padding: 16px; max-width: 480px; }
 .list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 24px; }
 .inner { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }

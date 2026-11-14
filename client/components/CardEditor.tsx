@@ -143,7 +143,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
           <div className="field">
             <div className="row">
               <label className="grow">Text</label>
-              <button type="button" className={`btn ${e.mdToggle} ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Text als Markdown bearbeiten (für Profis)">
+              <button type="button" className={`btn ${e.mdToggle} ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Markdown">
                 Markdown
               </button>
             </div>

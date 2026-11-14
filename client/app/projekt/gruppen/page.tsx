@@ -62,7 +62,7 @@ export default function Gruppen() {
   const ph = phaseList(project.settings, project.mode === 'single').find((x) => x.key === 'groups')!;
 
   return (
-    <ProjectShell me={me} project={project} where="Gruppen" phase="groups" actions={teacher && <TeacherActions project={project} onChanged={load} />}>
+    <ProjectShell me={me} project={project} info={{ key: 'gruppen', title: 'Gruppen', text: 'Jede Säule ist eine Gruppe. Je nach Einstellung teilt die Lehrkraft ein oder ihr wählt selbst eine Säule.' }} where="Gruppen" phase="groups" actions={teacher && <TeacherActions project={project} onChanged={load} />}>
       <div className={p.main}>
         {!teacher && <p className={p.brief}>{ph.help}</p>}
         {project.board.members.length === 0 && teacher && (

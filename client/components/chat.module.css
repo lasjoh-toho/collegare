@@ -1,6 +1,8 @@
 .wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--ui-bg); }
-.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
+.bar { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px; padding: 4px 36px 4px 12px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
 .barTitle { font-size: 14px; }
+/* Schließen ganz oben rechts an der Kante, auch wenn die Zeile umbricht */
+.close { position: absolute; top: 4px; right: 6px; }
 .tip { font-size: 11.5px; }
 .toast { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; background: var(--ui-text); color: var(--ui-panel); font-size: 13px; z-index: 5; max-width: 90%; }
 /* als Leiste: schmaler, Abstände knapper */

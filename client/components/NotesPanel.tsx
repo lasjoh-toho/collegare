@@ -58,7 +58,7 @@ function cardText(n: Note) {
   return parts.filter(Boolean).join('\n\n').slice(0, 5000);
 }
 
-function Editor({ draft, setDraft, onSave, onCancel, busy }: { draft: Draft; setDraft: (d: Draft) => void; onSave: () => void; onCancel?: () => void; busy: boolean }) {
+function Editor({ draft, setDraft, onSave, onCancel, busy, adding = false }: { draft: Draft; setDraft: (d: Draft) => void; onSave: () => void; onCancel?: () => void; busy: boolean; adding?: boolean }) {
   const k = KINDS.find((x) => x.kind === draft.kind)!;
   const ok = !!(draft.title.trim() || draft.body.trim() || draft.url.trim());
   return (
@@ -102,7 +102,7 @@ function Editor({ draft, setDraft, onSave, onCancel, busy }: { draft: Draft; set
           </button>
         )}
         <button className="btn primary" type="submit" disabled={!ok || busy}>
-          {onCancel ? 'Speichern' : 'Hinzufügen'}
+          {onCancel && !adding ? 'Speichern' : 'Hinzufügen'}
         </button>
       </div>
     </form>
@@ -115,6 +115,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   const [notes, setNotes] = useState<Note[]>([]);
   const [scope, setScope] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(empty());
+  // Eingabe erst nach „+“ in der Kopfzeile (Wunsch Jo), nicht gleich ein leeres Formular
+  const [adding, setAdding] = useState(false);
   const [edit, setEdit] = useState<{ id: number; d: Draft } | null>(null);
   const [filter, setFilter] = useState<Kind | 'all'>('all');
   const [busy, setBusy] = useState(false);
@@ -167,7 +169,10 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     setBusy(true);
     sock.current.emit('notes:add', { projectId: id, scope, note: payload(draft) }, (r: { ok: boolean; error?: string }) => {
       setBusy(false);
-      if (r.ok) setDraft(empty(draft.kind));
+      if (r.ok) {
+        setDraft(empty(draft.kind));
+        setAdding(false);
+      }
       else show(r.error ?? 'Speichern fehlgeschlagen');
     });
   }
@@ -205,11 +210,16 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
             ))}
           </select>
         ) : (
-          title && <span className="muted">{title}</span>
+          title && <span className={`muted ${c.barScope}`}>{title}</span>
+        )}
+        {scope && (
+          <button className={`btn icon ${c.add} ${adding ? 'on' : ''}`} onClick={() => setAdding((a) => !a)} title={adding ? 'Eingabe schließen' : 'Neue Notiz, Quelle oder Link'} aria-label="Hinzufügen" aria-expanded={adding}>
+            +
+          </button>
         )}
         <span className="grow" />
         {onClose && (
-          <button className="btn icon" onClick={onClose} title="Notizen schließen" aria-label="Notizen schließen">
+          <button className={`btn icon ${c.close}`} onClick={onClose} title="Schließen" aria-label="Notizen schließen">
             ×
           </button>
         )}
@@ -219,7 +229,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
       ) : (
         <div className={c.list}>
           <div className={c.inner}>
-            <Editor draft={draft} setDraft={setDraft} onSave={add} busy={busy} />
+            {adding && <Editor draft={draft} setDraft={setDraft} onSave={add} onCancel={() => setAdding(false)} busy={busy} adding />}
             <div className={c.filter}>
               <span className="seg" role="group" aria-label="Zeigen">
                 {([['all', 'Alle'], ...KINDS.map((k) => [k.kind, k.label === 'Notiz' ? 'Notizen' : k.label === 'Quelle' ? 'Quellen' : 'Links'])] as [Kind | 'all', string][]).map(([k, label]) => (
@@ -230,7 +240,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
               </span>
               <span className="muted">{panel ? 'In die Mindmap ziehen' : 'Karten lassen sich in die Mindmap ziehen'}</span>
             </div>
-            {join && shown.length === 0 && <p className={`muted ${c.empty}`}>{notes.length ? 'Nichts in dieser Auswahl.' : 'Noch keine Notizen. Was habt ihr gefunden?'}</p>}
+            {join && shown.length === 0 && <p className={`muted ${c.empty}`}>{notes.length ? 'Nichts in dieser Auswahl.' : 'Noch keine Notizen. Mit + oben haltet ihr fest, was ihr gefunden habt.'}</p>}
             {shown.map((n) =>
               edit?.id === n.id ? (
                 <div key={n.id} className={`${c.note} ${c.editing}`}>

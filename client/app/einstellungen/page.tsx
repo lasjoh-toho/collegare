@@ -328,20 +328,6 @@ export default function Einstellungen() {
               </div>
             );
           })}
-          <h4>Erklärblase in der Mindmap</h4>
-          <Check label="Erklärblase zeigen (Lernende können sie mit × schließen)" checked={s.mapHelp ?? true} onChange={(v) => set('mapHelp', v)} />
-          {(s.mapHelp ?? true) && (
-            <div className="field">
-              <label>Eigener Text (leer lassen für den Standardtext)</label>
-              <textarea
-                rows={3}
-                maxLength={1000}
-                value={s.mapHelpText ?? ''}
-                onChange={(ev) => set('mapHelpText', ev.target.value)}
-                placeholder="Standard: Sammelt Ideen mit + oder Tab. Wird eine Idee zum Thema, macht sie „Als Abschnitt“ zum Hauptast …"
-              />
-            </div>
-          )}
         </AccBox>
 
         <AccBox open={open.has('docs')} onToggle={toggle} id="docs" title="Dokumente und Dateien">

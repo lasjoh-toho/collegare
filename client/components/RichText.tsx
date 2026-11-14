@@ -281,7 +281,7 @@ export function RichText({
         <div className={r.bar} role="toolbar" aria-label="Auszeichnen" onMouseDown={keepFocus}>
           {buttons}
           <span className="grow" />
-          <button type="button" className="btn on" onClick={togglePin} title="Leiste lösen: Werkzeuge erscheinen dann über markiertem Text">
+          <button type="button" className="btn on" onClick={togglePin} title="Leiste lösen">
             📌
           </button>
         </div>
@@ -312,7 +312,7 @@ export function RichText({
           ) : (
             <>
               {buttons}
-              <button type="button" className="btn" onClick={togglePin} title="Als feste Leiste über dem Text anheften">
+              <button type="button" className="btn" onClick={togglePin} title="Leiste anheften">
                 📌
               </button>
             </>

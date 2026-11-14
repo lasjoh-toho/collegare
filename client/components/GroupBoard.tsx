@@ -253,7 +253,7 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
                     + {teacher ? 'Gruppe' : 'Neue Gruppe'}
                   </button>
                   {teacher && (
-                    <button className="btn" onClick={() => void openFromMap()} title="Cluster und Karten der Themen-Mindmap als Gruppen anlegen; die Titel lassen sich danach ändern">
+                    <button className="btn" onClick={() => void openFromMap()} title="Gruppen aus der Themen-Mindmap">
                       Aus der Themen-Mindmap …
                     </button>
                   )}

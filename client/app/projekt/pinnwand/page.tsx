@@ -104,6 +104,7 @@ export default function PinnwandPage() {
       me={me}
       project={project}
       where="Pinnwand"
+      info={{ key: 'pinnwand', title: 'Pinnwand', text: 'Die Pinnwand eurer Gruppe: Karten, Bilder, Links und Medien frei anordnen. Änderungen der anderen erscheinen von selbst.' }}
       phase="presentation"
       fill
       actions={
@@ -127,7 +128,7 @@ export default function PinnwandPage() {
             <button
               className="btn"
               onClick={() => void fromMap()}
-              title="Was in der Mindmap „In die Gliederung“ übernommen ist: Äste werden Rahmen im Roten Faden, Karten werden Zettel. Ergänzt nur, was noch fehlt."
+              title="Gliederung aus der Mindmap übernehmen"
             >
               Aus der Mindmap
             </button>

@@ -204,7 +204,7 @@ export default function SeitePage() {
 
   const extraTools = (api: EditorApi) => (
     <>
-      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('note', 'Randnotiz'))} title="Nummerierte Randnotiz (Tufte-Seitennotiz); antippen zum Ändern">
+      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('note', 'Randnotiz'))} title="Randnotiz">
         Randnotiz
       </button>
       <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('margin', 'Bemerkung'))} title="Randbemerkung ohne Nummer">
@@ -217,11 +217,11 @@ export default function SeitePage() {
           const w = api.selectedText().trim() || 'Wort';
           api.insertHtml(glossHtml(w, 'Erklärung'));
         }}
-        title="Worterklärung: Wort leicht fett, Erklärung erst beim Antippen"
+        title="Worterklärung"
       >
         Worterklärung
       </button>
-      <label className="btn" title="Bild einfügen; die Unterschrift steht am Rand">
+      <label className="btn" title="Bild einfügen">
         Bild
         <input
           type="file"
@@ -285,13 +285,13 @@ export default function SeitePage() {
           <div className={st.editor}>
             <input className={st.titleIn} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titel der Seite" />
             <div className={st.tools}>
-              <label className="btn" title="Word-Datei (DOCX) als Lernseite übernehmen; Fußnoten werden Randnotizen">
+              <label className="btn" title="Word-Datei übernehmen">
                 Word übernehmen
                 <input type="file" accept=".docx" hidden onChange={(e) => e.target.files?.[0] && void importDocx(e.target.files[0])} />
               </label>
               {msg && <span className={st.msg}>{msg}</span>}
               <span className="grow" />
-              <button type="button" className={`btn ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Seite als Markdown bearbeiten (für Profis)">
+              <button type="button" className={`btn ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Markdown">
                 Markdown
               </button>
             </div>
@@ -307,16 +307,16 @@ export default function SeitePage() {
               <button className="btn" onClick={() => wrap('*', '*', 'kursiv')} title="Kursiv">
                 <i>K</i>
               </button>
-              <button className="btn" onClick={() => wrap('^[', ']', 'Randnotiz')} title="Nummerierte Randnotiz (Tufte-Seitennotiz)">
+              <button className="btn" onClick={() => wrap('^[', ']', 'Randnotiz')} title="Randnotiz">
                 Randnotiz
               </button>
               <button className="btn" onClick={() => wrap('^^[', ']', 'Bemerkung')} title="Randbemerkung ohne Nummer">
                 Marginalie
               </button>
-              <button className="btn" onClick={() => wrap('{', '|Erklärung}', 'Wort')} title="Worterklärung: Wort leicht fett, Erklärung erst beim Antippen">
+              <button className="btn" onClick={() => wrap('{', '|Erklärung}', 'Wort')} title="Worterklärung">
                 Worterklärung
               </button>
-              <button className="btn" onClick={() => line('> ', 'Zitat')} title="Zitat; Zeile „> — Name“ nennt die Quelle">
+              <button className="btn" onClick={() => line('> ', 'Zitat')} title="Zitat">
                 Zitat
               </button>
               <button className="btn" onClick={() => line('- ', 'Punkt')}>

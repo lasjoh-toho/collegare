@@ -554,7 +554,7 @@ export function MindMap({
                 </button>
               )}
               {selCard.kind === 'cluster' && selCard.children.some((id) => !map.cards[id]?.pick) && (
-                <button className="btn" onClick={() => void togglePick(selCard, true)} title="Cluster mit allen seinen Karten übernehmen">
+                <button className="btn" onClick={() => void togglePick(selCard, true)} title="Cluster übernehmen">
                   Ganzer Cluster
                 </button>
               )}

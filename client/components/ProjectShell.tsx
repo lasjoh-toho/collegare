@@ -13,11 +13,14 @@ import type { Me, ProjectView } from '@/lib/types';
 import { ChatPanel } from './ChatPanel';
 import { NotesPanel } from './NotesPanel';
 import { Icon } from './Icon';
+import { InfoButton, type InfoSpec } from './InfoButton';
 import { ThemeSwitch } from './ThemeSwitch';
 import sh from './shell.module.css';
 
 const PIN_KEY = 'collegare-menu-pinned';
 const SIDE_KEY = 'collegare-leiste';
+const SIDE_W_KEY = 'collegare-leiste-breite';
+const clampSide = (w: number) => Math.round(Math.max(280, Math.min(w, 900, innerWidth * 0.7)));
 type Side = 'chat' | 'notes' | null;
 
 interface Props {
@@ -33,16 +36,47 @@ interface Props {
   docs?: DocSummary | null;
   /** volle Höhe ohne Seitenrollen (Editoren, Mindmap) */
   fill?: boolean;
+  /** Erklärung hinter dem i-Knopf neben dem Titel */
+  info?: InfoSpec;
   children: React.ReactNode;
 }
 
-export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, children }: Props) {
+export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
   const [ownDocs, setOwnDocs] = useState<DocSummary | null>(null);
   // Chat oder Notizen als Leiste am rechten Rand (immer nur eine), je Gerät gemerkt
   const [side, setSide] = useState<Side>(null);
+  // Breite der Leiste, am linken Rand ziehbar (Wunsch Jo), je Gerät gemerkt
+  const [sideW, setSideW] = useState(360);
+  useEffect(() => {
+    try {
+      const w = Number(localStorage.getItem(SIDE_W_KEY));
+      if (w) setSideW(clampSide(w));
+    } catch {}
+  }, []);
+  function dragSide(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sideW;
+    let w = startW;
+    const move = (ev: PointerEvent) => {
+      w = clampSide(startW + startX - ev.clientX);
+      setSideW(w);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      document.body.style.cursor = '';
+      try {
+        localStorage.setItem(SIDE_W_KEY, String(w));
+      } catch {}
+    };
+    document.body.style.cursor = 'col-resize';
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  }
   // Herkunftsmarke beim Kopieren innerhalb des Projekts (Karten-Editor, Konzept 8d.3)
   useEffect(() => watchCopy(project.id, me.name), [project.id, me.name]);
   useEffect(() => {
@@ -118,19 +152,22 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }
 
   return (
-    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes ? sh.chatOpen : ''}`}>
+    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
       <header className={sh.head}>
-        <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü: Projekt, Phasen, Tag/Nacht">
+        <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
           <Icon name="menu" size={18} />
           <span className={sh.whoText}>
             <span className={sh.whoName}>{me.name}</span>
             <span className={sh.whoClass}>{teacher ? `Lehrkraft · ${project.course.title}` : (myGroup ? `${project.course.title} · ${myGroup.title}` : project.course.title)}</span>
           </span>
         </button>
-        <div className={sh.where}>
-          <span className={sh.project}>{project.title}</span>
-          <span className={sh.sep}>/</span>
-          <strong>{where}</strong>
+        <div className={sh.whereBox}>
+          <div className={sh.where}>
+            <span className={sh.project}>{project.title}</span>
+            <span className={sh.sep}>/</span>
+            <strong>{where}</strong>
+          </div>
+          {info && <InfoButton project={project} spec={info} />}
         </div>
         <div className={sh.actions}>
           {me.impersonated && (
@@ -140,12 +177,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           )}
           {actions}
           {where !== 'Notizen und Quellen' && (
-            <button className={`btn icon ${showNotes ? 'on' : ''}`} onClick={() => toggleSide(showNotes ? null : 'notes')} title={showNotes ? 'Notizen ausblenden' : 'Notizen und Quellen am rechten Rand zeigen'} aria-pressed={showNotes} aria-label="Notizen und Quellen">
+            <button className={`btn icon ${showNotes ? 'on' : ''}`} onClick={() => toggleSide(showNotes ? null : 'notes')} title={showNotes ? 'Notizen ausblenden' : 'Notizen zeigen'} aria-pressed={showNotes} aria-label="Notizen und Quellen">
               <Icon name="notes" size={16} />
             </button>
           )}
           {chatOn && where !== 'Chat' && (
-            <button className={`btn icon ${showChat ? 'on' : ''}`} onClick={() => toggleSide(showChat ? null : 'chat')} title={showChat ? 'Chat ausblenden' : 'Chat am rechten Rand zeigen'} aria-pressed={showChat} aria-label="Chat">
+            <button className={`btn icon ${showChat ? 'on' : ''}`} onClick={() => toggleSide(showChat ? null : 'chat')} title={showChat ? 'Chat ausblenden' : 'Chat zeigen'} aria-pressed={showChat} aria-label="Chat">
               <Icon name="chat" size={16} />
             </button>
           )}
@@ -272,11 +309,13 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
       </main>
       {showChat && (
         <aside className={sh.chat} aria-label="Chat">
+          <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
           <ChatPanel me={me} project={project} panel onClose={() => toggleSide(null)} />
         </aside>
       )}
       {showNotes && (
         <aside className={sh.chat} aria-label="Notizen und Quellen">
+          <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
           <NotesPanel me={me} project={project} panel onClose={() => toggleSide(null)} />
         </aside>
       )}

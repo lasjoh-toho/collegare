@@ -156,7 +156,7 @@ a { color: var(--accent); text-decoration: none; }
 .grow { flex: 1; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 14px;
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px;
   background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
 }
 .brand { font-weight: 700; letter-spacing: -0.01em; color: var(--fg); }
