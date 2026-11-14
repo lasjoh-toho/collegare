@@ -27,7 +27,19 @@ interface Deck {
   doc: { id: number; title: string; doneAt: number | null } | null;
 }
 
-type Msg = { bento: string; action?: string; doc?: Record<string, unknown>; snapshots?: Record<string, string>; dirty?: boolean; title?: string };
+type Msg = {
+  bento: string;
+  action?: string;
+  doc?: Record<string, unknown>;
+  snapshots?: Record<string, string>;
+  dirty?: boolean;
+  title?: string;
+  kind?: 'wordart' | 'shape' | 'formula';
+  edit?: { id: string; data: string };
+};
+/** offener Einzel-Editor aus der Pinnwand (WordArt, Formen-Editor, Formel) */
+type Insert = { kind: 'wordart' | 'shape' | 'formula'; edit?: { id: string; data: string } };
+const INSERT_TITLE = { wordart: 'WordArt', shape: 'Formen-Editor', formula: 'Formel' } as const;
 
 export default function Folien() {
   const [me] = useMe();
@@ -56,6 +68,24 @@ export default function Folien() {
   const [busy, setBusy] = useState('');
   const toBento = useCallback((msg: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(msg, location.origin), []);
   const toast = useCallback((message: string, kind: 'neutral' | 'success' | 'error' = 'neutral') => toBento({ bento: 'toast', message, kind }), [toBento]);
+  // Einfügen › WordArt / Formen-Editor / Formel: die Editoren der Pinnwand in einem eigenen iframe, erst bei Bedarf geladen
+  const [insert, setInsert] = useState<Insert | null>(null);
+  const editorFrame = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    if (!insert) return;
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== location.origin || ev.source !== editorFrame.current?.contentWindow) return;
+      const m = ev.data as { pinnwandEditor?: string; svg?: string; data?: string; tex?: string };
+      if (m?.pinnwandEditor === 'ready') {
+        editorFrame.current?.contentWindow?.postMessage({ pinnwandEditor: 'init', kind: insert.kind, data: insert.edit?.data ?? '', teacher: project?.role === 'teacher' }, location.origin);
+      } else if (m?.pinnwandEditor === 'done') {
+        toBento({ bento: 'inserted', app: 'pinnwand', kind: insert.kind, svg: m.svg, data: m.data, tex: m.tex, editId: insert.edit?.id });
+        setInsert(null);
+      } else if (m?.pinnwandEditor === 'cancel') setInsert(null);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [insert, project, toBento]);
   // Titel und Speicherstand stehen in der Kopfzeile (Wunsch Jo), Bento meldet beides
   const [title, setTitle] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -67,6 +97,7 @@ export default function Folien() {
       if ((m.bento === 'ready' || m.bento === 'title') && typeof m.title === 'string') setTitle(m.title);
       if (m.bento === 'ready' || m.bento === 'dirty') setDirty(!!m.dirty);
       if (m.bento === 'saved') setDirty(false);
+      if (m.bento === 'insert' && m.kind && m.kind in INSERT_TITLE) setInsert({ kind: m.kind, edit: m.edit });
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
@@ -216,6 +247,13 @@ export default function Folien() {
           <div className={s.editor}>
             <div className={s.stripe} />
             <iframe ref={frame} key={url} className={s.frame} src={url} title="Folien" allow="clipboard-read; clipboard-write; fullscreen; display-capture" allowFullScreen />
+          </div>
+        )}
+        {insert && (
+          <div className={s.insertBack} onClick={(e) => e.target === e.currentTarget && setInsert(null)}>
+            <div className={`panel ${s.insertBox} ${insert.kind === 'formula' ? s.insertFormula : ''}`} role="dialog" aria-label={INSERT_TITLE[insert.kind]}>
+              <iframe ref={editorFrame} className={s.insertFrame} src={`${BASE_PATH}/pinnwand/editor.html`} title={INSERT_TITLE[insert.kind]} />
+            </div>
           </div>
         )}
       </div>

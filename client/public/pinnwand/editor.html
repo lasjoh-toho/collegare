@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Editor</title>
+<!--
+  Einzel-Editor aus mod_pinnwand für die Folien (Einfügen › WordArt, Formen-Editor, Formel): startet js/app.js mit
+  cfg.editorOnly, ohne Pinnwand und ohne Server. Die Seite /projekt/folien/ legt diesen iframe erst an, wenn jemand
+  einen der Knöpfe drückt (nichts davon wird vorher geladen), und spricht per postMessage mit ihm:
+    hierher:  {pinnwandEditor:'init', kind, data?, teacher?}
+    zurück:   {pinnwandEditor:'ready'} · {pinnwandEditor:'done', svg?, data?, tex?} · {pinnwandEditor:'cancel'}
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #1b1d22; color: #f2f3f5; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #status { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
+  /* Formel-Editor: der Dialog füllt das Fenster, der Hintergrund bleibt ruhig */
+  .ic-formula-overlay { background: transparent !important; }
+</style>
+</head>
+<body>
+<div id="status"><p>Editor wird geladen …</p></div>
+<script>
+(function () {
+  'use strict';
+  var status = document.getElementById('status');
+  var root = location.pathname.replace(/\/editor\.html$/, '').replace(/\/$/, '');
+  function post(msg) { msg.pinnwandEditor = msg.pinnwandEditor || 'x'; window.parent.postMessage(msg, location.origin); }
+  function fail(msg) { status.innerHTML = ''; var p = document.createElement('p'); p.textContent = msg; status.appendChild(p); }
+  function load(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = function () { rej(new Error('Datei fehlt: ' + src)); };
+      document.body.appendChild(s);
+    });
+  }
+  var started = false;
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent || e.origin !== location.origin || !e.data || e.data.pinnwandEditor !== 'init' || started) return;
+    started = true;
+    var init = e.data;
+    Promise.all([
+      fetch(root + '/mod/pinnwand/strings.json').then(function (r) {
+        if (!r.ok) throw new Error('Die Pinnwand ist auf diesem Server nicht eingerichtet (scripts/pinnwand-holen.sh).');
+        return r.json();
+      }),
+      fetch(root + '/mod/pinnwand/STAND').then(function (r) { return r.ok ? r.text() : ''; })
+    ]).then(function (res) {
+      var v = encodeURIComponent((res[1] || '').trim().slice(0, 12));
+      window.pinnwandConfig = {
+        cmid: 0, wwwroot: root, strings: res[0], formulatransform: true, formulacalc: true,
+        editorOnly: {
+          kind: init.kind, data: init.data || '', edit: !!init.data, teacher: !!init.teacher,
+          onDone: function (r) { post({ pinnwandEditor: 'done', svg: r.svg, data: r.data, tex: r.tex }); },
+          onCancel: function () { post({ pinnwandEditor: 'cancel' }); }
+        }
+      };
+      var css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = root + '/mod/pinnwand/styles.css?v=' + v;
+      document.head.appendChild(css);
+      var app = document.createElement('div');
+      app.id = 'pinnwand-app'; app.className = 'pinnwand-app';
+      document.body.appendChild(app);
+      status.remove();
+      return load(root + '/mod/pinnwand/js/app.js?v=' + v);
+    }).catch(function (err) { fail(err.message || String(err)); });
+  });
+  post({ pinnwandEditor: 'ready' });
+})();
+</script>
+</body>
+</html>

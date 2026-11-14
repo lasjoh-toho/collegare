@@ -82,6 +82,8 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
       readOnly: !a.write,
       canImport: a.canImport,
       fileActions: ['exportPptx', 'exportJson', 'importPptx', 'importHtml', 'importJson'],
+      // Einfügen › WordArt, Formen-Editor, Formel: die Editoren der Pinnwand (lädt die Folien-Seite erst bei Bedarf)
+      inserts: ['wordart', 'shape', 'formula'],
     };
     const meta = `<meta name="bento-host-config" data-bento-transient content="${escAttr(JSON.stringify(config))}">`;
     return reply
