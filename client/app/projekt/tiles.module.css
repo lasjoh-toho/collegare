@@ -36,3 +36,15 @@ a.tile:hover { box-shadow: var(--shadow), 0 0 0 2px var(--tile-color); }
   .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .tile { min-height: 128px; padding: 12px; }
 }
+/* Abschnitte nach der Rolle im Projekt; Hover im Seitenmenü hebt eine Phase hervor */
+.section { display: flex; flex-direction: column; gap: 10px; padding: 10px; margin: 0 -10px; border-radius: 16px; transition: background 0.15s, box-shadow 0.15s; }
+.section.hot { background: var(--ui-accent-soft); box-shadow: 0 0 0 2px var(--ui-accent); }
+.head { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 650; color: var(--ui-muted); }
+.no { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ui-sunken); color: var(--ui-text); font-size: 12px; }
+.nowChip { padding: 1px 8px; border-radius: 10px; background: var(--ui-accent); color: var(--ui-accent-fg); font-size: 11.5px; }
+.hiddenNote { padding: 1px 8px; border-radius: 10px; background: var(--attr-soft); color: var(--attr); font-size: 11.5px; font-weight: 600; }
+.sub { margin: -4px 0 2px; font-size: 12.5px; color: var(--ui-muted); }
+/* Was Lernende nicht sehen: gepunkteter Rand in der Farbe der Lehrkraft-Hinweise und Zeichen „nur du“ */
+.hidden { outline: 2px dotted var(--attr); outline-offset: -2px; }
+.onlyMe { position: absolute; right: 10px; top: 12px; padding: 1px 7px; border-radius: 9px; background: var(--attr-soft); color: var(--attr); font-size: 11px; font-weight: 700; }
+.teacherOnly { border: 1px dashed var(--attr); }

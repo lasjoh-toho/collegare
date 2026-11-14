@@ -3,6 +3,10 @@
  * Projekt-Übersicht (docs/gestaltung.md, Abschnitt 7): Ist kein Editor offen, zeigt Collegare alle Oberflächen
  * als Kacheln mit Symbol, Name und Zustand. Nicht freigegebene sind gestrichelt mit dem Hinweis, ab wann sie kommen.
  * Lehrkräfte sehen dieselbe Übersicht und oben ihre Knöpfe (Lernende, Zugangscodes, Einstellungen).
+ *
+ * Geordnet nach der Rolle im Projekt (Wunsch Jo, 14. November 2026): erst Allgemeines, dann je Phase ein Abschnitt in
+ * der Reihenfolge des Seitenmenüs. Fährt man im Seitenmenü über eine Phase, leuchten ihre Kacheln auf. Was Lernende
+ * (noch) nicht sehen, trägt für die Lehrkraft das Zeichen „nur du“; ganz unten liegt ihr Testbereich ohne Gruppen.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
@@ -23,6 +27,13 @@ export default function Projekt() {
   const [project, setProject] = useState<ProjectView | null>(null);
   const [docs, setDocs] = useState<DocSummary | null>(null);
   const [error, setError] = useState('');
+  // Phase, über der die Maus im Seitenmenü steht (Ereignis aus ProjectShell)
+  const [hot, setHot] = useState<string | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => setHot((e as CustomEvent<string | null>).detail);
+    addEventListener('collegare:phase-hover', on);
+    return () => removeEventListener('collegare:phase-hover', on);
+  }, []);
 
   const load = useCallback(() => {
     if (!Number.isInteger(id)) return;
@@ -105,38 +116,100 @@ export default function Projekt() {
         {teacher && project.board.members.length === 0 && (
           <div className={`notice ${t.hint}`}>Noch keine Lernenden. Trage sie oben mit „+ Lernende“ ein oder übernimm sie aus Moodle.</div>
         )}
-        <div className={t.grid}>
-          {tiles.map((tile) => {
+        {(() => {
+          const card = (tile: TileDef, opts: { bereich?: string; onlyMe?: string } = {}) => {
             const st = status(tile);
             const color = tile.office ? OFFICE_VAR[tile.office] : 'var(--ui-muted)';
+            const path = tile.path ? tile.path.replace('{id}', String(id)) + (opts.bereich ? `&bereich=${opts.bereich}` : '') : '';
+            const open = opts.bereich ? !!tile.path : st.open;
+            const kind = opts.bereich ? 'released' : st.kind;
             const inner = (
               <>
-                <span className={t.icon} style={{ color: st.kind === 'missing' ? undefined : color }}>
+                <span className={t.icon} style={{ color: kind === 'missing' ? undefined : color }}>
                   <Icon name={tile.icon} size={26} />
-                  {st.kind === 'done' && (
+                  {kind === 'done' && (
                     <span className={t.tick} title="erledigt">
                       <Icon name="check" size={12} />
                     </span>
                   )}
                 </span>
                 <span className={t.title}>{tile.title}</span>
-                <span className={t.line}>{st.line}</span>
-                {!st.open && st.kind === 'missing' && tile.path && <Icon name="lock" size={14} className={t.lock} />}
+                <span className={t.line}>{opts.bereich ? 'Ohne Gruppe ausprobieren, Demo vorbereiten' : st.line}</span>
+                {opts.onlyMe && (
+                  <span className={t.onlyMe} title={opts.onlyMe}>
+                    nur du
+                  </span>
+                )}
+                {!open && kind === 'missing' && tile.path && <Icon name="lock" size={14} className={t.lock} />}
               </>
             );
-            const cls = `${t.tile} ${t[st.kind]}`;
+            const cls = `${t.tile} ${t[kind]} ${opts.onlyMe ? t.hidden : ''}`;
             const style = { '--tile-color': color } as React.CSSProperties;
-            return st.open ? (
-              <a key={tile.key} className={cls} style={style} href={href(tile.path!.replace('{id}', String(id)))} data-office={tile.office ?? undefined}>
+            const key = tile.key + (opts.bereich ?? '');
+            return open ? (
+              <a key={key} className={cls} style={style} href={href(path)} data-office={tile.office ?? undefined}>
                 {inner}
               </a>
             ) : (
-              <div key={tile.key} className={cls} style={style} aria-disabled="true" data-office={tile.office ?? undefined}>
+              <div key={key} className={cls} style={style} aria-disabled="true" data-office={tile.office ?? undefined}>
                 {inner}
               </div>
             );
-          })}
-        </div>
+          };
+          const general = tiles.filter((x) => x.phase === null);
+          const shown = phases.filter((ph) => ph.state !== 'off' && tiles.some((x) => x.phase === ph.key));
+          const testTiles = TILES.filter((x) => ['map', 'notes', 'sections', 'pinnwand', 'slides'].includes(x.key) && (!x.docType || project.settings.docTypes[x.docType]));
+          return (
+            <>
+              {general.length > 0 && (
+                <section className={t.section}>
+                  <h2 className={t.head}>Allgemein</h2>
+                  <div className={t.grid}>{general.map((x) => card(x))}</div>
+                </section>
+              )}
+              {shown.map((ph, i) => {
+                const hidden = teacher && ph.state === 'upcoming';
+                return (
+                  <section key={ph.key} className={`${t.section} ${hot === ph.key ? t.hot : ''}`} data-phase={ph.key}>
+                    <h2 className={t.head}>
+                      <span className={t.no}>{i + 1}</span> {ph.title}
+                      {ph.key === now && <span className={t.nowChip}>jetzt dran</span>}
+                      {hidden && <span className={t.hiddenNote}>Lernende sehen das {ph.badge}</span>}
+                    </h2>
+                    <div className={t.grid}>{tiles.filter((x) => x.phase === ph.key).map((x) => card(x, hidden ? { onlyMe: `Für Lernende ${ph.badge} freigegeben` } : {}))}</div>
+                  </section>
+                );
+              })}
+              {teacher && (
+                <section className={`${t.section} ${t.teacherOnly}`}>
+                  <h2 className={t.head}>
+                    Nur für dich <span className={t.hiddenNote}>Lernende sehen diesen Bereich nicht</span>
+                  </h2>
+                  <p className={t.sub}>Dein Testbereich: Mindmap, Notizen, Texte und Präsentationen ohne Gruppen ausprobieren oder eine Demo vorbereiten.</p>
+                  <div className={t.grid}>
+                    {testTiles.map((x) => card(x, { bereich: 't' + me.id, onlyMe: 'Testbereich, für Lernende unsichtbar' }))}
+                    <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/projekt/korrektur/?id=${id}`)}>
+                      <span className={t.icon}>
+                        <Icon name="check" size={26} />
+                      </span>
+                      <span className={t.title}>Korrektur</span>
+                      <span className={t.line}>Bewerten und Rückmeldung geben</span>
+                      <span className={t.onlyMe}>nur du</span>
+                    </a>
+                    <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/einstellungen/?id=${id}`)}>
+                      <span className={t.icon}>
+                        <Icon name="gear" size={26} />
+                      </span>
+                      <span className={t.title}>Einstellungen</span>
+                      <span className={t.line}>Phasen, Gruppen, Dokumente, Regeln</span>
+                      <span className={t.onlyMe}>nur du</span>
+                    </a>
+                  </div>
+                </section>
+              )}
+            </>
+          );
+        })()}
       </div>
     </ProjectShell>
   );

@@ -64,10 +64,10 @@ div.phase { opacity: 0.75; }
 .body { min-width: 0; min-height: 0; }
 .fill .body { display: flex; flex-direction: column; overflow: hidden; }
 
-/* angeheftet (nur breite Bildschirme, siehe ProjectShell): Menü als Spalte links */
-.pinned { grid-template-columns: 340px minmax(0, 1fr); }
-.pinned .menu { position: sticky; top: 52px; height: calc(100dvh - 52px); width: auto; transform: none; visibility: visible; box-shadow: none; z-index: 5; }
-.pinned.fill .menu { height: auto; }
+/* angeheftet oder aufgeklappt auf breiten Bildschirmen (ProjectShell): Menü als Spalte links, Inhalt rückt zur Seite */
+.pushed { grid-template-columns: 340px minmax(0, 1fr); }
+.pushed .menu { position: sticky; top: 52px; height: calc(100dvh - 52px); width: auto; transform: none; visibility: visible; box-shadow: none; z-index: 5; }
+.pushed.fill .menu { height: auto; }
 .pinned .closeBtn { display: none; }
 .pinBtn { color: var(--ui-muted); }
 .pinned .pinBtn { color: var(--ui-accent); background: var(--ui-accent-soft); }

@@ -29,6 +29,9 @@ export class DocError extends Error {
   }
 }
 
+/** Abschnitt-Kennung der Folienpräsentation einer Gruppe */
+export const DECK = '__folien';
+
 export const collabId = (id: number) => 'cg' + id;
 export function parseCollabId(docId: string): number | null {
   const m = /^cg(\d{1,10})$/.exec(docId);
@@ -109,6 +112,17 @@ export class Documents {
       }
     }
     return { created, total: position };
+  }
+
+  /** Folienpräsentation der Gruppe (klassisch wie PowerPoint, neben der Pinnwand): eine je Bereich, beim ersten Öffnen angelegt */
+  async deck(projectId: number, scope: string): Promise<DocRow> {
+    const found = (await this.list(projectId, scope)).find((d) => d.kind === 'slide' && d.sectionId === DECK);
+    if (found) return found;
+    await this.db
+      .insertInto('documents')
+      .values({ project_id: projectId, scope, section_id: DECK, section_title: 'Präsentation', card_id: null, kind: 'slide', title: 'Präsentation', owner_id: null, position: 0, done_at: null, done_by: null, created_at: Date.now() })
+      .execute();
+    return (await this.list(projectId, scope)).find((d) => d.kind === 'slide' && d.sectionId === DECK)!;
   }
 
   async setDone(id: number, by: number | null): Promise<void> {

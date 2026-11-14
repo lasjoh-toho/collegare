@@ -62,6 +62,8 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }, [docs, project.id]);
   // Anheften nur auf breiten Bildschirmen; am Handy bleibt es ein Menü zum Aufklappen
   const pinned = pinPref && wide;
+  // Auf breiten Bildschirmen schiebt das aufgeklappte Menü den Inhalt zur Seite, statt die Kacheln zu überdecken
+  const pushed = pinned || (open && wide);
 
   useEffect(() => {
     try {
@@ -116,7 +118,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }
 
   return (
-    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${fill ? sh.fill : ''} ${showChat || showNotes ? sh.chatOpen : ''}`}>
+    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes ? sh.chatOpen : ''}`}>
       <header className={sh.head}>
         <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü: Projekt, Phasen, Tag/Nacht">
           <Icon name="menu" size={18} />
@@ -150,7 +152,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
         </div>
       </header>
 
-      {open && !pinned && <div className={sh.scrim} onClick={() => setOpen(false)} />}
+      {open && !pushed && <div className={sh.scrim} onClick={() => setOpen(false)} />}
       <aside id="seitenmenue" className={`${sh.menu} ${open || pinned ? sh.open : ''}`} aria-label="Seitenmenü" aria-hidden={!(open || pinned)}>
         <div className={sh.menuTop}>
           <div className="grow">
@@ -224,12 +226,17 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
                 </span>
               </>
             );
+            // Hover über einem Schritt hebt in der Übersicht die Kacheln dieses Schritts hervor
+            const hover = {
+              onMouseEnter: () => dispatchEvent(new CustomEvent('collegare:phase-hover', { detail: p.key })),
+              onMouseLeave: () => dispatchEvent(new CustomEvent('collegare:phase-hover', { detail: null })),
+            };
             return reachable ? (
-              <a key={p.key} className={cls} href={href(path!.replace('{id}', String(project.id)))}>
+              <a key={p.key} {...hover} className={cls} href={href(path!.replace('{id}', String(project.id)))}>
                 {body}
               </a>
             ) : (
-              <div key={p.key} className={cls} aria-disabled="true">
+              <div key={p.key} {...hover} className={cls} aria-disabled="true">
                 {body}
               </div>
             );

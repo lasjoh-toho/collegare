@@ -391,7 +391,9 @@ describe('Mindmap in Echtzeit', () => {
 
     const st = connect(t);
     const tj = await emit(st, 'map:join', { projectId: project, scope: 'g' + g1 });
-    expect(tj.scopes).toHaveLength(3);
+    // Thema, zwei Gruppen und der Testbereich der Lehrkraft (für Lernende unsichtbar, siehe oben)
+    expect(tj.scopes).toHaveLength(4);
+    expect(tj.scopes[3]).toMatchObject({ scope: expect.stringMatching(/^t\d+$/), title: expect.stringContaining('Testbereich') });
     const seen = new Promise<J>((r) => st.on('map', r));
 
     const ok = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'karte1', kind: 'card', title: 'Hyperinflation', x: 10, y: 10, w: 160, h: 90, owner: ids[1] } } });

@@ -24,7 +24,7 @@ interface Doc {
 }
 interface DocList {
   role: 'teacher' | 'student';
-  scopes: { scope: string; title: string }[];
+  scopes: { scope: string; title: string; test?: boolean }[];
   scope: string | null;
   people: { id: number; name: string }[];
   docs: Doc[];
@@ -122,10 +122,12 @@ export default function Ausarbeitung() {
     if (last && last.id === d.sectionId) last.docs.push(d);
     else sections.push({ id: d.sectionId, title: d.sectionTitle, docs: [d] });
   }
-  const canEdit = (d: Doc) => !teacher && !d.doneAt;
+  // im eigenen Testbereich schreibt die Lehrkraft selbst
+  const inTest = !!data?.scopes.find((x) => x.scope === data.scope)?.test;
+  const canEdit = (d: Doc) => (!teacher || inTest) && !d.doneAt;
   const editorUrl = (d: Doc) =>
     `${BASE_PATH}/office/editor/?${new URLSearchParams({ new: 'docx', collab: 'cg' + d.id, name: me.name, uid: String(me.id), title: d.title, editing: canEdit(d) ? '1' : '0', lang: 'de' })}`;
-  const mayFinish = (d: Doc) => !!data?.finishLock && !teacher && !d.doneAt && (d.ownerId === null || d.ownerId === me.id);
+  const mayFinish = (d: Doc) => !!data?.finishLock && (!teacher || inTest) && !d.doneAt && (d.ownerId === null || d.ownerId === me.id);
   const mayReopen = (d: Doc) => !!d.doneAt && (teacher || data?.reopenBy === 'group');
 
   const status = current

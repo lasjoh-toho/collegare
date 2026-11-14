@@ -7,3 +7,5 @@
 .ask { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
 .ask legend { padding: 0 4px; font-weight: 600; }
 .opt { display: flex; align-items: center; gap: 6px; }
+.mdToggle { height: 22px !important; padding: 0 7px !important; font-size: 11px; }
+.md { font-family: var(--mono); font-size: 12.5px; }

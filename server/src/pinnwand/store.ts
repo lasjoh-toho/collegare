@@ -120,27 +120,66 @@ export class PinStore {
     private now: () => number = Date.now,
   ) {}
 
+  /**
+   * Geladene Bereiche bleiben im Speicher (alle Schreibzugriffe laufen über Scope, der Server ist ein Prozess), damit
+   * nicht jeder Aufruf alle Zeilen eines Boards neu liest. Höchstens CACHE_MAX Bereiche, nach CACHE_IDLE ohne Zugriff
+   * verworfen; schlägt ein Aufruf fehl (auch mit PinError, falls schon etwas geändert war), wird der Bereich neu geladen.
+   */
+  private cache = new Map<string, { sc: Scope; at: number }>();
+  static CACHE_MAX = 64;
+  static CACHE_IDLE = 10 * 60_000;
+
+  private async load(projectId: number, scope: string): Promise<Scope> {
+    const [rows, files] = await Promise.all([
+      this.db.selectFrom('pinnwand_rows').select(['id', 'tbl', 'data']).where('project_id', '=', projectId).where('scope', '=', scope).execute(),
+      this.db.selectFrom('pinnwand_files').select(['id', 'area', 'item_id', 'name', 'mime', 'created_at']).where('project_id', '=', projectId).where('scope', '=', scope).execute(),
+    ]);
+    return new Scope(
+      this.db,
+      projectId,
+      scope,
+      rows.map((r) => ({ id: Number(r.id), tbl: r.tbl, data: r.data })),
+      files.map((f) => ({ id: Number(f.id), area: f.area, itemId: Number(f.item_id), name: f.name, mime: f.mime, createdAt: Number(f.created_at) })),
+      this.now,
+    );
+  }
+
+  private evict() {
+    const now = this.now();
+    for (const [k, v] of this.cache) if (now - v.at > PinStore.CACHE_IDLE && !this.queues.has(k)) this.cache.delete(k);
+    while (this.cache.size > PinStore.CACHE_MAX) {
+      const oldest = [...this.cache].filter(([k]) => !this.queues.has(k)).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!oldest) break;
+      this.cache.delete(oldest[0]);
+    }
+  }
+
   /** Arbeit an einem Bereich, nacheinander (wie eine Transaktion je Aufruf) */
   run<T>(projectId: number, scope: string, fn: (s: Scope) => Promise<T>): Promise<T> {
     const key = projectId + ':' + scope;
     const prev = this.queues.get(key) ?? Promise.resolve();
     const next = prev.catch(() => {}).then(async () => {
-      const [rows, files] = await Promise.all([
-        this.db.selectFrom('pinnwand_rows').select(['id', 'tbl', 'data']).where('project_id', '=', projectId).where('scope', '=', scope).execute(),
-        this.db.selectFrom('pinnwand_files').select(['id', 'area', 'item_id', 'name', 'mime', 'created_at']).where('project_id', '=', projectId).where('scope', '=', scope).execute(),
-      ]);
-      const sc = new Scope(
-        this.db,
-        projectId,
-        scope,
-        rows.map((r) => ({ id: Number(r.id), tbl: r.tbl, data: r.data })),
-        files.map((f) => ({ id: Number(f.id), area: f.area, itemId: Number(f.item_id), name: f.name, mime: f.mime, createdAt: Number(f.created_at) })),
-        this.now,
-      );
-      return fn(sc);
+      let hit = this.cache.get(key);
+      if (!hit) {
+        hit = { sc: await this.load(projectId, scope), at: 0 };
+        this.cache.set(key, hit);
+      }
+      hit.at = this.now();
+      try {
+        return await fn(hit.sc);
+      } catch (e) {
+        // Speicher und Datenbank könnten auseinanderlaufen: beim nächsten Aufruf neu laden
+        this.cache.delete(key);
+        throw e;
+      }
     });
     this.queues.set(key, next);
-    void next.finally(() => this.queues.get(key) === next && this.queues.delete(key)).catch(() => {});
+    void next
+      .finally(() => {
+        if (this.queues.get(key) === next) this.queues.delete(key);
+        this.evict();
+      })
+      .catch(() => {});
     return next;
   }
 

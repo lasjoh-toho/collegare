@@ -28,10 +28,22 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     const a = await scopeAccess(req, reply, projectId, req.query.bereich);
     if (!a) return;
     const p = await s.projects.get(projectId);
-    const base = { role: a.role, scopes: a.scopes.map(({ scope, title }) => ({ scope, title })), finishLock: p!.settings.finishLock, reopenBy: p!.settings.reopenBy };
+    const base = { role: a.role, scopes: a.scopes.map(({ scope, title, test }) => ({ scope, title, test: !!test })), finishLock: p!.settings.finishLock, reopenBy: p!.settings.reopenBy };
     if (!a.scope) return { ...base, scope: null, people: [], docs: [], outlineAt: null };
     const { map } = await s.maps.get(projectId, a.scope.scope);
-    return { ...base, scope: a.scope.scope, people: a.scope.people, docs: await s.documents.list(projectId, a.scope.scope), outlineAt: map.outline?.at ?? null };
+    const docs = (await s.documents.list(projectId, a.scope.scope)).filter((d) => d.kind === 'word');
+    return { ...base, scope: a.scope.scope, people: a.scope.people, docs, outlineAt: map.outline?.at ?? null };
+  });
+
+  // Folienpräsentation der Gruppe (bzw. im Testbereich der Lehrkraft)
+  app.get<{ Params: { id: string }; Querystring: { bereich?: string } }>('/api/projects/:id/folien', async (req, reply) => {
+    const projectId = Number(req.params.id);
+    const a = await scopeAccess(req, reply, projectId, req.query.bereich);
+    if (!a) return;
+    const base = { role: a.role, scopes: a.scopes.map(({ scope, title, test }) => ({ scope, title, test: !!test })) };
+    if (!a.scope) return { ...base, scope: null, doc: null };
+    const doc = await s.documents.deck(projectId, a.scope.scope);
+    return { ...base, scope: a.scope.scope, test: !!a.scope.test, doc };
   });
 
   app.post<{ Params: { id: string } }>('/api/projects/:id/documents/sync', async (req, reply) => {
@@ -98,6 +110,8 @@ export async function authorizeDoc(s: Services, sess: { userId: number; projectI
   if (!doc) return null;
   if (sess.projectId !== null && sess.projectId !== doc.projectId) return null;
   const r = await mapScopes(s, sess.userId, doc.projectId);
-  if (!r || !r.scopes.some((x) => x.scope === doc.scope)) return null;
-  return { view: doc.doneAt !== null || r.role === 'teacher' };
+  const sc = r?.scopes.find((x) => x.scope === doc.scope);
+  if (!r || !sc) return null;
+  // im eigenen Testbereich schreibt die Lehrkraft selbst
+  return { view: doc.doneAt !== null || (r.role === 'teacher' && !sc.test) };
 }

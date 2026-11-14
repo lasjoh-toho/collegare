@@ -68,7 +68,7 @@ export default function PastesPage() {
     <ProjectShell
       me={me}
       project={project}
-      where="Einfüge-Protokoll"
+      where="Quellen"
       phase="research"
       actions={
         teacher && data && data.scopes.length > 1 ? (

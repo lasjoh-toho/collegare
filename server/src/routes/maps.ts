@@ -12,7 +12,12 @@ export interface MapScope {
   people: { id: number; name: string }[];
   /** Lernende dürfen nur lesen (Themen-Mindmap, wenn nur die Lehrkraft daran arbeitet) */
   readOnly?: boolean;
+  /** Testbereich der Lehrkraft: für Lernende unsichtbar, zum Ausprobieren und für Demos */
+  test?: boolean;
 }
+
+/** Testbereich je Lehrkraft (t<id>): Mindmap, Notizen, Pinnwand und Dokumente ohne Gruppen ausprobieren */
+export const testScope = (userId: number) => 't' + userId;
 
 export const TOPIC = 'p';
 
@@ -32,6 +37,10 @@ export async function mapScopes(s: Services, userId: number, projectId: number, 
     const me = board.members.find((m) => m.userId === userId);
     const own = board.mode === 'single' ? 'u' + userId : me?.groupId != null ? 'g' + me.groupId : null;
     scopes = scopes.filter((x) => x.scope === own);
+  }
+  if (role === 'teacher') {
+    const me = await s.users.byId(userId);
+    scopes.push({ scope: testScope(userId), title: 'Mein Testbereich (nur für mich)', people: [{ id: userId, name: me?.name ?? 'Lehrkraft' }], test: true });
   }
   const settings = withTopic ? (await s.projects.get(projectId))?.settings : undefined;
   if (withTopic && settings && settings.phases.topic?.state !== 'off') {

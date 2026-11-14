@@ -1,17 +1,20 @@
 'use client';
 /**
- * Einfacher Karten-Editor (Konzept 8d.3): Titel, Text mit Absätzen, Fett/Kursiv, Listen, Link und Quelle als Markdown,
- * mit Knöpfen statt Office, damit es am Handy geht. Beim Einsetzen gelten die Regeln des Projekts:
+ * Einfacher Karten-Editor (Konzept 8d.3): Titel und Text mit Absätzen, Fett/Kursiv, Listen, Link und Quelle. Der Text
+ * erscheint wie auf der Karte (RichText, Menü über der Markierung); die Markdown-Ansicht gibt es nur für Profis und Notfälle. Beim Einsetzen gelten die Regeln des Projekts:
  * - Text aus dem Projekt (Herkunftsmarke, lib/clip.ts) ist immer erlaubt; die Herkunft lässt sich als Zuschreibung anfügen.
  * - Text von außen ab der Schwelle kommt ins Einfüge-Protokoll; je nach Einstellung wird er einfach eingesetzt, nach der
  *   Herkunft gefragt („später“ ist erlaubt) oder abgewiesen.
  */
-import { useRef, useState, type ClipboardEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent } from 'react';
 import { post } from '@/lib/api';
 import { clipOrigin, type ClipMark } from '@/lib/clip';
 import { PASTE_ANSWERS, usePasteRules } from '@/lib/pasteRules';
 import type { MapCard, MapOp } from '@/lib/types';
 import e from './cardeditor.module.css';
+import { RichText } from './RichText';
+
+const MD_KEY = 'collegare-editor-markdown';
 
 type Answer = (typeof PASTE_ANSWERS)[number]['key'];
 const fmt = (ms: number) => new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -29,6 +32,22 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
   const [note, setNote] = useState('');
   const [cite, setCite] = useState(true);
   const isCard = card.kind === 'card';
+  const [markdown, setMarkdown] = useState(false);
+  useEffect(() => {
+    try {
+      setMarkdown(localStorage.getItem(MD_KEY) === '1');
+    } catch {
+      /* ohne Speicher: WYSIWYG */
+    }
+  }, []);
+  function toggleMarkdown() {
+    setMarkdown(!markdown);
+    try {
+      localStorage.setItem(MD_KEY, markdown ? '0' : '1');
+    } catch {
+      /* egal */
+    }
+  }
 
   async function save() {
     if (title !== card.title || text !== card.text) {
@@ -73,7 +92,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
     });
   }
 
-  function onPaste(ev: ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>) {
+  function onPaste(ev: ClipboardEvent<HTMLElement>) {
     if (!rules) return;
     const pasted = ev.clipboardData.getData('text/plain');
     if (!pasted.trim()) return;
@@ -122,28 +141,39 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
         </div>
         {isCard && (
           <div className="field">
-            <label>Text</label>
-            <div className={e.tools} role="toolbar" aria-label="Auszeichnen">
-              <button type="button" className="btn" onClick={() => wrap('**', 'fett')} title="Fett (**…**)">
-                <b>F</b>
-              </button>
-              <button type="button" className="btn" onClick={() => wrap('*', 'kursiv')} title="Kursiv (*…*)">
-                <i>K</i>
-              </button>
-              <button type="button" className="btn" onClick={() => list(false)} title="Liste mit Punkten">
-                • Liste
-              </button>
-              <button type="button" className="btn" onClick={() => list(true)} title="Nummerierte Liste">
-                1. Liste
-              </button>
-              <button type="button" className="btn" onClick={link} title="Link ([Text](https://…))">
-                Link
-              </button>
-              <button type="button" className="btn" onClick={() => source()} title="Zeile „Quelle:“ anfügen">
-                Quelle
+            <div className="row">
+              <label className="grow">Text</label>
+              <button type="button" className={`btn ${e.mdToggle} ${markdown ? 'on' : ''}`} onClick={toggleMarkdown} aria-pressed={markdown} title="Text als Markdown bearbeiten (für Profis)">
+                Markdown
               </button>
             </div>
-            <textarea ref={area} rows={8} value={text} onChange={(ev) => setText(ev.target.value)} onPaste={onPaste} maxLength={5000} />
+            {markdown ? (
+              <>
+                <div className={e.tools} role="toolbar" aria-label="Auszeichnen">
+                  <button type="button" className="btn" onClick={() => wrap('**', 'fett')} title="Fett (**…**)">
+                    <b>F</b>
+                  </button>
+                  <button type="button" className="btn" onClick={() => wrap('*', 'kursiv')} title="Kursiv (*…*)">
+                    <i>K</i>
+                  </button>
+                  <button type="button" className="btn" onClick={() => list(false)} title="Liste mit Punkten">
+                    • Liste
+                  </button>
+                  <button type="button" className="btn" onClick={() => list(true)} title="Nummerierte Liste">
+                    1. Liste
+                  </button>
+                  <button type="button" className="btn" onClick={link} title="Link ([Text](https://…))">
+                    Link
+                  </button>
+                  <button type="button" className="btn" onClick={() => source()} title="Zeile „Quelle:“ anfügen">
+                    Quelle
+                  </button>
+                </div>
+                <textarea ref={area} rows={8} value={text} onChange={(ev) => setText(ev.target.value)} onPaste={onPaste} maxLength={5000} className={e.md} />
+              </>
+            ) : (
+              <RichText value={text} onChange={setText} onPaste={onPaste} label="Text der Karte" />
+            )}
           </div>
         )}
 
@@ -179,7 +209,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
         )}
         {ask && !ask.open && (
           <div className={e.note} role="status">
-            <span>Eingesetzter Text von außen steht im Einfüge-Protokoll.</span>
+            <span>Eingesetzter Text von außen steht unter „Quellen“.</span>
             <button type="button" className="btn" onClick={() => setAsk({ ...ask, open: true })}>
               Herkunft angeben
             </button>
@@ -203,7 +233,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
               </label>
             )}
             <div className="row">
-              <span className="muted">Du kannst auch später antworten (Einfüge-Protokoll).</span>
+              <span className="muted">Du kannst auch später antworten (unter „Quellen“).</span>
               <span className="grow" />
               <button type="button" className="btn" onClick={() => setAsk(null)}>
                 Später
