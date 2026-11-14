@@ -132,7 +132,7 @@ export const TILES: TileDef[] = [
   { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}', sub: 'Ideen sammeln und ordnen' },
   { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/mindmap/?id={id}&gliederung=1', sub: 'Abschnitte aus den Clustern' },
   { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', path: '/projekt/notizen/?id={id}', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
-  { key: 'pastes', phase: 'research', title: 'Herkunft von Texten', icon: 'clip', path: '/projekt/einfuegen/?id={id}', sub: 'Woher eingesetzte Texte von außen stammen' },
+  { key: 'pastes', phase: 'research', title: 'Arbeitsprozess', icon: 'clip', path: '/projekt/einfuegen/?id={id}', sub: 'Herkunft von Texten: woher eingesetzte Texte von außen stammen' },
   { key: 'sections', phase: 'drafting', title: 'Textabschnitte', icon: 'doc', office: 'word', docType: 'section', path: '/projekt/ausarbeitung/?id={id}', sub: 'Texteditor je Abschnitt' },
   { key: 'pinnwand', phase: 'presentation', title: 'Pinnwand-Präsentation', icon: 'present', path: '/projekt/pinnwand/?id={id}', sub: 'Bilder, Texte und Roter Faden, gezoomt wie Prezi' },
   { key: 'slides', phase: 'presentation', title: 'Folien-Präsentation', icon: 'slides', office: 'slide', docType: 'slides', path: '/projekt/folien/?id={id}', sub: 'Klassisch Folie für Folie, wie PowerPoint' },

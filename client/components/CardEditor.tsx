@@ -209,7 +209,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
         )}
         {ask && !ask.open && (
           <div className={e.note} role="status">
-            <span>Eingesetzter Text von außen steht unter „Herkunft von Texten“.</span>
+            <span>Eingesetzter Text von außen steht unter „Arbeitsprozess“.</span>
             <button type="button" className="btn" onClick={() => setAsk({ ...ask, open: true })}>
               Herkunft angeben
             </button>
@@ -233,7 +233,7 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
               </label>
             )}
             <div className="row">
-              <span className="muted">Du kannst auch später antworten (unter „Herkunft von Texten“).</span>
+              <span className="muted">Du kannst auch später antworten (unter „Arbeitsprozess“).</span>
               <span className="grow" />
               <button type="button" className="btn" onClick={() => setAsk(null)}>
                 Später

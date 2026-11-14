@@ -99,7 +99,7 @@ export default function Projekt() {
   });
 
   return (
-    <ProjectShell me={me} project={project} where="Arbeitsprozess" docs={docs} actions={teacher && <TeacherActions project={project} onChanged={load} />}>
+    <ProjectShell me={me} project={project} where="Übersicht" docs={docs} actions={teacher && <TeacherActions project={project} onChanged={load} />}>
       <div className={t.wrap}>
         {nowInfo && !teacher && (
           <a className={`panel ${t.now}`} href={href(TILES.find((x) => x.phase === now && x.path)?.path?.replace('{id}', String(id)) ?? `/projekt/?id=${id}`)}>

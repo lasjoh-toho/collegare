@@ -1,6 +1,6 @@
 'use client';
 /**
- * Einfüge-Protokoll (Konzept 6.1, 8d.3): Lernende sehen ihre eigenen Einträge und beantworten offene „Woher stammt der
+ * Arbeitsprozess, Abschnitt „Herkunft von Texten“ (Konzept 6.1, 8d.3; Seitentitel Wunsch Jo, 14. November 2026): Lernende sehen ihre eigenen Einträge und beantworten offene „Woher stammt der
  * Text?“-Fragen später; Lehrkräfte sehen alle Gruppen. Eine Grundlage für das Gespräch, keine Bewertung.
  */
 import { useCallback, useEffect, useState } from 'react';
@@ -68,7 +68,7 @@ export default function PastesPage() {
     <ProjectShell
       me={me}
       project={project}
-      where="Herkunft von Texten"
+      where="Arbeitsprozess"
       phase="research"
       actions={
         teacher && data && data.scopes.length > 1 ? (
@@ -84,6 +84,8 @@ export default function PastesPage() {
       }
     >
       <div className={s.page}>
+        <h1 className={s.title}>Arbeitsprozess</h1>
+        <h2 className={s.section}>Herkunft von Texten</h2>
         <p className="muted">
           {rule} {project.settings.pasteThreshold} Zeichen {project.settings.pasteOutside === 'limit' ? 'einsetzen.' : 'nach der Herkunft gefragt bzw. protokolliert.'} Kopieren innerhalb des Projekts gehört nicht
           hierher. {teacher ? 'Das Protokoll ist eine Grundlage für das Gespräch, keine Bewertung.' : 'Offene Fragen kannst du hier beantworten.'}
