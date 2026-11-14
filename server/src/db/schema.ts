@@ -158,6 +158,14 @@ export interface DocumentsTable {
   created_at: Ms;
 }
 
+export interface BentoDecksTable {
+  doc_id: number;
+  data: string;
+  version: number;
+  updated_at: Ms;
+  updated_by: number | null;
+}
+
 export interface DocChangesTable {
   doc_id: string;
   seq: number;
@@ -307,6 +315,7 @@ export interface Database {
   maps: MapsTable;
   documents: DocumentsTable;
   doc_changes: DocChangesTable;
+  bento_decks: BentoDecksTable;
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
   gradings: GradingsTable;

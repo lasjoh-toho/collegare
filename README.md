@@ -12,7 +12,7 @@ Konzept: [docs/konzept.md](docs/konzept.md)
 | `client/` | Projektoberfläche (Kanban, Mindmap, Notizen, Einstellungen), Gestaltung nach brausa; bindet die Editoren per iframe ein |
 | `web/` | Office-Teil, Grundlage [office-website](https://github.com/lasjoh-toho/office-website) (Fork von ZIZIYI Office, AGPL-3.0) mit den OnlyOffice-Editoren |
 | `server/` | Collegare-Server (Node.js, TypeScript): Kollaboration, später LTI, API, Worker |
-| `scripts/` | Hilfsskripte, z. B. OnlyOffice-Dateien holen |
+| `scripts/` | Hilfsskripte, z. B. OnlyOffice-Dateien holen, Bento bauen (`bento-holen.sh`) |
 | `docs/` | Konzept, Ergebnisse der Meilensteine |
 
 ## Installieren
@@ -58,6 +58,7 @@ Gestaltungsrichtlinie für Autogra.fi und Collegare: [docs/gestaltung.md](docs/g
 | Projekt-Übersicht | brausa Projektkacheln | Kacheln je Oberfläche mit den Zuständen aus gestaltung.md 2; oben „Jetzt dran“ mit der Anleitung der aktuellen Phase (wie die Info-Karte in Autogra.fi). Das Board der Gruppenbildung liegt jetzt unter `/projekt/gruppen/` |
 | Ausarbeitung | gestaltung.md 5 | keine Leiste mehr über dem Editor: Titel, Zustand und „Fertig melden“ stehen in der Kopfzeile, darüber nur der 6-px-Streifen in Textblau. Der zarte Verlauf hinter dem OnlyOffice-Menüband fehlt noch (bräuchte eine Änderung in `web/`) |
 | Pinnwand `/projekt/pinnwand/` | mod_pinnwand (Moodle) | unverändert eingebettet (eigene dunkle Oberfläche, Bedienung wie in Moodle), damit dieselbe Pinnwand in Moodle und Collegare gleich bedient wird (Konzept 8d.5). Das Board gehört der Gruppe statt einer Person; Änderungen anderer zeigt Collegare als Hinweis „Neu laden“. Holen mit `scripts/pinnwand-holen.sh` (fester Stand in `scripts/pinnwand.ref`) |
+| Folien `/projekt/folien/` | Bento (eigenständige Ein-Datei-Präsentation, MIT) statt OnlyOffice-Präsentation | Wunsch Jo (14. November 2026): Bento ersetzt den OnlyOffice-Präsentationseditor, weil es Morph, Diagramme aus Tabellen, Format übertragen, eingebettete Schriften und die Medienübersicht mitbringt und eine Präsentation als eine Datei weitergegeben werden kann. Damit sich Lernende wie in PowerPoint zurechtfinden, bekommt Bento ein Menüband (Datei, Start, Einfügen, Entwurf, Übergänge, Animationen, Bildschirmpräsentation, Überprüfen, Ansicht) mit den Begriffen aus PowerPoint; Funktionen, die es in PowerPoint nicht gibt (Morph-Paarung, Zustandsfolien, Hover-Inhalte), stehen im Formatbereich rechts. Import und Export: PowerPoint (.pptx), Bento-HTML, JSON; Import für Lernende erst nach Freischaltung in den Einstellungen. Gespeichert wird auf dem Server (`bento_decks`), noch ohne gleichzeitiges Bearbeiten; Formeln gehen als Text, Videos als Platzhalter, Diagramme als Bild nach PowerPoint |
 | Akzentfarbe | brausa Blau `#2f6bff` | neutrales Schieferblau `--ui-accent`, weil gestaltung.md 8 eine neutrale, nicht markenhafte Akzentfarbe verlangt und das kräftige Blau mit Textblau `#2b579a` verwechselt würde |
 
 Gemeinsam bearbeiten: `http://localhost:3000/editor?new=docx&collab=test1&name=Anna` und in einem zweiten

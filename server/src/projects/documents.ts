@@ -125,6 +125,10 @@ export class Documents {
     return (await this.list(projectId, scope)).find((d) => d.kind === 'slide' && d.sectionId === DECK)!;
   }
 
+  async rename(id: number, title: string): Promise<void> {
+    await this.db.updateTable('documents').set({ title }).where('id', '=', id).execute();
+  }
+
   async setDone(id: number, by: number | null): Promise<void> {
     await this.db
       .updateTable('documents')

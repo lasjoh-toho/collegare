@@ -11,6 +11,8 @@ import { createServices, type Services } from '../src/services.js';
 const clientDir = mkdtempSync(join(tmpdir(), 'cg-client-'));
 mkdirSync(join(clientDir, 'pinnwand/mod/pinnwand/js'), { recursive: true });
 writeFileSync(join(clientDir, 'pinnwand/mod/pinnwand/js/presentation-player.js'), 'var PinnwandPresentation = {}; // "</script>" darf nicht durchkommen');
+mkdirSync(join(clientDir, 'bento'), { recursive: true });
+writeFileSync(join(clientDir, 'bento/Bento_Slides.bento.html'), '<!doctype html><html><head><title>Bento</title></head><body><script type="application/bento+json" id="bento-doc"></script></body></html>');
 writeFileSync(join(clientDir, 'pinnwand/mod/pinnwand/strings.json'), JSON.stringify({ present_show: 'Einblenden', nothreadtoexport: 'Kein Faden' }));
 
 let app: App;
@@ -418,6 +420,47 @@ describe('Mindmap in Echtzeit', () => {
     const wrong = await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'update', id: 'karte1', patch: { owner: ids[2] } } });
     expect(wrong).toMatchObject({ ok: false, error: 'Diese Person gehört nicht zur Gruppe' });
     expect((await emit(sa, 'map:op', { projectId: project, scope: 'g' + g1, op: { type: 'add', card: { id: 'x', kind: 'card' } } })).error).toBe('Ungültige Änderung');
+  });
+
+  it('Folien in Bento: Oberfläche mit Präsentation, Speichern mit Version, Import für Lernende erst nach Freigabe', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0], ids[2]] })).json.codes as J[];
+    const anna = (await call('POST', '/api/access/redeem', undefined, { code: codes[0].code })).json.token as string;
+    const clara = (await call('POST', '/api/access/redeem', undefined, { code: codes[1].code })).json.token as string;
+    const deck = (await call('GET', `/api/projects/${project}/folien`, anna)).json.doc as J;
+    const page = async (tok: string) => {
+      const r = await fetch(`${base}/api/documents/${deck.id}/bento`, { headers: { authorization: 'Bearer ' + tok } });
+      const html = await r.text();
+      const cfg = html.match(/name="bento-host-config" data-bento-transient content="([^"]*)"/);
+      const data = html.match(/id="bento-doc">([\s\S]*?)<\/script>/);
+      return { status: r.status, cfg: cfg ? JSON.parse(cfg[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')) : null, doc: data ? JSON.parse(data[1]) : null };
+    };
+    const first = await page(anna);
+    expect(first.status).toBe(200);
+    expect(first.cfg).toMatchObject({ saveUrl: `/collegare/api/documents/${deck.id}/bento`, version: 0, readOnly: false, canImport: false, ribbon: true });
+    expect(first.doc).toMatchObject({ format: 'bento/slides', slides: [{ id: 's-titel' }] });
+
+    // Speichern: `<` landet nie roh im Datenblock, alte Version ergibt 409, Live-Zugangsdaten fallen weg
+    const doc = { ...first.doc, title: 'Inflation 1923', collab: { key: 'x' }, slides: [{ ...first.doc.slides[0], notes: '</script><b>' }] };
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, anna, { doc, version: 0 })).json).toEqual({ version: 1 });
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, anna, { doc, version: 0 })).status).toBe(409);
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, anna, { doc: { format: 'x' }, version: 1 })).status).toBe(400);
+    const again = await page(anna);
+    expect(again.cfg.version).toBe(1);
+    expect(again.doc.slides[0].notes).toBe('</script><b>');
+    expect(again.doc.collab).toBeUndefined();
+    expect((await call('GET', `/api/projects/${project}/folien`, anna)).json.doc.title).toBe('Inflation 1923');
+
+    // Lehrkraft sieht die Gruppe nur lesend, Clara (andere bzw. keine Gruppe) gar nicht
+    expect((await page(t)).cfg).toMatchObject({ readOnly: true, canImport: false });
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, t, { doc, version: 1 })).status).toBe(403);
+    expect((await page(clara)).status).toBe(403);
+
+    // Import für Lernende erst, wenn die Lehrkraft ihn einschaltet
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { slidesImportStudents: true } })).status).toBe(200);
+    expect((await page(anna)).cfg.canImport).toBe(true);
   });
 
   it('Chat: je Gruppe und für alle, Lehrkraft liest alles und löscht', async () => {

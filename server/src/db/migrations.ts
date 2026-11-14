@@ -380,6 +380,20 @@ migrations['0011_material_visible'] = {
   },
 };
 
+/** Folienpräsentation in Bento (Wunsch Jo, 14. November 2026): das Dokument als JSON je Präsentation, mit Version gegen Überschreiben */
+migrations['0012_bento_decks'] = {
+  async up(db) {
+    await db.schema
+      .createTable('bento_decks')
+      .addColumn('doc_id', 'integer', (c) => c.primaryKey())
+      .addColumn('data', isMysql(db) ? sql`longtext` : sql`text`, (c) => c.notNull())
+      .addColumn('version', 'integer', (c) => c.notNull())
+      .addColumn('updated_at', 'bigint', (c) => c.notNull())
+      .addColumn('updated_by', 'integer')
+      .execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

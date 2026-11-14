@@ -89,6 +89,7 @@ export interface ProjectSettings {
   logbookRequired: boolean;
   aiFeedback: boolean;
   aiDailyLimit: number;
+  slidesImportStudents: boolean;
 }
 
 export interface ProjectView {

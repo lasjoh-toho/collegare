@@ -1,13 +1,17 @@
 'use client';
 /**
  * Klassische Folienpräsentation (Wunsch Jo, 14. November 2026): neben der Pinnwand eine Präsentation wie in PowerPoint,
- * eine je Gruppe, im Office-Editor (iframe unter /office/, AGPL-Teil, nur über die Adresse angesprochen). Die Lehrkraft
- * sieht die Präsentationen der Gruppen lesend und arbeitet im eigenen Testbereich selbst.
+ * eine je Gruppe. Seit 0.7.0 in Bento (MIT, mit Menüband wie in PowerPoint) statt OnlyOffice: der Server liefert die
+ * Bento-Oberfläche mit der Präsentation (/api/documents/:id/bento), Bento speichert selbst dorthin zurück. Diese Seite
+ * erledigt die Datei-Aktionen aus Bentos Menü „Datei“ (PowerPoint, Bento-Datei, JSON). Die Lehrkraft sieht die
+ * Präsentationen der Gruppen lesend und arbeitet im eigenen Testbereich selbst.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { ApiError, BASE_PATH, get, href } from '@/lib/api';
+import { download, fileBase, importBentoHtml, importJson, importPowerPoint, pickFile } from '@/lib/bentoFiles';
+import { bentoToPptx } from '@/lib/pptxExport';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import s from './folien.module.css';
@@ -19,6 +23,8 @@ interface Deck {
   test?: boolean;
   doc: { id: number; title: string; doneAt: number | null } | null;
 }
+
+type Msg = { bento: string; action?: string; doc?: Record<string, unknown>; snapshots?: Record<string, string>; dirty?: boolean };
 
 export default function Folien() {
   const [me] = useMe();
@@ -43,13 +49,67 @@ export default function Folien() {
     void load(wanted);
   }, [id, me, wanted, load]);
 
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [busy, setBusy] = useState('');
+  const toBento = useCallback((msg: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(msg, location.origin), []);
+  const toast = useCallback((message: string, kind: 'neutral' | 'success' | 'error' = 'neutral') => toBento({ bento: 'toast', message, kind }), [toBento]);
+
+  // Datei-Aktionen aus Bentos Menü „Datei“
+  useEffect(() => {
+    const onMsg = async (ev: MessageEvent) => {
+      if (ev.origin !== location.origin || ev.source !== frame.current?.contentWindow) return;
+      const m = ev.data as Msg;
+      if (!m || m.bento !== 'file' || !m.action) return;
+      const replace = (d: Record<string, unknown>, note?: string) => {
+        toBento({ bento: 'replace', doc: d });
+        if (note) setTimeout(() => toast(note), 1200);
+      };
+      try {
+        switch (m.action) {
+          case 'exportPptx': {
+            setBusy('PowerPoint-Datei wird erstellt …');
+            const r = await bentoToPptx(m.doc ?? {}, m.snapshots ?? {});
+            download(r.blob, `${fileBase(m.doc?.title)}.pptx`);
+            toast(r.warnings.length ? `PowerPoint-Datei erstellt. Hinweis: ${r.warnings.join(' ')}` : 'PowerPoint-Datei erstellt.', 'success');
+            break;
+          }
+          case 'exportJson':
+            download(new Blob([JSON.stringify(m.doc, null, 1)], { type: 'application/json' }), `${fileBase(m.doc?.title)}.bento.json`);
+            break;
+          case 'importPptx': {
+            const f = await pickFile('.pptx,.ppt,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint');
+            if (!f) break;
+            setBusy('PowerPoint-Datei wird umgewandelt …');
+            const r = await importPowerPoint(f);
+            replace(r.doc, r.warnings.length ? `Hinweise zum Import: ${r.warnings.slice(0, 4).join(' ')}` : undefined);
+            break;
+          }
+          case 'importHtml': {
+            const f = await pickFile('.html,.htm,text/html');
+            if (f) replace(await importBentoHtml(f));
+            break;
+          }
+          case 'importJson': {
+            const f = await pickFile('.json,application/json');
+            if (f) replace(await importJson(f));
+            break;
+          }
+        }
+      } catch (e) {
+        toast(e instanceof Error ? e.message : String(e), 'error');
+      } finally {
+        setBusy('');
+      }
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [toBento, toast]);
+
   if (!me || !project) return <Topbar me={me ?? null} />;
   const teacher = project.role === 'teacher';
   const doc = data?.doc ?? null;
   const editing = !!doc && !doc.doneAt && (!teacher || !!data?.test);
-  const url = doc
-    ? `${BASE_PATH}/office/editor/?${new URLSearchParams({ new: 'pptx', collab: 'cg' + doc.id, name: me.name, uid: String(me.id), title: doc.title, editing: editing ? '1' : '0', lang: 'de' })}`
-    : null;
+  const url = doc ? `${BASE_PATH}/api/documents/${doc.id}/bento` : null;
 
   return (
     <ProjectShell
@@ -60,6 +120,7 @@ export default function Folien() {
       fill
       actions={
         <>
+          {busy && <span className="muted">{busy}</span>}
           {teacher && !editing && doc && <span className="muted">Ansicht für die Lehrkraft</span>}
           {data && data.scopes.length > 1 && (
             <select className={s.scope} value={data.scope ?? ''} onChange={(e) => void load(e.target.value)} title="Präsentation welcher Gruppe?">
@@ -79,7 +140,7 @@ export default function Folien() {
         {url && (
           <div className={s.editor}>
             <div className={s.stripe} />
-            <iframe key={url} className={s.frame} src={url} title="Folien" allow="clipboard-read; clipboard-write; fullscreen" allowFullScreen />
+            <iframe ref={frame} key={url} className={s.frame} src={url} title="Folien" allow="clipboard-read; clipboard-write; fullscreen; display-capture" allowFullScreen />
           </div>
         )}
       </div>

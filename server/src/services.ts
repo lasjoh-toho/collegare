@@ -1,4 +1,5 @@
 import { DocChangeStore, Documents } from './projects/documents.js';
+import { BentoDecks } from './projects/bentoDecks.js';
 import { MapStore } from './projects/maps.js';
 import { Gradings } from './projects/gradings.js';
 import { Materials } from './projects/materials.js';
@@ -64,6 +65,7 @@ export interface Services {
   oidc: OidcProvider;
   documents: Documents;
   docStore: DocChangeStore;
+  bentoDecks: BentoDecks;
   lti: Lti;
   toolKey: ToolKeyStore;
   loginLimiter: RateLimiter;
@@ -104,6 +106,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     oidc: new OidcProvider(db, toolKey, users, contexts, config.appUrl, now),
     documents: new Documents(db),
     docStore: new DocChangeStore(db),
+    bentoDecks: new BentoDecks(db, now),
     lti,
     toolKey,
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),

@@ -5,6 +5,8 @@
 | Collegare-Kern: `server/`, `client/` (Projektoberfläche: Kanban, Mindmap, Notizen, Einstellungen), `docs/`, `scripts/` | nicht-kommerziell, siehe [`LICENSE`](LICENSE) | eigener Code, gleiche Lizenz wie mod_pinnwand und mod_bento |
 | Office-Teil: `web/` | AGPL-3.0, siehe [`web/LICENSE.txt`](web/LICENSE.txt) | Fork von office-website mit den OnlyOffice-Editoren (sdkjs, web-apps, x2t), die unter AGPL-3.0 stehen |
 | OnlyOffice-Dateien in `web/public/v*/` (nicht im Repository, per Skript geholt) | AGPL-3.0 mit den Zusatzbedingungen von Ascensio System SIA | Hinweise und Logos von OnlyOffice bleiben unverändert erhalten |
+| Folien-Oberfläche aus [Bento](https://github.com/lasjoh-toho/bento) in `client/public/bento/` (nicht im Repository, per `scripts/bento-holen.sh` gebaut) | MIT, siehe `LICENSE-bento` dort | eigenständige Ein-Datei-App; der Kern lädt sie im iframe und spricht sie nur per `postMessage` und über `/api/documents/:id/bento` an |
+| PowerPoint-Import `bentoconvert.js` aus mod_bento (ebenda, nur der Umwandlungsteil) | nicht-kommerziell wie der Kern, siehe `LICENSE-bentoconvert.md` | gleicher Rechteinhaber |
 | Bibliotheken über npm (Fastify, socket.io, Kysely, zod, KaTeX, JSZip …) | jeweils eigene, freie Lizenz (MIT, Apache-2.0, BSD) | in `package.json` aufgeführt |
 
 ## Installation auf Servern

@@ -26,6 +26,8 @@ cp "$ROOT/server/.env.example" "$STAGE/server/env.example"
 echo "== Projektoberfläche"
 # Pinnwand-Modul (mod_pinnwand, fester Stand aus scripts/pinnwand.ref)
 [[ -f "$ROOT/client/public/pinnwand/mod/pinnwand/strings.json" ]] || "$ROOT/scripts/pinnwand-holen.sh"
+# Folien-Oberfläche aus Bento (fester Stand aus scripts/bento.ref, braucht npm)
+[[ -f "$ROOT/client/public/bento/Bento_Slides.bento.html" ]] || "$ROOT/scripts/bento-holen.sh"
 ( cd "$ROOT/client" && pnpm install --frozen-lockfile && NEXT_PUBLIC_BASE_PATH="$BASE" NEXT_PUBLIC_API_URL= npx next build )
 cp -r "$ROOT/client/out" "$STAGE/client"
 

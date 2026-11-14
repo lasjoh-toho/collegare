@@ -72,6 +72,8 @@ export const SettingsSchema = z.object({
   logbookRequired: z.boolean(),
   aiFeedback: z.boolean(),
   aiDailyLimit: z.number().int().min(0).max(100),
+  /** Folien: Lernende dürfen PowerPoint, Bento-Dateien und JSON importieren (Wunsch Jo: standardmäßig aus) */
+  slidesImportStudents: z.boolean(),
 });
 export type ProjectSettings = z.infer<typeof SettingsSchema>;
 
@@ -106,6 +108,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   logbookRequired: true,
   aiFeedback: false,
   aiDailyLimit: 5,
+  slidesImportStudents: false,
 };
 
 /** Voreinstellungen der Leiste oben auf der Einstellungsseite: setzen nur die genannten Felder. */

@@ -2,6 +2,6 @@
 .area { flex: 1; min-height: 0; display: flex; }
 .notice { margin: 20px; padding: 16px; max-width: 480px; height: fit-content; }
 .editor { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-/* Streifen in der Farbe der Office-Art (docs/gestaltung.md), darunter OnlyOffice unverändert */
+/* Streifen in der Farbe der Office-Art (docs/gestaltung.md), darunter Bento */
 .stripe { flex: none; height: 6px; background: var(--office-slide); }
 .frame { flex: 1; width: 100%; border: 0; background: #fff; }

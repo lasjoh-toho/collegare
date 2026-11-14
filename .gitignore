@@ -16,3 +16,5 @@ client/tsconfig.tsbuildinfo
 dist-release/
 # mod_pinnwand wird mit scripts/pinnwand-holen.sh geholt
 client/public/pinnwand/mod/
+# Bento-Oberfläche und PowerPoint-Import werden mit scripts/bento-holen.sh geholt
+client/public/bento/

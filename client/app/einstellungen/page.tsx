@@ -354,6 +354,12 @@ export default function Einstellungen() {
           {Object.entries(IMPORT_LABELS).map(([k, l]) => (
             <Check key={k} label={l} checked={s.importTypes[k]} disabled={f.importTypes[k] === false} onChange={(v) => flag('importTypes', k, v)} />
           ))}
+          <Check
+            label="Lernende dürfen Präsentationen importieren"
+            checked={s.slidesImportStudents}
+            onChange={(v) => set('slidesImportStudents', v)}
+            hint="PowerPoint, Bento-Datei oder JSON in die Folien der Gruppe. Ein Import ersetzt die ganze Präsentation; ohne Häkchen sehen Lernende im Menü „Datei“ nur die Exporte."
+          />
           <h4>Exportformate</h4>
           {Object.entries(EXPORT_LABELS).map(([k, l]) => (
             <Check key={k} label={l} checked={s.exportFormats[k]} disabled={f.exportFormats[k] === false} onChange={(v) => flag('exportFormats', k, v)} />
