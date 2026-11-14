@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
-import { ApiError, BASE_PATH, get, href } from '@/lib/api';
+import { ApiError, BASE_PATH, get, href, post } from '@/lib/api';
 import { download, fileBase, importBentoHtml, importJson, importPowerPoint, pickFile } from '@/lib/bentoFiles';
 import { bentoToPptx } from '@/lib/pptxExport';
 import type { ProjectView } from '@/lib/types';
@@ -18,13 +18,16 @@ import s from './folien.module.css';
 
 interface Deck {
   role: 'teacher' | 'student';
-  scopes: { scope: string; title: string; test: boolean }[];
+  scopes: { scope: string; title: string; test: boolean; demo: boolean }[];
   scope: string | null;
   test?: boolean;
+  demo?: boolean;
+  /** Lehrkraft: die eigene Präsentation aus „Test / Demo“ ist für Lernende sichtbar */
+  demoVisible?: boolean;
   doc: { id: number; title: string; doneAt: number | null } | null;
 }
 
-type Msg = { bento: string; action?: string; doc?: Record<string, unknown>; snapshots?: Record<string, string>; dirty?: boolean };
+type Msg = { bento: string; action?: string; doc?: Record<string, unknown>; snapshots?: Record<string, string>; dirty?: boolean; title?: string };
 
 export default function Folien() {
   const [me] = useMe();
@@ -53,6 +56,21 @@ export default function Folien() {
   const [busy, setBusy] = useState('');
   const toBento = useCallback((msg: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(msg, location.origin), []);
   const toast = useCallback((message: string, kind: 'neutral' | 'success' | 'error' = 'neutral') => toBento({ bento: 'toast', message, kind }), [toBento]);
+  // Titel und Speicherstand stehen in der Kopfzeile (Wunsch Jo), Bento meldet beides
+  const [title, setTitle] = useState('');
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== location.origin || ev.source !== frame.current?.contentWindow) return;
+      const m = ev.data as Msg;
+      if (!m || typeof m.bento !== 'string') return;
+      if ((m.bento === 'ready' || m.bento === 'title') && typeof m.title === 'string') setTitle(m.title);
+      if (m.bento === 'ready' || m.bento === 'dirty') setDirty(!!m.dirty);
+      if (m.bento === 'saved') setDirty(false);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
 
   // Datei-Aktionen aus Bentos Menü „Datei“
   useEffect(() => {
@@ -110,12 +128,57 @@ export default function Folien() {
   const doc = data?.doc ?? null;
   const editing = !!doc && !doc.doneAt && (!teacher || !!data?.test);
   const url = doc ? `${BASE_PATH}/api/documents/${doc.id}/bento` : null;
+  const scopeTitle = data?.scopes.find((x) => x.scope === data.scope)?.title.replace(/ \(nur für mich\)$/, '') ?? 'Folien';
+  // „Test / Demo“ erscheint im Auswahlfeld zweimal: nur für mich oder für die Lernenden sichtbar
+  const testScope = data?.scopes.find((x) => x.test)?.scope;
+  const selectValue = data?.scope === testScope && data?.demoVisible ? `${testScope}:sichtbar` : (data?.scope ?? '');
+  async function chooseScope(v: string) {
+    if (testScope && (v === testScope || v === `${testScope}:sichtbar`)) {
+      const visible = v.endsWith(':sichtbar');
+      if (visible !== !!data?.demoVisible) await post(`/api/projects/${id}/folien/demo`, { visible }).catch(() => {});
+      return void load(testScope);
+    }
+    void load(v);
+  }
+  const renameDeck = (v: string) => {
+    const t = v.trim();
+    if (t && t !== title) toBento({ bento: 'title', title: t });
+  };
 
   return (
     <ProjectShell
       me={me}
       project={project}
-      where="Folien"
+      where={scopeTitle}
+      crumbs={
+        doc && (
+          <>
+            <span className={s.sep}>/</span>
+            {editing ? (
+              <input
+                key={title}
+                className={s.title}
+                defaultValue={title}
+                aria-label="Titel der Präsentation"
+                title="Titel der Präsentation"
+                size={Math.min(Math.max(title.length, 8), 40)}
+                onBlur={(e) => renameDeck(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              />
+            ) : (
+              <span className={s.titleRead}>{title || doc.title}</span>
+            )}
+            {editing &&
+              (dirty ? (
+                <button className={s.unsaved} onClick={() => toBento({ bento: 'save' })} title="Nicht gespeichert – jetzt speichern" aria-label="Nicht gespeichert, jetzt speichern" />
+              ) : (
+                <span className={s.saved} title="Gespeichert" aria-label="Gespeichert">
+                  ✓
+                </span>
+              ))}
+          </>
+        )
+      }
       info={{ key: 'folien', title: 'Folien', text: 'Eure Präsentation, bedient wie PowerPoint: Oben stehen Datei, Start, Einfügen und die anderen Registerkarten, rechts der Formatbereich zur gewählten Registerkarte. Gespeichert wird von selbst. Unter „Datei“ lässt sich die Präsentation als PowerPoint, Bento-Datei oder JSON herunterladen.' }}
       phase="presentation"
       fill
@@ -124,12 +187,23 @@ export default function Folien() {
           {busy && <span className="muted">{busy}</span>}
           {teacher && !editing && doc && <span className="muted">Ansicht für die Lehrkraft</span>}
           {data && data.scopes.length > 1 && (
-            <select className={s.scope} value={data.scope ?? ''} onChange={(e) => void load(e.target.value)} title="Präsentation welcher Gruppe?">
-              {data.scopes.map((x) => (
-                <option key={x.scope} value={x.scope}>
-                  {x.title}
-                </option>
-              ))}
+            <select className={s.scope} value={selectValue} onChange={(e) => void chooseScope(e.target.value)} title="Welche Präsentation?">
+              {data.scopes.map((x) =>
+                x.test ? (
+                  [
+                    <option key={x.scope} value={x.scope}>
+                      Test / Demo (nur für mich)
+                    </option>,
+                    <option key={x.scope + 's'} value={`${x.scope}:sichtbar`}>
+                      Test / Demo (Lernende sehen sie)
+                    </option>,
+                  ]
+                ) : (
+                  <option key={x.scope} value={x.scope}>
+                    {x.title}
+                  </option>
+                ),
+              )}
             </select>
           )}
         </>

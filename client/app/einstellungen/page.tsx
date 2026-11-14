@@ -258,7 +258,7 @@ export default function Einstellungen() {
         </AccBox>
 
         <AccBox open={open.has('phases')} onToggle={toggle} id="phases" title="Phasen und Werkzeuge">
-          <p className="muted">Wie die Schritte in Autogra.fi: an, zeitgesteuert oder aus. Was aus ist, sehen die Lernenden nicht. Gruppen können zurückgehen; ein Wechsel wird protokolliert.</p>
+          <p className="muted">Wie die Schritte in Autogra.fi: an, geschlossen, zeitgesteuert oder aus. Dasselbe geht auch direkt auf der Projektkarte der Übersicht. Was aus ist, sehen die Lernenden nicht. Gruppen können zurückgehen; ein Wechsel wird protokolliert.</p>
           {Object.entries(PHASE_LABELS).map(([k, l]) => {
             const ph = s.phases[k] ?? { state: 'on', from: null, to: null };
             return (
@@ -271,6 +271,7 @@ export default function Einstellungen() {
                   {(
                     [
                       ['on', 'an'],
+                      ['closed', 'geschlossen'],
                       ['scheduled', 'zeitgesteuert'],
                       ['off', 'aus'],
                     ] as const

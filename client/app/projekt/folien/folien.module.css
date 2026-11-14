@@ -5,3 +5,12 @@
 /* Streifen in der Farbe der Office-Art (docs/gestaltung.md), darunter Bento */
 .stripe { flex: none; height: 6px; background: var(--office-slide); }
 .frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.sep { color: var(--ui-faint); }
+/* Titel der Präsentation in der Kopfzeile, änderbar */
+.title { min-width: 6ch; max-width: 32vw; height: 26px; padding: 0 6px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--ui-text); font: inherit; font-weight: 650; }
+.title:hover { border-color: var(--ui-border); }
+.title:focus { border-color: var(--ui-accent); background: var(--ui-bg); outline: none; }
+.titleRead { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Speicherstand: grüner Haken oder roter Kreis (Klick speichert) */
+.saved { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--state-done); font-weight: 800; font-size: 14px; }
+.unsaved { flex: none; width: 12px; height: 12px; margin: 0 3px; padding: 0; border-radius: 50%; border: 0; background: var(--danger, #d33); cursor: pointer; }

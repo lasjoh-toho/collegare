@@ -1,7 +1,7 @@
 'use client';
 /**
  * Portal für Lehrkräfte und Administration, Aufbau wie das Aufgaben-Portal von Autogra.fi (/portal):
- * Seitenleiste mit „Administration“, „Meine Projekte“ und „Klassen“, unten Konto, Tag/Nacht und Abmelden.
+ * Seitenleiste mit „Administration“, „Projekte“ und „Klassen“, unten Konto, Tag/Nacht und Abmelden.
  * Begriffe und Reihenfolge wie dort, damit der spätere Umzug in die gemeinsame Verwaltung nur ein Umzug ist
  * (docs/gestaltung.md 3).
  */
@@ -84,7 +84,7 @@ export function PortalShell({ me, active, children }: { me: Me; active: PortalPa
           )}
           {teacher && (
             <>
-              <div className={ps.section}>Meine Projekte</div>
+              <div className={ps.section}>Projekte</div>
               {item('overview', '/', 'grid', 'Übersicht')}
               {item('new', '/?neu=1', 'pen', 'Neues Projekt')}
               {courses.length > 0 && <div className={ps.section}>Klassen</div>}

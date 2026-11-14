@@ -11,7 +11,7 @@ import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { Icon } from '@/components/Icon';
-import { get, href, projectSocket } from '@/lib/api';
+import { get, href, post, projectSocket } from '@/lib/api';
 import type { MapCard, MapDim, MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import p from '../projekt.module.css';
@@ -89,6 +89,7 @@ export default function MindmapPage() {
   const [map, setMap] = useState<MapData | null>(null);
   const [scope, setScope] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [groupNote, setGroupNote] = useState('');
   const [outlineOpen, setOutlineOpen] = useState(false);
   // Hervorheben: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen (Wunsch Jo, 13. November 2026)
   const [dim, setDim] = useState<MapDim>('none');
@@ -281,6 +282,21 @@ export default function MindmapPage() {
   const info = isTopic ? { key: 'mindmap-topic', title: 'Themen-Mindmap', text: helpText, start: true } : { key: 'mindmap', title: 'Mindmap der Gruppe', text: helpText, start: true };
   const center = isTopic ? project.title : join?.scopes?.find((x) => x.scope === scope)?.title || project.title;
 
+  // Themen-Mindmap: aus einer Idee eine Gruppe machen (Wunsch Jo), nur die Lehrkraft
+  const toGroup =
+    isTopic && teacher && project.mode === 'group'
+      ? async (title: string) => {
+          if (project.board.groups.some((g) => g.title.trim().toLowerCase() === title.toLowerCase())) return setGroupNote(`Die Gruppe „${title}“ gibt es schon.`);
+          try {
+            await post(`/api/projects/${project.id}/groups/viele`, { titles: [title] });
+            setGroupNote(`Gruppe „${title}“ angelegt. Die Lernenden ordnest du auf dem Gruppen-Board zu.`);
+          } catch (e) {
+            setGroupNote(e instanceof Error ? e.message : 'Gruppe konnte nicht angelegt werden');
+          }
+          setTimeout(() => setGroupNote(''), 5000);
+        }
+      : undefined;
+
   const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold } : null;
 
   return (
@@ -340,6 +356,7 @@ export default function MindmapPage() {
             </div>
           )}
           <div className={s.notes}>
+            {groupNote && <div className={`panel ${s.banner}`}>{groupNote}</div>}
             {!isTopic && empty && hasTopic && canEdit && (
               <div className={`panel ${s.banner}`}>
                 Eure Mindmap ist noch leer.
@@ -359,8 +376,8 @@ export default function MindmapPage() {
               </button>
             </div>
           )}
-          {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} />}
-          {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} />}
+          {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} />}
+          {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} />}
           {map && outlineOpen && !isTopic && (
             <aside className={s.outline}>
               <div className="row">

@@ -113,9 +113,6 @@ export default function Projekt() {
             <Icon name="arrow" size={18} className={t.nowArrow} />
           </a>
         )}
-        {teacher && project.board.members.length === 0 && (
-          <div className={`notice ${t.hint}`}>Noch keine Lernenden. Trage sie oben mit „+ Lernende“ ein oder übernimm sie aus Moodle.</div>
-        )}
         {(() => {
           const card = (tile: TileDef, opts: { bereich?: string; onlyMe?: string } = {}) => {
             const st = status(tile);

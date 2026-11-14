@@ -18,7 +18,7 @@ export interface PhaseInfo {
   help: string;
 }
 
-const ORDER: { key: PhaseKey; title: string; icon: string }[] = [
+export const PHASE_ORDER: { key: PhaseKey; title: string; icon: string }[] = [
   { key: 'topic', title: 'Thema', icon: 'map' },
   { key: 'groups', title: 'Gruppen', icon: 'users' },
   { key: 'orientation', title: 'Orientierung', icon: 'map' },
@@ -62,13 +62,16 @@ function help(key: PhaseKey, s: ProjectSettings, single: boolean): string {
 }
 
 export function phaseList(s: ProjectSettings, single: boolean, now = Date.now()): PhaseInfo[] {
-  return ORDER.map(({ key, title, icon }) => {
+  return PHASE_ORDER.map(({ key, title, icon }) => {
     const ph = s.phases[key] ?? { state: 'on', from: null, to: null };
     let state: PhaseState = 'open';
     let badge = 'offen';
     if (ph.state === 'off') {
       state = 'off';
       badge = 'nicht vorgesehen';
+    } else if (ph.state === 'closed') {
+      state = 'closed';
+      badge = 'geschlossen';
     } else if (ph.state === 'scheduled') {
       if (ph.from && now < ph.from) {
         state = 'upcoming';

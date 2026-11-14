@@ -94,7 +94,7 @@ function rounded(pts: [number, number][], r = 12): string {
 }
 
 const LEAD = 18; // gerades Stück vor der Pfeilspitze
-const LINE = 5; // alle Äste gleich dick (Wunsch Jo)
+const LINE = 14; // alle Äste gleich dick, breit wie ein Schriftband (Wunsch Jo)
 const TIP = 1.25; // Länge der Spitze in Linienbreiten (stumpfer, Wunsch Jo)
 
 type V = [number, number];
@@ -379,7 +379,7 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   return { nodes, height: Math.max(hr, hl, 200) };
 }
 
-export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean>; dim?: MapDim }) {
+export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onToGroup }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean>; dim?: MapDim; onToGroup?: (title: string) => void }) {
   const { nodes, height } = useMemo(() => layout(map), [map]);
   const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
@@ -1044,6 +1044,11 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none' }: {
           {selected.kind === 'cluster' && selected.children.some((id) => !map.cards[id]?.pick) && (
             <button className="btn" onClick={() => void togglePick(selected, true)} title="Ast übernehmen">
               Ganzer Ast
+            </button>
+          )}
+          {onToGroup && selected.title.trim() && (
+            <button className="btn" onClick={() => onToGroup(selected.title.trim())} title="Aus dieser Idee eine Gruppe machen">
+              <Icon name="users" size={14} /> Zur Gruppe
             </button>
           )}
           <button className="btn" onClick={() => startEdit(selected.id, selected.title)}>

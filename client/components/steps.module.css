@@ -1,0 +1,26 @@
+/* Schritte als quadratische Symbole (StepIcons), wie die Schritt-Knöpfe in Autogra.fi */
+.wrap { position: relative; }
+.icons { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.icon {
+  width: 28px; height: 28px; flex: none; display: grid; place-items: center; padding: 0; border-radius: 7px; border: 1.5px solid var(--ui-border);
+  background: transparent; color: var(--ui-faint); cursor: pointer; font: inherit;
+}
+.icon:disabled { cursor: default; }
+.icon.open { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-accent-fg); }
+.icon.grey { background: var(--ui-sunken); color: var(--ui-muted); }
+.small .icons { flex-wrap: nowrap; }
+.small .icon { width: 24px; height: 24px; border-radius: 6px; }
+.mini { width: 20px; height: 20px; border-radius: 5px; cursor: inherit; }
+.edit { margin-left: 2px; color: var(--ui-muted); }
+.pop {
+  position: fixed; z-index: 60; width: min(460px, calc(100vw - 24px)); padding: 10px 12px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 6px; font-size: 13px;
+}
+.popHead { font-weight: 650; font-size: 13px; margin-bottom: 2px; }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 0; border-top: 1px solid var(--ui-border); }
+.row:first-of-type { border-top: 0; }
+.row.off .name { color: var(--ui-muted); }
+.name { display: flex; align-items: center; gap: 6px; min-width: 150px; cursor: pointer; }
+.dates { display: flex; align-items: center; gap: 4px; }
+.dates input { height: 26px; padding: 0 4px; border-radius: 6px; border: 1px solid var(--ui-border); background: var(--ui-bg); color: var(--ui-text); font: inherit; font-size: 12px; }
+.err { margin: 0; color: var(--danger); font-size: 12px; }

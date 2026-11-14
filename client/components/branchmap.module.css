@@ -43,7 +43,11 @@
 .handle { position: absolute; width: 14px; height: 14px; transform: translate(-50%, -50%); background: var(--ui-panel); border: 3px solid var(--c); cursor: grab; touch-action: none; z-index: 3; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
 .handle:active { cursor: grabbing; }
 .start { border-radius: 50%; }
-.stop { border-radius: 3px; }
+.stop { width: 20px; height: 20px; border-radius: 50%; }
+/* Zwischenstopp als rundes Plus: hier kann ein Ast abzweigen (Wunsch Jo) */
+.stop::before, .stop::after { content: ''; position: absolute; left: 50%; top: 50%; background: var(--c); border-radius: 1px; transform: translate(-50%, -50%); }
+.stop::before { width: 10px; height: 2.5px; }
+.stop::after { width: 2.5px; height: 10px; }
 .hand { width: 11px; height: 11px; border-width: 2px; border-radius: 50%; background: var(--c); }
 .tangent { stroke: var(--ui-muted, #888); stroke-width: 1.5; stroke-dasharray: 4 3; }
 /* Stopps anderer Äste, an denen der gewählte Ast abzweigen kann */

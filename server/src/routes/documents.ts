@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
 import { DocError, collabId } from '../projects/documents.js';
 import type { Services } from '../services.js';
-import { mapScopes } from './maps.js';
+import { folienScopes, mapScopes } from './maps.js';
 
 /** Meldet geänderte Dokumente an offene Projektseiten und trennt bei „Fertig“ die Editoren. */
 export interface DocEvents {
@@ -35,15 +35,37 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     return { ...base, scope: a.scope.scope, people: a.scope.people, docs, outlineAt: map.outline?.at ?? null };
   });
 
-  // Folienpräsentation der Gruppe (bzw. im Testbereich der Lehrkraft)
+  // Folienpräsentation der Gruppe (bzw. „Test / Demo“ der Lehrkraft; freigegebene Demos sehen Lernende lesend)
   app.get<{ Params: { id: string }; Querystring: { bereich?: string } }>('/api/projects/:id/folien', async (req, reply) => {
     const projectId = Number(req.params.id);
-    const a = await scopeAccess(req, reply, projectId, req.query.bereich);
-    if (!a) return;
-    const base = { role: a.role, scopes: a.scopes.map(({ scope, title, test }) => ({ scope, title, test: !!test })) };
-    if (!a.scope) return { ...base, scope: null, doc: null };
-    const doc = await s.documents.deck(projectId, a.scope.scope);
-    return { ...base, scope: a.scope.scope, test: !!a.scope.test, doc };
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    if (sess.projectId !== null && sess.projectId !== projectId) return reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    const r = await folienScopes(s, sess.userId, projectId);
+    if (!r) return reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    const wanted = req.query.bereich;
+    const sc = wanted ? r.scopes.find((x) => x.scope === wanted) : r.scopes.find((x) => !x.demo);
+    const p = await s.projects.get(projectId);
+    const base = { role: r.role, scopes: r.scopes.map(({ scope, title, test, demo }) => ({ scope, title, test: !!test, demo: !!demo })), demoVisible: p!.settings.folienDemo.includes(sess.userId) };
+    if (!sc) return { ...base, scope: null, doc: null };
+    const doc = await s.documents.deck(projectId, sc.scope);
+    return { ...base, scope: sc.scope, test: !!sc.test, demo: !!sc.demo, doc };
+  });
+
+  /** Lehrkraft: Präsentation aus „Test / Demo“ für die Lernenden sichtbar machen oder verbergen */
+  app.post<{ Params: { id: string } }>('/api/projects/:id/folien/demo', async (req, reply) => {
+    const projectId = Number(req.params.id);
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    const body = z.object({ visible: z.boolean() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Angabe fehlt' });
+    if ((await s.projects.roleOf(sess.userId, projectId)) !== 'teacher') return reply.code(403).send({ error: 'Nur für Lehrkräfte' });
+    const p = await s.projects.get(projectId);
+    const list = p!.settings.folienDemo.filter((x) => x !== sess.userId);
+    if (body.data.visible) list.push(sess.userId);
+    await s.projects.updateSettings(projectId, { folienDemo: list });
+    await s.audit.append({ actorId: sess.userId, action: 'folien.demo', projectId, data: { visible: body.data.visible } });
+    return { ok: true, visible: body.data.visible };
   });
 
   app.post<{ Params: { id: string } }>('/api/projects/:id/documents/sync', async (req, reply) => {

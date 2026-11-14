@@ -93,12 +93,15 @@ export function MindMap({
   canEdit,
   send,
   dim = 'none',
+  onToGroup,
 }: {
   map: MapData;
   people: Person[];
   canEdit: boolean;
   send: (op: MapOp, join?: boolean) => Promise<boolean>;
   dim?: MapDim;
+  /** Themen-Mindmap, Lehrkraft: aus einer Idee eine Gruppe machen */
+  onToGroup?: (title: string) => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const [cam, setCam] = useState<Cam>({ x: 40, y: 40, k: 1 });
@@ -556,6 +559,11 @@ export function MindMap({
               {selCard.kind === 'cluster' && selCard.children.some((id) => !map.cards[id]?.pick) && (
                 <button className="btn" onClick={() => void togglePick(selCard, true)} title="Cluster übernehmen">
                   Ganzer Cluster
+                </button>
+              )}
+              {onToGroup && selCard.title.trim() && (
+                <button className="btn" onClick={() => onToGroup(selCard.title.trim())} title="Aus dieser Idee eine Gruppe machen">
+                  Zur Gruppe
                 </button>
               )}
               <button className="btn" onClick={() => setEditing(selCard.id)}>

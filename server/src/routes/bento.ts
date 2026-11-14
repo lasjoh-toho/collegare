@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
 import { BentoConflict, blankDeck } from '../projects/bentoDecks.js';
 import type { Services } from '../services.js';
-import { mapScopes } from './maps.js';
+import { folienScopes } from './maps.js';
 
 const SHELL = 'bento/Bento_Slides.bento.html';
 /** Präsentationen mit eingebetteten Bildern und Videos werden groß */
@@ -55,12 +55,12 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
     const doc = await s.documents.get(Number(req.params.id));
     if (!doc || doc.kind !== 'slide') return void reply.code(404).send({ error: 'Präsentation nicht gefunden' });
     if (sess.projectId !== null && sess.projectId !== doc.projectId) return void reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
-    const r = await mapScopes(s, sess.userId, doc.projectId);
+    const r = await folienScopes(s, sess.userId, doc.projectId);
     const scope = r?.scopes.find((x) => x.scope === doc.scope);
     if (!r || !scope) return void reply.code(403).send({ error: 'Kein Zugriff auf diese Präsentation' });
     const project = await s.projects.get(doc.projectId);
     const teacher = r.role === 'teacher';
-    const write = !doc.doneAt && (!teacher || !!scope.test);
+    const write = !doc.doneAt && !scope.demo && (!teacher || !!scope.test);
     const canImport = write && (teacher || !!project?.settings.slidesImportStudents);
     return { userId: sess.userId, doc, write, canImport, teacher };
   }
@@ -77,6 +77,8 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
       saveUrl: `${basePath}/api/documents/${a.doc.id}/bento`,
       version: deck?.version ?? 0,
       ribbon: true,
+      // Titel und Speicherstand zeigt die Kopfzeile von Collegare
+      titleInHost: true,
       readOnly: !a.write,
       canImport: a.canImport,
       fileActions: ['exportPptx', 'exportJson', 'importPptx', 'importHtml', 'importJson'],

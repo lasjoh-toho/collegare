@@ -38,10 +38,12 @@ interface Props {
   fill?: boolean;
   /** Erklärung hinter dem i-Knopf neben dem Titel */
   info?: InfoSpec;
+  /** weitere Teile hinter „where“ in der Mitte der Kopfzeile (z. B. Titel der Präsentation und Speicherstand) */
+  crumbs?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, children }: Props) {
+export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
@@ -156,10 +158,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
       <header className={sh.head}>
         <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
           <Icon name="menu" size={18} />
-          <span className={sh.whoText}>
-            <span className={sh.whoName}>{me.name}</span>
-            <span className={sh.whoClass}>{teacher ? `Lehrkraft · ${project.course.title}` : (myGroup ? `${project.course.title} · ${myGroup.title}` : project.course.title)}</span>
-          </span>
+          <span className={sh.whoName}>{me.name}</span>
         </button>
         <div className={sh.whereBox}>
           <div className={sh.where}>
@@ -167,6 +166,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             <span className={sh.sep}>/</span>
             <strong>{where}</strong>
           </div>
+          {crumbs}
           {info && <InfoButton project={project} spec={info} />}
         </div>
         <div className={sh.actions}>

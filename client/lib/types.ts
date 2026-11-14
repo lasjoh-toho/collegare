@@ -60,6 +60,12 @@ export interface Board {
 
 export type GroupFormation = 'teacher' | 'choice' | 'open';
 
+export interface PhaseSetting {
+  state: 'on' | 'closed' | 'scheduled' | 'off';
+  from: number | null;
+  to: number | null;
+}
+
 export interface ProjectSettings {
   brief: string;
   subject: string | null;
@@ -75,7 +81,7 @@ export interface ProjectSettings {
   chatAll: boolean;
   roles: string[];
   freeRoles: boolean;
-  phases: Record<string, { state: 'on' | 'scheduled' | 'off'; from: number | null; to: number | null }>;
+  phases: Record<string, PhaseSetting>;
   docTypes: Record<string, boolean>;
   importTypes: Record<string, boolean>;
   exportFormats: Record<string, boolean>;
@@ -90,6 +96,7 @@ export interface ProjectSettings {
   aiFeedback: boolean;
   aiDailyLimit: number;
   slidesImportStudents: boolean;
+  folienDemo: number[];
   infos: Record<string, { text: string; start: boolean }>;
 }
 

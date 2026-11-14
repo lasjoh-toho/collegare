@@ -28,3 +28,18 @@
 .cardTop { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .stats { display: flex; gap: 18px; margin: 4px 0; font-size: 12.5px; }
 .card .acts { justify-content: flex-start; margin-top: auto; padding-top: 6px; }
+/* Karte nach Autogra.fi (task-card): Fach oben in Großbuchstaben, Titel, Kennzahlen mit Symbolen, Schritte, Knöpfe */
+.card { padding: 16px 18px; gap: 8px; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+.card:hover { border-color: var(--ui-accent); box-shadow: 0 4px 16px color-mix(in srgb, var(--ui-accent) 15%, transparent); transform: translateY(-1px); }
+.fach { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ui-accent); }
+.fachName { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lms { padding: 1px 6px; border-radius: 4px; font-size: 10px; letter-spacing: 0.02em; background: color-mix(in srgb, #6366f1 18%, transparent); color: #6366f1; }
+.fach .phase { text-transform: none; letter-spacing: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ui-muted); margin-bottom: 4px; }
+.meta span { display: inline-flex; align-items: center; gap: 4px; }
+.metaDone { color: var(--state-done); }
+.cardActs { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding-top: 8px; }
+.cardActs :global(.btn) { justify-content: center; border: 1px solid var(--ui-border); }
+.cardRow { display: flex; gap: 6px; }
+.cardRow :global(.btn) { flex: 1; }
+.cardRow .gear { flex: 0 0 auto; }

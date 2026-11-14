@@ -28,7 +28,8 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export const PHASES = ['topic', 'groups', 'orientation', 'research', 'drafting', 'presentation'] as const;
 const PhaseSchema = z.object({
-  state: z.enum(['on', 'scheduled', 'off']),
+  /** on: offen, closed: von der Lehrkraft geschlossen, scheduled: Zeitraum from–to, off: nicht vorgesehen */
+  state: z.enum(['on', 'closed', 'scheduled', 'off']),
   from: z.number().int().nullable().default(null),
   to: z.number().int().nullable().default(null),
 });
@@ -78,6 +79,8 @@ export const SettingsSchema = z.object({
    * Erklärungen hinter den i-Knöpfen der Seiten (Wunsch Jo, 14. November 2026): je Schlüssel eigener Text der
    * Lehrkraft (leer = Standardtext) und ob die Erklärung beim ersten Öffnen von selbst aufgeht.
    */
+  /** Folien: Lehrkräfte (ids), deren Präsentation aus „Test / Demo“ die Lernenden lesend sehen */
+  folienDemo: z.array(z.number().int()).max(50),
   infos: z.record(z.string().max(40), z.object({ text: z.string().max(2000), start: z.boolean() })),
 });
 export type ProjectSettings = z.infer<typeof SettingsSchema>;
@@ -114,6 +117,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   aiFeedback: false,
   aiDailyLimit: 5,
   slidesImportStudents: false,
+  folienDemo: [],
   infos: {},
 };
 

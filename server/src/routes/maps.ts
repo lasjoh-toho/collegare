@@ -12,6 +12,8 @@ export interface MapScope {
   people: { id: number; name: string }[];
   /** Lernende dürfen nur lesen (Themen-Mindmap, wenn nur die Lehrkraft daran arbeitet) */
   readOnly?: boolean;
+  /** freigegebene Folien-Demo einer Lehrkraft: Lernende sehen sie nur lesend */
+  demo?: boolean;
   /** Testbereich der Lehrkraft: für Lernende unsichtbar, zum Ausprobieren und für Demos */
   test?: boolean;
 }
@@ -40,13 +42,28 @@ export async function mapScopes(s: Services, userId: number, projectId: number, 
   }
   if (role === 'teacher') {
     const me = await s.users.byId(userId);
-    scopes.push({ scope: testScope(userId), title: 'Mein Testbereich (nur für mich)', people: [{ id: userId, name: me?.name ?? 'Lehrkraft' }], test: true });
+    scopes.push({ scope: testScope(userId), title: 'Test / Demo (nur für mich)', people: [{ id: userId, name: me?.name ?? 'Lehrkraft' }], test: true });
   }
   const settings = withTopic ? (await s.projects.get(projectId))?.settings : undefined;
   if (withTopic && settings && settings.phases.topic?.state !== 'off') {
     scopes.unshift({ scope: TOPIC, title: 'Thema (alle)', people: people(() => true), readOnly: role === 'student' && settings.topicMapEdit === 'teacher' });
   }
   return { role, scopes };
+}
+
+/** Folien: wie mapScopes, für Lernende dazu die freigegebenen Demos der Lehrkräfte (settings.folienDemo) */
+export async function folienScopes(s: Services, userId: number, projectId: number): Promise<{ role: 'teacher' | 'student'; scopes: MapScope[] } | null> {
+  const r = await mapScopes(s, userId, projectId);
+  if (!r || r.role !== 'student') return r;
+  const p = await s.projects.get(projectId);
+  const ids = p?.settings.folienDemo ?? [];
+  if (!ids.length) return r;
+  const teachers = await s.db.selectFrom('users').select(['id', 'name']).where('id', 'in', ids).execute();
+  for (const t of teachers) {
+    if ((await s.projects.roleOf(t.id, projectId)) !== 'teacher') continue;
+    r.scopes.push({ scope: testScope(t.id), title: `Demo: ${t.name}`, people: [], demo: true, readOnly: true });
+  }
+  return r;
 }
 
 type Ack = (r: Record<string, unknown>) => void;

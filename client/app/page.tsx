@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { StepIcons } from '@/components/StepIcons';
 import { PortalHead, PortalShell, type PortalPage } from '@/components/PortalShell';
 import { Welcome } from '@/components/Welcome';
 import { BASE_PATH, get, href, post } from '@/lib/api';
@@ -90,6 +91,9 @@ function Portal({ me }: { me: Me }) {
     }
   };
 
+  // Schritte auf der Karte geändert: Phase der Karte gleich mitziehen
+  const setPhases = (id: number, phases: ProjectSettings['phases']) =>
+    setProjects((l) => (l ?? []).map((x) => (x.id === id && x.summary ? { ...x, summary: { ...x.summary, phases } } : x)));
   const courseTitle = (id: number) => courses.find((c) => c.id === id)?.title ?? 'Kurs';
   const q = filter.trim().toLowerCase();
   const shown = (projects ?? []).filter(
@@ -166,6 +170,7 @@ function Portal({ me }: { me: Me }) {
                   <th>Phase</th>
                   <th>Lernende</th>
                   <th>Abschnitte</th>
+                  <th>Schritte</th>
                   <th />
                 </tr>
               </thead>
@@ -183,6 +188,7 @@ function Portal({ me }: { me: Me }) {
                     <td>{p.summary ? <PhaseChip s={p.summary} /> : '–'}</td>
                     <td>{p.summary ? <People s={p.summary} /> : '–'}</td>
                     <td>{p.summary ? <Docs s={p.summary} /> : '–'}</td>
+                    <td>{p.summary ? <StepIcons projectId={p.id} phases={p.summary.phases} editable={p.role === 'teacher'} small onChange={(ph) => setPhases(p.id, ph)} /> : '–'}</td>
                     <td>
                       <Acts p={p} />
                     </td>
@@ -195,28 +201,44 @@ function Portal({ me }: { me: Me }) {
 
         {view === 'cards' && shown.length > 0 && (
           <div className={s.cards}>
-            {shown.map((p) => (
-              <div key={p.id} className={`panel ${s.card}`}>
-                <div className={s.cardTop}>
-                  <span className={s.subject}>{p.summary?.subject ?? 'ohne Fach'}</span>
-                  <span className="grow" />
-                  {p.summary && <PhaseChip s={p.summary} />}
-                </div>
-                <a className={s.ptitle} href={href(`/projekt/?id=${p.id}`)}>
-                  <h3>{p.title}</h3>
-                </a>
-                <p className="muted">
-                  {courseTitle(p.contextId)} · {p.mode === 'single' ? 'Einzelarbeit' : 'Gruppenarbeit'}
-                </p>
-                {p.summary && (
-                  <div className={s.stats}>
-                    <People s={p.summary} />
-                    <Docs s={p.summary} />
+            {shown.map((p) => {
+              const course = courses.find((c) => c.id === p.contextId);
+              return (
+                <div key={p.id} className={`panel ${s.card}`}>
+                  <div className={s.fach}>
+                    <span className={s.fachName}>
+                      <Icon name={course?.moodle ? 'present' : 'doc'} size={13} /> {p.summary?.subject ?? courseTitle(p.contextId)}
+                    </span>
+                    {course?.moodle && <span className={s.lms}>LMS</span>}
+                    {p.summary && <PhaseChip s={p.summary} />}
                   </div>
-                )}
-                <Acts p={p} />
-              </div>
-            ))}
+                  <a className={s.ptitle} href={href(`/projekt/?id=${p.id}`)}>
+                    <h3>{p.title}</h3>
+                  </a>
+                  <div className={s.meta}>
+                    <span>
+                      <Icon name="users" size={13} /> {courseTitle(p.contextId)}
+                    </span>
+                    <span>
+                      <Icon name={p.mode === 'single' ? 'doc' : 'grid'} size={13} /> {p.mode === 'single' ? 'Einzelarbeit' : 'Gruppenarbeit'}
+                    </span>
+                    {p.summary && (
+                      <span>
+                        <Icon name="users" size={13} /> {p.summary.students} Lernende{p.summary.groups ? ` · ${p.summary.groups} ${p.summary.groups === 1 ? 'Gruppe' : 'Gruppen'}` : ''}
+                      </span>
+                    )}
+                    {p.summary && p.summary.docs > 0 && (
+                      <span className={s.metaDone}>
+                        <Icon name="check" size={13} /> {p.summary.done} / {p.summary.docs} fertig{p.summary.newDone > 0 ? ` (+${p.summary.newDone} neu)` : ''}
+                      </span>
+                    )}
+                    {p.summary && p.summary.unassigned > 0 && p.summary.groups > 0 && <span className={s.warn}>{p.summary.unassigned} ohne Gruppe</span>}
+                  </div>
+                  {p.summary && <StepIcons projectId={p.id} phases={p.summary.phases} editable={p.role === 'teacher'} onChange={(ph) => setPhases(p.id, ph)} />}
+                  <CardActs p={p} />
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
@@ -263,6 +285,30 @@ function Docs({ s: sum }: { s: ProjectSummary }) {
       {sum.done} / {sum.docs} fertig
       {sum.newDone > 0 && <span className={s.newBadge}>+{sum.newDone} neu</span>}
     </span>
+  );
+}
+
+/** Knöpfe unten auf der Karte, angeordnet wie in Autogra.fi: Öffnen über die ganze Breite, darunter die Werkzeuge */
+function CardActs({ p }: { p: ProjectListItem }) {
+  return (
+    <div className={s.cardActs}>
+      <a className="btn" href={href(`/projekt/?id=${p.id}`)}>
+        <Icon name="grid" size={15} /> Projekt öffnen
+      </a>
+      {p.role === 'teacher' && (
+        <div className={s.cardRow}>
+          <a className="btn" href={href(`/projekt/korrektur/?id=${p.id}`)}>
+            <Icon name="pen" size={15} /> Korrektur
+          </a>
+          <a className="btn" href={href(`/projekt/gruppen/?id=${p.id}`)}>
+            <Icon name="users" size={15} /> Gruppen
+          </a>
+          <a className={`btn ${s.gear}`} href={href(`/einstellungen/?id=${p.id}`)} title="Einstellungen" aria-label="Einstellungen">
+            <Icon name="gear" size={15} />
+          </a>
+        </div>
+      )}
+    </div>
   );
 }
 
