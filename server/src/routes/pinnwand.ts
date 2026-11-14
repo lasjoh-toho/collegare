@@ -213,7 +213,24 @@ export function pinnwandSocket(nsp: import('socket.io').Namespace, s: Services) 
   s.pinnwandEvents.on('changed', (e: { projectId: number; scope: string; by: number; method: string }) => {
     nsp.to(`pin:${e.projectId}:${e.scope}`).emit('pinnwand', e);
   });
+  /** Wer hat diese Pinnwand gerade offen (gemeinsames Bearbeiten): an alle im Raum */
+  async function presence(room: string) {
+    const [, p, scope] = room.split(':');
+    const seen = new Map<number, string>();
+    for (const so of await nsp.in(room).fetchSockets()) {
+      const d = so.data.pin as { userId: number; name: string } | undefined;
+      if (d) seen.set(d.userId, d.name);
+    }
+    nsp.to(room).emit('pinnwand:presence', { projectId: Number(p), scope, people: [...seen].map(([id, name]) => ({ id, name })) });
+  }
   nsp.on('connection', (socket) => {
+    const leave = () => {
+      for (const rm of socket.rooms)
+        if (rm.startsWith('pin:')) {
+          void socket.leave(rm);
+          void presence(rm);
+        }
+    };
     socket.on('pinnwand:join', async (msg: { projectId?: unknown; scope?: unknown }, ack?: (r: { ok: boolean; error?: string }) => void) => {
       const sess = socket.data.session as { userId: number; projectId: number | null };
       const projectId = Number(msg?.projectId);
@@ -221,9 +238,14 @@ export function pinnwandSocket(nsp: import('socket.io').Namespace, s: Services) 
       const r = await mapScopes(s, sess.userId, projectId);
       const sc = r?.scopes.find((x) => x.scope === msg?.scope);
       if (!sc) return ack?.({ ok: false, error: 'Kein Zugriff' });
-      for (const rm of socket.rooms) if (rm.startsWith('pin:')) void socket.leave(rm);
-      await socket.join(`pin:${projectId}:${sc.scope}`);
+      leave();
+      const room = `pin:${projectId}:${sc.scope}`;
+      const user = await s.users.byId(sess.userId);
+      socket.data.pin = { userId: sess.userId, name: user?.name ?? '' };
+      await socket.join(room);
       ack?.({ ok: true });
+      await presence(room);
     });
+    socket.on('disconnecting', leave);
   });
 }

@@ -73,6 +73,17 @@
     }
   };
 
+  // Gemeinsam bearbeiten: Die Seite um den iframe hört auf Änderungen anderer (socket.io) und meldet sie hierher;
+  // mod_pinnwand ab 0.170.0 lädt dann nach (subscribe). Ältere Stände rufen subscribe nicht auf, dann zeigt die Seite
+  // weiter „Neu laden“.
+  transport.subscribe = function (cb) {
+    window.addEventListener('message', function (e) {
+      if (e.source !== window.parent || e.origin !== location.origin || !e.data || e.data.type !== 'collegare:pinnwand-changed') return;
+      cb(e.data);
+    });
+    window.parent.postMessage({ type: 'collegare:pinnwand-live' }, location.origin);
+  };
+
   Promise.all([
     fetch(api + '/start', { credentials: 'include' }).then(json),
     fetch(root + '/mod/pinnwand/strings.json').then(function (r) {

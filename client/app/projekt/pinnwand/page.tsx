@@ -1,8 +1,10 @@
 'use client';
 /**
  * Pinnwand als Modul für die Präsentation (Konzept 8d.5): mod_pinnwand läuft unverändert im iframe
- * (public/pinnwand/index.html) und speichert über Collegare je Gruppe. Ändert jemand anderes etwas, zeigt die Seite
- * einen Hinweis zum Neuladen, statt mitten in der Arbeit neu zu laden.
+ * (public/pinnwand/index.html) und speichert über Collegare je Gruppe. Gemeinsam bearbeiten: Ändert jemand anderes
+ * etwas, meldet die Seite das an die Pinnwand im iframe, und diese lädt nach, sobald man gerade nichts in der Hand hat
+ * (mod_pinnwand ab 0.170.0). Ältere Stände der Pinnwand bekommen stattdessen den Hinweis „Neu laden“. Oben steht, wer
+ * die Pinnwand gerade noch offen hat.
  */
 import { useEffect, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
@@ -34,6 +36,19 @@ export default function PinnwandPage() {
     return () => clearTimeout(t);
   }, [info]);
   const frame = useRef<HTMLIFrameElement>(null);
+  // Pinnwand im iframe lädt Änderungen selbst nach (meldet sich mit collegare:pinnwand-live)
+  const live = useRef(false);
+  const [people, setPeople] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === 'collegare:pinnwand-live') live.current = true;
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+  useEffect(() => {
+    live.current = false;
+  }, [scope, reload]);
 
   useEffect(() => {
     if (me === null) location.replace(href('/'));
@@ -57,10 +72,16 @@ export default function PinnwandPage() {
     const join = () => so.emit('pinnwand:join', { projectId: id, scope });
     so.on('connect', join);
     so.on('pinnwand', (e: { projectId: number; scope: string; by: number }) => {
-      if (e.projectId === id && e.scope === scope && e.by !== me.id) setStale('Jemand aus der Gruppe hat die Pinnwand geändert.');
+      if (e.projectId !== id || e.scope !== scope || e.by === me.id) return;
+      if (live.current) frame.current?.contentWindow?.postMessage({ type: 'collegare:pinnwand-changed', by: e.by }, location.origin);
+      else setStale('Jemand aus der Gruppe hat die Pinnwand geändert.');
+    });
+    so.on('pinnwand:presence', (e: { projectId: number; scope: string; people: { id: number; name: string }[] }) => {
+      if (e.projectId === id && e.scope === scope) setPeople(e.people.filter((x) => x.id !== me.id));
     });
     return () => {
       so.disconnect();
+      setPeople([]);
     };
   }, [id, scope, me]);
 
@@ -87,6 +108,21 @@ export default function PinnwandPage() {
       fill
       actions={
         <>
+          {people.length > 0 && (
+            <span className={s.people} title={'Gerade auch auf dieser Pinnwand: ' + people.map((x) => x.name).join(', ')}>
+              {people.slice(0, 4).map((x) => (
+                <span key={x.id} className={s.person}>
+                  {x.name
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </span>
+              ))}
+              {people.length > 4 && <span className={s.person}>+{people.length - 4}</span>}
+            </span>
+          )}
           {scope && (
             <button
               className="btn"
