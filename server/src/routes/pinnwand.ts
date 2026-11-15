@@ -95,6 +95,8 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
         username: me?.name ?? '',
         managerurl: null,
         exportpresentationurl: `${base}/api/projects/${a.projectId}/pinnwand/${a.scope.scope}/export?v=1`,
+        // Vorschaubilder schickt hier der Browser mit (Moodle erzeugt sie auf dem Server)
+        clientthumbs: true,
         courseurl: `${base}/projekt/?id=${a.projectId}`,
         isediting: false,
         settingsurl: null,
@@ -156,7 +158,7 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
 
   // Präsentation als eigenständige HTML-Datei (export_presentation.php): Abspiel-Logik und Texte kommen aus den
   // mitgelieferten Dateien von mod_pinnwand, Bilder sind eingebettet
-  app.get<{ Params: P; Querystring: { boardid?: string; annot?: string; ink?: string } }>('/api/projects/:id/pinnwand/:scope/export', async (req, reply) => {
+  app.get<{ Params: P; Querystring: { boardid?: string; annot?: string; ink?: string; full?: string } }>('/api/projects/:id/pinnwand/:scope/export', async (req, reply) => {
     const a = await access(req, reply);
     if (!a) return;
     const dir = clientDir ? join(resolve(clientDir), 'pinnwand', 'mod', 'pinnwand') : '';
@@ -168,7 +170,7 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
     } catch {
       return reply.code(503).type('text/plain; charset=utf-8').send('Die Pinnwand ist auf diesem Server nicht eingerichtet (scripts/pinnwand-holen.sh).');
     }
-    const opts = { boardid: Math.max(0, Math.trunc(Number(req.query.boardid ?? 0)) || 0), annot: req.query.annot === '1', ink: req.query.ink === '1' };
+    const opts = { boardid: Math.max(0, Math.trunc(Number(req.query.boardid ?? 0)) || 0), annot: req.query.annot === '1', ink: req.query.ink === '1', full: req.query.full === '1' };
     const data = await s.pinnwand.run(a.projectId, a.scope.scope, (sc) => exportPresentation(ctx(a, sc), opts, labels));
     if (!data) return reply.code(404).type('text/plain; charset=utf-8').send(labels.nothreadtoexport ?? 'Kein Roter Faden zum Exportieren.');
     const project = await s.projects.get(a.projectId);

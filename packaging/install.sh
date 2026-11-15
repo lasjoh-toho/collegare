@@ -79,6 +79,9 @@ ENV
   chown root:collegare "$ENVF" && chmod 640 "$ENVF"
   umask 022
 fi
+# Ordner für Dateien (Pinnwand-Medien je Pinnwand unter $DATA/pinnwand); ältere Einstellungen ergänzen
+grep -q '^DATA_DIR=' "$ENVF" || echo "DATA_DIR=$DATA" >> "$ENVF"
+mkdir -p "$DATA/pinnwand" && chown collegare:collegare "$DATA/pinnwand" && chmod 750 "$DATA" "$DATA/pinnwand"
 if [ -n "$URL" ]; then
   case "$URL" in http://*|https://*) ;; *) echo "Die Adresse muss mit https:// beginnen: $URL" >&2; exit 1 ;; esac
   grep -q "^APP_URL=$URL\$" "$ENVF" || { sed -i "s#^APP_URL=.*#APP_URL=$URL#" "$ENVF"; echo "Adresse gesetzt: $URL"; }
@@ -176,3 +179,5 @@ echo "Collegare $VERSION läuft: $APP_URL"
 echo "Moodle eintragen: $APP_URL/verwaltung/moodle/ (als Administration anmelden)"
 [ -n "$ADMIN" ] || echo "Erstes Konto anlegen: sudo collegare admin <kürzel>"
 echo "Später aktualisieren: sudo collegare aktualisieren"
+echo "Sichern (Datenbank und Pinnwand-Medien in $DATA zusammen): sudo collegare sichern"
+echo "  Wer selbst sichert: Datenbank UND den Ordner $DATA mitnehmen, sonst fehlen die Bilder der Pinnwände."

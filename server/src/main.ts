@@ -1,5 +1,6 @@
 import { buildApp } from './app.js';
 import { configFromEnv, createServices } from './services.js';
+import { moveBlobs } from './pinnwand/media.js';
 
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? '127.0.0.1';
@@ -10,6 +11,9 @@ const { http } = await buildApp({ logger: true, corsOrigin: cors, services, spik
   clientDir: process.env.CLIENT_DIR ?? '../client/out',
   officeDir: process.env.OFFICE_DIR ?? '../web/out',
 });
+
+// Pinnwand-Medien älterer Installationen aus der Datenbank in die Ordner umtragen (im Hintergrund)
+void moveBlobs(services.db, services.pinnwand.media, (m) => http.log.info(m)).catch((e) => http.log.error(e, 'Pinnwand-Medien: Umzug abgebrochen'));
 
 // abgelaufene Sitzungen, Codes und LTI-Zustände stündlich aufräumen
 setInterval(() => void services.sessions.cleanup().catch((e) => http.log.warn(e)), 3_600_000).unref();

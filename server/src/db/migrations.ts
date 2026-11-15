@@ -394,6 +394,14 @@ migrations['0012_bento_decks'] = {
   },
 };
 
+// Pinnwand-Medien als Dateien je Pinnwand statt Blobs (Jo, 15. November 2026); data bleibt für den Umzug, wird danach leer
+migrations['0013_pinnwand_files_path'] = {
+  async up(db) {
+    await db.schema.alterTable('pinnwand_files').addColumn('path', 'varchar(400)').execute();
+    await db.schema.alterTable('pinnwand_files').addColumn('size', 'integer').execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

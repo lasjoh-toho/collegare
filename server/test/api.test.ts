@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { io as ioc, type Socket } from 'socket.io-client';
 import type { AddressInfo } from 'node:net';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { checkMedia, moveBlobs } from '../src/pinnwand/media.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildApp, type App } from '../src/app.js';
@@ -602,6 +603,42 @@ describe('Mindmap in Echtzeit', () => {
     expect(photos[0].url).toMatch(/^\/collegare\/api\//);
     const fileUrl = photos[0].url.replace(/^\/collegare/, '');
     expect((await call('GET', fileUrl, ben)).status).toBe(200);
+    // Medien liegen als Dateien im Ordner der Pinnwand, die Tabelle hält nur die Angaben
+    const dir = s.pinnwand.media.dirOf(project, gs);
+    const row = await s.db.selectFrom('pinnwand_files').selectAll().where('item_id', '=', id).where('area', '=', 'photo').executeTakeFirstOrThrow();
+    expect(row.path).toBeTruthy();
+    expect(Buffer.from(row.data).length).toBe(0);
+    expect(existsSync(join(s.pinnwand.media.root, row.path!))).toBe(true);
+    expect(join(s.pinnwand.media.root, row.path!).startsWith(dir)).toBe(true);
+    // volle Auflösung und Vorschau nachreichen (wie mod_pinnwand save_photo_hires)
+    expect((await pin(anna, gs, 'save_photo_hires', { photoid: id, imagedata: png, targets: 'full,orig' })).json).toMatchObject({ ok: true, data: { success: true } });
+    expect((await pin(anna, gs, 'save_photo_hires', { photoid: id, imagedata: png, targets: 'thumb' })).json.ok).toBe(true);
+    const sized = ((await pin(ben, gs, 'get_photos')).json.data.photos as J[])[0];
+    expect(sized.fullurl).toMatch(/photofull_/);
+    expect(sized.thumburl).toMatch(/photothumb_/);
+    expect(sized.origurl).toMatch(/photoorig_/);
+    expect((await call('GET', sized.fullurl.replace(/^\/collegare/, ''), ben)).status).toBe(200);
+    expect((await pin(clara, gs, 'save_photo_hires', { photoid: id, imagedata: png })).status).toBe(403);
+    // neues Bild verwirft volle Auflösung und Vorschau
+    await pin(anna, gs, 'update_photo', { photoid: id, imagedata: png });
+    const fresh = ((await pin(ben, gs, 'get_photos')).json.data.photos as J[])[0];
+    expect(fresh.fullurl).toBe('');
+    expect(fresh.thumburl).toBe('');
+    // Umzug älterer Installationen: Blob in der Tabelle wird zur Datei, gelesen wird vorher und nachher
+    const blob = await s.db
+      .insertInto('pinnwand_files')
+      .values({ project_id: project, scope: gs, area: 'slidemedia', item_id: 0, name: 'alt.txt', mime: 'text/plain', data: Buffer.from('alter Blob'), path: null, size: null, created_at: Date.now() })
+      .executeTakeFirst();
+    const blobId = Number(blob.insertId);
+    expect((await s.pinnwand.file(project, gs, blobId))!.data.toString()).toBe('alter Blob');
+    expect((await checkMedia(s.db, s.pinnwand.media)).inDb).toBe(1);
+    expect(await moveBlobs(s.db, s.pinnwand.media)).toBe(1);
+    const movedRow = await s.db.selectFrom('pinnwand_files').selectAll().where('id', '=', blobId).executeTakeFirstOrThrow();
+    expect(movedRow.path).toBeTruthy();
+    expect(Buffer.from(movedRow.data).length).toBe(0);
+    expect((await s.pinnwand.file(project, gs, blobId))!.data.toString()).toBe('alter Blob');
+    const check = await checkMedia(s.db, s.pinnwand.media);
+    expect(check).toMatchObject({ inDb: 0, missing: [], wrongSize: [], orphans: [] });
     // Roter Faden und Board-Namen
     expect((await pin(ben, gs, 'add_thread_item', { itemtype: 'photo', photoid: id })).json.data.items).toHaveLength(1);
     await pin(ben, gs, 'set_board_name', { boardid: 0, name: 'Ursachen' });

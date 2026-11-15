@@ -3,10 +3,13 @@
  *   node dist/cli.js admin:create <kürzel> "<Name>"   – Passwort aus COLLEGARE_PASSWORD oder Eingabe
  *   node dist/cli.js admin:password <kürzel>
  *   node dist/cli.js audit:verify
+ *   node dist/cli.js pinnwand:pruefen    – Medien der Pinnwände: fehlt eine Datei, liegt etwas Unbekanntes im Ordner?
+ *   node dist/cli.js pinnwand:umziehen   – noch in der Datenbank liegende Medien sofort in die Ordner umtragen
  */
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { configFromEnv, createServices } from './services.js';
+import { checkMedia, moveBlobs } from './pinnwand/media.js';
 
 /** Eine Zeile lesen; mit hidden ohne Anzeige der Zeichen (Passwort im Terminal). */
 async function ask(question: string, hidden: boolean): Promise<string> {
@@ -72,8 +75,25 @@ try {
       process.exitCode = r.ok ? 0 : 2;
       break;
     }
+    case 'pinnwand:umziehen': {
+      const n = await moveBlobs(s.db, s.pinnwand.media);
+      console.log(n ? `${n} Datei(en) in ${s.pinnwand.media.root} umgetragen.` : 'Alle Pinnwand-Medien liegen schon im Ordner.');
+      break;
+    }
+    case 'pinnwand:pruefen': {
+      const r = await checkMedia(s.db, s.pinnwand.media);
+      console.log(`Pinnwand-Medien in ${s.pinnwand.media.root}: ${r.files} Datei(en).`);
+      if (r.inDb) console.log(`${r.inDb} Datei(en) liegen noch in der Datenbank (werden beim Start umgetragen, sofort: pinnwand:umziehen).`);
+      for (const m of r.missing) console.log(`FEHLT: ${m.path} (Eintrag ${m.id})`);
+      for (const m of r.wrongSize) console.log(`GRÖSSE STIMMT NICHT: ${m.path} (Eintrag ${m.id})`);
+      if (r.orphans.length) console.log(`${r.orphans.length} Datei(en) ohne Eintrag (übrig nach Abbrüchen, können gelöscht werden), z. B. ${r.orphans.slice(0, 3).join(', ')}`);
+      const ok = !r.missing.length && !r.wrongSize.length;
+      console.log(ok ? 'Pinnwand-Medien vollständig.' : 'Pinnwand-Medien unvollständig – bitte aus der Sicherung zurückholen (collegare sichern legt Datenbank und Ordner zusammen ab).');
+      process.exitCode = ok ? 0 : 2;
+      break;
+    }
     default:
-      console.log('Befehle: admin:create <kürzel> "<Name>" | admin:password <kürzel> | audit:verify');
+      console.log('Befehle: admin:create <kürzel> "<Name>" | admin:password <kürzel> | audit:verify | pinnwand:pruefen | pinnwand:umziehen');
       process.exitCode = 1;
   }
 } catch (e) {

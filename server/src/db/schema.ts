@@ -254,7 +254,11 @@ export interface PinnwandFilesTable {
   item_id: number;
   name: string;
   mime: string;
+  /** nur noch für den Umzug älterer Installationen; neue Dateien liegen im Ordner (path), data ist dann leer */
   data: Buffer;
+  /** relativ zu <DATA_DIR>/pinnwand, null = noch als Blob in data */
+  path: string | null;
+  size: number | null;
   created_at: Ms;
 }
 

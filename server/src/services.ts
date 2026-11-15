@@ -1,3 +1,7 @@
+import { existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { PinMedia } from './pinnwand/media.js';
 import { DocChangeStore, Documents } from './projects/documents.js';
 import { BentoDecks } from './projects/bentoDecks.js';
 import { MapStore } from './projects/maps.js';
@@ -30,6 +34,8 @@ export interface Config {
   cookieSecure: boolean;
   /** Lebensdauer eines Lernenden-Zugangscodes in Tagen (Standard 14, ein Projekt dauert Wochen) */
   accessCodeDays: number;
+  /** Ordner für Dateien (Pinnwand-Medien unter pinnwand/); ohne Angabe ein temporärer Ordner (Tests) */
+  dataDir?: string;
 }
 
 export function configFromEnv(env = process.env): Config {
@@ -39,6 +45,8 @@ export function configFromEnv(env = process.env): Config {
     appUrl,
     cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === '1' : appUrl.startsWith('https:'),
     accessCodeDays: Number(env.ACCESS_CODE_DAYS ?? 14),
+    // Installer: /var/lib/collegare (Heimatordner des Dienstkontos, im systemd-Dienst beschreibbar)
+    dataDir: env.DATA_DIR || (existsSync('/var/lib/collegare') ? '/var/lib/collegare' : resolve('data')),
   };
 }
 
@@ -79,6 +87,7 @@ export async function createServices(config: Config, now: () => number = Date.no
   const contexts = new Contexts(db, now);
   await contexts.system();
   const audit = new AuditLog(db, now);
+  const media = new PinMedia(config.dataDir ?? mkdtempSync(join(tmpdir(), 'collegare-data-')));
   const projects = new Projects(db, users, now);
   const maps = new MapStore(db);
   const toolKey = new ToolKeyStore(db);
@@ -101,7 +110,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     chat: new Chat(db, now),
     notes: new Notes(db, now),
     pastes: new Pastes(db, now),
-    pinnwand: new PinStore(db, now),
+    pinnwand: new PinStore(db, media, now),
     pinnwandEvents: new EventEmitter(),
     oidc: new OidcProvider(db, toolKey, users, contexts, config.appUrl, now),
     documents: new Documents(db),

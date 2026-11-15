@@ -111,10 +111,19 @@ function photoFile(c: PinCtx, id: number) {
   return c.s.areaFiles('photo', id)[0];
 }
 
+/** Vorschau und volle Auflösung (leer, wenn es sie nicht gibt; die Oberfläche nimmt dann die Anzeigegröße) */
+function sizeUrls(c: PinCtx, id: number) {
+  return { thumburl: areaUrl(c, 'photothumb', id), fullurl: areaUrl(c, 'photofull', id) };
+}
+
+/** Bilddateien eines Objekts; photothumb ist eine Vorschau, die der Browser mitschickt */
+const PHOTO_AREAS = ['photo', 'photoorig', 'photomask', 'photofull', 'photothumb'];
+
 function exportPhoto(c: PinCtx, r: Row, counts: Map<number, number>) {
   return {
     id: r.id,
     url: fileUrl(c, photoFile(c, r.id), r.timemodified),
+    ...sizeUrls(c, r.id),
     annotationdata: r.annotationdata != null ? String(r.annotationdata) : '[]',
     gridtype: r.gridtype ?? 'none',
     gridvalue: int(r.gridvalue),
@@ -652,7 +661,7 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
   async permanently_delete_photo(c, a) {
     const p = ownPhoto(c, a.photoid, 'permanently_delete_photo');
     if (c.s.all('object_placements', { photoid: p.id, status: 'active' }).length) throw new PinError('error_save');
-    for (const area of ['photo', 'photoorig', 'photomask']) await c.s.deleteArea(area, p.id);
+    for (const area of PHOTO_AREAS) await c.s.deleteArea(area, p.id);
     await c.s.remove('photos', [p.id]);
     await c.s.remove(
       'object_placements',
@@ -684,6 +693,7 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
         userid: int(r.userid),
         userfullname: c.fullname,
         url: fileUrl(c, photoFile(c, r.id), r.timemodified),
+        ...sizeUrls(c, r.id),
         sourcetitle: String(r.sourcetitle ?? ''),
         sourceauthor: String(r.sourceauthor ?? ''),
         sourceyear: String(r.sourceyear ?? ''),
@@ -735,9 +745,32 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
     const t = sec(c.s);
     await c.s.update('photos', { ...p, wordfielddata: raw(a.wordfielddata) !== '' ? raw(a.wordfielddata) : null, timemodified: t });
     await c.s.deleteArea('photo', p.id);
+    // volle Auflösung und Vorschau passen nicht mehr; der Browser schickt sie danach neu (save_photo_hires)
+    await c.s.deleteArea('photofull', p.id);
+    await c.s.deleteArea('photothumb', p.id);
     const f = await c.s.putFile('photo', p.id, `photo_${p.id}_${t}.${d.ext}`, d.mime, d.bin);
     await storePhotoEdit(c, c.s.get('photos', p.id)!, raw(a.origdata), raw(a.maskdata), raw(a.editdata));
     return { success: true, url: fileUrl(c, f, t) };
+  },
+
+  /** volle Auflösung, Original in voller Auflösung oder Vorschau nachreichen (wie mod_pinnwand 0.172) */
+  async save_photo_hires(c, a) {
+    const p = c.s.get('photos', int(a.photoid));
+    if (!p) throw new PinError('invalidrecord');
+    if (!(c.teacher || p.userid == ME)) deny('save_photo_hires');
+    const d = dataUrl(raw(a.imagedata), /^image\/(png|jpeg|jpg)$/);
+    if (!d || d.bin.length < 50 || d.bin.length > c.maxBytes) throw new PinError('error_save');
+    const areas: Record<string, string> = { full: 'photofull', orig: 'photoorig', thumb: 'photothumb' };
+    const targets = raw(a.targets, 'full')
+      .split(',')
+      .map((x) => areas[x.trim()])
+      .filter(Boolean);
+    const ext = d.ext === 'png' ? 'png' : 'jpg';
+    for (const area of targets) {
+      await c.s.deleteArea(area, p.id);
+      await c.s.putFile(area, p.id, `${area}_${p.id}_${sec(c.s)}.${ext}`, d.mime, d.bin);
+    }
+    return { success: targets.length > 0, fullurl: areaUrl(c, 'photofull', p.id) };
   },
 
   get_threads(c) {
@@ -868,6 +901,7 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
         userfullname: c.fullname,
         mine: true,
         url: fileUrl(c, photoFile(c, r.id), r.timemodified),
+        thumburl: areaUrl(c, 'photothumb', r.id),
         sourcetitle: String(r.sourcetitle ?? ''),
         sourceauthor: String(r.sourceauthor ?? ''),
         sourceyear: String(r.sourceyear ?? ''),
@@ -900,6 +934,10 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
     });
     const f = photoFile(c, src.id);
     const nf = f ? await c.s.copyFile(f, 'photo', id) : null;
+    for (const area of ['photoorig', 'photomask', 'photofull', 'photothumb']) {
+      const g = c.s.areaFiles(area, src.id)[0];
+      if (g) await c.s.copyFile(g, area, id);
+    }
     return { id, url: fileUrl(c, nf ?? undefined, t) };
   },
 
@@ -1095,6 +1133,8 @@ export interface ExportOptions {
   boardid: number;
   annot: boolean;
   ink: boolean;
+  /** Bilder in voller Auflösung einbetten (photofull, falls vorhanden) */
+  full?: boolean;
 }
 
 /** Datenblock der exportierten Präsentation (formatVersion 1 wie in Moodle) oder null ohne eigenen Roten Faden */
@@ -1111,7 +1151,8 @@ export async function exportPresentation(c: PinCtx, o: ExportOptions, labels: A)
     if (id <= 0) return null;
     if (cache.has(id)) return cache.get(id)!;
     const p = c.s.get('photos', id);
-    const file = p ? await dataUrlOf(c, photoFile(c, id), 'image/svg+xml') : null;
+    const src = (o.full && c.s.areaFiles('photofull', id)[0]) || photoFile(c, id);
+    const file = p ? await dataUrlOf(c, src, 'image/svg+xml') : null;
     if (!p || !file) {
       cache.set(id, null);
       return null;

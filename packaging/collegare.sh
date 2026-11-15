@@ -14,7 +14,10 @@
 #   sudo collegare neustart
 #   sudo collegare admin <kürzel>           weiteres Administrationskonto
 #   sudo collegare passwort <kürzel>        Passwort neu setzen
-#   sudo collegare pruefen                  Protokollkette prüfen
+#   sudo collegare pruefen                  Protokollkette und Pinnwand-Medien prüfen
+#   sudo collegare sichern [ordner]         Datenbank und Dateien (Pinnwand-Medien) zusammen sichern
+#                                           (Standard /var/backups/collegare, die letzten 14 bleiben)
+#   sudo collegare zurueckholen <datei>     eine solche Sicherung zurückspielen (ersetzt alles!)
 set -euo pipefail
 
 REPO=lasjoh-toho/collegare
@@ -52,6 +55,26 @@ fetch_and_install() {
   if has_tty; then "$tmp/collegare-$v/install.sh" "$@" </dev/tty; else "$tmp/collegare-$v/install.sh" "$@"; fi
 }
 
+# Einstellungen lesen (DATABASE_URL, DATA_DIR)
+load_env() {
+  set -a; . "$ENVF"; set +a
+  DATA_DIR="${DATA_DIR:-/var/lib/collegare}"
+}
+
+# mysql://nutzer:passwort@host:port/datenbank zerlegen; das Passwort geht über eine Datei, nicht über die Befehlszeile
+db_args() {
+  local u="${DATABASE_URL#mysql://}" cred hostpart
+  case "$DATABASE_URL" in mysql://*) ;; *) die "Sichern geht nur mit MariaDB/MySQL (DATABASE_URL=mysql://…)." ;; esac
+  cred="${u%%@*}"; hostpart="${u#*@}"
+  DB_USER="${cred%%:*}"; DB_PASS="${cred#*:}"
+  DB_NAME="${hostpart#*/}"; DB_NAME="${DB_NAME%%\?*}"
+  hostpart="${hostpart%%/*}"; DB_HOST="${hostpart%%:*}"; DB_PORT="${hostpart#*:}"; [ "$DB_PORT" != "$hostpart" ] || DB_PORT=3306
+  DB_CNF="$(mktemp)"; chmod 600 "$DB_CNF"
+  printf '[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\n' "$DB_USER" "$(printf '%b' "${DB_PASS//%/\\x}")" "$DB_HOST" "$DB_PORT" > "$DB_CNF"
+}
+db_dump() { db_args; mysqldump --defaults-extra-file="$DB_CNF" --single-transaction --routines "$DB_NAME"; local rc=$?; rm -f "$DB_CNF"; return $rc; }
+db_restore() { db_args; mysql --defaults-extra-file="$DB_CNF" "$DB_NAME"; local rc=$?; rm -f "$DB_CNF"; return $rc; }
+
 run_cli() {
   need_root
   [ -f "$ENVF" ] || die "Collegare ist nicht installiert."
@@ -88,8 +111,51 @@ case "$cmd" in
   protokoll|log) journalctl -u collegare -f ;;
   neustart|restart) need_root; systemctl restart collegare ;;
   admin) [ -n "${1:-}" ] || die "Kürzel angeben."; if has_tty; then read -r -p "Name für $1: " NAME </dev/tty; else read -r -p "Name für $1: " NAME; fi; run_cli admin:create "$1" "$NAME" ;;
-  pruefen) run_cli audit:verify ;;
+  pruefen)
+    rc=0
+    run_cli audit:verify || rc=$?
+    run_cli pinnwand:pruefen || rc=$?
+    exit "$rc" ;;
+  sichern|backup)
+    need_root
+    [ -f "$ENVF" ] || die "Collegare ist nicht installiert."
+    load_env
+    dest="${1:-/var/backups/collegare}"
+    mkdir -p "$dest" && chmod 700 "$dest"
+    stamp="$(date +%Y-%m-%d-%H%M%S)"
+    work="$(mktemp -d /var/tmp/collegare-sichern.XXXXXX)"
+    trap 'rm -rf "$work"' EXIT
+    echo "== Datenbank …"
+    db_dump > "$work/datenbank.sql"
+    echo "== Dateien aus $DATA_DIR …"
+    base="$(basename "$DATA_DIR")"
+    tar -czf "$dest/collegare-$stamp.tar.gz" --exclude='*.tmp' --transform "s#^$base#dateien#" \
+      -C "$work" datenbank.sql -C "$(dirname "$DATA_DIR")" "$base"
+    chmod 600 "$dest/collegare-$stamp.tar.gz"
+    ls -1t "$dest"/collegare-*.tar.gz 2>/dev/null | tail -n +15 | xargs -r rm -f
+    echo "Gesichert: $dest/collegare-$stamp.tar.gz ($(du -h "$dest/collegare-$stamp.tar.gz" | cut -f1))" ;;
+  zurueckholen|restore)
+    need_root
+    f="${1:-}"; [ -f "$f" ] || die "Sicherungsdatei angeben, z. B. /var/backups/collegare/collegare-….tar.gz"
+    load_env
+    if has_tty; then
+      read -r -p "Alles in Collegare wird durch den Stand aus $f ersetzt. Weiter? (ja/nein) " ANS </dev/tty
+      [ "$ANS" = ja ] || die "Abgebrochen."
+    fi
+    work="$(mktemp -d /var/tmp/collegare-zurueck.XXXXXX)"
+    trap 'rm -rf "$work"' EXIT
+    tar -xzf "$f" -C "$work"
+    [ -f "$work/datenbank.sql" ] || die "In der Datei fehlt datenbank.sql."
+    systemctl stop collegare
+    db_restore < "$work/datenbank.sql"
+    if [ -d "$work/dateien" ]; then
+      rm -rf "$DATA_DIR/pinnwand"
+      cp -a "$work/dateien/." "$DATA_DIR/"
+      chown -R collegare:collegare "$DATA_DIR"
+    fi
+    systemctl start collegare
+    echo "Zurückgeholt: $f" ;;
   passwort) [ -n "${1:-}" ] || die "Kürzel angeben."; run_cli admin:password "$1" ;;
-  hilfe|-h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
+  hilfe|-h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "Unbekannter Befehl: $cmd (collegare hilfe)" ;;
 esac
