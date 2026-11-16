@@ -84,6 +84,20 @@
     window.parent.postMessage({ type: 'collegare:pinnwand-live' }, location.origin);
   };
 
+  // Rückgängig/Wiederholen mit Verlauf in der Kopfzeile von Collegare (mod_pinnwand ab 0.174.0): die Pinnwand meldet
+  // ihren Stand, die Seite schickt undo, redo oder go mit Schrittzahl zurück
+  transport.undo = {
+    report: function (st) {
+      window.parent.postMessage({ type: 'collegare:pinnwand-undo', canUndo: st.canUndo, canRedo: st.canRedo, entries: st.entries }, location.origin);
+    },
+    listen: function (cb) {
+      window.addEventListener('message', function (e) {
+        if (e.source !== window.parent || e.origin !== location.origin || !e.data || e.data.type !== 'collegare:pinnwand-undo-do') return;
+        cb(e.data);
+      });
+    }
+  };
+
   Promise.all([
     fetch(api + '/start', { credentials: 'include' }).then(json),
     fetch(root + '/mod/pinnwand/strings.json').then(function (r) {

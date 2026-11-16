@@ -1,6 +1,9 @@
 /** Schlichte Linien-Symbole (24er-Raster, Strich 2), damit die Oberfläche ohne Schriftart-Symbole auskommt. */
 const PATHS: Record<string, string> = {
   menu: 'M4 6h16M4 12h16M4 18h16',
+  undo: 'M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  redo: 'M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',
   users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   map: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M5 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4M19 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4M5 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4M19 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4M6.5 7.5l3.3 2.8M17.5 7.5l-3.3 2.8M6.5 16.5l3.3-2.8M17.5 16.5l-3.3-2.8',
   outline: 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',

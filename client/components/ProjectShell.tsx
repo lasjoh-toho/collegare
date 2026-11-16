@@ -21,7 +21,28 @@ const PIN_KEY = 'collegare-menu-pinned';
 const SIDE_KEY = 'collegare-leiste';
 const SIDE_W_KEY = 'collegare-leiste-breite';
 const clampSide = (w: number) => Math.round(Math.max(280, Math.min(w, 900, innerWidth * 0.7)));
-type Side = 'chat' | 'notes' | null;
+type Side = 'chat' | 'notes' | 'history' | null;
+
+/** ein Schritt im Verlauf (Bento, Pinnwand) */
+export interface UndoEntry {
+  label: string;
+  at?: number;
+}
+/**
+ * Rückgängig/Wiederholen der Seite (Wunsch Jo, 0.7.5): die Pfeile stehen immer rechts oben in der Kopfzeile, der
+ * dritte Knopf öffnet den Verlauf als Leiste. Einträge in zeitlicher Reihenfolge; go(n) geht n Schritte zurück (n < 0)
+ * oder vor (n > 0).
+ */
+export interface UndoSpec {
+  canUndo: boolean;
+  canRedo: boolean;
+  entries?: { undo: UndoEntry[]; redo: UndoEntry[] } | null;
+  onUndo: () => void;
+  onRedo: () => void;
+  onGo?: (steps: number) => void;
+  /** der Verlauf wird gezeigt: die Seite holt die Einträge */
+  onHistory?: () => void;
+}
 
 interface Props {
   me: Me;
@@ -40,10 +61,12 @@ interface Props {
   info?: InfoSpec;
   /** weitere Teile hinter „where“ in der Mitte der Kopfzeile (z. B. Titel der Präsentation und Speicherstand) */
   crumbs?: React.ReactNode;
+  /** Rückgängig/Wiederholen mit Verlauf (Folien, Pinnwand) */
+  undo?: UndoSpec;
   children: React.ReactNode;
 }
 
-export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, children }: Props) {
+export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, undo, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
@@ -84,7 +107,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   useEffect(() => {
     try {
       const v = localStorage.getItem(SIDE_KEY) ?? (localStorage.getItem('collegare-chat-offen') === '1' ? 'chat' : '');
-      setSide(v === 'chat' || v === 'notes' ? v : null);
+      setSide(v === 'chat' || v === 'notes' || v === 'history' ? v : null);
     } catch {}
   }, []);
   const toggleSide = (v: Side) => {
@@ -134,6 +157,13 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   const chatOn = project.settings.chatAll !== false || (project.settings.chatGroups !== false && project.mode === 'group');
   const showChat = chatOn && side === 'chat' && where !== 'Chat';
   const showNotes = side === 'notes' && where !== 'Notizen und Quellen';
+  const showHistory = side === 'history' && !!undo?.onGo;
+  const wantHistory = showHistory ? undo?.onHistory : undefined;
+  useEffect(() => {
+    wantHistory?.();
+    // nur beim Öffnen der Leiste (die Seite schickt danach jede Änderung mit)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showHistory]);
   const phases = phaseList(project.settings, project.mode === 'single').filter((p) => p.state !== 'off');
   const done = phaseDone(project, me.id, docs === undefined ? ownDocs : docs);
   const now = currentPhase(phases, done);
@@ -154,7 +184,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }
 
   return (
-    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
+    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes || showHistory ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
       <header className={sh.head}>
         <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
           <Icon name="menu" size={18} />
@@ -176,6 +206,21 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             </button>
           )}
           {actions}
+          {undo && (
+            <span className={sh.undoGroup}>
+              <button className="btn icon" onClick={undo.onUndo} disabled={!undo.canUndo} title="Rückgängig (Strg+Z)" aria-label="Rückgängig">
+                <Icon name="undo" size={16} />
+              </button>
+              <button className="btn icon" onClick={undo.onRedo} disabled={!undo.canRedo} title="Wiederholen (Strg+Y)" aria-label="Wiederholen">
+                <Icon name="redo" size={16} />
+              </button>
+              {undo.onGo && (
+                <button className={`btn icon ${showHistory ? 'on' : ''}`} onClick={() => toggleSide(showHistory ? null : 'history')} title={showHistory ? 'Verlauf ausblenden' : 'Verlauf zeigen'} aria-pressed={showHistory} aria-label="Verlauf">
+                  <Icon name="history" size={16} />
+                </button>
+              )}
+            </span>
+          )}
           {where !== 'Notizen und Quellen' && (
             <button className={`btn icon ${showNotes ? 'on' : ''}`} onClick={() => toggleSide(showNotes ? null : 'notes')} title={showNotes ? 'Notizen ausblenden' : 'Notizen zeigen'} aria-pressed={showNotes} aria-label="Notizen und Quellen">
               <Icon name="notes" size={16} />
@@ -313,11 +358,79 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           <ChatPanel me={me} project={project} panel onClose={() => toggleSide(null)} />
         </aside>
       )}
+      {showHistory && undo && (
+        <aside className={sh.chat} aria-label="Verlauf">
+          <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
+          <HistoryPanel undo={undo} onClose={() => toggleSide(null)} />
+        </aside>
+      )}
       {showNotes && (
         <aside className={sh.chat} aria-label="Notizen und Quellen">
           <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
           <NotesPanel me={me} project={project} panel onClose={() => toggleSide(null)} />
         </aside>
+      )}
+    </div>
+  );
+}
+
+function ago(at?: number) {
+  if (!at) return '';
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 60) return 'gerade eben';
+  if (s < 3600) return `vor ${Math.round(s / 60)} Min.`;
+  return new Date(at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Verlauf der Änderungen: oben, was sich wiederholen lässt, darunter „Jetzt“ und die früheren Schritte; ein Klick springt dorthin */
+function HistoryPanel({ undo, onClose }: { undo: UndoSpec; onClose: () => void }) {
+  const past = undo.entries?.undo ?? [];
+  const future = undo.entries?.redo ?? [];
+  const n = past.length;
+  const go = (steps: number) => steps && undo.onGo?.(steps);
+  return (
+    <div className={sh.history}>
+      <div className={sh.historyBar}>
+        <Icon name="history" size={16} />
+        <strong className="grow">Verlauf</strong>
+        <button className="btn icon" onClick={onClose} title="Schließen" aria-label="Verlauf schließen">
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+      {!undo.entries ? (
+        <p className="muted">Der Verlauf wird geladen …</p>
+      ) : (
+        <ol className={sh.historyList}>
+          {future
+            .map((e, j) => (
+              <li key={`r${j}`}>
+                <button className={`${sh.historyItem} ${sh.historyFuture}`} onClick={() => go(j + 1)} title="Bis hierher wiederholen">
+                  <span className="grow">{e.label}</span>
+                  <span className="muted">{ago(e.at)}</span>
+                </button>
+              </li>
+            ))
+            .reverse()}
+          <li>
+            <div className={sh.historyNow}>Jetzt</div>
+          </li>
+          {past
+            .map((e, i) => (
+              <li key={`u${i}`}>
+                <button className={sh.historyItem} onClick={() => go(i + 1 - n)} disabled={i === n - 1} title={i === n - 1 ? 'Der aktuelle Stand' : 'Bis hierher zurück'}>
+                  <span className="grow">{e.label}</span>
+                  <span className="muted">{ago(e.at)}</span>
+                </button>
+              </li>
+            ))
+            .reverse()}
+          <li>
+            <button className={sh.historyItem} onClick={() => go(-n)} disabled={!n} title="Alle Schritte zurücknehmen">
+              <span className="grow muted">Ausgangszustand</span>
+            </button>
+          </li>
+          {!n && !future.length && <li className="muted">Noch keine Änderungen.</li>}
+        </ol>
       )}
     </div>
   );

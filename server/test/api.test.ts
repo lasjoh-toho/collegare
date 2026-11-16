@@ -643,6 +643,28 @@ describe('Mindmap in Echtzeit', () => {
     expect((await pin(ben, gs, 'add_thread_item', { itemtype: 'photo', photoid: id })).json.data.items).toHaveLength(1);
     await pin(ben, gs, 'set_board_name', { boardid: 0, name: 'Ursachen' });
     expect((await pin(anna, gs, 'get_board_names')).json.data.names).toEqual([{ boardid: 0, name: 'Ursachen' }]);
+    // Bilder zum Untersuchen: Lehrkraft gibt in „Test / Demo“ frei, Anna öffnet dazu ein eigenes Board
+    const ts = ((await call('GET', `/api/projects/${project}/pinnwand`, t)).json.scopes as J[]).find((x) => x.scope.startsWith('t'))!.scope;
+    expect((await call('GET', `/api/projects/${project}/pinnwand/${ts}/start`, t)).json.config.canstudyrelease).toBe(true);
+    expect((await call('GET', `/api/projects/${project}/pinnwand/${gs}/start`, t)).json.config.canstudyrelease).toBe(false);
+    const tid = (await pin(t, ts, 'save_photo', { imagedata: png, sourcetitle: 'Karte 1914' })).json.data.photoid;
+    expect((await pin(anna, gs, 'set_photo_studyable', { photoid: id, studyable: true })).json.ok).toBe(false);
+    expect((await pin(anna, gs, 'get_study_photos')).json.data.photos).toEqual([]);
+    expect((await pin(t, ts, 'set_photo_studyable', { photoid: tid, studyable: true })).json.data).toEqual({ success: true, studyable: true });
+    const sp = (await pin(anna, gs, 'get_study_photos')).json.data.photos as J[];
+    expect(sp).toEqual([expect.objectContaining({ id: tid, title: 'Karte 1914', boardid: -1 })]);
+    expect((await call('GET', sp[0].url.replace(/^\/collegare/, ''), anna)).status).toBe(200);
+    expect((await call('GET', sp[0].url.replace(/^\/collegare/, '').replace('/' + gs + '/', '/g' + g2 + '/'), anna)).status).toBe(403);
+    const opened = (await pin(anna, gs, 'open_study_board', { photoid: tid })).json.data;
+    expect(opened).toMatchObject({ boardid: 1, created: true, boardbgs: [expect.objectContaining({ boardid: 1, sourcephotoid: tid })] });
+    expect((await pin(ben, gs, 'open_study_board', { photoid: tid })).json.data).toMatchObject({ boardid: 1, created: false });
+    expect((await pin(ben, gs, 'get_photos')).json.data.boardbgs).toHaveLength(1);
+    expect((await call('GET', opened.boardbgs[0].url.replace(/^\/collegare/, ''), ben)).status).toBe(200);
+    expect((await pin(anna, gs, 'get_board_names')).json.data.names).toContainEqual({ boardid: 1, name: 'Karte 1914' });
+    expect((await pin(anna, gs, 'get_study_photos')).json.data.photos[0].boardid).toBe(1);
+    await pin(t, ts, 'set_photo_studyable', { photoid: tid, studyable: false });
+    expect((await pin(anna, gs, 'get_study_photos')).json.data.photos).toEqual([]);
+    expect((await call('GET', sp[0].url.replace(/^\/collegare/, ''), anna)).status).toBe(404);
     // Clara (andere Gruppe) kommt weder an die Aufrufe noch an die Dateien
     expect((await pin(clara, gs, 'get_photos')).status).toBe(403);
     expect((await call('GET', fileUrl, clara)).status).toBe(403);

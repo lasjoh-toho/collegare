@@ -8,7 +8,7 @@
   Einzel-Editor aus mod_pinnwand für die Folien (Einfügen › WordArt, Formen-Editor, Formel): startet js/app.js mit
   cfg.editorOnly, ohne Pinnwand und ohne Server. Die Seite /projekt/folien/ legt diesen iframe erst an, wenn jemand
   einen der Knöpfe drückt (nichts davon wird vorher geladen), und spricht per postMessage mit ihm:
-    hierher:  {pinnwandEditor:'init', kind, data?, teacher?}
+    hierher:  {pinnwandEditor:'init', kind, data?, text?, teacher?}
     zurück:   {pinnwandEditor:'ready'} · {pinnwandEditor:'done', svg?, data?, tex?} · {pinnwandEditor:'cancel'}
 -->
 <style>
@@ -50,7 +50,7 @@
       window.pinnwandConfig = {
         cmid: 0, wwwroot: root, strings: res[0], formulatransform: true, formulacalc: true,
         editorOnly: {
-          kind: init.kind, data: init.data || '', edit: !!init.data, teacher: !!init.teacher,
+          kind: init.kind, data: init.data || '', text: init.text || '', edit: !!init.data, teacher: !!init.teacher,
           onDone: function (r) { post({ pinnwandEditor: 'done', svg: r.svg, data: r.data, tex: r.tex }); },
           onCancel: function () { post({ pinnwandEditor: 'cancel' }); }
         }

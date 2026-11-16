@@ -17,6 +17,23 @@ export interface PinCtx {
   base: string;
   /** Grenze für Dateien in Bytes */
   maxBytes: number;
+  /** Bilder zum Untersuchen aus den Pinnwänden „Test / Demo“ der Lehrkräfte (fehlt in Tests) */
+  study?: StudyAccess;
+}
+
+export interface StudySource {
+  scope: string;
+  id: number;
+  title: string;
+  /** vorhandene Fassungen: Bereich → Datei-id */
+  files: Record<string, number>;
+}
+export interface StudyAccess {
+  list(): Promise<StudySource[]>;
+  /** Adresse einer Fassung (photo, photofull, photothumb) für die Ansicht */
+  url(src: StudySource, area: string): string;
+  /** Inhalt einer Datei des Lehrkraft-Bereichs */
+  read(src: StudySource, fileId: number): Promise<{ name: string; mime: string; data: Buffer } | null>;
 }
 
 /** Einstellungen der Aktivität (Tabelle pinnwand), in Collegare fest für Gruppenarbeit */
@@ -155,7 +172,17 @@ function exportPhoto(c: PinCtx, r: Row, counts: Map<number, number>) {
     editdata: String(r.editdata ?? ''),
     otherboardcount: counts.get(r.id) ?? 0,
     userfullname: c.fullname,
+    studyable: !!r.studyable,
   };
+}
+
+/** Eigene Hintergründe einzelner Boards (Untersuchung eines Bildes der Lehrkraft) */
+function boardBgs(c: PinCtx) {
+  return c.s
+    .all('board_bg', { userid: ME })
+    .map((r) => ({ boardid: int(r.boardid), url: areaUrl(c, 'boardbg', r.id), sourcephotoid: int(r.sourcephotoid) }))
+    .filter((b) => b.url)
+    .sort((a, b) => a.boardid - b.boardid);
 }
 
 // ---- Hintergrund (in Moodle Nutzereinstellungen, hier Zeilen in prefs) ----
@@ -387,6 +414,7 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
       .map((r) => exportPhoto(c, r, counts));
     return {
       photos,
+      boardbgs: boardBgs(c),
       max: effectiveMax(c),
       background: backgroundData(c),
       candelete: c.teacher,
@@ -482,6 +510,53 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
 
   get_board_names(c) {
     return { names: c.s.all('board_names', { userid: ME }).map((r) => ({ boardid: int(r.boardid), name: String(r.name ?? '') })) };
+  },
+
+  // ---- Bilder zum Untersuchen: freigeben in der eigenen Pinnwand „Test / Demo“ der Lehrkraft, Lernende öffnen dazu
+  // ein eigenes Board mit einer Kopie des Bildes als Hintergrund ----
+  async set_photo_studyable(c, a) {
+    if (!c.teacher || !c.s.scope.startsWith('t')) deny('set_photo_studyable');
+    const p = ownPhoto(c, a.photoid, 'set_photo_studyable');
+    const studyable = bool(a.studyable) ? 1 : 0;
+    await c.s.update('photos', { ...p, studyable });
+    return { success: true, studyable: !!studyable };
+  },
+
+  async get_study_photos(c) {
+    if (!c.study) return { photos: [] };
+    const mine = new Map(c.s.all('board_bg', { userid: ME }).map((r) => [`${r.sourcescope}:${r.sourcephotoid}`, int(r.boardid)]));
+    const list = await c.study.list();
+    return {
+      photos: list.map((src) => ({
+        id: src.id,
+        title: src.title,
+        url: c.study!.url(src, 'photo'),
+        thumburl: src.files.photothumb ? c.study!.url(src, 'photothumb') : c.study!.url(src, 'photo'),
+        fullurl: src.files.photofull ? c.study!.url(src, 'photofull') : '',
+        boardid: mine.get(`${src.scope}:${src.id}`) ?? -1,
+      })),
+    };
+  },
+
+  async open_study_board(c, a) {
+    if (!c.study) deny('open_study_board');
+    const id = int(a.photoid);
+    const src = (await c.study.list()).find((x) => x.id === id);
+    if (!src) deny('open_study_board');
+    const existing = c.s.first('board_bg', { userid: ME, sourcescope: src.scope, sourcephotoid: id });
+    if (existing && c.s.areaFiles('boardbg', existing.id).length) return { boardid: int(existing.boardid), created: false, boardbgs: boardBgs(c) };
+    // volle Auflösung, sonst Anzeigegröße
+    const file = (src.files.photofull ? await c.study.read(src, src.files.photofull) : null) ?? (await c.study.read(src, src.files.photo));
+    if (!file) throw new PinError('error_save');
+    let max = -1;
+    for (const t of ['photos', 'board_names', 'board_ink', 'board_bg', 'object_placements'] as const) for (const r of c.s.all(t)) max = Math.max(max, int(r.boardid));
+    const boardid = max + 1;
+    if (existing) await c.s.remove('board_bg', [existing.id]);
+    const rid = await c.s.insert('board_bg', { userid: ME, boardid, sourcephotoid: id, sourcescope: src.scope, timecreated: sec(c.s) });
+    await c.s.putFile('boardbg', rid, `boardbg_${rid}_${file.name}`, file.mime, file.data);
+    const name = text(a.name).trim() || src.title || 'Untersuchung';
+    await c.s.insert('board_names', { userid: ME, boardid, name: name.slice(0, 255), hidden: 0, timemodified: sec(c.s) });
+    return { boardid, created: true, boardbgs: boardBgs(c) };
   },
 
   async set_board_name(c, a) {
@@ -962,7 +1037,7 @@ export const METHODS: Record<string, (c: PinCtx, a: A) => Promise<unknown> | unk
 };
 
 /** Methoden, die nur lesen (für Echtzeit: nach allen anderen bekommen die übrigen Geräte Bescheid) */
-export const READ_ONLY = new Set(['get_photos', 'get_board_ink', 'get_object_placements', 'get_object_usage', 'get_board_names', 'get_all_boards', 'get_trash', 'get_all_photos', 'get_threads', 'get_stream_photos']);
+export const READ_ONLY = new Set(['get_study_photos', 'get_photos', 'get_board_ink', 'get_object_placements', 'get_object_usage', 'get_board_names', 'get_all_boards', 'get_trash', 'get_all_photos', 'get_threads', 'get_stream_photos']);
 
 /** Folien-Medien (slidemedia.php): Bild, Ton oder Video hochladen; gleicher Inhalt, gleiche Datei */
 export async function slideMedia(c: PinCtx, name: string, mime: string, data: Buffer): Promise<A> {

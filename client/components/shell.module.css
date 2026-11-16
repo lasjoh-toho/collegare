@@ -101,3 +101,21 @@ div.phase { opacity: 0.75; }
 .sideGrip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; touch-action: none; }
 .sideGrip:hover, .sideGrip:active { background: linear-gradient(90deg, transparent 3px, var(--ui-accent) 3px, var(--ui-accent) 5px, transparent 5px); }
 @media (max-width: 899px) { .chat { width: min(var(--side-w, 380px), 100vw); box-shadow: var(--shadow); } }
+
+/* Rückgängig/Wiederholen und Verlauf (0.7.5) */
+.undoGroup { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; margin: 0 2px; border-left: 1px solid var(--ui-border); border-right: 1px solid var(--ui-border); }
+.undoGroup :global(.btn[disabled]) { opacity: 0.4; }
+.history { display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow: auto; height: 100%; }
+.historyBar { display: flex; align-items: center; gap: 8px; }
+.historyList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.historyItem {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.historyItem:hover:not([disabled]) { background: var(--ui-bg-2); }
+.historyItem[disabled] { cursor: default; font-weight: 600; }
+.historyFuture { opacity: 0.55; }
+.historyNow {
+  margin: 4px 0; padding: 2px 10px; font-size: 12px; font-weight: 600; color: var(--ui-accent);
+  border-top: 2px solid var(--ui-accent);
+}

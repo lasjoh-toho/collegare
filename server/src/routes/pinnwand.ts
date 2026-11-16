@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { exportHtml } from '../pinnwand/exportHtml.js';
 import { fetchMedia, mediaMime } from '../pinnwand/fetchMedia.js';
-import { exportPresentation, fromMap, INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx } from '../pinnwand/api.js';
+import { exportPresentation, fromMap, INSTANCE, METHODS, READ_ONLY, slideMedia, type PinCtx, type StudyAccess, type StudySource } from '../pinnwand/api.js';
 import { buildOutline } from '../projects/maps.js';
 import { PinError } from '../pinnwand/store.js';
 import type { Services } from '../services.js';
@@ -47,7 +47,26 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
     return { userId: sess.userId, projectId, scope: sc, role: r.role, scopes: r.scopes, maxBytes, settings: project?.settings };
   }
 
-  const ctx = (a: NonNullable<Awaited<ReturnType<typeof access>>>, sc: PinCtx['s']): PinCtx => ({ s: sc, fullname: a.scope.title, teacher: a.role === 'teacher', base, maxBytes: a.maxBytes });
+  /** Freigegebene Bilder der Lehrkräfte dieses Projekts (Pinnwände „Test / Demo“) */
+  async function studyList(projectId: number): Promise<StudySource[]> {
+    const all = await s.pinnwand.studySources(projectId);
+    const ok = new Map<string, boolean>();
+    const out: StudySource[] = [];
+    for (const src of all) {
+      if (!ok.has(src.scope)) {
+        const uid = Number(src.scope.slice(1));
+        ok.set(src.scope, Number.isInteger(uid) && (await s.projects.roleOf(uid, projectId)) === 'teacher');
+      }
+      if (ok.get(src.scope)) out.push(src);
+    }
+    return out;
+  }
+  const study = (a: NonNullable<Awaited<ReturnType<typeof access>>>): StudyAccess => ({
+    list: () => studyList(a.projectId),
+    url: (src, area) => (src.files[area] ? `${base}/api/projects/${a.projectId}/pinnwand/${a.scope.scope}/vorlage/${src.scope}/${src.files[area]}` : ''),
+    read: (src, fileId) => s.pinnwand.file(a.projectId, src.scope, fileId),
+  });
+  const ctx = (a: NonNullable<Awaited<ReturnType<typeof access>>>, sc: PinCtx['s']): PinCtx => ({ s: sc, fullname: a.scope.title, teacher: a.role === 'teacher', base, maxBytes: a.maxBytes, study: study(a) });
 
   // Welche Pinnwände: Lernende die eigene, Lehrkräfte alle Gruppen
   app.get<{ Params: { id: string } }>('/api/projects/:id/pinnwand', async (req, reply) => {
@@ -90,6 +109,8 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
         allowconsent: !!INSTANCE.allowconsent,
         consenttext: '',
         canmanage: teacher,
+        // Bilder zum Untersuchen gibt die Lehrkraft in ihrer Pinnwand „Test / Demo“ frei
+        canstudyrelease: teacher && a.scope.scope.startsWith('t'),
         // In Collegare arbeitet die Gruppe als eine Person: ihr Name steht an den Objekten
         currentuserfullname: a.scope.title,
         username: me?.name ?? '',
@@ -201,6 +222,16 @@ export function pinnwandRoutes(app: FastifyInstance, s: Services, clientDir?: st
     const a = await access(req, reply);
     if (!a) return;
     return send(reply, await s.pinnwand.file(a.projectId, a.scope.scope, Number(req.params.fid)));
+  });
+
+  // Bild zum Untersuchen aus der Pinnwand einer Lehrkraft (nur freigegebene Bilder und ihre Fassungen)
+  app.get<{ Params: P & { src: string; fid: string } }>('/api/projects/:id/pinnwand/:scope/vorlage/:src/:fid', async (req, reply) => {
+    const a = await access(req, reply);
+    if (!a) return;
+    const fid = Number(req.params.fid);
+    const src = (await studyList(a.projectId)).find((x) => x.scope === req.params.src && Object.values(x.files).includes(fid));
+    if (!src) return reply.code(404).send({ error: 'Nicht gefunden' });
+    return send(reply, await s.pinnwand.file(a.projectId, src.scope, fid));
   });
 
   app.get<{ Params: P & { file: string } }>('/api/projects/:id/pinnwand/:scope/medien/:file', async (req, reply) => {

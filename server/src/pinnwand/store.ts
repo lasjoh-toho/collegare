@@ -8,7 +8,7 @@ import type { Db } from '../db/index.js';
 import type { PinMedia } from './media.js';
 
 export type Row = Record<string, any> & { id: number };
-export type Table = 'photos' | 'threads' | 'thread_items' | 'board_ink' | 'board_names' | 'object_placements' | 'prefs';
+export type Table = 'photos' | 'threads' | 'thread_items' | 'board_ink' | 'board_names' | 'object_placements' | 'prefs' | 'board_bg';
 
 export interface PinFile {
   id: number;
@@ -213,6 +213,38 @@ export class PinStore {
       })
       .catch(() => {});
     return next;
+  }
+
+  /**
+   * Bilder zum Untersuchen: freigegebene Bilder aus den Pinnwänden „Test / Demo“ der Lehrkräfte (Bereiche t…). Liest
+   * direkt aus der Datenbank (ohne die Warteschlange des Bereichs), weil Zeilen sofort geschrieben werden.
+   */
+  async studySources(projectId: number): Promise<{ scope: string; id: number; title: string; sortorder: number; files: Record<string, number> }[]> {
+    const rows = await this.db.selectFrom('pinnwand_rows').select(['id', 'scope', 'data']).where('project_id', '=', projectId).where('tbl', '=', 'photos').where('scope', 'like', 't%').execute();
+    const out: { scope: string; id: number; title: string; sortorder: number; files: Record<string, number> }[] = [];
+    for (const r of rows) {
+      let d: Record<string, any>;
+      try {
+        d = JSON.parse(r.data);
+      } catch {
+        continue;
+      }
+      if (!d.studyable || (d.status ?? 'active') !== 'active' || d.wordfielddata) continue;
+      out.push({ scope: r.scope, id: Number(r.id), title: String(d.sourcetitle ?? ''), sortorder: Number(d.sortorder) || 0, files: {} });
+    }
+    if (!out.length) return out;
+    const files = await this.db
+      .selectFrom('pinnwand_files')
+      .select(['id', 'scope', 'area', 'item_id', 'size'])
+      .where('project_id', '=', projectId)
+      .where('item_id', 'in', out.map((o) => o.id))
+      .where('area', 'in', ['photo', 'photofull', 'photothumb'])
+      .execute();
+    for (const f of files) {
+      const o = out.find((x) => x.id === Number(f.item_id) && x.scope === f.scope);
+      if (o) o.files[f.area] = Number(f.id);
+    }
+    return out.filter((o) => o.files.photo).sort((a, b) => a.scope.localeCompare(b.scope) || a.sortorder - b.sortorder || a.id - b.id);
   }
 
   async file(projectId: number, scope: string, id: number): Promise<{ name: string; mime: string; data: Buffer } | null> {

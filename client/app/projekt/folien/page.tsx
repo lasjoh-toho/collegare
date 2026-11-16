@@ -7,7 +7,7 @@
  * Präsentationen der Gruppen lesend und arbeitet im eigenen Testbereich selbst.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ProjectShell } from '@/components/ProjectShell';
+import { ProjectShell, type UndoEntry } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { ApiError, BASE_PATH, get, href, post } from '@/lib/api';
 import { download, fileBase, importBentoHtml, importJson, importPowerPoint, pickFile } from '@/lib/bentoFiles';
@@ -36,9 +36,14 @@ type Msg = {
   title?: string;
   kind?: 'wordart' | 'shape' | 'formula';
   edit?: { id: string; data: string };
+  /** WordArt/Form auf ein Textfeld oder eine Auswahl anwenden: der Text dazu */
+  text?: string;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  entries?: { undo: UndoEntry[]; redo: UndoEntry[] };
 };
 /** offener Einzel-Editor aus der Pinnwand (WordArt, Formen-Editor, Formel) */
-type Insert = { kind: 'wordart' | 'shape' | 'formula'; edit?: { id: string; data: string } };
+type Insert = { kind: 'wordart' | 'shape' | 'formula'; edit?: { id: string; data: string }; text?: string };
 const INSERT_TITLE = { wordart: 'WordArt', shape: 'Formen-Editor', formula: 'Formel' } as const;
 
 export default function Folien() {
@@ -77,7 +82,7 @@ export default function Folien() {
       if (ev.origin !== location.origin || ev.source !== editorFrame.current?.contentWindow) return;
       const m = ev.data as { pinnwandEditor?: string; svg?: string; data?: string; tex?: string };
       if (m?.pinnwandEditor === 'ready') {
-        editorFrame.current?.contentWindow?.postMessage({ pinnwandEditor: 'init', kind: insert.kind, data: insert.edit?.data ?? '', teacher: project?.role === 'teacher' }, location.origin);
+        editorFrame.current?.contentWindow?.postMessage({ pinnwandEditor: 'init', kind: insert.kind, data: insert.edit?.data ?? '', text: insert.text ?? '', teacher: project?.role === 'teacher' }, location.origin);
       } else if (m?.pinnwandEditor === 'done') {
         toBento({ bento: 'inserted', app: 'pinnwand', kind: insert.kind, svg: m.svg, data: m.data, tex: m.tex, editId: insert.edit?.id });
         setInsert(null);
@@ -89,6 +94,9 @@ export default function Folien() {
   // Titel und Speicherstand stehen in der Kopfzeile (Wunsch Jo), Bento meldet beides
   const [title, setTitle] = useState('');
   const [dirty, setDirty] = useState(false);
+  // Rückgängig/Wiederholen in der Kopfzeile (Wunsch Jo, 0.7.5), Bento meldet den Stand
+  const [history, setHistory] = useState<{ canUndo: boolean; canRedo: boolean; entries: { undo: UndoEntry[]; redo: UndoEntry[] } | null }>({ canUndo: false, canRedo: false, entries: null });
+  const historyWanted = useRef(false);
   useEffect(() => {
     const onMsg = (ev: MessageEvent) => {
       if (ev.origin !== location.origin || ev.source !== frame.current?.contentWindow) return;
@@ -97,11 +105,13 @@ export default function Folien() {
       if ((m.bento === 'ready' || m.bento === 'title') && typeof m.title === 'string') setTitle(m.title);
       if (m.bento === 'ready' || m.bento === 'dirty') setDirty(!!m.dirty);
       if (m.bento === 'saved') setDirty(false);
-      if (m.bento === 'insert' && m.kind && m.kind in INSERT_TITLE) setInsert({ kind: m.kind, edit: m.edit });
+      if (m.bento === 'insert' && m.kind && m.kind in INSERT_TITLE) setInsert({ kind: m.kind, edit: m.edit, text: typeof m.text === 'string' ? m.text : undefined });
+      if (m.bento === 'ready' && historyWanted.current) toBento({ bento: 'history-get' });
+      if (m.bento === 'history') setHistory((h) => ({ canUndo: !!m.canUndo, canRedo: !!m.canRedo, entries: m.entries ?? h.entries }));
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, []);
+  }, [toBento]);
 
   // Datei-Aktionen aus Bentos Menü „Datei“
   useEffect(() => {
@@ -213,6 +223,20 @@ export default function Folien() {
       info={{ key: 'folien', title: 'Folien', text: 'Eure Präsentation, bedient wie PowerPoint: Oben stehen Datei, Start, Einfügen und die anderen Registerkarten, rechts der Formatbereich zur gewählten Registerkarte. Gespeichert wird von selbst. Unter „Datei“ lässt sich die Präsentation als PowerPoint, Bento-Datei oder JSON herunterladen.' }}
       phase="presentation"
       fill
+      undo={
+        editing
+          ? {
+              ...history,
+              onUndo: () => toBento({ bento: 'undo' }),
+              onRedo: () => toBento({ bento: 'redo' }),
+              onGo: (steps) => toBento({ bento: 'history-go', steps }),
+              onHistory: () => {
+                historyWanted.current = true;
+                toBento({ bento: 'history-get' });
+              },
+            }
+          : undefined
+      }
       actions={
         <>
           {busy && <span className="muted">{busy}</span>}

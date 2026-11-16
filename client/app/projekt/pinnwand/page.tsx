@@ -7,7 +7,7 @@
  * die Pinnwand gerade noch offen hat.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ProjectShell } from '@/components/ProjectShell';
+import { ProjectShell, type UndoEntry } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { BASE_PATH, get, href, post, projectSocket } from '@/lib/api';
 import type { ProjectView } from '@/lib/types';
@@ -41,14 +41,20 @@ export default function PinnwandPage() {
   const [people, setPeople] = useState<{ id: number; name: string }[]>([]);
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      if (e.origin === location.origin && e.source === frame.current?.contentWindow && e.data?.type === 'collegare:pinnwand-live') live.current = true;
+      if (e.origin !== location.origin || e.source !== frame.current?.contentWindow) return;
+      if (e.data?.type === 'collegare:pinnwand-live') live.current = true;
+      // Rückgängig/Wiederholen in der Kopfzeile (0.7.5): die Pinnwand meldet ihren Stand und Verlauf
+      if (e.data?.type === 'collegare:pinnwand-undo') setPinUndo({ canUndo: !!e.data.canUndo, canRedo: !!e.data.canRedo, entries: e.data.entries ?? null });
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, []);
   useEffect(() => {
     live.current = false;
+    setPinUndo(null);
   }, [scope, reload]);
+  const [pinUndo, setPinUndo] = useState<{ canUndo: boolean; canRedo: boolean; entries: { undo: UndoEntry[]; redo: UndoEntry[] } | null } | null>(null);
+  const toPin = (m: Record<string, unknown>) => frame.current?.contentWindow?.postMessage({ type: 'collegare:pinnwand-undo-do', ...m }, location.origin);
 
   useEffect(() => {
     if (me === null) location.replace(href('/'));
@@ -107,6 +113,16 @@ export default function PinnwandPage() {
       info={{ key: 'pinnwand', title: 'Pinnwand', text: 'Die Pinnwand eurer Gruppe: Karten, Bilder, Links und Medien frei anordnen. Änderungen der anderen erscheinen von selbst.' }}
       phase="presentation"
       fill
+      undo={
+        pinUndo
+          ? {
+              ...pinUndo,
+              onUndo: () => toPin({ action: 'undo' }),
+              onRedo: () => toPin({ action: 'redo' }),
+              onGo: (steps) => toPin({ action: 'go', steps }),
+            }
+          : undefined
+      }
       actions={
         <>
           {people.length > 0 && (

@@ -79,6 +79,8 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
       ribbon: true,
       // Titel und Speicherstand zeigt die Kopfzeile von Collegare
       titleInHost: true,
+      // Rückgängig/Wiederholen und der Verlauf stehen in der Kopfzeile von Collegare (Wunsch Jo, 0.7.5)
+      undoInHost: true,
       readOnly: !a.write,
       canImport: a.canImport,
       fileActions: ['exportPptx', 'exportJson', 'importPptx', 'importHtml', 'importJson'],
