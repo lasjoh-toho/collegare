@@ -14,7 +14,7 @@ import { setChatDrag } from '@/lib/chatDrag';
 import type { Me, ProjectView } from '@/lib/types';
 import c from './notes.module.css';
 
-type Kind = 'note' | 'source' | 'link' | 'data';
+type Kind = 'note' | 'source' | 'link' | 'image' | 'data';
 export type Visibility = 'private' | 'group' | 'all';
 export interface Note {
   id: number;
@@ -25,6 +25,12 @@ export interface Note {
   body: string;
   source: string;
   url: string | null;
+  /** Urheber, Lizenz, Ursprungsseite (Bilder) */
+  credit?: string;
+  license?: string;
+  origin?: string | null;
+  /** angehängte Datei: GET /api/projects/:id/notizen/:noteId/datei */
+  file?: { mime: string; size: number } | null;
   visibility: Visibility;
   rows: string[][] | null;
   at: number;
@@ -57,6 +63,7 @@ type Res = { ok: boolean; error?: string };
 /** „Allgemein (alle Gruppen)“, wie SHARED im Server */
 const SHARED = '*';
 
+/** Arten im Editor; „Bild“ kommt über Ziehen und Einfügen (lib/imageDrop.ts) */
 const KINDS: { kind: Kind; label: string; plural: string; hint: string }[] = [
   { kind: 'note', label: 'Notiz', plural: 'Notizen', hint: 'Gedanke, Frage, Absprache' },
   { kind: 'source', label: 'Quelle', plural: 'Quellen', hint: 'Buch, Artikel, Zitat mit Fundstelle' },
@@ -520,7 +527,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                   title={n.reported ? undefined : 'In die Mindmap ziehen'}
                 >
                   <header className={c.head}>
-                    <span className={c.kind}>{KINDS.find((k) => k.kind === n.kind)?.label}</span>
+                    <span className={c.kind}>{KINDS.find((k) => k.kind === n.kind)?.label ?? (n.kind === 'image' ? 'Bild' : n.kind)}</span>
                     <span className={c.who}>
                       {n.name} · {when(n.updatedAt)}
                       {n.updatedAt > n.at + 1000 ? ' (überarbeitet)' : ''}

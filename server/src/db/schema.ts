@@ -274,6 +274,14 @@ export interface NotesTable {
   /** Fundstelle einer Quelle (Autor, Titel, Seite …) */
   source: string;
   url: string | null;
+  /** Urheber, Lizenz, Ursprungsseite (Bilder aus dem Netz) */
+  credit: Generated<string>;
+  license: Generated<string>;
+  origin: string | null;
+  /** angehängte Datei unter DATA_DIR/notizen (relativ), Typ und Größe */
+  file_path: string | null;
+  file_mime: string | null;
+  file_size: number | null;
   /** private = nur Erstellerin (und Lehrkraft), group = eigene Gruppe, all = ganzes Projekt (Konzept 8e.2) */
   visibility: Generated<string>;
   /** Art „data“: {rows: string[][]}, erste Zeile = Kopfzeile */

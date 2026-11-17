@@ -17,6 +17,8 @@ type Ack = (r: Record<string, unknown>) => void;
 export const SHARED = '*';
 /** hier liegen Notizen, die die Lehrkraft unter „Allgemein“ schreibt */
 const TEACHER_SHARED = 'p';
+/** wohin eine Notiz (oder ihre Datei) unter „Allgemein“ gehört: Lernende in die eigene Gruppe, die Lehrkraft in den Projektbereich */
+export const sharedTarget = (role: Viewer['role'], scopes: string[]) => (role === 'teacher' ? TEACHER_SHARED : (scopes.find((x) => !x.startsWith('t')) ?? null));
 const room = (projectId: number, scope: string) => `notes:${projectId}:${scope}`;
 
 interface Joined {
@@ -37,7 +39,7 @@ export function notesSocket(nsp: Namespace, s: Services) {
         const userId = (so.data.session as { userId: number } | undefined)?.userId;
         if (!j || userId == null) continue;
         const viewer: Viewer = { userId, role: j.role };
-        const visible = !gone && (!shared || (row.visibility === 'all' && !row.scope.startsWith('t'))) && Notes.canSee(row, viewer, j.scopes.includes(row.scope));
+        const visible = !gone && (!shared || (row.visibility === 'all' && !row.scope.startsWith('t'))) && Notes.canSee(row, viewer, !shared && j.scopes.includes(row.scope));
         if (visible) so.emit('note', { projectId: row.projectId, scope, note: { ...Notes.viewFor(row, viewer), scope: row.scope } });
         else so.emit('note:gone', { projectId: row.projectId, scope, id: row.id });
       }
@@ -97,7 +99,7 @@ export function notesSocket(nsp: Namespace, s: Services) {
         let data = input.data;
         if (scope === SHARED) {
           // „Allgemein“: Lernende schreiben in ihre Gruppe und geben frei, die Lehrkraft in den Projektbereich
-          const own = r.role === 'teacher' ? TEACHER_SHARED : r.all.find((x) => !x.startsWith('t'));
+          const own = sharedTarget(r.role, r.all);
           if (!own) return ack?.({ ok: false, error: 'Du bist noch keiner Gruppe zugeordnet.' });
           scope = own;
           data = { ...data, visibility: 'all' };

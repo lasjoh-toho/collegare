@@ -76,6 +76,12 @@ export const SettingsSchema = z.object({
   /** Folien: Lernende dürfen PowerPoint, Bento-Dateien und JSON importieren (Wunsch Jo: standardmäßig aus) */
   slidesImportStudents: z.boolean(),
   /**
+   * Bilder aus dem Netz (Wunsch Jo, 17. November 2026): Lernende dürfen Bilder fremder Seiten direkt auf Folien
+   * ziehen oder einfügen. Aus: erst in „Notizen und Quellen“ ablegen (mit Urheber, Lizenz, Ursprungsseite), von dort
+   * auf die Folie ziehen. Lehrkräfte dürfen immer.
+   */
+  imagesDirect: z.boolean(),
+  /**
    * Erklärungen hinter den i-Knöpfen der Seiten (Wunsch Jo, 14. November 2026): je Schlüssel eigener Text der
    * Lehrkraft (leer = Standardtext) und ob die Erklärung beim ersten Öffnen von selbst aufgeht.
    */
@@ -117,6 +123,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   aiFeedback: false,
   aiDailyLimit: 5,
   slidesImportStudents: false,
+  imagesDirect: false,
   folienDemo: [],
   infos: {},
 };

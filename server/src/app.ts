@@ -20,6 +20,7 @@ import { notesSocket } from './routes/notes.js';
 import { pinnwandRoutes, pinnwandSocket } from './routes/pinnwand.js';
 import { bentoRoutes } from './routes/bento.js';
 import { pasteRoutes } from './routes/pastes.js';
+import { webImageRoutes } from './routes/webImages.js';
 import { authorizeDoc, documentRoutes } from './routes/documents.js';
 import { collabId, parseCollabId } from './projects/documents.js';
 import type { Services } from './services.js';
@@ -37,6 +38,8 @@ export interface AppOptions {
   corsOrigin?: string | string[];
   /** Ohne Dienste läuft nur der Kollaborationsserver wie im M0-Spike (Protokolltests). */
   services?: Services;
+  /** Nur Tests: welche Adressen der Server für Bilder aus dem Netz abrufen darf (sonst nur öffentliche) */
+  webAllowed?: (ip: string) => boolean;
   /** Test-Endpunkte unter /api/spike (Fertig-Sperre von Hand setzen). Nie im Betrieb. */
   spike?: boolean;
   /** Statischer Export der Projektoberfläche (client/out), ausgeliefert unter / */
@@ -137,6 +140,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     pinnwandRoutes(http, s, opts.clientDir);
     bentoRoutes(http, s, opts.clientDir);
     pasteRoutes(http, s);
+    webImageRoutes(http, s, opts.webAllowed);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 
