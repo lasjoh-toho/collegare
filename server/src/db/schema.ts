@@ -326,6 +326,16 @@ export interface PastesTable {
   answered_at: Ms | null;
 }
 
+/** Eigene Linie (Konzept 8e.7): Stationen mit Notiz, Abschnitt der Gliederung und angehängten Karten, als JSON */
+export interface NoteLinesTable {
+  id: Generated<number>;
+  project_id: number;
+  scope: string;
+  user_id: number;
+  data: string;
+  updated_at: Ms;
+}
+
 export interface KeyValueTable {
   k: string;
   v: string;
@@ -357,6 +367,7 @@ export interface Database {
   chat_messages: ChatMessagesTable;
   notes: NotesTable;
   note_reports: NoteReportsTable;
+  note_lines: NoteLinesTable;
   pinnwand_rows: PinnwandRowsTable;
   pinnwand_files: PinnwandFilesTable;
   pastes: PastesTable;

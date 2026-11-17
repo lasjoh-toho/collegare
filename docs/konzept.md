@@ -883,7 +883,8 @@ dann braucht der Server kein zusätzliches Programm.
 
 ### 8e.10 Reihenfolge
 
-Stand 17. November 2026: Schritte 1 und 2 sind gebaut (Bild aus dem Thread „Bilder per Drag and drop“). Handschrift wird
+Stand 17. November 2026: Schritte 1 bis 3 sind gebaut (Linie als Ansicht „Meine Linie“ auf der Notizen-Seite, Tabelle
+`note_lines`) (Bild aus dem Thread „Bilder per Drag and drop“). Handschrift wird
 noch abgetippt; „Text erkennen“ wartet auf die Verbindung zu Autogra.fi (8d.4).
 
 1. Plus-Knopf, Sichtbarkeit mit Filter, Schatten für Freigegebenes, Melden, großes Modal (klein, sofort).

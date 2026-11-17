@@ -608,6 +608,15 @@ describe('Mindmap in Echtzeit', () => {
     await emit(st, 'notes:join', { projectId: project, scope: '*' });
     const tn = (await emit(st, 'notes:add', { projectId: project, scope: '*', note: { body: 'Hinweis an alle' } })).id;
     expect(ids2(await emit(sc, 'notes:join', { projectId: project, scope: '*' }))).toEqual([grp, tn].sort());
+
+    // Eigene Linie (8e.7): je Person, Notizen nur aus dem Projekt
+    expect(await emit(sa, 'lines:get', { projectId: project, scope: g })).toMatchObject({ ok: true, line: { stations: [] }, sections: [] });
+    const line = { stations: [{ id: 's1', noteId: grp, section: null, attached: [{ noteId: tab, visible: false }] }] };
+    expect((await emit(sa, 'lines:save', { projectId: project, scope: g, line })).ok).toBe(true);
+    expect((await emit(sa, 'lines:get', { projectId: project, scope: g })).line).toEqual(line);
+    expect((await emit(sb, 'lines:get', { projectId: project, scope: g })).line).toEqual({ stations: [] });
+    expect((await emit(sa, 'lines:save', { projectId: project, scope: g, line: { stations: [{ id: 'x', noteId: 99999, section: null, attached: [] }] } })).ok).toBe(false);
+    expect((await emit(sc, 'lines:get', { projectId: project, scope: g })).ok).toBe(false);
   });
 
   it('Einfüge-Protokoll: eigene Einträge, Antwort später, Lehrkraft sieht alle', async () => {

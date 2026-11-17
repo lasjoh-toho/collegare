@@ -98,3 +98,9 @@
 @keyframes recBlink { 50% { opacity: 0.2; } }
 .imageEdit .audio, .imageEdit .video { max-width: 360px; }
 .note.audio, .note.video, .note.hand { width: 100%; box-sizing: border-box; }
+/* Thread allein oder neben der eigenen Linie (8e.7): Linie links, Thread als Quelle zum Ziehen rechts */
+.single { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr); }
+.split .list { border-left: 1px solid var(--line); }
+.lineCol { min-height: 0; overflow-y: auto; padding: 14px 16px 24px; }
+@media (max-width: 760px) { .split { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } .split .list { border-left: 0; } .lineCol { max-height: 55vh; } }

@@ -9,6 +9,7 @@ import { Gradings } from './projects/gradings.js';
 import { Materials } from './projects/materials.js';
 import { Chat } from './projects/chat.js';
 import { Notes } from './projects/notes.js';
+import { NoteLines } from './projects/noteLines.js';
 import { NoteFiles } from './projects/noteFiles.js';
 import { Pastes } from './projects/pastes.js';
 import { EventEmitter } from 'node:events';
@@ -67,6 +68,7 @@ export interface Services {
   materials: Materials;
   chat: Chat;
   notes: Notes;
+  noteLines: NoteLines;
   pastes: Pastes;
   pinnwand: PinStore;
   /** Änderungen an Pinnwänden (für die Echtzeit im Socket) */
@@ -113,6 +115,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     materials: new Materials(db, now),
     chat: new Chat(db, now),
     notes: new Notes(db, now, new NoteFiles(dataDir)),
+    noteLines: new NoteLines(db, now),
     pastes: new Pastes(db, now),
     pinnwand: new PinStore(db, media, now),
     pinnwandEvents: new EventEmitter(),

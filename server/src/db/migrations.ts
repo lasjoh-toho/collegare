@@ -445,6 +445,22 @@ migrations['0016_deck_access'] = {
   },
 };
 
+// Eigene Linie je Person und Bereich: Notizen parallel zur Gliederung (Konzept 8e.7)
+migrations['0017_note_lines'] = {
+  async up(db) {
+    await db.schema
+      .createTable('note_lines')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('project_id', 'integer', (c) => c.notNull())
+      .addColumn('scope', 'varchar(20)', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('data', sql`text`, (c) => c.notNull())
+      .addColumn('updated_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('note_lines_owner').on('note_lines').columns(['project_id', 'scope', 'user_id']).unique().execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

@@ -11,6 +11,8 @@ import type { Namespace, Socket } from 'socket.io';
 import { NoteInput, type NoteRow, Notes, type Viewer } from '../projects/notes.js';
 import type { Services } from '../services.js';
 import { mapScopes } from './maps.js';
+import { Line } from '../projects/noteLines.js';
+import { buildOutline } from '../projects/maps.js';
 
 type Ack = (r: Record<string, unknown>) => void;
 /** „Allgemein (alle Gruppen)“ */
@@ -171,6 +173,40 @@ export function notesSocket(nsp: Namespace, s: Services) {
         ack?.({ ok: true });
       } catch (e) {
         fail(ack, e, 'Melden fehlgeschlagen');
+      }
+    });
+
+    /** Eigene Linie (8e.7): Stationen der Person in diesem Bereich und die Abschnitte der Gliederung aus der Mindmap */
+    socket.on('lines:get', async (msg: { projectId?: unknown; scope?: unknown }, ack?: Ack) => {
+      try {
+        const r = await resolve(msg?.projectId, msg?.scope);
+        if (!r?.scope || r.scope === SHARED) return ack?.({ ok: false, error: 'Kein Zugriff auf diese Notizen' });
+        const { map } = await s.maps.get(r.projectId, r.scope);
+        const live = buildOutline(map);
+        const sections = (live.length ? live : (map.outline?.sections ?? [])).map((x) => ({ id: x.id, title: x.title }));
+        const { line, at } = await s.noteLines.get(r.projectId, r.scope, sess().userId);
+        ack?.({ ok: true, line, at, sections });
+      } catch (e) {
+        fail(ack, e, 'Laden fehlgeschlagen');
+      }
+    });
+
+    socket.on('lines:save', async (msg: { projectId?: unknown; scope?: unknown; line?: unknown }, ack?: Ack) => {
+      try {
+        const r = await resolve(msg?.projectId, msg?.scope);
+        if (!r?.scope || r.scope === SHARED) return ack?.({ ok: false, error: 'Kein Zugriff auf diese Notizen' });
+        const p = Line.safeParse(msg.line);
+        if (!p.success) return ack?.({ ok: false, error: 'Linie ungültig' });
+        // nur Notizen dieses Projekts
+        const ids = [...new Set(p.data.stations.flatMap((st) => [st.noteId, ...st.attached.map((a) => a.noteId)]))];
+        if (ids.length) {
+          const found = await s.db.selectFrom('notes').select('id').where('project_id', '=', r.projectId).where('id', 'in', ids).execute();
+          if (found.length !== ids.length) return ack?.({ ok: false, error: 'Unbekannte Notiz in der Linie' });
+        }
+        const at = await s.noteLines.save(r.projectId, r.scope, sess().userId, p.data);
+        ack?.({ ok: true, at });
+      } catch (e) {
+        fail(ack, e, 'Speichern fehlgeschlagen');
       }
     });
 
