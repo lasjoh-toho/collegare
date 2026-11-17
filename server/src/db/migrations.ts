@@ -402,6 +402,23 @@ migrations['0013_pinnwand_files_path'] = {
   },
 };
 
+// Notizen zweite Fassung (Konzept 8e): Sichtbarkeit privat|group|all, Tabellen-Daten, Meldungen
+migrations['0015_notes_visibility'] = {
+  async up(db) {
+    await db.schema.alterTable('notes').addColumn('visibility', 'varchar(8)', (c) => c.notNull().defaultTo('group')).execute();
+    await db.schema.alterTable('notes').addColumn('data_json', sql`text`).execute();
+    await db.schema
+      .createTable('note_reports')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('note_id', 'integer', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('reason', 'varchar(300)', (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('note_reports_note_user').on('note_reports').columns(['note_id', 'user_id']).unique().execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;
