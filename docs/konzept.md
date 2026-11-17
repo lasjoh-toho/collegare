@@ -883,6 +883,9 @@ dann braucht der Server kein zusätzliches Programm.
 
 ### 8e.10 Reihenfolge
 
+Stand 17. November 2026: Schritte 1 und 2 sind gebaut (Bild aus dem Thread „Bilder per Drag and drop“). Handschrift wird
+noch abgetippt; „Text erkennen“ wartet auf die Verbindung zu Autogra.fi (8d.4).
+
 1. Plus-Knopf, Sichtbarkeit mit Filter, Schatten für Freigegebenes, Melden, großes Modal (klein, sofort).
 2. Arten Daten, Video, Audio, Handschrift (nach der Bild-Art aus dem Nachbar-Thread, gleiche Dateiablage).
 3. Eigene Linie mit Stationen und angehängten Karten (8e.7).
