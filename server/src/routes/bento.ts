@@ -73,7 +73,8 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
     const { lockedBy } = await s.bentoDecks.access(doc.id);
     const write = deckWritable(teacher, { mine: teacher ? !!scope.test : !scope.demo, test: !!scope.test, lockedBy }, doc.doneAt, sess.userId);
     const canImport = write && (teacher || !!project?.settings.slidesImportStudents);
-    return { userId: sess.userId, doc, write, canImport, teacher, locked: lockedBy !== null && lockedBy !== sess.userId };
+    const webImages = write && (teacher || !!project?.settings.imagesDirect);
+    return { userId: sess.userId, doc, write, canImport, webImages, teacher, locked: lockedBy !== null && lockedBy !== sess.userId };
   }
 
   app.get<{ Params: { id: string } }>('/api/documents/:id/bento', async (req, reply) => {
@@ -97,6 +98,11 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
       fileActions: ['exportPptx', 'exportJson', 'importPptx', 'importHtml', 'importJson'],
       // Einfügen › WordArt, Formen-Editor, Formel: die Editoren der Pinnwand (lädt die Folien-Seite erst bei Bedarf)
       inserts: ['wordart', 'shape', 'formula'],
+      // Bilder aus anderen Tabs: über den Server holen (CORS), Angaben zur Quelle dazu (routes/webImages.ts)
+      imageProxy: `${basePath}/api/bild-holen?url=`,
+      imageInfo: `${basePath}/api/bild-info?url=`,
+      webImages: a.webImages,
+      webImagesHint: 'Bilder aus dem Netz legst du zuerst bei „Notizen und Quellen“ ab, mit Urheber und Lizenz. Von dort ziehst du sie auf die Folie.',
     };
     const meta = `<meta name="bento-host-config" data-bento-transient content="${escAttr(JSON.stringify(config))}">`;
     return reply

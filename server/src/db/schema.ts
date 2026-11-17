@@ -276,14 +276,35 @@ export interface NotesTable {
   project_id: number;
   scope: string;
   user_id: number;
-  kind: 'note' | 'source' | 'link';
+  kind: string;
   title: string;
   body: string;
   /** Fundstelle einer Quelle (Autor, Titel, Seite …) */
   source: string;
   url: string | null;
+  /** Urheber, Lizenz, Ursprungsseite (Bilder aus dem Netz) */
+  credit: Generated<string>;
+  license: Generated<string>;
+  origin: string | null;
+  /** angehängte Datei unter DATA_DIR/notizen (relativ), Typ und Größe */
+  file_path: string | null;
+  file_mime: string | null;
+  file_size: number | null;
+  /** private = nur Erstellerin (und Lehrkraft), group = eigene Gruppe, all = ganzes Projekt (Konzept 8e.2) */
+  visibility: Generated<string>;
+  /** Art „data“: {rows: string[][]}, erste Zeile = Kopfzeile */
+  data_json: string | null;
   created_at: Ms;
   updated_at: Ms;
+}
+
+/** Gemeldete Notizen (Konzept 8e.4): sichtbar nur noch für Lehrkraft, Erstellerin und Meldende */
+export interface NoteReportsTable {
+  id: Generated<number>;
+  note_id: number;
+  user_id: number;
+  reason: string;
+  created_at: Ms;
 }
 
 /** Einfüge-Protokoll (Konzept 6.1, 8d.3): Einsetzen von außen ab der Schwelle, mit Antwort auf „Woher?“ */
@@ -335,6 +356,7 @@ export interface Database {
   materials: MaterialsTable;
   chat_messages: ChatMessagesTable;
   notes: NotesTable;
+  note_reports: NoteReportsTable;
   pinnwand_rows: PinnwandRowsTable;
   pinnwand_files: PinnwandFilesTable;
   pastes: PastesTable;

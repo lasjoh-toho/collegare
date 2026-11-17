@@ -402,8 +402,38 @@ migrations['0013_pinnwand_files_path'] = {
   },
 };
 
+// Bilder in den Notizen und Quellen (Jo, 17. November 2026): Datei, Urheber, Lizenz, Ursprungsseite. Die Datei-Spalten
+// sind allgemein gehalten (später Audio, Video, Handschrift).
+migrations['0014_note_files'] = {
+  async up(db) {
+    await db.schema.alterTable('notes').addColumn('credit', 'varchar(300)', (c) => c.notNull().defaultTo('')).execute();
+    await db.schema.alterTable('notes').addColumn('license', 'varchar(200)', (c) => c.notNull().defaultTo('')).execute();
+    await db.schema.alterTable('notes').addColumn('origin', 'varchar(2000)').execute();
+    await db.schema.alterTable('notes').addColumn('file_path', 'varchar(400)').execute();
+    await db.schema.alterTable('notes').addColumn('file_mime', 'varchar(100)').execute();
+    await db.schema.alterTable('notes').addColumn('file_size', 'integer').execute();
+  },
+};
+
+// Notizen zweite Fassung (Konzept 8e): Sichtbarkeit privat|group|all, Tabellen-Daten, Meldungen
+migrations['0015_notes_visibility'] = {
+  async up(db) {
+    await db.schema.alterTable('notes').addColumn('visibility', 'varchar(8)', (c) => c.notNull().defaultTo('group')).execute();
+    await db.schema.alterTable('notes').addColumn('data_json', sql`text`).execute();
+    await db.schema
+      .createTable('note_reports')
+      .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+      .addColumn('note_id', 'integer', (c) => c.notNull())
+      .addColumn('user_id', 'integer', (c) => c.notNull())
+      .addColumn('reason', 'varchar(300)', (c) => c.notNull())
+      .addColumn('created_at', ms, (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('note_reports_note_user').on('note_reports').columns(['note_id', 'user_id']).unique().execute();
+  },
+};
+
 // Folien: Freigabe für alle im Projekt und „Bearbeitung sperren“ je Präsentation (Jo, 17. November 2026)
-migrations['0014_deck_access'] = {
+migrations['0016_deck_access'] = {
   async up(db) {
     await db.schema
       .createTable('deck_access')
