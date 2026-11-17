@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
 import { DocError, collabId } from '../projects/documents.js';
 import type { Services } from '../services.js';
+import { deckWritable } from './bento.js';
 import { folienScopes, mapScopes } from './maps.js';
 
 /** Meldet geänderte Dokumente an offene Projektseiten und trennt bei „Fertig“ die Editoren. */
@@ -35,7 +36,8 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     return { ...base, scope: a.scope.scope, people: a.scope.people, docs, outlineAt: map.outline?.at ?? null };
   });
 
-  // Folienpräsentation der Gruppe (bzw. „Test / Demo“ der Lehrkraft; freigegebene Demos sehen Lernende lesend)
+  // Folienpräsentationen: die eigene (Gruppe bzw. Testbereich der Lehrkraft), für die Lehrkraft alle Gruppen, für Lernende
+  // dazu alle, die andere für alle freigeschaltet haben (Wunsch Jo, 17. November 2026: Titel statt „Test / Demo“)
   app.get<{ Params: { id: string }; Querystring: { bereich?: string } }>('/api/projects/:id/folien', async (req, reply) => {
     const projectId = Number(req.params.id);
     const sess = requireSession(req, reply);
@@ -43,29 +45,88 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     if (sess.projectId !== null && sess.projectId !== projectId) return reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
     const r = await folienScopes(s, sess.userId, projectId);
     if (!r) return reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    const docs = await Promise.all(r.scopes.map((x) => s.documents.deck(projectId, x.scope)));
+    const acc = await s.bentoDecks.accessMany(docs.map((d) => d.id));
+    const names = new Map<number, string>();
+    for (const a of acc.values()) if (a.lockedBy !== null && !names.has(a.lockedBy)) names.set(a.lockedBy, (await s.users.byId(a.lockedBy))?.name ?? 'jemand');
+    const decks = r.scopes.map((x, i) => {
+      const a = acc.get(docs[i].id) ?? { shared: false, lockedBy: null };
+      const mine = r.role === 'teacher' ? !!x.test : !x.demo;
+      return {
+        scope: x.scope,
+        docId: docs[i].id,
+        title: docs[i].title,
+        owner: x.test ? (r.role === 'teacher' ? 'Nur du' : x.title) : x.title.replace(/ \(nur für mich\)$/, ''),
+        shared: a.shared,
+        lockedBy: a.lockedBy,
+        lockedByName: a.lockedBy === null ? null : (names.get(a.lockedBy) ?? null),
+        mine,
+        test: !!x.test,
+        done: !!docs[i].doneAt,
+      };
+    });
     const wanted = req.query.bereich;
-    const sc = wanted ? r.scopes.find((x) => x.scope === wanted) : r.scopes.find((x) => !x.demo);
-    const p = await s.projects.get(projectId);
-    const base = { role: r.role, scopes: r.scopes.map(({ scope, title, test, demo }) => ({ scope, title, test: !!test, demo: !!demo })), demoVisible: p!.settings.folienDemo.includes(sess.userId) };
-    if (!sc) return { ...base, scope: null, doc: null };
-    const doc = await s.documents.deck(projectId, sc.scope);
-    return { ...base, scope: sc.scope, test: !!sc.test, demo: !!sc.demo, doc };
+    const cur = (wanted ? decks.find((d) => d.scope === wanted) : undefined) ?? decks.find((d) => d.mine && !d.test) ?? decks.find((d) => d.mine) ?? decks[0];
+    const base = { role: r.role, decks };
+    if (!cur) return { ...base, scope: null, doc: null };
+    const doc = docs[decks.indexOf(cur)];
+    const teacher = r.role === 'teacher';
+    const write = deckWritable(teacher, cur, doc.doneAt, sess.userId);
+    return {
+      ...base,
+      scope: cur.scope,
+      doc,
+      write,
+      canShare: cur.mine || teacher,
+      canLock: !cur.test && (cur.mine || teacher),
+      canUnlock: cur.lockedBy !== null && (cur.lockedBy === sess.userId || teacher),
+    };
   });
 
-  /** Lehrkraft: Präsentation aus „Test / Demo“ für die Lernenden sichtbar machen oder verbergen */
-  app.post<{ Params: { id: string } }>('/api/projects/:id/folien/demo', async (req, reply) => {
-    const projectId = Number(req.params.id);
+  /** Zugriff auf eine Präsentation für Freigabe und Sperre */
+  async function deckAccess(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
     const sess = requireSession(req, reply);
-    if (!sess) return;
-    const body = z.object({ visible: z.boolean() }).safeParse(req.body);
+    if (!sess) return null;
+    const doc = await s.documents.get(Number(req.params.id));
+    if (!doc || doc.kind !== 'slide') return void reply.code(404).send({ error: 'Präsentation nicht gefunden' });
+    if (sess.projectId !== null && sess.projectId !== doc.projectId) return void reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    const r = await folienScopes(s, sess.userId, doc.projectId);
+    const scope = r?.scopes.find((x) => x.scope === doc.scope);
+    if (!r || !scope) return void reply.code(403).send({ error: 'Kein Zugriff auf diese Präsentation' });
+    const teacher = r.role === 'teacher';
+    const mine = teacher ? !!scope.test : !scope.demo;
+    return { userId: sess.userId, doc, teacher, mine, test: !!scope.test, access: await s.bentoDecks.access(doc.id) };
+  }
+
+  /** Für alle freischalten (Lernende die eigene Präsentation, die Lehrkraft jede) oder wieder verbergen */
+  app.post<{ Params: { id: string } }>('/api/documents/:id/freigabe', async (req, reply) => {
+    const body = z.object({ shared: z.boolean() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Angabe fehlt' });
-    if ((await s.projects.roleOf(sess.userId, projectId)) !== 'teacher') return reply.code(403).send({ error: 'Nur für Lehrkräfte' });
-    const p = await s.projects.get(projectId);
-    const list = p!.settings.folienDemo.filter((x) => x !== sess.userId);
-    if (body.data.visible) list.push(sess.userId);
-    await s.projects.updateSettings(projectId, { folienDemo: list });
-    await s.audit.append({ actorId: sess.userId, action: 'folien.demo', projectId, data: { visible: body.data.visible } });
-    return { ok: true, visible: body.data.visible };
+    const a = await deckAccess(req, reply);
+    if (!a) return;
+    if (!a.mine && !a.teacher) return reply.code(403).send({ error: 'Nur die eigene Präsentation' });
+    await s.bentoDecks.setShared(a.doc.id, body.data.shared);
+    await s.audit.append({ actorId: a.userId, action: 'folien.freigabe', projectId: a.doc.projectId, data: { doc: a.doc.id, shared: body.data.shared } });
+    return { ok: true, shared: body.data.shared };
+  });
+
+  /** „Bearbeitung sperren“: nur wer sperrt, ändert noch (auch Gruppenmitglieder nicht); entsperren sie selbst oder die Lehrkraft */
+  app.post<{ Params: { id: string } }>('/api/documents/:id/sperre', async (req, reply) => {
+    const body = z.object({ locked: z.boolean() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Angabe fehlt' });
+    const a = await deckAccess(req, reply);
+    if (!a) return;
+    if (a.test || (!a.mine && !a.teacher)) return reply.code(403).send({ error: 'Nur die eigene Präsentation' });
+    const holder = a.access.lockedBy;
+    if (body.data.locked) {
+      if (holder !== null && holder !== a.userId && !a.teacher) return reply.code(409).send({ error: 'Schon von jemand anderem gesperrt' });
+      await s.bentoDecks.setLock(a.doc.id, a.userId);
+    } else {
+      if (holder !== null && holder !== a.userId && !a.teacher) return reply.code(403).send({ error: 'Entsperren kann nur, wer gesperrt hat, oder die Lehrkraft' });
+      await s.bentoDecks.setLock(a.doc.id, null);
+    }
+    await s.audit.append({ actorId: a.userId, action: 'folien.sperre', projectId: a.doc.projectId, data: { doc: a.doc.id, locked: body.data.locked } });
+    return { ok: true, locked: body.data.locked };
   });
 
   app.post<{ Params: { id: string } }>('/api/projects/:id/documents/sync', async (req, reply) => {

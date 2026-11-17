@@ -761,6 +761,56 @@ und Pinnwand getrennte Stände; „neu übernehmen“ ergänzt nur, was fehlt.
 4. Pinnwand als Modul samt Übernahme aus der Mindmap (8d.5), mit der kleinen Änderung in mod_pinnwand.
 5. Notiz scannen mit Autogra.fi (8d.4), sobald die Anmeldung über Collegare steht.
 
+## 8f. Zusatztexte der Folien und Ausarbeitung abgleichen (Konzept, 17. November 2026)
+
+Idee von Jo vom 17. November 2026, hier als Konzept vor dem Bauen.
+
+### 8f.1 Ausgangslage
+
+Jede Folie in Bento kann einen **Zusatztext** tragen (`slide.longRead`, Blöcke: Überschrift, Erklärung, Zitat,
+Bildunterschrift, Glossar, Aufgabe, Quellen); im Vortrag wischt man nach oben oder klickt den Knopf unten. Die
+**Ausarbeitung** besteht aus Abschnitts-Dokumenten, die aus der Gliederung entstehen (Abschnitt 4, Phase 3). Beide
+erzählen dasselbe: die Folie die Kernaussage, der Zusatztext eine Lesefassung, die Ausarbeitung den ausführlichen
+Text. Heute pflegt eine Gruppe beides getrennt, und die Fassungen laufen auseinander.
+
+**Ziel:** Ein Gedanke wird einmal geschrieben und erscheint als Absatz in der Ausarbeitung und als Zusatztext hinter
+der passenden Folie, ohne dass zwei Fassungen entstehen.
+
+### 8f.2 Vorschlag
+
+1. **Verknüpfung über die Gliederung.** Eine Folie lässt sich an einen Abschnitt oder Unterpunkt der Gliederung
+   binden (Seitenmenü von Bento, Bereich „Zusatztext“: Auswahl „Abschnitt der Ausarbeitung“). Im Deck steht das als
+   optionales Feld `slide.link = { app: 'collegare', card: '<Karten-ID>' }`; Bento ignoriert es außerhalb von Collegare
+   (Formatregel „nur hinzufügen“). Umgekehrt zeigt die Ausarbeitung am Rand, welche Folie zum Abschnitt gehört.
+2. **Abgeglichen wird je Absatz, nicht je Dokument.** Ein Absatz der Ausarbeitung und ein Block des Zusatztexts sind
+   „gespiegelt“, wenn sie dieselbe Kennung tragen. Beim Spiegeln wählt man einzelne Absätze aus (Häkchen), denn ein
+   Zusatztext ist eine Lesefassung, kein vollständiger Abschnitt. Randnotizen werden zu `<<Referenz:Wort|Erklärung>>`,
+   Quellen zum Block „Quellen“ aus denselben Datensätzen wie „Notizen und Quellen“.
+3. **Die Ausarbeitung führt.** Änderungen in der Ausarbeitung kommen beim nächsten Öffnen der Präsentation an
+   („2 Absätze in der Ausarbeitung geändert – übernehmen?“). Ändert jemand einen gespiegelten Block im Zusatztext,
+   wird er zur Abweichung (markiert). Collegare bietet dann „In die Ausarbeitung zurückschreiben“ als Vorschlag an die
+   zuständige Person oder „Lösen“ (der Block wird eigenständig). Kein stilles Zusammenführen in beide Richtungen:
+   Abschnitte haben Zuständige und Fertig-Sperren (Abschnitt 5), eine Folie gehört der ganzen Gruppe.
+4. **Die Präsentation bleibt eine eigenständige Datei.** Gespiegelte Blöcke stehen als Kopie mit Stand im Deck, damit
+   der Export ohne Collegare läuft („die Datei ist die Software“).
+
+### 8f.3 Technik in zwei Stufen
+
+- **Stufe 1, mit OnlyOffice möglich:** Im Zusatztext-Editor „Aus der Ausarbeitung einfügen …“: Collegare holt den
+  zuletzt gespeicherten Stand des gebundenen Abschnitts als DOCX, wandelt ihn im Browser in Absätze (mammoth, wie beim
+  Word-Import der Lernseiten) und merkt sich Herkunft und Stand. Ein Hinweis zeigt später, dass der Abschnitt neuer
+  ist. Ohne Rückweg, weil OnlyOffice keine verlässlichen Absatz-Kennungen liefert.
+- **Stufe 2, mit dem eigenen Texteditor (Entscheidung 13):** Absätze sind Yjs-Knoten mit fester Kennung. Bento bekommt
+  gespiegelte Blöcke über das Host-Protokoll (`postMessage` `longread-sync`, wie `title`/`undo`) und meldet
+  Abweichungen zurück. Dieselbe Verknüpfung trägt die geplante Ansicht „Hausarbeit mit Präsentation“ (Ausarbeitung
+  links, Folien rechts, die Gliederung als U-Bahn-Linie in der Mitte).
+
+### 8f.4 Offene Fragen an Jo
+
+- Soll die Ausarbeitung führen (Vorschlag), oder darf auch der Zusatztext direkt zurückschreiben?
+- Reicht Stufe 1, bis der eigene Texteditor kommt?
+- Gehört zu einer Folie genau ein Abschnitt, oder darf sie mehrere Unterpunkte bündeln?
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |

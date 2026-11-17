@@ -402,6 +402,19 @@ migrations['0013_pinnwand_files_path'] = {
   },
 };
 
+// Folien: Freigabe für alle im Projekt und „Bearbeitung sperren“ je Präsentation (Jo, 17. November 2026)
+migrations['0014_deck_access'] = {
+  async up(db) {
+    await db.schema
+      .createTable('deck_access')
+      .addColumn('doc_id', 'integer', (c) => c.primaryKey())
+      .addColumn('shared', 'integer', (c) => c.notNull().defaultTo(0))
+      .addColumn('locked_by', 'integer')
+      .addColumn('locked_at', 'bigint')
+      .execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

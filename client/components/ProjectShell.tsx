@@ -61,12 +61,14 @@ interface Props {
   info?: InfoSpec;
   /** weitere Teile hinter „where“ in der Mitte der Kopfzeile (z. B. Titel der Präsentation und Speicherstand) */
   crumbs?: React.ReactNode;
+  /** ersetzt die Überschrift „Projekt / where“ in der Mitte der Kopfzeile (Folien: Auswahl der Präsentation) */
+  center?: React.ReactNode;
   /** Rückgängig/Wiederholen mit Verlauf (Folien, Pinnwand) */
   undo?: UndoSpec;
   children: React.ReactNode;
 }
 
-export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, undo, children }: Props) {
+export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, center, undo, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
@@ -190,12 +192,14 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           <Icon name="menu" size={18} />
           <span className={sh.whoName}>{me.name}</span>
         </button>
-        <div className={sh.whereBox}>
-          <div className={sh.where}>
-            <span className={sh.project}>{project.title}</span>
-            <span className={sh.sep}>/</span>
-            <strong>{where}</strong>
-          </div>
+        <div className={`${sh.whereBox} ${center ? sh.centerBox : ''}`}>
+          {center ?? (
+            <div className={sh.where}>
+              <span className={sh.project}>{project.title}</span>
+              <span className={sh.sep}>/</span>
+              <strong>{where}</strong>
+            </div>
+          )}
           {crumbs}
           {info && <InfoButton project={project} spec={info} />}
         </div>

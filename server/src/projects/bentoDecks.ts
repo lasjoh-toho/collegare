@@ -82,4 +82,56 @@ export class BentoDecks {
     }
     return version;
   }
+
+  /** Freigabe und Sperre einer Präsentation */
+  async access(docId: number): Promise<DeckAccess> {
+    return (await this.accessMany([docId])).get(docId) ?? { shared: false, lockedBy: null };
+  }
+
+  async accessMany(docIds: number[]): Promise<Map<number, DeckAccess>> {
+    const out = new Map<number, DeckAccess>();
+    if (!docIds.length) return out;
+    const rows = await this.db.selectFrom('deck_access').selectAll().where('doc_id', 'in', docIds).execute();
+    for (const r of rows) out.set(r.doc_id, { shared: !!Number(r.shared), lockedBy: r.locked_by ?? null });
+    return out;
+  }
+
+  /** Präsentationen des Projekts, die für alle freigeschaltet sind */
+  async sharedDocs(projectId: number): Promise<{ id: number; scope: string; title: string }[]> {
+    return this.db
+      .selectFrom('deck_access')
+      .innerJoin('documents', 'documents.id', 'deck_access.doc_id')
+      .select(['documents.id as id', 'documents.scope as scope', 'documents.title as title'])
+      .where('documents.project_id', '=', projectId)
+      .where('documents.kind', '=', 'slide')
+      .where('deck_access.shared', '=', 1)
+      .orderBy('documents.id')
+      .execute();
+  }
+
+  async setShared(docId: number, shared: boolean): Promise<void> {
+    await this.upsert(docId, { shared: shared ? 1 : 0 });
+  }
+
+  /** sperren (userId) oder entsperren (null) */
+  async setLock(docId: number, userId: number | null): Promise<void> {
+    await this.upsert(docId, { locked_by: userId, locked_at: userId === null ? null : this.now() });
+  }
+
+  private async upsert(docId: number, patch: { shared?: number; locked_by?: number | null; locked_at?: number | null }) {
+    const r = await this.db.updateTable('deck_access').set(patch).where('doc_id', '=', docId).executeTakeFirst();
+    if (Number(r.numUpdatedRows) > 0) return;
+    try {
+      await this.db.insertInto('deck_access').values({ doc_id: docId, shared: 0, locked_by: null, locked_at: null, ...patch }).execute();
+    } catch {
+      await this.db.updateTable('deck_access').set(patch).where('doc_id', '=', docId).execute();
+    }
+  }
+}
+
+export interface DeckAccess {
+  /** für alle im Projekt sichtbar (lesend) */
+  shared: boolean;
+  /** „Bearbeitung sperren“: nur diese Person (und die Lehrkraft) kann noch ändern */
+  lockedBy: number | null;
 }

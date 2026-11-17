@@ -158,6 +158,14 @@ export interface DocumentsTable {
   created_at: Ms;
 }
 
+/** Folien: Freigabe und Sperre je Präsentation (fehlt eine Zeile: nicht freigegeben, nicht gesperrt) */
+export interface DeckAccessTable {
+  doc_id: number;
+  shared: number;
+  locked_by: number | null;
+  locked_at: Ms | null;
+}
+
 export interface BentoDecksTable {
   doc_id: number;
   data: string;
@@ -320,6 +328,7 @@ export interface Database {
   documents: DocumentsTable;
   doc_changes: DocChangesTable;
   bento_decks: BentoDecksTable;
+  deck_access: DeckAccessTable;
   ydocs: YdocsTable;
   audit_log: AuditLogTable;
   gradings: GradingsTable;

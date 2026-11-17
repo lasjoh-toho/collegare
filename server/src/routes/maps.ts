@@ -51,19 +51,53 @@ export async function mapScopes(s: Services, userId: number, projectId: number, 
   return { role, scopes };
 }
 
-/** Folien: wie mapScopes, für Lernende dazu die freigegebenen Demos der Lehrkräfte (settings.folienDemo) */
+/**
+ * Folien: wie mapScopes, für Lernende dazu alle Präsentationen anderer Gruppen und der Lehrkräfte, die für alle
+ * freigeschaltet sind (nur lesend). Früher gab es nur die Demo der Lehrkraft (settings.folienDemo); die wird beim ersten
+ * Aufruf in eine Freigabe umgewandelt.
+ */
 export async function folienScopes(s: Services, userId: number, projectId: number): Promise<{ role: 'teacher' | 'student'; scopes: MapScope[] } | null> {
   const r = await mapScopes(s, userId, projectId);
-  if (!r || r.role !== 'student') return r;
-  const p = await s.projects.get(projectId);
-  const ids = p?.settings.folienDemo ?? [];
-  if (!ids.length) return r;
-  const teachers = await s.db.selectFrom('users').select(['id', 'name']).where('id', 'in', ids).execute();
-  for (const t of teachers) {
-    if ((await s.projects.roleOf(t.id, projectId)) !== 'teacher') continue;
-    r.scopes.push({ scope: testScope(t.id), title: `Demo: ${t.name}`, people: [], demo: true, readOnly: true });
+  if (!r) return r;
+  await convertFolienDemo(s, projectId);
+  if (r.role !== 'student') return r;
+  const own = new Set(r.scopes.map((x) => x.scope));
+  for (const d of await s.bentoDecks.sharedDocs(projectId)) {
+    if (own.has(d.scope)) continue;
+    // nur Bereiche, die es im Projekt (noch) gibt: Gruppen, Einzelpersonen, Testbereiche von Lehrkräften
+    const owner = await scopeOwner(s, projectId, d.scope);
+    if (owner === null) continue;
+    r.scopes.push({ scope: d.scope, title: owner, people: [], demo: true, readOnly: true });
   }
   return r;
+}
+
+/** Name hinter einem Bereich: Gruppe, Person oder Lehrkraft (Testbereich); null, wenn es ihn im Projekt nicht gibt */
+export async function scopeOwner(s: Services, projectId: number, scope: string): Promise<string | null> {
+  const id = Number(scope.slice(1));
+  if (!Number.isInteger(id)) return null;
+  if (scope[0] === 't') {
+    if ((await s.projects.roleOf(id, projectId)) !== 'teacher') return null;
+    return (await s.users.byId(id))?.name ?? 'Lehrkraft';
+  }
+  const board = await s.projects.board(projectId);
+  if (scope[0] === 'g') {
+    const i = board.groups.findIndex((g) => g.id === id);
+    return i < 0 ? null : board.groups[i].title || `Gruppe ${i + 1}`;
+  }
+  if (scope[0] === 'u') return board.members.find((m) => m.userId === id)?.name ?? null;
+  return null;
+}
+
+async function convertFolienDemo(s: Services, projectId: number) {
+  const p = await s.projects.get(projectId);
+  const ids = p?.settings.folienDemo ?? [];
+  if (!ids.length) return;
+  for (const id of ids) {
+    const doc = await s.documents.deck(projectId, testScope(id));
+    await s.bentoDecks.setShared(doc.id, true);
+  }
+  await s.projects.updateSettings(projectId, { folienDemo: [] });
 }
 
 type Ack = (r: Record<string, unknown>) => void;

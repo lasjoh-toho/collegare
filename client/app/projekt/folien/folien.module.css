@@ -1,16 +1,48 @@
-.scope { height: 28px; max-width: 34vw; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); font-size: 12px; }
 .area { flex: 1; min-height: 0; display: flex; }
 .notice { margin: 20px; padding: 16px; max-width: 480px; height: fit-content; }
 .editor { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* Streifen in der Farbe der Office-Art (docs/gestaltung.md), darunter Bento */
 .stripe { flex: none; height: 6px; background: var(--office-slide); }
 .frame { flex: 1; width: 100%; border: 0; background: #fff; }
-.sep { color: var(--ui-faint); }
-/* Titel der Präsentation in der Kopfzeile, änderbar */
-.title { min-width: 6ch; max-width: 32vw; height: 26px; padding: 0 6px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--ui-text); font: inherit; font-weight: 650; }
-.title:hover { border-color: var(--ui-border); }
-.title:focus { border-color: var(--ui-accent); background: var(--ui-bg); outline: none; }
-.titleRead { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Auswahl der Präsentation in der Mitte der Kopfzeile (DeckPicker): Titel änderbar, Auge = freigeschaltet, Schloss = gesperrt */
+.picker { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pickWrap { position: relative; min-width: 0; display: flex; }
+.pickBox { display: flex; align-items: center; min-width: 0; height: 30px; padding: 0 2px 0 2px; border-radius: 8px; border: 1px solid var(--ui-border); background: var(--ui-bg); }
+.pickBox:hover, .pickOpen { border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border)); }
+.title { min-width: 6ch; max-width: 30vw; height: 26px; padding: 0 6px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--ui-text); font: inherit; font-weight: 650; }
+.title:focus { border-color: var(--ui-accent); outline: none; }
+.titleRead { min-width: 0; max-width: 30vw; padding: 0 8px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ui-text); }
+.owner { flex: none; padding: 1px 7px; margin-right: 2px; border-radius: 99px; font-size: 11.5px; background: var(--ui-sunken); color: var(--ui-muted); white-space: nowrap; }
+.pickBtn { flex: none; display: grid; place-items: center; width: 24px; height: 26px; border-radius: 6px; color: var(--ui-muted); }
+.pickBtn:hover { background: var(--ui-sunken); color: var(--ui-text); }
+.pickMenu {
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 60; width: max-content; min-width: 280px; max-width: min(420px, 92vw);
+  max-height: 70vh; overflow: auto; padding: 6px; border-radius: 10px; border: 1px solid var(--ui-border); background: var(--ui-panel); box-shadow: var(--shadow);
+}
+.shareMenu { min-width: 260px; }
+.pickHead { padding: 6px 8px 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ui-faint); }
+.pickItem { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border-radius: 7px; text-align: left; color: var(--ui-text); }
+.pickItem:hover { background: var(--ui-sunken); }
+.pickHere { background: color-mix(in srgb, var(--ui-accent) 12%, transparent); }
+.pickText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pickTitle { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pickOwner { font-size: 12px; color: var(--ui-muted); }
+.pickEmpty { padding: 6px 8px 8px; font-size: 12.5px; color: var(--ui-muted); }
+.stateIcons { flex: none; display: flex; align-items: center; gap: 6px; }
+.stateOn { color: var(--ui-accent); display: grid; }
+.stateOff { color: var(--ui-faint); display: grid; }
+.stateLock { color: var(--danger, #c0392b); display: grid; }
+.stateBtn { gap: 4px; }
+.stateBtnOn { color: var(--ui-accent); }
+.stateBtnLock { color: var(--danger, #c0392b); }
+.lockChip { display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--danger, #c0392b) 40%, transparent); color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 8%, transparent); }
+.lockChip:disabled { cursor: default; opacity: 1; }
+.lockName { font-size: 12px; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.readNote { white-space: nowrap; }
+@media (max-width: 760px) {
+  .title, .titleRead { max-width: 38vw; }
+  .owner, .readNote { display: none; }
+}
 /* Speicherstand: grüner Haken oder roter Kreis (Klick speichert) */
 .saved { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--state-done); font-weight: 800; font-size: 14px; }
 .unsaved { flex: none; width: 12px; height: 12px; margin: 0 3px; padding: 0; border-radius: 50%; border: 0; background: var(--danger, #d33); cursor: pointer; }

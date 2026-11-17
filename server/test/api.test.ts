@@ -462,6 +462,33 @@ describe('Mindmap in Echtzeit', () => {
     // Import für Lernende erst, wenn die Lehrkraft ihn einschaltet
     expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { slidesImportStudents: true } })).status).toBe(200);
     expect((await page(anna)).cfg.canImport).toBe(true);
+
+    // Für alle freischalten: Clara (andere Gruppe) sieht sie dann lesend, mit dem Titel der Präsentation
+    expect((await call('POST', `/api/documents/${deck.id}/freigabe`, clara, { shared: true })).status).toBe(403);
+    expect((await call('POST', `/api/documents/${deck.id}/freigabe`, anna, { shared: true })).json).toEqual({ ok: true, shared: true });
+    const seen = (await call('GET', `/api/projects/${project}/folien?bereich=g${g1}`, clara)).json;
+    expect(seen.decks).toContainEqual(expect.objectContaining({ scope: 'g' + g1, title: 'Inflation 1923', owner: 'Inflation', shared: true, mine: false }));
+    expect(seen).toMatchObject({ scope: 'g' + g1, write: false, canShare: false });
+    expect((await page(clara)).cfg.readOnly).toBe(true);
+
+    // Bearbeitung sperren: nur Anna ändert noch, Ben (gleiche Gruppe) nicht; die Lehrkraft entsperrt
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    const ben = (await call('POST', '/api/access/redeem', undefined, { code: ((await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[1]] })).json.codes as J[])[0].code })).json.token as string;
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, anna, { locked: true })).status).toBe(200);
+    expect((await page(ben)).cfg.readOnly).toBe(true);
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, ben, { doc, version: 1 })).status).toBe(403);
+    expect((await page(anna)).cfg.readOnly).toBe(false);
+    expect((await call('GET', `/api/projects/${project}/folien`, ben)).json).toMatchObject({ write: false, canUnlock: false, decks: [expect.objectContaining({ lockedByName: 'Anna' })] });
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, ben, { locked: false })).status).toBe(403);
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, t, { locked: false })).status).toBe(200);
+    expect((await page(ben)).cfg.readOnly).toBe(false);
+
+    // Die Präsentation der Lehrkraft (früher „Test / Demo (Lernende sehen sie)“) über dieselbe Freigabe
+    const own = (await call('GET', `/api/projects/${project}/folien`, t)).json;
+    const mine = own.decks.find((d: J) => d.mine);
+    expect(mine).toMatchObject({ test: true, owner: 'Nur du', shared: false });
+    expect((await call('POST', `/api/documents/${mine.docId}/freigabe`, t, { shared: true })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/folien`, ben)).json.decks.map((d: J) => d.scope)).toEqual(['g' + g1, mine.scope]);
   });
 
   it('Chat: je Gruppe und für alle, Lehrkraft liest alles und löscht', async () => {
