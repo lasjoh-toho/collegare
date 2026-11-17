@@ -268,12 +268,20 @@ export interface NotesTable {
   project_id: number;
   scope: string;
   user_id: number;
-  kind: 'note' | 'source' | 'link';
+  kind: 'note' | 'source' | 'link' | 'image';
   title: string;
   body: string;
   /** Fundstelle einer Quelle (Autor, Titel, Seite …) */
   source: string;
   url: string | null;
+  /** Urheber, Lizenz, Ursprungsseite (Bilder aus dem Netz) */
+  credit: Generated<string>;
+  license: Generated<string>;
+  origin: string | null;
+  /** angehängte Datei unter DATA_DIR/notizen (relativ), Typ und Größe */
+  file_path: string | null;
+  file_mime: string | null;
+  file_size: number | null;
   created_at: Ms;
   updated_at: Ms;
 }
