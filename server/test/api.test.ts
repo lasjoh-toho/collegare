@@ -462,6 +462,33 @@ describe('Mindmap in Echtzeit', () => {
     // Import für Lernende erst, wenn die Lehrkraft ihn einschaltet
     expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { slidesImportStudents: true } })).status).toBe(200);
     expect((await page(anna)).cfg.canImport).toBe(true);
+
+    // Für alle freischalten: Clara (andere Gruppe) sieht sie dann lesend, mit dem Titel der Präsentation
+    expect((await call('POST', `/api/documents/${deck.id}/freigabe`, clara, { shared: true })).status).toBe(403);
+    expect((await call('POST', `/api/documents/${deck.id}/freigabe`, anna, { shared: true })).json).toEqual({ ok: true, shared: true });
+    const seen = (await call('GET', `/api/projects/${project}/folien?bereich=g${g1}`, clara)).json;
+    expect(seen.decks).toContainEqual(expect.objectContaining({ scope: 'g' + g1, title: 'Inflation 1923', owner: 'Inflation', shared: true, mine: false }));
+    expect(seen).toMatchObject({ scope: 'g' + g1, write: false, canShare: false });
+    expect((await page(clara)).cfg.readOnly).toBe(true);
+
+    // Bearbeitung sperren: nur Anna ändert noch, Ben (gleiche Gruppe) nicht; die Lehrkraft entsperrt
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    const ben = (await call('POST', '/api/access/redeem', undefined, { code: ((await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[1]] })).json.codes as J[])[0].code })).json.token as string;
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, anna, { locked: true })).status).toBe(200);
+    expect((await page(ben)).cfg.readOnly).toBe(true);
+    expect((await call('PUT', `/api/documents/${deck.id}/bento`, ben, { doc, version: 1 })).status).toBe(403);
+    expect((await page(anna)).cfg.readOnly).toBe(false);
+    expect((await call('GET', `/api/projects/${project}/folien`, ben)).json).toMatchObject({ write: false, canUnlock: false, decks: [expect.objectContaining({ lockedByName: 'Anna' })] });
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, ben, { locked: false })).status).toBe(403);
+    expect((await call('POST', `/api/documents/${deck.id}/sperre`, t, { locked: false })).status).toBe(200);
+    expect((await page(ben)).cfg.readOnly).toBe(false);
+
+    // Die Präsentation der Lehrkraft (früher „Test / Demo (Lernende sehen sie)“) über dieselbe Freigabe
+    const own = (await call('GET', `/api/projects/${project}/folien`, t)).json;
+    const mine = own.decks.find((d: J) => d.mine);
+    expect(mine).toMatchObject({ test: true, owner: 'Nur du', shared: false });
+    expect((await call('POST', `/api/documents/${mine.docId}/freigabe`, t, { shared: true })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/folien`, ben)).json.decks.map((d: J) => d.scope)).toEqual(['g' + g1, mine.scope]);
   });
 
   it('Chat: je Gruppe und für alle, Lehrkraft liest alles und löscht', async () => {
@@ -525,6 +552,62 @@ describe('Mindmap in Echtzeit', () => {
     expect(m.map.cards.notiz1).toMatchObject({ title: 'Brotpreis November 1923', text: '233 Mrd. Mark\n\nFundstelle: DHM' });
     expect(((await emit(sa, 'notes:join', { projectId: project })).notes as J[])[0]).toMatchObject({ kind: 'source', name: 'Anna' });
     expect((await emit(sa, 'notes:delete', { projectId: project, id: add.id })).ok).toBe(true);
+  });
+
+  it('Notizen: Privat, Gruppe, Allgemein, Melden (Konzept 8e)', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    const g2 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Kultur' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[2], groupId: g2, position: 0 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0], ids[1], ids[2]] })).json.codes as J[];
+    const tok = async (i: number) => (await call('POST', '/api/access/redeem', undefined, { code: codes[i].code })).json.token as string;
+    const sa = connect(await tok(0));
+    const sb = connect(await tok(1));
+    const sc = connect(await tok(2));
+    const st = connect(t);
+    const g = 'g' + g1;
+    await emit(sa, 'notes:join', { projectId: project });
+    const priv = (await emit(sa, 'notes:add', { projectId: project, scope: g, note: { body: 'nur für mich', visibility: 'private' } })).id;
+    const grp = (await emit(sa, 'notes:add', { projectId: project, scope: g, note: { body: 'für die Gruppe' } })).id;
+    const tab = (await emit(sa, 'notes:add', { projectId: project, scope: g, note: { kind: 'data', title: 'Preise', rows: [['Jahr', 'Mark'], ['1923', '233 Mrd.'], ['', '']] } })).id;
+    const ids2 = (l: J) => (l.notes as J[]).map((n) => n.id).sort();
+    // Ben (gleiche Gruppe) sieht die private Notiz nicht, die Lehrkraft schon
+    expect(ids2(await emit(sb, 'notes:join', { projectId: project }))).toEqual([grp, tab].sort());
+    expect(ids2(await emit(st, 'notes:join', { projectId: project, scope: g }))).toEqual([priv, grp, tab].sort());
+    expect(((await emit(st, 'notes:join', { projectId: project, scope: g })).notes as J[]).find((n) => n.id === tab).rows).toEqual([['Jahr', 'Mark'], ['1923', '233 Mrd.']]);
+    // Allgemein: Clara (andere Gruppe) sieht erst nach der Freigabe
+    expect((await emit(sc, 'notes:join', { projectId: project, scope: '*' })).notes).toEqual([]);
+    const seen = new Promise<J>((r) => sc.on('note', r));
+    expect((await emit(sa, 'notes:update', { projectId: project, id: grp, note: { body: 'für alle', visibility: 'all' } })).ok).toBe(true);
+    expect((await seen).note).toMatchObject({ id: grp, visibility: 'all', scope: g });
+    expect(ids2(await emit(sc, 'notes:join', { projectId: project, scope: '*' }))).toEqual([grp]);
+    // Lernende schreiben unter Allgemein in die eigene Gruppe, freigegeben
+    const all = (await emit(sc, 'notes:add', { projectId: project, scope: '*', note: { body: 'Kultur teilt' } })).id;
+    expect(((await emit(sa, 'notes:join', { projectId: project, scope: '*' })).notes as J[]).map((n) => n.id).sort()).toEqual([grp, all].sort());
+    // Lehrkraft darf auf Privat zurückstellen, aber nicht veröffentlichen
+    expect((await emit(st, 'notes:update', { projectId: project, id: priv, note: { body: 'nur für mich', visibility: 'group' } })).ok).toBe(false);
+    expect((await emit(st, 'notes:update', { projectId: project, id: all, note: { body: 'Kultur teilt', visibility: 'private' } })).ok).toBe(true);
+    expect((await emit(sa, 'notes:join', { projectId: project, scope: '*' })).notes).toHaveLength(1);
+    // Melden: Ben meldet Annas Notiz; Clara sieht sie nicht mehr, Anna sieht „gemeldet“ ohne Namen
+    expect((await emit(sa, 'notes:report', { projectId: project, id: grp })).ok).toBe(false);
+    expect((await emit(sb, 'notes:report', { projectId: project, id: grp, reason: 'beleidigend' })).ok).toBe(true);
+    expect((await emit(sb, 'notes:report', { projectId: project, id: grp })).ok).toBe(false);
+    expect((await emit(sc, 'notes:join', { projectId: project, scope: '*' })).notes).toEqual([]);
+    const annas = ((await emit(sa, 'notes:join', { projectId: project })).notes as J[]).find((n) => n.id === grp);
+    expect(annas).toMatchObject({ reported: true });
+    expect(annas.reports).toBeUndefined();
+    expect(((await emit(sb, 'notes:join', { projectId: project })).notes as J[]).find((n) => n.id === grp)).toMatchObject({ reportedByMe: true });
+    const forT = ((await emit(st, 'notes:join', { projectId: project, scope: g })).notes as J[]).find((n) => n.id === grp);
+    expect(forT.reports).toMatchObject([{ reason: 'beleidigend' }]);
+    expect((await emit(sb, 'notes:unreport', { projectId: project, id: grp })).ok).toBe(false);
+    expect((await emit(st, 'notes:unreport', { projectId: project, id: grp })).ok).toBe(true);
+    expect(ids2(await emit(sc, 'notes:join', { projectId: project, scope: '*' }))).toEqual([grp]);
+    // Lehrkraft schreibt unter Allgemein: alle sehen es
+    await emit(st, 'notes:join', { projectId: project, scope: '*' });
+    const tn = (await emit(st, 'notes:add', { projectId: project, scope: '*', note: { body: 'Hinweis an alle' } })).id;
+    expect(ids2(await emit(sc, 'notes:join', { projectId: project, scope: '*' }))).toEqual([grp, tn].sort());
   });
 
   it('Einfüge-Protokoll: eigene Einträge, Antwort später, Lehrkraft sieht alle', async () => {

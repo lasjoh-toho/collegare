@@ -42,7 +42,12 @@ export const isPublicAddress = (raw: string) => {
 };
 
 export type FetchError = 'invalid' | 'download' | 'toolarge';
-export type Fetched = { data: Buffer; mime: string; name: string } | { error: FetchError };
+export type Fetched = { data: Buffer; mime: string; name: string; finalUrl: string } | { error: FetchError };
+/** Kopfzeilen der Anfrage (Standard: Medien wie in slidemedia.php) */
+export interface FetchOpts {
+  accept?: string;
+  userAgent?: string;
+}
 
 async function resolvePublic(host: string, ok: (ip: string) => boolean): Promise<{ address: string; family: number } | null> {
   const h = host.replace(/^\[|\]$/g, '');
@@ -51,13 +56,13 @@ async function resolvePublic(host: string, ok: (ip: string) => boolean): Promise
   return all[0];
 }
 
-function getOnce(url: URL, addr: { address: string; family: number }, maxBytes: number, deadline: number): Promise<{ status: number; location?: string; mime: string; data?: Buffer; error?: FetchError }> {
+function getOnce(url: URL, addr: { address: string; family: number }, maxBytes: number, deadline: number, opts: FetchOpts): Promise<{ status: number; location?: string; mime: string; data?: Buffer; error?: FetchError }> {
   return new Promise((resolve) => {
     const mod = url.protocol === 'https:' ? https : http;
     const req = mod.get(
       url,
       {
-        headers: { 'user-agent': 'Collegare-Pinnwand', accept: 'image/*,audio/*,video/*;q=0.9,*/*;q=0.1' },
+        headers: { 'user-agent': opts.userAgent ?? 'Collegare-Pinnwand', accept: opts.accept ?? 'image/*,audio/*,video/*;q=0.9,*/*;q=0.1' },
         timeout: Math.max(1000, deadline - Date.now()),
         // geprüfte Adresse festhalten
         lookup: ((_h: string, opts: { all?: boolean }, cb: (...a: unknown[]) => void) =>
@@ -97,7 +102,7 @@ function getOnce(url: URL, addr: { address: string; family: number }, maxBytes: 
 }
 
 /** allowed ist nur für Tests austauschbar */
-export async function fetchMedia(raw: string, maxBytes: number, allowed: (ip: string) => boolean = isPublicAddress): Promise<Fetched> {
+export async function fetchMedia(raw: string, maxBytes: number, allowed: (ip: string) => boolean = isPublicAddress, opts: FetchOpts = {}): Promise<Fetched> {
   let url: URL;
   try {
     url = new URL(raw);
@@ -109,7 +114,7 @@ export async function fetchMedia(raw: string, maxBytes: number, allowed: (ip: st
     if (!/^https?:$/.test(url.protocol) || url.username || url.password) return { error: 'invalid' };
     const addr = await resolvePublic(url.hostname, allowed);
     if (!addr) return { error: 'invalid' };
-    const r = await getOnce(url, addr, maxBytes, deadline);
+    const r = await getOnce(url, addr, maxBytes, deadline, opts);
     if (r.location) {
       try {
         url = new URL(r.location, url);
@@ -120,7 +125,7 @@ export async function fetchMedia(raw: string, maxBytes: number, allowed: (ip: st
     }
     if (r.error || !r.data) return { error: r.error ?? 'download' };
     const name = decodeURIComponent(url.pathname.split('/').pop() || 'download').replace(/[^\w.-]+/g, '_').slice(0, 100) || 'download';
-    return { data: r.data, mime: r.mime, name };
+    return { data: r.data, mime: r.mime, name, finalUrl: url.href };
   }
   return { error: 'download' };
 }

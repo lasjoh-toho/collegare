@@ -3,7 +3,6 @@
 .bar select { min-width: 0; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; padding: 0 8px; max-width: 220px; }
 .barTitle { font-size: 14px; white-space: nowrap; }
 .barScope { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.add { flex: none; font-size: 18px; font-weight: 500; color: var(--ui-accent); }
 /* Schließen ganz oben rechts an der Kante (Wunsch Jo), nicht in einer umbrochenen zweiten Zeile */
 .close { position: absolute; top: 4px; right: 6px; }
 .notice { margin: 20px; padding: 16px; max-width: 480px; }
@@ -43,3 +42,47 @@
 .body { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.45; }
 .place { margin: 6px 0 0; font-size: 12.5px; color: var(--fg-muted); font-style: italic; }
 .url { display: inline-block; margin-top: 6px; font-size: 12.5px; color: var(--tone); word-break: break-all; }
+
+/* Zweite Fassung (Konzept 8e) */
+.note.data { --tone: #7a5af5; }
+.vis, .visSmall { height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; padding: 0 6px; }
+.visSmall { height: 24px; font-size: 11.5px; padding: 0 2px; max-width: 110px; flex: none; }
+.visTag { flex: none; font-size: 12px; }
+/* freigegeben (Allgemein): angehoben mit Schatten; privat: gestrichelt */
+.released { box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--line); transform: translateY(-2px); }
+.private { border-style: dashed; border-left-style: solid; }
+.reported { --tone: var(--danger); }
+.reportBox { margin-top: 6px; padding: 6px 8px; border-radius: 8px; font-size: 12.5px; background: color-mix(in srgb, var(--danger) 9%, transparent); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.reportForm { display: flex; gap: 6px; margin-top: 6px; }
+.reportForm input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }
+/* großer, deutlich sichtbarer Knopf unter den Karten (Wunsch Jo) */
+.addBig {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 4px;
+  border: 2px dashed color-mix(in srgb, var(--ui-accent) 55%, var(--line)); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ui-accent) 7%, var(--bg-elev)); color: var(--ui-accent); font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+}
+.addBig span { font-size: 24px; line-height: 1; font-weight: 500; }
+.addBig:hover { background: color-mix(in srgb, var(--ui-accent) 14%, var(--bg-elev)); border-style: solid; }
+.modal { width: min(900px, calc(100% - 48px)); max-height: calc(100% - 48px); }
+.modal .editor { border: 0; padding: 0; background: none; }
+.modal .editor textarea { min-height: 160px; }
+.tableWrap { overflow-x: auto; margin-top: 6px; }
+.table { border-collapse: collapse; font-size: 13px; }
+.table th, .table td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; vertical-align: top; }
+.table th { background: color-mix(in srgb, var(--tone) 10%, transparent); font-weight: 600; }
+.tableEdit { overflow-x: auto; display: flex; flex-direction: column; gap: 6px; }
+.tableEdit table { border-collapse: collapse; width: auto; align-self: flex-start; }
+.tableEdit td { padding: 1px; }
+.editor .tableEdit input { width: 140px; padding: 4px 6px; border-radius: 4px; }
+.tableEdit input.th { font-weight: 600; }
+
+/* Bilder (lib/imageDrop.ts, Wunsch Jo 17.11.2026) */
+.note.image { --tone: var(--office-slide, var(--ui-accent)); }
+.picture { display: block; max-width: 100%; max-height: 260px; margin: 6px 0 2px; border-radius: 6px; object-fit: contain; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+.missing { color: var(--danger); font-style: normal; }
+.imageEdit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.imageEdit img { max-width: 220px; max-height: 140px; border-radius: 6px; object-fit: contain; }
+.fromPage { flex: none; font-size: 16px; }
+.dropping { outline: 2px dashed var(--ui-accent); outline-offset: -6px; }
+.dropHint { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; background: var(--ui-accent); color: #fff; font-size: 13px; z-index: 6; pointer-events: none; max-width: 90%; text-align: center; }
+.wrap:focus { outline: none; }

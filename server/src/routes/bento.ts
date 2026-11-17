@@ -33,6 +33,16 @@ export function spliceDoc(shell: string, json: string, meta: string): string {
   return out;
 }
 
+/**
+ * Schreiben dürfen Lernende die eigene Präsentation, die Lehrkraft ihren Testbereich; nicht nach „Fertig“ und nicht,
+ * wenn jemand anderes die Bearbeitung gesperrt hat.
+ */
+export function deckWritable(teacher: boolean, d: { mine: boolean; test: boolean; lockedBy: number | null }, doneAt: number | null, userId: number): boolean {
+  if (doneAt || !d.mine) return false;
+  if (teacher && !d.test) return false;
+  return d.lockedBy === null || d.lockedBy === userId;
+}
+
 export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: string) {
   let cache: { mtime: number; html: string } | null = null;
   async function shell(): Promise<string | null> {
@@ -60,9 +70,11 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
     if (!r || !scope) return void reply.code(403).send({ error: 'Kein Zugriff auf diese Präsentation' });
     const project = await s.projects.get(doc.projectId);
     const teacher = r.role === 'teacher';
-    const write = !doc.doneAt && !scope.demo && (!teacher || !!scope.test);
+    const { lockedBy } = await s.bentoDecks.access(doc.id);
+    const write = deckWritable(teacher, { mine: teacher ? !!scope.test : !scope.demo, test: !!scope.test, lockedBy }, doc.doneAt, sess.userId);
     const canImport = write && (teacher || !!project?.settings.slidesImportStudents);
-    return { userId: sess.userId, doc, write, canImport, teacher };
+    const webImages = write && (teacher || !!project?.settings.imagesDirect);
+    return { userId: sess.userId, doc, write, canImport, webImages, teacher, locked: lockedBy !== null && lockedBy !== sess.userId };
   }
 
   app.get<{ Params: { id: string } }>('/api/documents/:id/bento', async (req, reply) => {
@@ -86,6 +98,11 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
       fileActions: ['exportPptx', 'exportJson', 'importPptx', 'importHtml', 'importJson'],
       // Einfügen › WordArt, Formen-Editor, Formel: die Editoren der Pinnwand (lädt die Folien-Seite erst bei Bedarf)
       inserts: ['wordart', 'shape', 'formula'],
+      // Bilder aus anderen Tabs: über den Server holen (CORS), Angaben zur Quelle dazu (routes/webImages.ts)
+      imageProxy: `${basePath}/api/bild-holen?url=`,
+      imageInfo: `${basePath}/api/bild-info?url=`,
+      webImages: a.webImages,
+      webImagesHint: 'Bilder aus dem Netz legst du zuerst bei „Notizen und Quellen“ ab, mit Urheber und Lizenz. Von dort ziehst du sie auf die Folie.',
     };
     const meta = `<meta name="bento-host-config" data-bento-transient content="${escAttr(JSON.stringify(config))}">`;
     return reply
@@ -106,7 +123,7 @@ export function bentoRoutes(app: FastifyInstance, s: Services, clientDir?: strin
   app.put<{ Params: { id: string } }>('/api/documents/:id/bento', { bodyLimit: MAX_BYTES }, async (req, reply) => {
     const a = await access(req, reply);
     if (!a) return;
-    if (!a.write) return reply.code(403).send({ error: a.doc.doneAt ? 'Die Präsentation ist als fertig markiert.' : 'Nur lesen' });
+    if (!a.write) return reply.code(403).send({ error: a.doc.doneAt ? 'Die Präsentation ist als fertig markiert.' : a.locked ? 'Die Bearbeitung ist gesperrt.' : 'Nur lesen' });
     const body = Body.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Ungültige Daten' });
     const d = body.data.doc;

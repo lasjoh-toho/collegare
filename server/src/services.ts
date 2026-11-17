@@ -9,6 +9,7 @@ import { Gradings } from './projects/gradings.js';
 import { Materials } from './projects/materials.js';
 import { Chat } from './projects/chat.js';
 import { Notes } from './projects/notes.js';
+import { NoteFiles } from './projects/noteFiles.js';
 import { Pastes } from './projects/pastes.js';
 import { EventEmitter } from 'node:events';
 import { PinStore } from './pinnwand/store.js';
@@ -78,6 +79,8 @@ export interface Services {
   toolKey: ToolKeyStore;
   loginLimiter: RateLimiter;
   codeLimiter: RateLimiter;
+  /** Abrufe fremder Bilder und Seiten je Person (Bilder aus dem Netz) */
+  webLimiter: RateLimiter;
 }
 
 export async function createServices(config: Config, now: () => number = Date.now, fetchFn: typeof fetch = fetch): Promise<Services> {
@@ -87,7 +90,8 @@ export async function createServices(config: Config, now: () => number = Date.no
   const contexts = new Contexts(db, now);
   await contexts.system();
   const audit = new AuditLog(db, now);
-  const media = new PinMedia(config.dataDir ?? mkdtempSync(join(tmpdir(), 'collegare-data-')));
+  const dataDir = config.dataDir ?? mkdtempSync(join(tmpdir(), 'collegare-data-'));
+  const media = new PinMedia(dataDir);
   const projects = new Projects(db, users, now);
   const maps = new MapStore(db);
   const toolKey = new ToolKeyStore(db);
@@ -108,7 +112,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     gradings: new Gradings(db, projects, maps, now),
     materials: new Materials(db, now),
     chat: new Chat(db, now),
-    notes: new Notes(db, now),
+    notes: new Notes(db, now, new NoteFiles(dataDir)),
     pastes: new Pastes(db, now),
     pinnwand: new PinStore(db, media, now),
     pinnwandEvents: new EventEmitter(),
@@ -120,5 +124,6 @@ export async function createServices(config: Config, now: () => number = Date.no
     toolKey,
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),
     codeLimiter: new RateLimiter(10, 10 * 60_000, now),
+    webLimiter: new RateLimiter(300, 10 * 60_000, now),
   };
 }

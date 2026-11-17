@@ -761,6 +761,185 @@ und Pinnwand getrennte Stände; „neu übernehmen“ ergänzt nur, was fehlt.
 4. Pinnwand als Modul samt Übernahme aus der Mindmap (8d.5), mit der kleinen Änderung in mod_pinnwand.
 5. Notiz scannen mit Autogra.fi (8d.4), sobald die Anmeldung über Collegare steht.
 
+## 8e. Notizen und Quellen, zweite Fassung (17. November 2026)
+
+Wünsche von Jo vom 17. November 2026. Sie ersetzen die Rechte aus 8d.2 (dort sah jede Person alles ihrer Gruppe,
+ändern durfte nur die Erstellerin). Eine Notiz bleibt **ein** Datensatz; Mindmap, Pinnwand, Folien und Ausarbeitung
+verweisen nur darauf.
+
+### 8e.1 Neue Notiz
+
+Ein deutlich sichtbarer Knopf **„+ Neue Notiz“** steht unter den Karten. Der Thread läuft dafür wie ein Chat von alt
+(oben) nach neu (unten) und springt beim Öffnen ans Ende. Der kleine „+“ in der Kopfzeile entfällt.
+
+### 8e.2 Sichtbarkeit: Privat, Gruppe, Allgemein
+
+Jede Notiz hat eine Sichtbarkeit, die man an der Karte mit einem Select einstellt, in dieser Reihenfolge:
+
+| Stufe | wer sieht sie | Standard |
+|---|---|---|
+| **Privat** | nur die Erstellerin (und die Lehrkraft, siehe unten) | |
+| **Gruppe** | die eigene Gruppe | ja |
+| **Allgemein** | alle im Projekt, also auch die anderen Gruppen | |
+
+- Die **Lehrkraft sieht alles**, auch private Notizen. Damit das für Lernende kein Geheimnis ist, heißt die Stufe im
+  Select „Privat (nur ich und die Lehrkraft)“. Die Lehrkraft darf Notizen auf Privat zurückstellen (zum Beispiel einen
+  Beitrag, der nicht für alle gedacht war), aber **keine private Notiz veröffentlichen**: Das entscheidet nur die
+  Erstellerin.
+- Ändern und Löschen: die Erstellerin und die Lehrkraft (wie bisher).
+
+### 8e.3 Das Select in der Kopfzeile ist ein Filter
+
+Dasselbe Select mit denselben drei Stufen steht in der Kopfzeile und filtert die Karten:
+
+- **Lernende:** „Privat“ zeigt die eigenen privaten Notizen, „Gruppe“ alles der eigenen Gruppe, „Allgemein“ die
+  Notizen, die **irgendeine** Gruppe (oder die Lehrkraft) für alle freigegeben hat. Eine neue Notiz bekommt die
+  Stufe, die gerade im Filter steht.
+- **Lehrkraft:** Sie wählt wie bisher die Gruppe und sieht deren **alle** Karten. Freigegebene Karten (Allgemein)
+  sind **angehoben und haben einen Schatten**, private sind gestrichelt umrandet. Dazu kommt die Auswahl
+  „Allgemein (alle Gruppen)“; was die Lehrkraft dort schreibt, sehen alle.
+- Die Art-Knöpfe (Notizen, Quellen, Links …) bleiben als zweiter Filter darunter.
+
+### 8e.4 Karten melden
+
+Jede Person kann eine fremde Karte **melden** (Grund freiwillig). Danach sehen sie nur noch die Lehrkraft, die
+Erstellerin und die meldende Person. Steht sie schon in Mindmap oder Pinnwand, bleibt die Karte dort stehen, zeigt
+aber nur noch „gemeldet“ statt des Inhalts.
+
+- Die **Erstellerin** sieht „Diese Karte wurde gemeldet“, aber **nicht, von wem**.
+- Die **Lehrkraft** sieht, wer gemeldet hat und warum, und kann die Meldung **aufheben** (Karte wieder sichtbar) oder
+  die Karte löschen bzw. auf Privat stellen.
+- Meldungen kommen ins Prüfprotokoll (6.5). Eine Person kann dieselbe Karte nur einmal melden.
+
+### 8e.5 Weitere Arten
+
+| Art | Inhalt | Hinweis |
+|---|---|---|
+| Notiz, Quelle, Link | wie bisher | |
+| **Bild** | Bilddatei mit Urheber, Lizenz, Ursprungsseite | vom Thread „Bilder per Drag and drop übernehmen“: Ziehen aus anderen Tabs, Einfügen, Abruf über den Server |
+| **Daten** | kleine Tabelle (Kopfzeile + Zeilen), Einfügen aus Tabellenkalkulation | bis 50 × 12 Zellen; wird in Ausarbeitung und Folien zur Tabelle |
+| **Video**, **Audio** | Datei (Aufnahme am Handy oder Hochladen) oder Link | Grenze aus `maxFileMb`; Aufnahme mit `MediaRecorder` |
+| **Handschrift** | Foto einer handschriftlichen Notiz plus erkannter Text | Erkennung über Autogra.fi (8d.4), solange das nicht verbunden ist: Text selbst abtippen |
+
+Dateien liegen wie die Pinnwand-Medien unter `DATA_DIR` und kommen in `sichern` mit.
+
+### 8e.6 Bearbeiten im großen Fenster
+
+Auf dem Desktop öffnet sich die bearbeitete Notiz als **großes Modal** über der Seite (Breite bis 900 px), damit sie
+deutlich hervortritt und Platz für Bild, Tabelle oder Handschrift hat. Am Handy bleibt sie in der Liste.
+
+### 8e.7 Eigene Linie: Notizen parallel zur Gliederung (U-Bahn)
+
+Jede Person kann sich ihre Notizen **in eine eigene Reihenfolge** bringen, die parallel zur Gliederung läuft. Bild
+dafür ist eine **U-Bahn-Linie**, wie in der Mindmap-Ansicht „Äste“:
+
+```
+Gliederung              meine Linie
+ 1 Einleitung   ──────── ○  Zitat Müller
+                         │  └ Bild: Karte 1850 (sichtbar)
+ 2 Ursachen     ──────── ○  Statistik (Daten)
+                         ○  Notiz „Frage an Gruppe“
+ 3 Folgen       ──────── ○  …
+```
+
+- Die Linie ist **senkrecht** mit **weißen Kreisen** als Stationen. Neben jeder Station steht der Abschnitt der
+  Gliederung, zu dem sie gehört; Abschnitte ohne Station bleiben als dünne Markierung stehen.
+- Notizen zieht man aus dem Thread auf die Linie. Eine Station ist eine Notiz, die eigene Reihenfolge und die
+  Zuordnung zum Abschnitt gehören der Person (nicht der Notiz), so kann jede Person ihre eigene Linie haben, ohne die
+  anderen zu stören.
+- **Karten in eine Karte ziehen:** Auf eine Station lassen sich weitere Karten ziehen, zum Beispiel Bildquellen, die
+  in der Präsentation auf derselben Folie erscheinen sollen. Jede so angehängte Karte hat ein Auge zum **Ein- und
+  Ausblenden** (ausgeblendet = bleibt als Beleg dabei, erscheint aber nicht in Folie bzw. Text).
+- Daraus folgt später: eine Station = ein Absatz bzw. eine Folie, angehängte sichtbare Karten = Bilder, Tabellen,
+  Zitate darauf, angehängte Quellen = Literatur- und Bildnachweis.
+
+### 8e.8 Hausarbeit und Präsentation synchronisieren
+
+Wer Ausarbeitung **und** Präsentation hat, kann beide über die Linie koppeln. Dann steht die **Linie in der Mitte**:
+links die Abschnitte der Ausarbeitung, rechts die Folien. Eine Station verbindet einen Abschnitt (oder Absatz) mit
+einer Folie. Angehängte Karten erscheinen auf beiden Seiten; Zusatztexte der Folien (Sprechernotizen) und der Text des
+Abschnitts lassen sich nebeneinander vergleichen. Das ist auch die Antwort auf Jos Idee, Zusatztexte und Ausarbeitung
+zu synchronisieren: Der Abgleich läuft über die Station, nicht über Text-Diff.
+
+Gespeichert wird die Linie als eigenes Produkt je Person (`lines`: Stationen mit Notiz, Abschnitt, Folie, angehängten
+Karten samt Sichtbarkeit). Folien und Abschnitte werden nur referenziert.
+
+### 8e.9 Typst als Basis
+
+Typst bleibt die **Ausgabe**, nicht die Datenbasis (Entscheidung 14). Grundlage aller Teile oben ist das
+Strukturmodell in der Datenbank: Notizen mit Art und Sichtbarkeit, Linie mit Stationen, Gliederung, später der eigene
+Texteditor (Entscheidung 13). Daraus erzeugt Collegare beim Export den Typst-Text:
+
+- Quellen-Notizen werden zum Literaturverzeichnis (Typst liest das Hayagriva-/BibLaTeX-Format, Zitierstil per CSL),
+  Bild-Notizen zu Abbildungen mit **automatischem Bildnachweis** aus Urheber, Lizenz und Ursprungsseite,
+  Daten-Notizen zu Tabellen, Handschrift zum erkannten Text mit Bild als Randabbildung.
+- Die Linie liefert die Reihenfolge, angehängte sichtbare Karten die Abbildungen und Tabellen je Abschnitt.
+- Die Präsentation bleibt Bento; Typst erzeugt dazu höchstens ein **Handout** aus derselben Linie.
+
+Typst als Bearbeitungsformat wäre falsch: Lernende sollen kein Markup schreiben, und Typst kennt weder Sichtbarkeit
+noch Gruppen noch gemeinsames Bearbeiten. Als unsichtbarer Standard unter dem Editor mit „Für Fortgeschrittene“
+(Quelltext ansehen, Typst-Baustein, Vorlage) passt es dagegen gut. Typst kann als WASM im Browser laufen (typst.ts),
+dann braucht der Server kein zusätzliches Programm.
+
+### 8e.10 Reihenfolge
+
+1. Plus-Knopf, Sichtbarkeit mit Filter, Schatten für Freigegebenes, Melden, großes Modal (klein, sofort).
+2. Arten Daten, Video, Audio, Handschrift (nach der Bild-Art aus dem Nachbar-Thread, gleiche Dateiablage).
+3. Eigene Linie mit Stationen und angehängten Karten (8e.7).
+4. Kopplung Ausarbeitung und Präsentation (8e.8), braucht den eigenen Texteditor oder zumindest Abschnitte als Ziel.
+5. Typst-Export aus Linie, Notizen und Gliederung (8e.9).
+## 8f. Zusatztexte der Folien und Ausarbeitung abgleichen (Konzept, 17. November 2026)
+
+Idee von Jo vom 17. November 2026, hier als Konzept vor dem Bauen. Ergänzt 8e.8: Dort verbindet eine Station der
+Linie einen Abschnitt mit einer Folie; hier steht, was dann mit dem Text geschieht.
+
+### 8f.1 Ausgangslage
+
+Jede Folie in Bento kann einen **Zusatztext** tragen (`slide.longRead`, Blöcke: Überschrift, Erklärung, Zitat,
+Bildunterschrift, Glossar, Aufgabe, Quellen); im Vortrag wischt man nach oben oder klickt den Knopf unten. Die
+**Ausarbeitung** besteht aus Abschnitts-Dokumenten, die aus der Gliederung entstehen (Abschnitt 4, Phase 3). Beide
+erzählen dasselbe: die Folie die Kernaussage, der Zusatztext eine Lesefassung, die Ausarbeitung den ausführlichen
+Text. Heute pflegt eine Gruppe beides getrennt, und die Fassungen laufen auseinander.
+
+**Ziel:** Ein Gedanke wird einmal geschrieben und erscheint als Absatz in der Ausarbeitung und als Zusatztext hinter
+der passenden Folie, ohne dass zwei Fassungen entstehen.
+
+### 8f.2 Vorschlag
+
+1. **Verknüpfung über die Gliederung.** Eine Folie lässt sich an einen Abschnitt oder Unterpunkt der Gliederung
+   binden: über eine Station der Linie (8e.8) oder direkt im Seitenmenü von Bento (Bereich „Zusatztext“, Auswahl
+   „Abschnitt der Ausarbeitung“). Beides ist dieselbe Verknüpfung. Im Deck steht sie als
+   optionales Feld `slide.link = { app: 'collegare', card: '<Karten-ID>' }`; Bento ignoriert es außerhalb von Collegare
+   (Formatregel „nur hinzufügen“). Umgekehrt zeigt die Ausarbeitung am Rand, welche Folie zum Abschnitt gehört.
+2. **Abgeglichen wird je Absatz, nicht je Dokument.** Ein Absatz der Ausarbeitung und ein Block des Zusatztexts sind
+   „gespiegelt“, wenn sie dieselbe Kennung tragen. Beim Spiegeln wählt man einzelne Absätze aus (Häkchen), denn ein
+   Zusatztext ist eine Lesefassung, kein vollständiger Abschnitt. Randnotizen werden zu `<<Referenz:Wort|Erklärung>>`,
+   Quellen zum Block „Quellen“ aus denselben Datensätzen wie „Notizen und Quellen“.
+3. **Die Ausarbeitung führt.** Änderungen in der Ausarbeitung kommen beim nächsten Öffnen der Präsentation an
+   („2 Absätze in der Ausarbeitung geändert – übernehmen?“). Ändert jemand einen gespiegelten Block im Zusatztext,
+   wird er zur Abweichung (markiert). Collegare bietet dann „In die Ausarbeitung zurückschreiben“ als Vorschlag an die
+   zuständige Person oder „Lösen“ (der Block wird eigenständig). Kein stilles Zusammenführen in beide Richtungen:
+   Abschnitte haben Zuständige und Fertig-Sperren (Abschnitt 5), eine Folie gehört der ganzen Gruppe.
+4. **Die Präsentation bleibt eine eigenständige Datei.** Gespiegelte Blöcke stehen als Kopie mit Stand im Deck, damit
+   der Export ohne Collegare läuft („die Datei ist die Software“).
+
+### 8f.3 Technik in zwei Stufen
+
+- **Stufe 1, mit OnlyOffice möglich:** Im Zusatztext-Editor „Aus der Ausarbeitung einfügen …“: Collegare holt den
+  zuletzt gespeicherten Stand des gebundenen Abschnitts als DOCX, wandelt ihn im Browser in Absätze (mammoth, wie beim
+  Word-Import der Lernseiten) und merkt sich Herkunft und Stand. Ein Hinweis zeigt später, dass der Abschnitt neuer
+  ist. Ohne Rückweg, weil OnlyOffice keine verlässlichen Absatz-Kennungen liefert.
+- **Stufe 2, mit dem eigenen Texteditor (Entscheidung 13):** Absätze sind Yjs-Knoten mit fester Kennung. Bento bekommt
+  gespiegelte Blöcke über das Host-Protokoll (`postMessage` `longread-sync`, wie `title`/`undo`) und meldet
+  Abweichungen zurück. Dieselbe Verknüpfung trägt die geplante Ansicht „Hausarbeit mit Präsentation“ (Ausarbeitung
+  links, Folien rechts, die Gliederung als U-Bahn-Linie in der Mitte).
+
+### 8f.4 Offene Fragen an Jo
+
+- Soll die Ausarbeitung führen (Vorschlag), oder darf auch der Zusatztext direkt zurückschreiben?
+- Reicht Stufe 1, bis der eigene Texteditor kommt?
+- Gehört zu einer Folie genau ein Abschnitt, oder darf sie mehrere Unterpunkte bündeln?
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |
