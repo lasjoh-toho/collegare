@@ -13,6 +13,7 @@
 .who:hover, .who[aria-expanded='true'] { background: var(--ui-sunken); }
 .whoName { font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .whereBox { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.centerBox { gap: 6px; }
 .where { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; }
 .where strong { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
 .project { color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }
@@ -89,6 +90,7 @@ div.phase { opacity: 0.75; }
   .actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
   .where { display: none; }
   .whereBox { flex: 0 0 auto; }
+  .whereBox.centerBox { flex: 1 1 auto; }
 }
 
 /* Chat als Leiste am rechten Rand (zuschaltbar in der Kopfzeile); schmal: über dem Inhalt */

@@ -14,17 +14,18 @@ import { download, fileBase, importBentoHtml, importJson, importPowerPoint, pick
 import { bentoToPptx } from '@/lib/pptxExport';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
+import { DeckPicker, type DeckInfo } from './DeckPicker';
 import s from './folien.module.css';
 
 interface Deck {
   role: 'teacher' | 'student';
-  scopes: { scope: string; title: string; test: boolean; demo: boolean }[];
+  decks: DeckInfo[];
   scope: string | null;
-  test?: boolean;
-  demo?: boolean;
-  /** Lehrkraft: die eigene Präsentation aus „Test / Demo“ ist für Lernende sichtbar */
-  demoVisible?: boolean;
   doc: { id: number; title: string; doneAt: number | null } | null;
+  write?: boolean;
+  canShare?: boolean;
+  canLock?: boolean;
+  canUnlock?: boolean;
 }
 
 type Msg = {
@@ -60,9 +61,22 @@ export default function Folien() {
   }, [me]);
   const load = useCallback(
     (sc: string | null) =>
-      get<Deck>(`/api/projects/${id}/folien${sc ? `?bereich=${encodeURIComponent(sc)}` : ''}`).then(setData, (e) => setError(e instanceof ApiError ? e.message : String(e))),
+      get<Deck>(`/api/projects/${id}/folien${sc ? `?bereich=${encodeURIComponent(sc)}` : ''}`).then(
+        (d) => {
+          setData(d);
+          setError('');
+        },
+        (e) => setError(e instanceof ApiError ? e.message : String(e)),
+      ),
     [id],
   );
+  // Freigabe und Sperre ändern auch andere: regelmäßig nachsehen (sperrt jemand, wird die Präsentation hier lesend)
+  const scopeNow = data?.scope ?? null;
+  useEffect(() => {
+    if (!Number.isInteger(id) || !me) return;
+    const t = setInterval(() => document.visibilityState === 'visible' && void load(scopeNow), 20000);
+    return () => clearInterval(t);
+  }, [id, me, scopeNow, load]);
   useEffect(() => {
     if (!Number.isInteger(id) || !me) return;
     get<ProjectView>(`/api/projects/${id}`).then(setProject, () => setProject(null));
@@ -167,60 +181,50 @@ export default function Folien() {
   if (!me || !project) return <Topbar me={me ?? null} />;
   const teacher = project.role === 'teacher';
   const doc = data?.doc ?? null;
-  const editing = !!doc && !doc.doneAt && (!teacher || !!data?.test);
+  const editing = !!doc && !!data?.write;
   const url = doc ? `${BASE_PATH}/api/documents/${doc.id}/bento` : null;
-  const scopeTitle = data?.scopes.find((x) => x.scope === data.scope)?.title.replace(/ \(nur für mich\)$/, '') ?? 'Folien';
-  // „Test / Demo“ erscheint im Auswahlfeld zweimal: nur für mich oder für die Lernenden sichtbar
-  const testScope = data?.scopes.find((x) => x.test)?.scope;
-  const selectValue = data?.scope === testScope && data?.demoVisible ? `${testScope}:sichtbar` : (data?.scope ?? '');
-  async function chooseScope(v: string) {
-    if (testScope && (v === testScope || v === `${testScope}:sichtbar`)) {
-      const visible = v.endsWith(':sichtbar');
-      if (visible !== !!data?.demoVisible) await post(`/api/projects/${id}/folien/demo`, { visible }).catch(() => {});
-      return void load(testScope);
-    }
-    void load(v);
+  const current = data?.decks.find((x) => x.scope === data.scope) ?? null;
+  const renameDeck = (t: string) => toBento({ bento: 'title', title: t });
+  async function share(shared: boolean) {
+    if (!doc) return;
+    await post(`/api/documents/${doc.id}/freigabe`, { shared }).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    void load(data?.scope ?? null);
   }
-  const renameDeck = (v: string) => {
-    const t = v.trim();
-    if (t && t !== title) toBento({ bento: 'title', title: t });
-  };
+  async function lock(locked: boolean) {
+    if (!doc) return;
+    // vor dem Sperren speichern, damit nichts verloren geht
+    if (locked && dirty) toBento({ bento: 'save' });
+    await post(`/api/documents/${doc.id}/sperre`, { locked }).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    void load(data?.scope ?? null);
+  }
 
   return (
     <ProjectShell
       me={me}
       project={project}
-      where={scopeTitle}
-      crumbs={
-        doc && (
-          <>
-            <span className={s.sep}>/</span>
-            {editing ? (
-              <input
-                key={title}
-                className={s.title}
-                defaultValue={title}
-                aria-label="Titel der Präsentation"
-                title="Titel der Präsentation"
-                size={Math.min(Math.max(title.length, 8), 40)}
-                onBlur={(e) => renameDeck(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-              />
-            ) : (
-              <span className={s.titleRead}>{title || doc.title}</span>
-            )}
-            {editing &&
-              (dirty ? (
-                <button className={s.unsaved} onClick={() => toBento({ bento: 'save' })} title="Nicht gespeichert – jetzt speichern" aria-label="Nicht gespeichert, jetzt speichern" />
-              ) : (
-                <span className={s.saved} title="Gespeichert" aria-label="Gespeichert">
-                  ✓
-                </span>
-              ))}
-          </>
-        )
+      where="Folien"
+      center={
+        data && current ? (
+          <DeckPicker
+            decks={data.decks}
+            current={current}
+            teacher={teacher}
+            meId={me.id}
+            title={title}
+            editing={editing}
+            dirty={dirty}
+            canShare={!!data.canShare}
+            canLock={!!data.canLock}
+            canUnlock={!!data.canUnlock}
+            onChoose={(sc) => void load(sc)}
+            onRename={renameDeck}
+            onSave={() => toBento({ bento: 'save' })}
+            onShare={(on) => void share(on)}
+            onLock={(on) => void lock(on)}
+          />
+        ) : undefined
       }
-      info={{ key: 'folien', title: 'Folien', text: 'Eure Präsentation, bedient wie PowerPoint: Oben stehen Datei, Start, Einfügen und die anderen Registerkarten, rechts der Formatbereich zur gewählten Registerkarte. Gespeichert wird von selbst. Unter „Datei“ lässt sich die Präsentation als PowerPoint, Bento-Datei oder JSON herunterladen.' }}
+      info={{ key: 'folien', title: 'Folien', text: 'Eure Präsentation, bedient wie PowerPoint: Oben stehen Datei, Start, Einfügen und die anderen Registerkarten, rechts der Formatbereich zur gewählten Registerkarte. Gespeichert wird von selbst. Unter „Datei“ lässt sich die Präsentation als PowerPoint, Bento-Datei oder JSON herunterladen. In der Mitte der Kopfzeile wählst und benennst du die Präsentation; das Auge dahinter schaltet sie für alle frei, das Schloss sperrt die Bearbeitung für alle anderen, auch für deine Gruppe.' }}
       phase="presentation"
       fill
       undo={
@@ -240,27 +244,7 @@ export default function Folien() {
       actions={
         <>
           {busy && <span className="muted">{busy}</span>}
-          {teacher && !editing && doc && <span className="muted">Ansicht für die Lehrkraft</span>}
-          {data && data.scopes.length > 1 && (
-            <select className={s.scope} value={selectValue} onChange={(e) => void chooseScope(e.target.value)} title="Welche Präsentation?">
-              {data.scopes.map((x) =>
-                x.test ? (
-                  [
-                    <option key={x.scope} value={x.scope}>
-                      Test / Demo (nur für mich)
-                    </option>,
-                    <option key={x.scope + 's'} value={`${x.scope}:sichtbar`}>
-                      Test / Demo (Lernende sehen sie)
-                    </option>,
-                  ]
-                ) : (
-                  <option key={x.scope} value={x.scope}>
-                    {x.title}
-                  </option>
-                ),
-              )}
-            </select>
-          )}
+          {doc && !editing && <span className={`muted ${s.readNote}`}>{teacher ? 'Ansicht für die Lehrkraft' : 'Nur lesen'}</span>}
         </>
       }
     >
@@ -270,7 +254,7 @@ export default function Folien() {
         {url && (
           <div className={s.editor}>
             <div className={s.stripe} />
-            <iframe ref={frame} key={url} className={s.frame} src={url} title="Folien" allow="clipboard-read; clipboard-write; fullscreen; display-capture" allowFullScreen />
+            <iframe ref={frame} key={`${url}:${editing}`} className={s.frame} src={url} title="Folien" allow="clipboard-read; clipboard-write; fullscreen; display-capture" allowFullScreen />
           </div>
         )}
         {insert && (
