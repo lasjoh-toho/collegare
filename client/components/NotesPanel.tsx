@@ -10,7 +10,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { projectSocket } from '@/lib/api';
-import { setChatDrag } from '@/lib/chatDrag';
+import { isChatDrag, setChatDrag } from '@/lib/chatDrag';
+import { imagesFrom, mayHoldImages, noteFileUrl, setImageDrag, takeImages, uploadImage, type ImageNoteInput } from '@/lib/imageDrop';
+import { ImageImport } from './ImageImport';
 import type { Me, ProjectView } from '@/lib/types';
 import c from './notes.module.css';
 
@@ -57,18 +59,25 @@ interface Draft {
   url: string;
   visibility: Visibility;
   rows: string[][];
+  /** Bild: Urheber, Lizenz, Ursprungsseite; file = neu hochgeladener Pfad (undefined = Datei bleibt), preview zum Anzeigen */
+  credit: string;
+  license: string;
+  origin: string;
+  file?: string;
+  preview?: string;
 }
 type Res = { ok: boolean; error?: string };
 
 /** „Allgemein (alle Gruppen)“, wie SHARED im Server */
 const SHARED = '*';
 
-/** Arten im Editor; „Bild“ kommt über Ziehen und Einfügen (lib/imageDrop.ts) */
+/** Arten im Editor; Bilder kommen meist über Ziehen und Einfügen (lib/imageDrop.ts), „Bild“ hier für eine Datei vom Gerät */
 const KINDS: { kind: Kind; label: string; plural: string; hint: string }[] = [
   { kind: 'note', label: 'Notiz', plural: 'Notizen', hint: 'Gedanke, Frage, Absprache' },
   { kind: 'source', label: 'Quelle', plural: 'Quellen', hint: 'Buch, Artikel, Zitat mit Fundstelle' },
   { kind: 'link', label: 'Link', plural: 'Links', hint: 'Webseite oder Video' },
   { kind: 'data', label: 'Daten', plural: 'Daten', hint: 'Kleine Tabelle, auch aus einer Tabellenkalkulation eingefügt' },
+  { kind: 'image', label: 'Bild', plural: 'Bilder', hint: 'Bild mit Urheber, Lizenz und Ursprungsseite. Bilder aus anderen Tabs einfach hierher ziehen oder einfügen.' },
 ];
 /** Reihenfolge wie im Select gewünscht (Jo): Gruppe in der Mitte */
 const VIS: { v: Visibility; label: string; long: string; icon: string }[] = [
@@ -81,7 +90,7 @@ const blankRows = () => [
   ['', ''],
   ['', ''],
 ];
-const empty = (kind: Kind = 'note', visibility: Visibility = 'group'): Draft => ({ kind, title: '', body: '', source: '', url: '', visibility, rows: blankRows() });
+const empty = (kind: Kind = 'note', visibility: Visibility = 'group'): Draft => ({ kind, title: '', body: '', source: '', url: '', visibility, rows: blankRows(), credit: '', license: '', origin: '' });
 const when = (ms: number) => new Date(ms).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** wie Notes.cardTitle und Notes.cardText im Server: so sieht die Karte in der Mindmap aus */
@@ -91,7 +100,8 @@ function cardTitle(n: Note) {
 }
 function cardText(n: Note) {
   const table = n.rows?.length ? n.rows.map((r) => r.join(' | ')).join('\n') : '';
-  const parts = [n.title ? n.body.trim() : n.body.trim().split('\n').slice(1).join('\n').trim(), table, n.source && `Fundstelle: ${n.source}`, n.url ?? ''];
+  const rights = [n.credit, n.license].filter(Boolean).join(', ');
+  const parts = [n.title ? n.body.trim() : n.body.trim().split('\n').slice(1).join('\n').trim(), table, n.source && `Fundstelle: ${n.source}`, rights && `Bild: ${rights}`, n.origin ?? n.url ?? ''];
   return parts.filter(Boolean).join('\n\n').slice(0, 5000);
 }
 
@@ -180,6 +190,7 @@ function Editor({
   adding = false,
   visAllowed,
   showVis = true,
+  pickImage,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
@@ -189,9 +200,11 @@ function Editor({
   adding?: boolean;
   visAllowed?: Visibility[];
   showVis?: boolean;
+  /** Bild vom Gerät hochladen; setzt file und preview im Entwurf */
+  pickImage?: (f: File, d: Draft) => void;
 }) {
   const k = KINDS.find((x) => x.kind === draft.kind)!;
-  const ok = !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
+  const ok = draft.kind === 'image' ? !!(draft.file || draft.preview) : !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
   return (
@@ -222,6 +235,15 @@ function Editor({
       </div>
       <input ref={first} value={draft.title} maxLength={200} placeholder={draft.kind === 'source' ? 'Titel, Autorin oder Autor, Jahr' : draft.kind === 'data' ? 'Was zeigt die Tabelle?' : 'Überschrift (freiwillig)'} onChange={(e) => setDraft({ ...draft, title: e.target.value })} aria-label="Überschrift" />
       {draft.kind === 'data' && <TableEdit rows={draft.rows} set={(rows) => setDraft({ ...draft, rows })} />}
+      {draft.kind === 'image' && (
+        <div className={c.imageEdit}>
+          {draft.preview ? <img src={draft.preview} alt="" /> : <span className="muted">Noch kein Bild. Wähle eine Datei, oder schließ das Fenster und zieh Bilder aus einem anderen Tab auf die Notizen.</span>}
+          <label className="btn">
+            {draft.preview ? 'Anderes Bild …' : 'Bild wählen …'}
+            <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && pickImage?.(e.target.files[0], draft)} />
+          </label>
+        </div>
+      )}
       <textarea
         rows={draft.kind === 'data' ? 2 : 4}
         value={draft.body}
@@ -231,7 +253,14 @@ function Editor({
         aria-label="Text"
       />
       {(draft.kind === 'source' || draft.kind === 'data') && <input value={draft.source} maxLength={500} placeholder={draft.kind === 'data' ? 'Quelle der Daten, z. B. Statistisches Bundesamt 2024' : 'Fundstelle, z. B. S. 42 oder Kapitel 3'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} aria-label="Fundstelle" />}
-      {draft.kind !== 'note' && <input type="url" value={draft.url} maxLength={2000} placeholder="https://…" onChange={(e) => setDraft({ ...draft, url: e.target.value })} aria-label="Link" />}
+      {draft.kind !== 'note' && draft.kind !== 'image' && <input type="url" value={draft.url} maxLength={2000} placeholder="https://…" onChange={(e) => setDraft({ ...draft, url: e.target.value })} aria-label="Link" />}
+      {draft.kind === 'image' && (
+        <>
+          <input value={draft.credit} maxLength={300} placeholder="Urheber: Fotografin, Zeichner, Rechteinhaber" onChange={(e) => setDraft({ ...draft, credit: e.target.value })} aria-label="Urheber" />
+          <input value={draft.license} maxLength={200} placeholder="Lizenz, z. B. CC BY-SA 4.0 oder gemeinfrei" onChange={(e) => setDraft({ ...draft, license: e.target.value })} aria-label="Lizenz" />
+          <input type="url" value={draft.origin} maxLength={2000} placeholder="Ursprungsseite: wo du das Bild gefunden hast (https://…)" onChange={(e) => setDraft({ ...draft, origin: e.target.value })} aria-label="Ursprungsseite" />
+        </>
+      )}
       <div className={c.row}>
         <span className="muted">Strg+Enter speichert</span>
         <span className="grow" />
@@ -302,6 +331,9 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   const [edit, setEdit] = useState<{ id: number; d: Draft } | null>(null);
   const [reporting, setReporting] = useState<{ id: number; reason: string } | null>(null);
   const [kind, setKind] = useState<Kind | 'all'>('all');
+  // Bilder aus dem Netz: Auswahl von einer Seite, Hervorheben beim Ziehen
+  const [pageImport, setPageImport] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
   const sock = useRef<Socket | null>(null);
@@ -377,7 +409,42 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     url: d.kind === 'note' ? '' : d.url.trim(),
     rows: d.kind === 'data' ? d.rows : undefined,
     visibility: shared ? 'all' : d.visibility,
+    ...(d.kind === 'image' ? { credit: d.credit, license: d.license, origin: d.origin.trim(), url: d.url.trim(), ...(d.file ? { file: d.file } : {}) } : {}),
   });
+
+  /** neue Notizen aus Bildern bekommen die Stufe, die gerade im Filter steht */
+  const levelNow = (): Visibility => (shared ? 'all' : teacher ? 'group' : level);
+
+  function addImageNote(n: ImageNoteInput): Promise<Res> {
+    return new Promise((resolve) => {
+      if (!scope || !sock.current?.connected) return resolve({ ok: false, error: 'Keine Verbindung zum Server. Bitte kurz warten.' });
+      sock.current.emit('notes:add', { projectId: id, scope, note: { ...n, visibility: levelNow() } }, (r: Res) => resolve(r));
+    });
+  }
+
+  /** Bilder aus anderen Tabs, Bildschirmfotos, Dateien: ablegen oder einfügen (lib/imageDrop.ts) */
+  async function takeDropped(dt: DataTransfer) {
+    if (!scope) return;
+    const { images, pageLink } = imagesFrom(dt);
+    if (!images.length) {
+      if (pageLink) setPageImport(pageLink);
+      return;
+    }
+    const r = await takeImages(id, scope, images, addImageNote, (d, all) => all > 1 && d < all && show(`Bild ${d + 1} von ${all} …`));
+    if (r.page) return setPageImport(r.page);
+    if (!r.added) return show(r.error ?? 'Kein Bild übernommen');
+    show(`${r.added === 1 ? 'Bild' : r.added + ' Bilder'} übernommen${r.error ? ` (${r.error})` : ''}. Prüf Urheber, Lizenz und Ursprungsseite.`);
+  }
+
+  async function pickImage(f: File, d: Draft, put: (d: Draft) => void) {
+    if (!scope) return;
+    try {
+      const up = await uploadImage(id, scope, { file: f });
+      put({ ...d, file: up.file, preview: URL.createObjectURL(f), title: d.title || f.name.replace(/\.[a-z0-9]+$/i, '') });
+    } catch (e) {
+      show(e instanceof Error ? e.message : 'Hochladen fehlgeschlagen');
+    }
+  }
 
   function openAdd() {
     // neue Notiz bekommt die Stufe, die gerade im Filter steht
@@ -408,7 +475,19 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     });
   }
 
-  const toDraft = (n: Note): Draft => ({ kind: n.kind, title: n.title, body: n.body, source: n.source, url: n.url ?? '', visibility: n.visibility, rows: n.rows?.length ? n.rows : blankRows() });
+  const toDraft = (n: Note): Draft => ({
+    kind: n.kind,
+    title: n.title,
+    body: n.body,
+    source: n.source,
+    url: n.url ?? '',
+    visibility: n.visibility,
+    rows: n.rows?.length ? n.rows : blankRows(),
+    credit: n.credit ?? '',
+    license: n.license ?? '',
+    origin: n.origin ?? '',
+    preview: n.file ? noteFileUrl(id, n.id, n.updatedAt) : undefined,
+  });
 
   function save() {
     const n = edit && notes.find((x) => x.id === edit.id);
@@ -454,13 +533,44 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         onCancel={() => setEdit(null)}
         busy={busy}
         visAllowed={allowedFor(n)}
+        pickImage={(f, d) => void pickImage(f, d, (nd) => setEdit({ id: n.id, d: nd }))}
       />
     );
 
-  const addEditor = <Editor draft={draft} setDraft={setDraft} onSave={add} onCancel={() => setAdding(false)} busy={busy} adding showVis={!shared} />;
+  const addEditor = <Editor draft={draft} setDraft={setDraft} onSave={add} onCancel={() => setAdding(false)} busy={busy} adding showVis={!shared} pickImage={(f, d) => void pickImage(f, d, setDraft)} />;
+
+  // Ablegen nur für Bilder und Links von außen, nicht für eigene Karten (die gehen in die Mindmap)
+  const canDrop = (e: React.DragEvent) => !!scope && !isChatDrag(e) && mayHoldImages(e.dataTransfer);
 
   return (
-    <div className={`${c.wrap} ${panel ? c.panel : ''}`}>
+    <div
+      className={`${c.wrap} ${panel ? c.panel : ''} ${dropping ? c.dropping : ''}`}
+      onDragOver={(e) => {
+        if (!canDrop(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={(e) => {
+        setDropping(false);
+        if (!canDrop(e)) return;
+        e.preventDefault();
+        void takeDropped(e.dataTransfer);
+      }}
+      onPaste={(e) => {
+        // in Eingabefeldern bleibt Einfügen Text; sonst Bilder (Bildschirmfoto, kopiertes Bild) übernehmen
+        const t = e.target as HTMLElement;
+        if (!scope || t.closest('input, textarea, [contenteditable="true"]')) return;
+        const { images, pageLink } = imagesFrom(e.clipboardData);
+        if (!images.length && !pageLink) return;
+        e.preventDefault();
+        void takeDropped(e.clipboardData);
+      }}
+      tabIndex={-1}
+    >
       <div className={c.bar}>
         {panel && <strong className={c.barTitle}>Notizen und Quellen</strong>}
         {teacher ? (
@@ -488,6 +598,11 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
           )
         )}
         <span className="grow" />
+        {scope && (
+          <button className={`btn icon ${c.fromPage}`} onClick={() => setPageImport('')} title="Bilder von einer Seite übernehmen: Adresse einfügen, Bilder auswählen. Einzelne Bilder kannst du auch einfach aus einem anderen Tab hierher ziehen." aria-label="Bilder von einer Seite">
+            🖼
+          </button>
+        )}
         {onClose && (
           <button className={`btn icon ${c.close}`} onClick={onClose} title="Schließen" aria-label="Notizen schließen">
             ×
@@ -523,8 +638,17 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                   key={n.id}
                   className={`${c.note} ${c[n.kind]} ${n.visibility === 'all' && !shared ? c.released : ''} ${n.visibility === 'private' ? c.private : ''} ${n.reported ? c.reported : ''}`}
                   draggable={!n.reported}
-                  onDragStart={(e) => setChatDrag(e, { name: n.name, body: [n.title, n.body].filter(Boolean).join('\n'), note: { id: n.id, title: cardTitle(n), text: cardText(n) } })}
-                  title={n.reported ? undefined : 'In die Mindmap ziehen'}
+                  onDragStart={(e) => {
+                    setChatDrag(e, { name: n.name, body: [n.title, n.body].filter(Boolean).join('\n'), note: { id: n.id, title: cardTitle(n), text: cardText(n) } });
+                    // Bilder auch auf Folien (Bento übernimmt Bild und Quellenangabe)
+                    if (n.file && n.kind === 'image')
+                      setImageDrag(e.dataTransfer, {
+                        url: noteFileUrl(id, n.id, n.updatedAt),
+                        alt: n.title,
+                        citation: { author: [n.credit, n.license].filter(Boolean).join(', ') || undefined, title: n.title || undefined, sourceUrl: n.origin || n.url || '', retrievedAt: new Date(n.at).toISOString().slice(0, 10) },
+                      });
+                  }}
+                  title={n.reported ? undefined : n.kind === 'image' ? 'In die Mindmap oder auf eine Folie ziehen' : 'In die Mindmap ziehen'}
                 >
                   <header className={c.head}>
                     <span className={c.kind}>{KINDS.find((k) => k.kind === n.kind)?.label ?? (n.kind === 'image' ? 'Bild' : n.kind)}</span>
@@ -597,11 +721,33 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                       <button className="btn primary">Melden</button>
                     </form>
                   )}
+                  {n.kind === 'image' && n.file && <img className={c.picture} src={noteFileUrl(id, n.id, n.updatedAt)} alt={n.title} loading="lazy" draggable={false} />}
                   {n.title && <h3 className={c.title}>{n.title}</h3>}
+                  {n.kind === 'image' && (
+                    <p className={c.place}>
+                      {[n.credit && `Urheber: ${n.credit}`, n.license && `Lizenz: ${n.license}`].filter(Boolean).join(' · ') || 'Urheber und Lizenz fehlen noch.'}
+                      {n.origin ? (
+                        <>
+                          {' · '}
+                          <a href={n.origin} target="_blank" rel="noopener noreferrer">
+                            {(() => {
+                              try {
+                                return new URL(n.origin).hostname.replace(/^www\./, '');
+                              } catch {
+                                return n.origin;
+                              }
+                            })()}
+                          </a>
+                        </>
+                      ) : (
+                        <span className={c.missing}> · Ursprungsseite fehlt{canEdit ? ', bitte mit ✎ nachtragen' : ''}</span>
+                      )}
+                    </p>
+                  )}
                   {n.rows && n.rows.length > 0 && <Table rows={n.rows} />}
                   {n.body && <p className={c.body}>{n.body}</p>}
                   {n.source && <p className={c.place}>{n.kind === 'data' ? 'Quelle' : 'Fundstelle'}: {n.source}</p>}
-                  {n.url && (
+                  {n.url && n.kind !== 'image' && (
                     <a className={c.url} href={n.url} target="_blank" rel="noopener noreferrer">
                       {n.url.replace(/^https?:\/\//, '')}
                     </a>
@@ -625,6 +771,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
           {editorFor(editing)}
         </EditShell>
       )}
+      {pageImport !== null && scope && <ImageImport projectId={id} scope={scope} start={pageImport} addNote={addImageNote} onClose={() => setPageImport(null)} onDone={show} />}
+      {dropping && <div className={c.dropHint}>Bilder hier ablegen: Sie kommen mit Urheber, Lizenz und Ursprungsseite in die Notizen.</div>}
       {toast && <div className={c.toast}>{toast}</div>}
     </div>
   );
