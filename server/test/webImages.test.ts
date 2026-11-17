@@ -148,5 +148,22 @@ describe('Bilder aus dem Netz in Notizen und Quellen', () => {
     expect(await s.notes.files!.read(up.file)).toBeNull();
     expect((await emit(sa, 'notes:delete', { projectId: project, id: add.id })).ok).toBe(true);
     expect(await s.notes.files!.read(up2.file)).toBeNull();
+
+    // Tonaufnahme (MediaRecorder-WebM) und Handschrift (Konzept 8e.5)
+    const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(2000, 7)]);
+    const au = (await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=aufnahme.webm`, anna, undefined, WEBM)).json;
+    expect(au).toMatchObject({ mime: 'video/webm', size: WEBM.length });
+    expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'audio', title: 'ohne' } })).error).toBe('Tonaufnahme fehlt');
+    expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'hand', file: au.file } })).error).toBe('Die Datei passt nicht zu dieser Art');
+    const audio = await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'audio', title: 'Interview Oma', file: au.file } });
+    expect(audio.ok).toBe(true);
+    const part = await fetch(base + `/api/projects/${project}/notizen/${audio.id}/datei`, { headers: { authorization: 'Bearer ' + anna, range: 'bytes=0-99' } });
+    expect(part.status).toBe(206);
+    expect(part.headers.get('content-type')).toMatch(/^audio\/webm/);
+    expect(part.headers.get('content-range')).toBe(`bytes 0-99/${WEBM.length}`);
+    expect((await part.arrayBuffer()).byteLength).toBe(100);
+    expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'video', title: 'Film', url: 'https://example.org/film' } })).ok).toBe(true);
+    const ph = (await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=zettel.png`, anna, undefined, PNG)).json;
+    expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'hand', body: 'Ursachen der Inflation: Kriegsschulden', file: ph.file } })).ok).toBe(true);
   });
 });

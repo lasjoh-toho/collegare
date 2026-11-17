@@ -16,7 +16,7 @@ import { ImageImport } from './ImageImport';
 import type { Me, ProjectView } from '@/lib/types';
 import c from './notes.module.css';
 
-type Kind = 'note' | 'source' | 'link' | 'image' | 'data';
+type Kind = 'note' | 'source' | 'link' | 'image' | 'data' | 'video' | 'audio' | 'hand';
 export type Visibility = 'private' | 'group' | 'all';
 export interface Note {
   id: number;
@@ -65,6 +65,8 @@ interface Draft {
   origin: string;
   file?: string;
   preview?: string;
+  /** Typ der Datei, damit die Vorschau Bild, Ton oder Video zeigt */
+  mime?: string;
 }
 type Res = { ok: boolean; error?: string };
 
@@ -78,7 +80,17 @@ const KINDS: { kind: Kind; label: string; plural: string; hint: string }[] = [
   { kind: 'link', label: 'Link', plural: 'Links', hint: 'Webseite oder Video' },
   { kind: 'data', label: 'Daten', plural: 'Daten', hint: 'Kleine Tabelle, auch aus einer Tabellenkalkulation eingefügt' },
   { kind: 'image', label: 'Bild', plural: 'Bilder', hint: 'Bild mit Urheber, Lizenz und Ursprungsseite. Bilder aus anderen Tabs einfach hierher ziehen oder einfügen.' },
+  { kind: 'video', label: 'Video', plural: 'Videos', hint: 'Video aufnehmen, hochladen oder verlinken' },
+  { kind: 'audio', label: 'Audio', plural: 'Audio', hint: 'Ton aufnehmen oder hochladen, z. B. ein Interview' },
+  { kind: 'hand', label: 'Handschrift', plural: 'Handschrift', hint: 'Foto einer handschriftlichen Notiz mit dem Text dazu' },
 ];
+/** Arten mit Datei und was der Dateiwähler annimmt */
+const FILE_KINDS: Partial<Record<Kind, { accept: string; capture?: 'environment' | 'user'; what: string }>> = {
+  image: { accept: 'image/*', what: 'Bild' },
+  hand: { accept: 'image/*', capture: 'environment', what: 'Foto' },
+  video: { accept: 'video/*', what: 'Video' },
+  audio: { accept: 'audio/*,.m4a,.mp3,.ogg,.wav,.webm', what: 'Tonaufnahme' },
+};
 /** Reihenfolge wie im Select gewünscht (Jo): Gruppe in der Mitte */
 const VIS: { v: Visibility; label: string; long: string; icon: string }[] = [
   { v: 'private', label: 'Privat', long: 'Privat (nur ich und die Lehrkraft)', icon: '🔒' },
@@ -181,6 +193,63 @@ function VisSelect({ value, onChange, allowed, small = false }: { value: Visibil
   );
 }
 
+/** Aufnahme mit Mikrofon oder Kamera (MediaRecorder); das Ergebnis geht wie eine gewählte Datei hoch */
+function Recorder({ video, onDone, onError }: { video: boolean; onDone: (f: File) => void; onError: (m: string) => void }) {
+  const [rec, setRec] = useState<{ r: MediaRecorder; stream: MediaStream; t0: number } | null>(null);
+  const [secs, setSecs] = useState(0);
+  const live = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!rec) return;
+    const t = setInterval(() => setSecs(Math.round((Date.now() - rec.t0) / 1000)), 500);
+    if (video && live.current) live.current.srcObject = rec.stream;
+    return () => clearInterval(t);
+  }, [rec, video]);
+  useEffect(() => () => rec?.stream.getTracks().forEach((t) => t.stop()), [rec]);
+  async function start() {
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) return onError('Aufnehmen geht in diesem Browser nicht. Bitte eine Datei wählen.');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(video ? { video: { facingMode: 'environment' }, audio: true } : { audio: true });
+      const r = new MediaRecorder(stream);
+      const parts: Blob[] = [];
+      r.ondataavailable = (e) => e.data.size && parts.push(e.data);
+      r.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const type = r.mimeType || (video ? 'video/webm' : 'audio/webm');
+        const ext = type.includes('mp4') ? (video ? 'mp4' : 'm4a') : type.includes('ogg') ? 'ogg' : 'webm';
+        const stamp = new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/[^0-9]+/g, '-');
+        onDone(new File(parts, `${video ? 'video' : 'aufnahme'}-${stamp}.${ext}`, { type }));
+        setRec(null);
+      };
+      r.start(1000);
+      setSecs(0);
+      setRec({ r, stream, t0: Date.now() });
+    } catch {
+      onError(video ? 'Kein Zugriff auf Kamera und Mikrofon.' : 'Kein Zugriff auf das Mikrofon.');
+    }
+  }
+  return (
+    <span className={c.recorder}>
+      {rec && video && <video ref={live} autoPlay muted playsInline />}
+      {rec ? (
+        <button type="button" className="btn" onClick={() => rec.r.stop()}>
+          <span className={c.recDot} /> Stopp ({Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')})
+        </button>
+      ) : (
+        <button type="button" className="btn" onClick={() => void start()}>
+          {video ? '● Video aufnehmen' : '● Aufnehmen'}
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Vorschau einer Notizdatei je nach Typ */
+function Media({ src, mime, kind, title, className }: { src: string; mime?: string; kind: Kind; title?: string; className?: string }) {
+  if (kind === 'audio' || mime?.startsWith('audio/')) return <audio className={c.audio} controls preload="metadata" src={src} />;
+  if (kind === 'video' || mime?.startsWith('video/')) return <video className={c.video} controls preload="metadata" playsInline src={src} />;
+  return <img className={className} src={src} alt={title ?? ''} loading="lazy" draggable={false} />;
+}
+
 function Editor({
   draft,
   setDraft,
@@ -200,11 +269,19 @@ function Editor({
   adding?: boolean;
   visAllowed?: Visibility[];
   showVis?: boolean;
-  /** Bild vom Gerät hochladen; setzt file und preview im Entwurf */
+  /** Datei vom Gerät (oder Aufnahme) hochladen; setzt file, preview und mime im Entwurf */
   pickImage?: (f: File, d: Draft) => void;
 }) {
   const k = KINDS.find((x) => x.kind === draft.kind)!;
-  const ok = draft.kind === 'image' ? !!(draft.file || draft.preview) : !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
+  const fk = FILE_KINDS[draft.kind];
+  const hasFile = !!(draft.file || draft.preview);
+  const [recErr, setRecErr] = useState('');
+  const ok =
+    draft.kind === 'image' || draft.kind === 'audio' || draft.kind === 'hand'
+      ? hasFile
+      : draft.kind === 'video'
+        ? hasFile || !!draft.url.trim()
+        : !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
   return (
@@ -235,25 +312,49 @@ function Editor({
       </div>
       <input ref={first} value={draft.title} maxLength={200} placeholder={draft.kind === 'source' ? 'Titel, Autorin oder Autor, Jahr' : draft.kind === 'data' ? 'Was zeigt die Tabelle?' : 'Überschrift (freiwillig)'} onChange={(e) => setDraft({ ...draft, title: e.target.value })} aria-label="Überschrift" />
       {draft.kind === 'data' && <TableEdit rows={draft.rows} set={(rows) => setDraft({ ...draft, rows })} />}
-      {draft.kind === 'image' && (
+      {fk && (
         <div className={c.imageEdit}>
-          {draft.preview ? <img src={draft.preview} alt="" /> : <span className="muted">Noch kein Bild. Wähle eine Datei, oder schließ das Fenster und zieh Bilder aus einem anderen Tab auf die Notizen.</span>}
-          <label className="btn">
-            {draft.preview ? 'Anderes Bild …' : 'Bild wählen …'}
-            <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && pickImage?.(e.target.files[0], draft)} />
-          </label>
+          {draft.preview ? (
+            <Media src={draft.preview} mime={draft.mime} kind={draft.kind} />
+          ) : (
+            <span className="muted">
+              {draft.kind === 'image'
+                ? 'Noch kein Bild. Wähle eine Datei, oder schließ das Fenster und zieh Bilder aus einem anderen Tab auf die Notizen.'
+                : draft.kind === 'hand'
+                  ? 'Fotografiere deine handschriftliche Notiz (am Handy öffnet sich die Kamera).'
+                  : draft.kind === 'video'
+                    ? 'Nimm ein Video auf, wähle eine Datei oder trag unten einen Link ein.'
+                    : 'Nimm etwas auf oder wähle eine Datei.'}
+            </span>
+          )}
+          <span className={c.row}>
+            {(draft.kind === 'audio' || draft.kind === 'video') && <Recorder video={draft.kind === 'video'} onDone={(f) => pickImage?.(f, draft)} onError={setRecErr} />}
+            <label className="btn">
+              {hasFile ? `Andere Datei …` : `${fk.what} wählen …`}
+              <input type="file" accept={fk.accept} capture={fk.capture} hidden onChange={(e) => e.target.files?.[0] && pickImage?.(e.target.files[0], draft)} />
+            </label>
+          </span>
+          {recErr && <span className="error">{recErr}</span>}
+        </div>
+      )}
+      {draft.kind === 'hand' && (
+        <div className={c.row}>
+          <button type="button" className="btn" disabled title="Die Texterkennung kommt über Autogra.fi, sobald Collegare damit verbunden ist (Konzept 8d.4).">
+            Text erkennen
+          </button>
+          <span className="muted">Bis dahin den Text unten selbst abtippen.</span>
         </div>
       )}
       <textarea
         rows={draft.kind === 'data' ? 2 : 4}
         value={draft.body}
         maxLength={10_000}
-        placeholder={draft.kind === 'source' ? 'Zitat oder Zusammenfassung …' : draft.kind === 'link' ? 'Worum geht es auf der Seite?' : draft.kind === 'data' ? 'Erklärung zur Tabelle (freiwillig)' : k.hint + ' …'}
+        placeholder={draft.kind === 'source' ? 'Zitat oder Zusammenfassung …' : draft.kind === 'link' ? 'Worum geht es auf der Seite?' : draft.kind === 'hand' ? 'Text der Notiz (abgetippt oder erkannt)' : draft.kind === 'audio' || draft.kind === 'video' ? 'Worum geht es? Wichtige Stellen mit Zeit, z. B. 1:20 …' : draft.kind === 'data' ? 'Erklärung zur Tabelle (freiwillig)' : k.hint + ' …'}
         onChange={(e) => setDraft({ ...draft, body: e.target.value })}
         aria-label="Text"
       />
       {(draft.kind === 'source' || draft.kind === 'data') && <input value={draft.source} maxLength={500} placeholder={draft.kind === 'data' ? 'Quelle der Daten, z. B. Statistisches Bundesamt 2024' : 'Fundstelle, z. B. S. 42 oder Kapitel 3'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} aria-label="Fundstelle" />}
-      {draft.kind !== 'note' && draft.kind !== 'image' && <input type="url" value={draft.url} maxLength={2000} placeholder="https://…" onChange={(e) => setDraft({ ...draft, url: e.target.value })} aria-label="Link" />}
+      {!['note', 'image', 'audio', 'hand'].includes(draft.kind) && <input type="url" value={draft.url} maxLength={2000} placeholder="https://…" onChange={(e) => setDraft({ ...draft, url: e.target.value })} aria-label="Link" />}
       {draft.kind === 'image' && (
         <>
           <input value={draft.credit} maxLength={300} placeholder="Urheber: Fotografin, Zeichner, Rechteinhaber" onChange={(e) => setDraft({ ...draft, credit: e.target.value })} aria-label="Urheber" />
@@ -409,7 +510,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     url: d.kind === 'note' ? '' : d.url.trim(),
     rows: d.kind === 'data' ? d.rows : undefined,
     visibility: shared ? 'all' : d.visibility,
-    ...(d.kind === 'image' ? { credit: d.credit, license: d.license, origin: d.origin.trim(), url: d.url.trim(), ...(d.file ? { file: d.file } : {}) } : {}),
+    ...(d.kind === 'image' ? { credit: d.credit, license: d.license, origin: d.origin.trim(), url: d.url.trim() } : {}),
+    ...(FILE_KINDS[d.kind] && d.file ? { file: d.file } : {}),
   });
 
   /** neue Notizen aus Bildern bekommen die Stufe, die gerade im Filter steht */
@@ -439,8 +541,9 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   async function pickImage(f: File, d: Draft, put: (d: Draft) => void) {
     if (!scope) return;
     try {
+      if (FILE_KINDS[d.kind]?.what !== 'Bild' && FILE_KINDS[d.kind]?.what !== 'Foto') show('Wird hochgeladen …');
       const up = await uploadImage(id, scope, { file: f });
-      put({ ...d, file: up.file, preview: URL.createObjectURL(f), title: d.title || f.name.replace(/\.[a-z0-9]+$/i, '') });
+      put({ ...d, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
     } catch (e) {
       show(e instanceof Error ? e.message : 'Hochladen fehlgeschlagen');
     }
@@ -487,6 +590,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     license: n.license ?? '',
     origin: n.origin ?? '',
     preview: n.file ? noteFileUrl(id, n.id, n.updatedAt) : undefined,
+    mime: n.file?.mime,
   });
 
   function save() {
@@ -721,6 +825,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                       <button className="btn primary">Melden</button>
                     </form>
                   )}
+                  {n.file && n.kind !== 'image' && <Media className={c.picture} src={noteFileUrl(id, n.id, n.updatedAt)} mime={n.file.mime} kind={n.kind} title={n.title} />}
                   {n.kind === 'image' && n.file && <img className={c.picture} src={noteFileUrl(id, n.id, n.updatedAt)} alt={n.title} loading="lazy" draggable={false} />}
                   {n.title && <h3 className={c.title}>{n.title}</h3>}
                   {n.kind === 'image' && (

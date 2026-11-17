@@ -21,7 +21,19 @@ export const NOTE_FILE_TYPES: Record<string, string> = {
   'image/webp': 'webp',
   'image/avif': 'avif',
   'image/svg+xml': 'svg',
+  // Audio und Video (Konzept 8e.5): Aufnahme am Handy (MediaRecorder: WebM/Ogg/MP4) oder hochgeladen
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/flac': 'flac',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov',
 };
+
+/** Größte Bilddatei; Audio und Video richten sich nach maxFileMb des Projekts, höchstens MEDIA_MAX_BYTES */
+export const MEDIA_MAX_BYTES = 200 * 1024 * 1024; // wie der Parser für application/octet-stream (routes/materials.ts)
 export const noteFileAllowed = (mime: string) => Object.hasOwn(NOTE_FILE_TYPES, mime);
 
 export class NoteFiles {

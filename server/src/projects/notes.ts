@@ -11,7 +11,7 @@ import { noteFileAllowed, type NoteFiles } from './noteFiles.js';
 import { sniffImage } from './webImport.js';
 
 /** image: Bild mit Datei, Urheber, Lizenz und Ursprungsseite (Bilder per Ziehen/Einfügen, Wunsch Jo 17.11.2026); data: Tabelle */
-export const NOTE_KINDS = ['note', 'source', 'link', 'image', 'data'] as const;
+export const NOTE_KINDS = ['note', 'source', 'link', 'image', 'data', 'video', 'audio', 'hand'] as const;
 export const VISIBILITIES = ['private', 'group', 'all'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
 
@@ -89,11 +89,43 @@ export type NoteRow = Note & { projectId: number; scope: string; filePath: strin
 
 export class NoteError extends Error {}
 
-/** Typ einer hochgeladenen Notizdatei aus ihren ersten Bytes (für Audio/Video hier ergänzen) */
+/** Audio- und Videoformate an den ersten Bytes erkennen */
+export function sniffMedia(b: Buffer): string | null {
+  const at = (i: number, n: number) => b.subarray(i, i + n).toString('latin1');
+  if (b.length >= 4 && b.readUInt32BE(0) === 0x1a45dfa3) return 'video/webm'; // Matroska/WebM, auch reine Tonaufnahmen
+  if (b.length >= 4 && at(0, 4) === 'OggS') return 'audio/ogg';
+  if (b.length >= 4 && at(0, 4) === 'fLaC') return 'audio/flac';
+  if (b.length >= 12 && at(0, 4) === 'RIFF' && at(8, 4) === 'WAVE') return 'audio/wav';
+  if (b.length >= 3 && at(0, 3) === 'ID3') return 'audio/mpeg';
+  if (b.length >= 2 && b[0] === 0xff && (b[1] & 0xe0) === 0xe0 && (b[1] & 0x06) !== 0) return 'audio/mpeg';
+  if (b.length >= 12 && at(4, 4) === 'ftyp') {
+    const brand = at(8, 4);
+    if (/^avi[fs]/.test(brand)) return null; // Bild, siehe sniffImage
+    if (/^M4[AB] /.test(brand)) return 'audio/mp4';
+    if (brand === 'qt  ') return 'video/quicktime';
+    return 'video/mp4';
+  }
+  return null;
+}
+
+/** Typ einer hochgeladenen Notizdatei aus ihren ersten Bytes */
 export function sniffNoteFile(b: Buffer): string | null {
-  const m = sniffImage(b);
+  const m = sniffImage(b) ?? sniffMedia(b);
   return m && noteFileAllowed(m) ? m : null;
 }
+
+/** Passt die Datei zur Art? Bild und Handschrift: Bild; Audio: Ton (auch Tonaufnahme in WebM/MP4); Video: Video */
+export function fileFits(kind: string, mime: string): boolean {
+  if (kind === 'image' || kind === 'hand') return mime.startsWith('image/');
+  if (kind === 'audio') return mime.startsWith('audio/') || mime === 'video/webm' || mime === 'video/mp4';
+  if (kind === 'video') return mime.startsWith('video/');
+  return true;
+}
+
+/** Ausgeliefert wird eine Tonaufnahme im WebM/MP4-Behälter als audio/…, damit Browser sie im Audio-Element abspielen */
+export const serveMime = (kind: string, mime: string) => (kind === 'audio' && mime.startsWith('video/') ? 'audio/' + mime.slice(6) : mime);
+
+const NEEDS_FILE: Record<string, string> = { image: 'Bild fehlt', hand: 'Foto der Notiz fehlt', audio: 'Tonaufnahme fehlt' };
 
 const COLS = [
   'n.id', 'n.project_id', 'n.scope', 'n.user_id', 'u.name', 'n.kind', 'n.title', 'n.body', 'n.source', 'n.url', 'n.credit', 'n.license', 'n.origin',
@@ -152,7 +184,9 @@ export class Notes {
   async add(projectId: number, scope: string, userId: number, input: NoteInput, visibility: Visibility = 'group'): Promise<NoteRow> {
     const n = this.clean(input);
     const f = input.file ? await this.attach(projectId, scope, input.file) : NO_FILE;
-    if (n.kind === 'image' && !f.file_path) throw new NoteError('Bild fehlt');
+    if (NEEDS_FILE[n.kind] && !f.file_path) throw new NoteError(NEEDS_FILE[n.kind]);
+    if (n.kind === 'video' && !f.file_path && !n.url) throw new NoteError('Video oder Link fehlt');
+    if (f.file_mime && !fileFits(n.kind, f.file_mime)) throw new NoteError('Die Datei passt nicht zu dieser Art');
     if (!n.title && !n.body && !n.url && !n.data_json && !f.file_path) throw new NoteError('Leere Notiz');
     const at = this.now();
     const r = await this.db
@@ -169,7 +203,11 @@ export class Notes {
     let f: { file_path: string | null; file_mime: string | null; file_size: number | null } | null = null;
     if (input.file === null) f = NO_FILE;
     else if (input.file && input.file !== old.filePath) f = await this.attach(old.projectId, old.scope, input.file, id);
-    if (n.kind === 'image' && !(f ? f.file_path : old.filePath)) throw new NoteError('Bild fehlt');
+    const path = f ? f.file_path : old.filePath;
+    const mime = f ? f.file_mime : (old.file?.mime ?? null);
+    if (NEEDS_FILE[n.kind] && !path) throw new NoteError(NEEDS_FILE[n.kind]);
+    if (n.kind === 'video' && !path && !n.url) throw new NoteError('Video oder Link fehlt');
+    if (mime && !fileFits(n.kind, mime)) throw new NoteError('Die Datei passt nicht zu dieser Art');
     await this.db.updateTable('notes').set({ ...n, ...(f ?? {}), visibility, updated_at: this.now() }).where('id', '=', id).execute();
     if (f && old.filePath && f.file_path !== old.filePath) await this.files?.remove(old.filePath);
     return (await this.get(id))!;

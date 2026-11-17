@@ -11,7 +11,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
-import { Notes, sniffNoteFile } from '../projects/notes.js';
+import { MEDIA_MAX_BYTES } from '../projects/noteFiles.js';
+import { Notes, serveMime, sniffNoteFile } from '../projects/notes.js';
 import { SHARED, sharedTarget } from './notes.js';
 import { fetchImage, IMAGE_MAX_BYTES, imageInfo, readPage, type Allowed } from '../projects/webImport.js';
 import { isPublicAddress } from '../pinnwand/fetchMedia.js';
@@ -88,7 +89,7 @@ export function webImageRoutes(app: FastifyInstance, s: Services, allowed: Allow
   }
 
   const FromUrl = z.object({ scope: z.string().max(20), url: z.string().max(2000) });
-  app.post<{ Params: { id: string }; Querystring: { scope?: string; name?: string } }>('/api/projects/:id/notizen/datei', { bodyLimit: IMAGE_MAX_BYTES + 64 * 1024 }, async (req, reply) => {
+  app.post<{ Params: { id: string }; Querystring: { scope?: string; name?: string } }>('/api/projects/:id/notizen/datei', { bodyLimit: MEDIA_MAX_BYTES + 64 * 1024 }, async (req, reply) => {
     const a = await project(req, reply);
     if (!a || !s.notes.files) return a && reply.code(503).send({ error: 'Kein Ablageordner' });
     let scope: string, name: string, data: Buffer;
@@ -110,9 +111,15 @@ export function webImageRoutes(app: FastifyInstance, s: Services, allowed: Allow
     const target = await scopeOf(a.userId, a.projectId, scope);
     if (!target) return reply.code(403).send({ error: 'Kein Zugriff auf diese Notizen' });
     scope = target;
-    if (data.length > IMAGE_MAX_BYTES) return fail(reply, 'toolarge');
     const mime = sniffNoteFile(data);
-    if (!mime) return reply.code(415).send({ error: 'Nur Bilder (PNG, JPEG, GIF, WebP, AVIF, SVG)', code: 'type' });
+    if (!mime) return reply.code(415).send({ error: 'Nur Bilder (PNG, JPEG, GIF, WebP, AVIF, SVG), Ton (MP3, M4A, OGG, WAV, FLAC, WebM) und Video (MP4, WebM, MOV)', code: 'type' });
+    if (mime.startsWith('image/')) {
+      if (data.length > IMAGE_MAX_BYTES) return fail(reply, 'toolarge');
+    } else {
+      // Audio und Video: Grenze aus den Projekt-Einstellungen (maxFileMb)
+      const mb = (await s.projects.get(a.projectId))?.settings.maxFileMb ?? 25;
+      if (data.length > Math.min(mb * 1024 * 1024, MEDIA_MAX_BYTES)) return reply.code(413).send({ error: `Die Datei ist größer als ${mb} MB (Grenze in den Projekt-Einstellungen).`, code: 'toolarge' });
+    }
     const file = await s.notes.files.store(a.projectId, scope, name, data);
     return { file, mime, size: data.length };
   });
@@ -127,6 +134,17 @@ export function webImageRoutes(app: FastifyInstance, s: Services, allowed: Allow
     if (!n || !visible || n.projectId !== a.projectId || !n.filePath || !n.file) return reply.code(404).send({ error: 'Datei nicht gefunden' });
     const data = await s.notes.files?.read(n.filePath);
     if (!data) return reply.code(404).send({ error: 'Datei nicht gefunden' });
-    return sendImage(reply, data, n.file.mime, 'private, max-age=86400');
+    const mime = serveMime(n.kind, n.file.mime);
+    if (mime.startsWith('image/')) return sendImage(reply, data, mime, 'private, max-age=86400');
+    // Audio und Video mit Range, damit Spulen (und Safari überhaupt) funktioniert
+    void reply.header('Cache-Control', 'private, max-age=86400').header('X-Content-Type-Options', 'nosniff').header('Accept-Ranges', 'bytes').type(mime);
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    if (!m || (!m[1] && !m[2])) return reply.send(data);
+    let start = m[1] ? Number(m[1]) : data.length - Number(m[2]);
+    let end = m[1] && m[2] ? Number(m[2]) : data.length - 1;
+    start = Math.max(0, start);
+    end = Math.min(end, data.length - 1);
+    if (start > end) return reply.code(416).header('Content-Range', `bytes */${data.length}`).send();
+    return reply.code(206).header('Content-Range', `bytes ${start}-${end}/${data.length}`).send(data.subarray(start, end + 1));
   });
 }
