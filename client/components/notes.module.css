@@ -75,3 +75,14 @@
 .tableEdit td { padding: 1px; }
 .editor .tableEdit input { width: 140px; padding: 4px 6px; border-radius: 4px; }
 .tableEdit input.th { font-weight: 600; }
+
+/* Bilder (lib/imageDrop.ts, Wunsch Jo 17.11.2026) */
+.note.image { --tone: var(--office-slide, var(--ui-accent)); }
+.picture { display: block; max-width: 100%; max-height: 260px; margin: 6px 0 2px; border-radius: 6px; object-fit: contain; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+.missing { color: var(--danger); font-style: normal; }
+.imageEdit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.imageEdit img { max-width: 220px; max-height: 140px; border-radius: 6px; object-fit: contain; }
+.fromPage { flex: none; font-size: 16px; }
+.dropping { outline: 2px dashed var(--ui-accent); outline-offset: -6px; }
+.dropHint { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; background: var(--ui-accent); color: #fff; font-size: 13px; z-index: 6; pointer-events: none; max-width: 90%; text-align: center; }
+.wrap:focus { outline: none; }

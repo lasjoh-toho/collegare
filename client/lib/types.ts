@@ -96,6 +96,8 @@ export interface ProjectSettings {
   aiFeedback: boolean;
   aiDailyLimit: number;
   slidesImportStudents: boolean;
+  /** Lernende dürfen Bilder aus dem Netz direkt auf Folien ziehen (sonst erst über Notizen und Quellen) */
+  imagesDirect: boolean;
   folienDemo: number[];
   infos: Record<string, { text: string; start: boolean }>;
 }

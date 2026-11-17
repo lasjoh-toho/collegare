@@ -347,6 +347,12 @@ export default function Einstellungen() {
             onChange={(v) => set('slidesImportStudents', v)}
             hint="PowerPoint, Bento-Datei oder JSON in die Folien der Gruppe. Ein Import ersetzt die ganze Präsentation; ohne Häkchen sehen Lernende im Menü „Datei“ nur die Exporte."
           />
+          <Check
+            label="Lernende dürfen Bilder aus dem Netz direkt auf Folien ziehen"
+            checked={s.imagesDirect}
+            onChange={(v) => set('imagesDirect', v)}
+            hint="Ohne Häkchen legen Lernende Bilder aus anderen Tabs zuerst bei „Notizen und Quellen“ ab, dort mit Urheber, Lizenz und Ursprungsseite, und ziehen sie von dort auf die Folie. Mit Häkchen geht es auch direkt; die Quelle wird dann am Bild vermerkt. Lehrkräfte dürfen immer."
+          />
           <h4>Exportformate</h4>
           {Object.entries(EXPORT_LABELS).map(([k, l]) => (
             <Check key={k} label={l} checked={s.exportFormats[k]} disabled={f.exportFormats[k] === false} onChange={(v) => flag('exportFormats', k, v)} />
