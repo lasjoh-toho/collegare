@@ -3,35 +3,29 @@
  * Einfacher Karten-Editor (Konzept 8d.3): Titel und Text mit Absätzen, Fett/Kursiv, Listen, Link und Quelle. Der Text
  * erscheint wie auf der Karte (RichText, Menü über der Markierung); die Markdown-Ansicht gibt es nur für Profis und Notfälle. Beim Einsetzen gelten die Regeln des Projekts:
  * - Text aus dem Projekt (Herkunftsmarke, lib/clip.ts) ist immer erlaubt; die Herkunft lässt sich als Zuschreibung anfügen.
- * - Text von außen ab der Schwelle kommt ins Einfüge-Protokoll; je nach Einstellung wird er einfach eingesetzt, nach der
- *   Herkunft gefragt („später“ ist erlaubt) oder abgewiesen.
+ * - Text von außen kommt ins Einfüge-Protokoll (lib/usePasteGuard.ts); über der Grenze wird er je nach Einstellung
+ *   einfach eingesetzt, nach der Herkunft gefragt („später“ ist erlaubt) oder abgewiesen.
  */
-import { useEffect, useRef, useState, type ClipboardEvent } from 'react';
-import { post } from '@/lib/api';
-import { clipOrigin, type ClipMark } from '@/lib/clip';
-import { PASTE_ANSWERS, usePasteRules } from '@/lib/pasteRules';
+import { useEffect, useRef, useState } from 'react';
+import { usePasteRules } from '@/lib/pasteRules';
 import type { MapCard, MapOp } from '@/lib/types';
+import { usePasteGuard } from '@/lib/usePasteGuard';
 import e from './cardeditor.module.css';
+import { PasteNotes } from './PasteNotes';
 import { RichText } from './RichText';
 
 const MD_KEY = 'collegare-editor-markdown';
 
-type Answer = (typeof PASTE_ANSWERS)[number]['key'];
-const fmt = (ms: number) => new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: () => void; send: (op: MapOp) => Promise<boolean> }) {
   const rules = usePasteRules();
   const [title, setTitle] = useState(card.title);
   const [text, setText] = useState(card.text);
   const area = useRef<HTMLTextAreaElement>(null);
-  // Hinweise unter dem Text: Herkunft aus dem Projekt, abgewiesenes Einsetzen, Frage nach der Herkunft
-  const [origin, setOrigin] = useState<ClipMark | null>(null);
-  const [warn, setWarn] = useState('');
-  const [ask, setAsk] = useState<{ id: number | null; open: boolean } | null>(null);
-  const [answer, setAnswer] = useState<Answer>('quote');
-  const [note, setNote] = useState('');
-  const [cite, setCite] = useState(true);
   const isCard = card.kind === 'card';
+  // Hinweise unter dem Text: Herkunft aus dem Projekt, abgewiesenes Einsetzen, Frage nach der Herkunft
+  const guard = usePasteGuard(rules, `card:${card.id}`, () => `${isCard ? 'Karte' : 'Cluster'} „${(title || card.title || 'Ohne Titel').slice(0, 120)}“`);
+  const onPaste = guard.onPaste;
   const [markdown, setMarkdown] = useState(false);
   useEffect(() => {
     try {
@@ -92,39 +86,6 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
     });
   }
 
-  function onPaste(ev: ClipboardEvent<HTMLElement>) {
-    if (!rules) return;
-    const pasted = ev.clipboardData.getData('text/plain');
-    if (!pasted.trim()) return;
-    const from = clipOrigin(ev.clipboardData, rules.projectId, pasted);
-    setWarn('');
-    if (from) {
-      setOrigin(from);
-      return;
-    }
-    if ([...pasted].length < rules.threshold) return;
-    if (rules.outside === 'limit') {
-      ev.preventDefault();
-      setWarn(`Von außen lassen sich hier höchstens ${rules.threshold - 1} Zeichen auf einmal einsetzen. Schreib den Gedanken in eigenen Worten oder zitiere eine kurze Stelle mit Quelle.`);
-      return;
-    }
-    const place = `${isCard ? 'Karte' : 'Cluster'} „${(title || card.title || 'Ohne Titel').slice(0, 120)}“`;
-    setAnswer('quote');
-    setNote('');
-    setAsk({ id: null, open: rules.outside === 'ask' });
-    post<{ id: number }>(`/api/projects/${rules.projectId}/einfuegen`, { scope: rules.scope, place, text: pasted }).then(
-      (r) => setAsk((cur) => (cur ? { ...cur, id: r.id } : cur)),
-      () => setAsk((cur) => cur),
-    );
-  }
-
-  async function answerPaste() {
-    if (!rules || !ask) return;
-    if (ask.id !== null) await post(`/api/projects/${rules.projectId}/einfuegen/${ask.id}`, { answer, note: note.trim() }).catch(() => {});
-    if (answer === 'quote' && cite && note.trim()) source(note.trim());
-    setAsk(null);
-  }
-
   return (
     <div className="modal-bg" data-ui onPointerDown={(ev) => (ev.stopPropagation(), ev.target === ev.currentTarget && void save())}>
       <div
@@ -177,73 +138,12 @@ export function CardEditor({ card, onClose, send }: { card: MapCard; onClose: ()
           </div>
         )}
 
-        {origin && (
-          <div className={e.note} role="status">
-            <span>
-              Eingesetzt aus {origin.from} ({origin.by}, {fmt(origin.at)}).
-            </span>
-            {isCard && (
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setText((t) => (t.trimEnd() + `\n(aus ${origin.from}, ${origin.by})`).slice(0, 5000));
-                  setOrigin(null);
-                }}
-              >
-                Zuschreibung anfügen
-              </button>
-            )}
-            <button type="button" className="btn icon" onClick={() => setOrigin(null)} aria-label="Hinweis schließen">
-              ×
-            </button>
-          </div>
-        )}
-        {warn && (
-          <div className={`${e.note} ${e.warn}`} role="alert">
-            <span>{warn}</span>
-            <button type="button" className="btn icon" onClick={() => setWarn('')} aria-label="Hinweis schließen">
-              ×
-            </button>
-          </div>
-        )}
-        {ask && !ask.open && (
-          <div className={e.note} role="status">
-            <span>Eingesetzter Text von außen steht unter „Arbeitsprozess“.</span>
-            <button type="button" className="btn" onClick={() => setAsk({ ...ask, open: true })}>
-              Herkunft angeben
-            </button>
-            <button type="button" className="btn icon" onClick={() => setAsk(null)} aria-label="Hinweis schließen">
-              ×
-            </button>
-          </div>
-        )}
-        {ask?.open && (
-          <fieldset className={e.ask}>
-            <legend>Woher stammt der eingesetzte Text?</legend>
-            {PASTE_ANSWERS.map((o) => (
-              <label key={o.key} className={e.opt}>
-                <input type="radio" name="herkunft" checked={answer === o.key} onChange={() => setAnswer(o.key)} /> {o.label}
-              </label>
-            ))}
-            <input value={note} onChange={(ev) => setNote(ev.target.value)} maxLength={1000} placeholder={PASTE_ANSWERS.find((o) => o.key === answer)?.hint} aria-label="Angabe zur Herkunft" />
-            {answer === 'quote' && isCard && (
-              <label className={e.opt}>
-                <input type="checkbox" checked={cite} onChange={(ev) => setCite(ev.target.checked)} /> als „Quelle:“ in die Karte schreiben
-              </label>
-            )}
-            <div className="row">
-              <span className="muted">Du kannst auch später antworten (unter „Arbeitsprozess“).</span>
-              <span className="grow" />
-              <button type="button" className="btn" onClick={() => setAsk(null)}>
-                Später
-              </button>
-              <button type="button" className="btn primary" onClick={() => void answerPaste()}>
-                Angeben
-              </button>
-            </div>
-          </fieldset>
-        )}
+        <PasteNotes
+          g={guard}
+          onAttribute={isCard ? (o) => setText((t) => (t.trimEnd() + `\n(aus ${o.from}, ${o.by})`).slice(0, 5000)) : undefined}
+          onCite={isCard ? source : undefined}
+          citeLabel="Angeben und als Quelle in die Karte"
+        />
 
         <div className="row">
           <span className="muted">Strg+Enter speichert</span>

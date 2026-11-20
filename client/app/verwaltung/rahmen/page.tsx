@@ -78,6 +78,22 @@ export default function Rahmen() {
               </div>
             </section>
             <section className={`panel ${v.box}`}>
+              <h2>Ton und Video in den Notizen</h2>
+              <p className="muted" style={{ margin: '0 0 8px' }}>Aufnehmen und Hochladen braucht viel Speicher. Links auf Videos gehen immer.</p>
+              <label className={v.check}>
+                <input type="checkbox" checked={frame.notesAudio} onChange={(e) => change({ ...frame, notesAudio: e.target.checked })} />
+                <span>Ton aufnehmen und hochladen</span>
+              </label>
+              <label className={v.check}>
+                <input type="checkbox" checked={frame.notesVideo} onChange={(e) => change({ ...frame, notesVideo: e.target.checked })} />
+                <span>Video aufnehmen und hochladen</span>
+              </label>
+              <div className="field" style={{ maxWidth: 260 }}>
+                <label>Höchstgröße je Aufnahme (MB)</label>
+                <input type="number" min={1} max={200} value={frame.notesMediaMb} onChange={(e) => change({ ...frame, notesMediaMb: Math.max(1, Math.min(200, Number(e.target.value) || 1)) })} />
+              </div>
+            </section>
+            <section className={`panel ${v.box}`}>
               <h2>Export</h2>
               <Flags frame={frame} group="exportFormats" labels={EXPORT_LABELS} onChange={change} />
             </section>
