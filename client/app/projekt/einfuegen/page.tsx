@@ -86,7 +86,13 @@ export default function PastesPage() {
   const scopeTitle = (sc: string) => data?.scopes.find((x) => x.scope === sc)?.title ?? sc;
   const shown = (data?.pastes ?? []).filter((p) => !filter || p.scope === filter);
   const open = shown.filter((p) => !p.answer).length;
-  const rule = { allow: 'Einsetzen von außen ist erlaubt; über', ask: 'Beim Einsetzen von außen fragt Collegare über', limit: 'Von außen lassen sich nur bis' }[project.settings.pasteOutside];
+  const st = project.settings;
+  const rule = [
+    st.pasteLogAll !== false ? 'Jedes Einsetzen von außen steht hier.' : `Einsetzen von außen steht hier, sobald es je Karte bzw. Notiz ${st.pasteThreshold} Zeichen erreicht.`,
+    st.pasteOutside === 'ask' ? `Ab ${st.pasteThreshold} Zeichen je Karte bzw. Notiz fragt Collegare nach der Herkunft.` : st.pasteOutside === 'limit' ? `Mehr als ${st.pasteThreshold - 1} Zeichen je Karte bzw. Notiz lassen sich nicht einsetzen.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <ProjectShell
@@ -112,9 +118,7 @@ export default function PastesPage() {
         <h2 className={s.section}>Herkunft von Texten</h2>
         <p className={s.rule}>{CITE_RULE}</p>
         <p className="muted">
-          {project.settings.pasteLogAll !== false ? 'Jedes Einsetzen von außen steht hier. ' : ''}
-          {rule} {project.settings.pasteThreshold} Zeichen {project.settings.pasteOutside === 'limit' ? 'einsetzen' : project.settings.pasteOutside === 'ask' ? 'nach der Herkunft' : 'protokolliert'} (je Karte bzw. Notiz zusammengezählt). Kopieren innerhalb des Projekts
-          gehört nicht hierher. {teacher ? 'Das Protokoll ist eine Grundlage für das Gespräch, keine Bewertung.' : 'Offene Fragen kannst du hier beantworten.'}
+          {rule} Kopieren innerhalb des Projekts gehört nicht hierher. {teacher ? 'Das Protokoll ist eine Grundlage für das Gespräch, keine Bewertung.' : 'Offene Fragen kannst du hier beantworten.'}
         </p>
         {error && <div className="panel">{error}</div>}
         {data && !shown.length && <div className="panel">Noch keine Einträge.</div>}

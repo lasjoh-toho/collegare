@@ -104,3 +104,13 @@
 .split .list { border-left: 1px solid var(--line); }
 .lineCol { min-height: 0; overflow-y: auto; padding: 14px 16px 24px; }
 @media (max-width: 760px) { .split { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } .split .list { border-left: 0; } .lineCol { max-height: 55vh; } }
+/* Dritte Fassung (Wunsch Jo, 20. November 2026): Feld Material, Überschrift aus Markierung, Filter Quellenangabe */
+.material { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.material > input { flex: 1 1 220px; min-width: 0; }
+.material :global(.btn) { display: inline-flex; align-items: center; gap: 5px; height: 32px; }
+.editor .row > .titleInput { flex: 1; min-width: 0; font-weight: 600; }
+.selTitle { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missingBtn { color: var(--danger); }
+.visTag { display: inline-flex; align-items: center; color: var(--fg-muted); }
+.note[draggable='true']:not(.editing) { user-select: text; }
+.splitList { max-height: 46vh; }
