@@ -40,12 +40,15 @@ export async function mapScopes(s: Services, userId: number, projectId: number, 
     const own = board.mode === 'single' ? 'u' + userId : me?.groupId != null ? 'g' + me.groupId : null;
     scopes = scopes.filter((x) => x.scope === own);
   }
+  const project = await s.projects.get(projectId);
+  // Werkstatt der Lehrkraft (Werkzeuge im Portal): nur ihr eigener Bereich, keine Themen-Mindmap
+  const werkstatt = project?.kind === 'werkstatt';
   if (role === 'teacher') {
     const me = await s.users.byId(userId);
-    scopes.push({ scope: testScope(userId), title: 'Test / Demo (nur für mich)', people: [{ id: userId, name: me?.name ?? 'Lehrkraft' }], test: true });
+    scopes.push({ scope: testScope(userId), title: werkstatt ? 'Meine Werkstatt' : 'Test / Demo (nur für mich)', people: [{ id: userId, name: me?.name ?? 'Lehrkraft' }], test: true });
   }
-  const settings = withTopic ? (await s.projects.get(projectId))?.settings : undefined;
-  if (withTopic && settings && settings.phases.topic?.state !== 'off') {
+  const settings = withTopic && !werkstatt ? project?.settings : undefined;
+  if (settings && settings.phases.topic?.state !== 'off') {
     scopes.unshift({ scope: TOPIC, title: 'Thema (alle)', people: people(() => true), readOnly: role === 'student' && settings.topicMapEdit === 'teacher' });
   }
   return { role, scopes };

@@ -10,7 +10,7 @@ export class Contexts {
     return Number(res.insertId);
   }
 
-  async create(kind: 'school' | 'course', parentId: number, title: string): Promise<number> {
+  async create(kind: 'school' | 'course' | 'werkstatt', parentId: number | null, title: string): Promise<number> {
     const res = await this.db.insertInto('contexts').values({ kind, parent_id: parentId, title, lti_platform_id: null, lti_context_id: null, nrps_url: null, created_at: this.now() }).executeTakeFirstOrThrow();
     return Number(res.insertId);
   }

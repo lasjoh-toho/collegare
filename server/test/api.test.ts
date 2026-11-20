@@ -210,6 +210,41 @@ describe('Anmeldung', () => {
     expect((await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`)).status).toBe(401);
   });
 
+  it('Werkstatt: eigene Materialien mit Schlagworten, als Kopie für eine Gruppe oder Einzelne ins Projekt übernehmen', async () => {
+    const { at, t, project, ids } = await setup();
+    const w = (await call('GET', '/api/werkstatt', t)).json.projectId as number;
+    expect((await call('GET', '/api/werkstatt', t)).json.projectId).toBe(w);
+    // erscheint in keiner Projektliste und zählt nicht als offenes Projekt
+    expect((await call('GET', '/api/projects', t)).json.projects.map((p: J) => p.id)).toEqual([project]);
+    expect((await call('GET', '/api/admin/teachers', at)).json.teachers.find((x: J) => x.name === 'Frau Müller').projects).toBe(1);
+    // die Administration sieht fremde Werkstätten nicht
+    expect((await call('GET', `/api/projects/${w}/materials`, at)).status).toBe(404);
+    const pg = (await call('POST', `/api/projects/${w}/materials/page`, t, { title: 'Quellenarbeit', body: 'Text' })).json.id;
+    expect((await call('PATCH', `/api/projects/${w}/materials/${pg}`, t, { tags: ['Einführung', ' Quellen ', 'Einführung'] })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${w}/materials`, t)).json.materials[0]).toMatchObject({ title: 'Quellenarbeit', tags: ['Einführung', 'Quellen'], audience: null });
+    const ziele = (await call('GET', '/api/werkstatt/ziele', t)).json.projects;
+    expect(ziele.map((p: J) => p.id)).toEqual([project]);
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'A' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    const cp = await call('POST', `/api/projects/${w}/materials/${pg}/kopieren`, t, { to: project, visible: true, audience: { groups: [g1], users: [ids[2], 99999] } });
+    expect(cp.status).toBe(200);
+    const inProject = (await call('GET', `/api/projects/${project}/materials`, t)).json.materials[0];
+    expect(inProject).toMatchObject({ title: 'Quellenarbeit', sourceId: pg, audience: { groups: [g1], users: [ids[2]] } });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: ids })).json.codes as J[];
+    const tok = async (i: number) => (await call('POST', '/api/access/redeem', undefined, { code: codes[i].code })).json.token as string;
+    const [anna, ben, clara] = [await tok(0), await tok(1), await tok(2)];
+    expect((await call('GET', `/api/projects/${project}/materials`, anna)).json.materials).toHaveLength(1);
+    expect((await call('GET', `/api/projects/${project}/materials`, ben)).json.materials).toHaveLength(0);
+    expect((await call('GET', `/api/projects/${project}/materials/${cp.json.id}`, ben)).status).toBe(404);
+    expect((await call('GET', `/api/projects/${project}/materials/${cp.json.id}`, clara)).json.page).toMatchObject({ body: 'Text' });
+    // Lernende kommen nicht in die Werkstatt, und ins fremde Projekt kopiert niemand
+    expect((await call('GET', `/api/projects/${w}/materials`, anna)).status).toBe(403);
+    expect((await call('POST', `/api/projects/${w}/materials/${pg}/kopieren`, t, { to: w + 1000 })).status).toBe(403);
+    // für alle: Auswahl leeren
+    expect((await call('PATCH', `/api/projects/${project}/materials/${cp.json.id}`, t, { audience: null })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/materials`, ben)).json.materials).toHaveLength(1);
+  });
+
   it('sperrt nach zu vielen Fehlversuchen', async () => {
     await admin();
     for (let i = 0; i < 10; i++) expect((await call('POST', '/api/auth/login', undefined, { login: 'admin', password: 'falsch' })).status).toBe(401);

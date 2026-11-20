@@ -278,6 +278,9 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           </div>
         )}
 
+        {project.werkstatt ? (
+          <WerkstattNav project={project} me={me} where={where} />
+        ) : (
         <nav className={sh.phases} aria-label="Phasen">
           <a className={`${sh.overview} ${phase === null && where === 'Übersicht' ? sh.here : ''}`} href={href(`/projekt/?id=${project.id}`)}>
             <Icon name="grid" size={16} /> Übersicht aller Oberflächen
@@ -328,6 +331,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             );
           })}
         </nav>
+        )}
 
         <div className={sh.menuFoot}>
           <ThemeSwitch />
@@ -437,5 +441,39 @@ function HistoryPanel({ undo, onClose }: { undo: UndoSpec; onClose: () => void }
         </ol>
       )}
     </div>
+  );
+}
+
+/**
+ * Seitenmenü in der Werkstatt einer Lehrkraft (Jo, 20. November 2026): statt der Phasen die Werkzeuge und der Weg zurück
+ * zu „Werkzeuge“ und „Materialien“ im Portal.
+ */
+function WerkstattNav({ project, me, where }: { project: ProjectView; me: Me; where: string }) {
+  const tools: [string, string, string, string][] = [
+    ['Mindmap', 'map', `/projekt/mindmap/?id=${project.id}&bereich=t${me.id}`, 'Mindmap'],
+    ['Notizen und Quellen', 'notes', `/projekt/notizen/?id=${project.id}&bereich=t${me.id}`, 'Notizen und Quellen'],
+    ['Textabschnitte', 'doc', `/projekt/ausarbeitung/?id=${project.id}&bereich=t${me.id}`, 'Ausarbeitung'],
+    ['Pinnwand-Präsentation', 'present', `/projekt/pinnwand/?id=${project.id}&bereich=t${me.id}`, 'Pinnwand'],
+    ['Folien-Präsentation', 'slides', `/projekt/folien/?id=${project.id}&bereich=t${me.id}`, 'Folien'],
+  ];
+  return (
+    <nav className={sh.phases} aria-label="Werkzeuge">
+      <a className={sh.overview} href={href('/werkzeuge/')}>
+        <Icon name="tools" size={16} /> Alle Werkzeuge
+      </a>
+      <a className={`${sh.overview} ${where === 'Material' ? sh.here : ''}`} href={href('/materialien/')}>
+        <Icon name="library" size={16} /> Materialien
+      </a>
+      {tools.map(([title, icon, path, w]) => (
+        <a key={title} className={`${sh.phase} ${where === w ? sh.here : ''}`} href={href(path)}>
+          <span className={sh.phaseIcon}>
+            <Icon name={icon} size={17} />
+          </span>
+          <span className={sh.phaseText}>
+            <span className={sh.phaseHead}>{title}</span>
+          </span>
+        </a>
+      ))}
+    </nav>
   );
 }

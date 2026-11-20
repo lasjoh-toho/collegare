@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
-import { MaterialError } from '../projects/materials.js';
+import { MaterialError, reaches, type Audience, type Viewer } from '../projects/materials.js';
 import type { Services } from '../services.js';
 
 /**
@@ -19,10 +19,62 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     if (need === 'teacher' && role !== 'teacher') return void reply.code(403).send({ error: 'Nur für Lehrkräfte' });
     return { userId: sess.userId, projectId, role };
   }
+  /** Wer liest: Lehrkräfte alles, Lernende mit ihrer Gruppe (für Material nur für bestimmte Gruppen oder Personen) */
+  async function viewer(a: { userId: number; projectId: number; role: string }): Promise<Viewer> {
+    if (a.role === 'teacher') return { teacher: true };
+    const board = await s.projects.board(a.projectId);
+    return { teacher: false, userId: a.userId, groupId: board.members.find((m) => m.userId === a.userId)?.groupId ?? null };
+  }
+  const AudienceBody = z.object({ groups: z.array(z.number().int()).max(200), users: z.array(z.number().int()).max(500) }).nullable();
+  /** nur Gruppen und Personen, die es im Projekt gibt */
+  async function cleanAudience(projectId: number, a: Audience | null): Promise<Audience | null> {
+    if (!a) return null;
+    const board = await s.projects.board(projectId);
+    const groups = a.groups.filter((g) => board.groups.some((x) => x.id === g));
+    const users = a.users.filter((u) => board.members.some((x) => x.userId === u));
+    return groups.length || users.length ? { groups, users } : null;
+  }
+
   const fail = (reply: FastifyReply, e: unknown) => {
     if (e instanceof MaterialError) return reply.code(e.status).send({ error: e.message });
     throw e;
   };
+
+  /** Werkstatt der Lehrkraft (Werkzeuge und Materialien im Portal); wird beim ersten Aufruf angelegt */
+  app.get('/api/werkstatt', async (req, reply) => {
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    if (sess.projectId !== null) return reply.code(403).send({ error: 'Die Werkstatt gibt es nur im Portal, nicht beim Start aus einem Projekt' });
+    const teaches = await s.db
+      .selectFrom('memberships')
+      .innerJoin('contexts', 'contexts.id', 'memberships.context_id')
+      .select('contexts.id')
+      .where('memberships.user_id', '=', sess.userId)
+      .where('memberships.role', 'in', ['teacher', 'admin'])
+      .where('contexts.kind', '!=', 'werkstatt')
+      .executeTakeFirst();
+    if (!teaches) return reply.code(403).send({ error: 'Nur für Lehrkräfte' });
+    return { projectId: await s.projects.werkstatt(sess.userId) };
+  });
+
+  /** Ziele zum Übernehmen: eigene Projekte als Lehrkraft mit ihren Gruppen und Lernenden */
+  app.get('/api/werkstatt/ziele', async (req, reply) => {
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    const list = (await s.projects.listFor(sess.userId)).filter((p) => p.role === 'teacher' && (sess.projectId === null || p.id === sess.projectId));
+    const out = [];
+    for (const p of list) {
+      const b = await s.projects.board(p.id);
+      out.push({
+        id: p.id,
+        title: p.title,
+        mode: p.mode,
+        groups: b.groups.map((g, i) => ({ id: g.id, title: g.title || `Gruppe ${i + 1}` })),
+        members: b.members.map((m) => ({ id: m.userId, name: m.name, groupId: m.groupId })),
+      });
+    }
+    return { projects: out };
+  });
 
   // Dateien kommen als rohe Bytes (Name und Titel in der Adresse), ohne Multipart-Abhängigkeit
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 200 * 1024 * 1024 }, (_req, body, done) => done(null, body));
@@ -30,7 +82,7 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
   app.get<{ Params: { id: string } }>('/api/projects/:id/materials', async (req, reply) => {
     const a = await member(req, reply, 'member');
     if (!a) return;
-    return { materials: await s.materials.list(a.projectId, a.role !== 'teacher'), canEdit: a.role === 'teacher' };
+    return { materials: await s.materials.list(a.projectId, await viewer(a)), canEdit: a.role === 'teacher' };
   });
 
   // Lernseite: bis 4 MB Text (eingebettete Bilder als data:-Adressen eingeschlossen)
@@ -50,7 +102,7 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     const a = await member(req, reply, 'member');
     if (!a) return;
     const p = await s.materials.page(a.projectId, Number(req.params.mid));
-    if (!p || (!p.visible && a.role !== 'teacher')) return reply.code(404).send({ error: 'Seite nicht gefunden' });
+    if (!p || !reaches(p, await viewer(a))) return reply.code(404).send({ error: 'Seite nicht gefunden' });
     return { page: p, canEdit: a.role === 'teacher' };
   });
 
@@ -85,7 +137,7 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     }
   });
 
-  const Patch = z.object({ visible: z.boolean().optional(), title: z.string().max(200).optional(), note: z.string().max(5000).optional(), body: z.string().max(4_000_000).optional(), order: z.array(z.number().int()).max(500).optional() });
+  const Patch = z.object({ visible: z.boolean().optional(), title: z.string().max(200).optional(), note: z.string().max(5000).optional(), body: z.string().max(4_000_000).optional(), order: z.array(z.number().int()).max(500).optional(), tags: z.array(z.string().max(60)).max(30).optional(), audience: AudienceBody.optional() });
   app.patch<{ Params: { id: string; mid: string } }>('/api/projects/:id/materials/:mid', async (req, reply) => {
     const a = await member(req, reply, 'teacher');
     if (!a) return;
@@ -93,9 +145,33 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     if (!body.success) return reply.code(400).send({ error: 'Ungültige Änderung' });
     try {
       if (body.data.order) await s.materials.reorder(a.projectId, body.data.order);
-      await s.materials.update(a.projectId, Number(req.params.mid), { title: body.data.title, note: body.data.note, body: body.data.body, visible: body.data.visible });
+      const audience = body.data.audience === undefined ? undefined : await cleanAudience(a.projectId, body.data.audience);
+      await s.materials.update(a.projectId, Number(req.params.mid), { title: body.data.title, note: body.data.note, body: body.data.body, visible: body.data.visible, tags: body.data.tags, audience });
+      if (body.data.audience !== undefined) await s.audit.append({ actorId: a.userId, action: 'material.audience', projectId: a.projectId, data: { id: Number(req.params.mid), audience: audience ?? 'alle' } });
       if (body.data.visible !== undefined) await s.audit.append({ actorId: a.userId, action: body.data.visible ? 'material.shown' : 'material.hidden', projectId: a.projectId, data: { id: Number(req.params.mid) } });
       return { ok: true };
+    } catch (e) {
+      return fail(reply, e);
+    }
+  });
+
+  /**
+   * Übernehmen (Jo, 20. November 2026): Material aus den „Materialien“ (Werkstatt) als Kopie in ein Projekt, z. B. als
+   * einführendes Material, für alle Lernenden, einzelne Gruppen oder einzelne Personen. Lehrkraft in beiden Projekten.
+   */
+  const CopyBody = z.object({ to: z.number().int(), visible: z.boolean().default(false), audience: AudienceBody.default(null) });
+  app.post<{ Params: { id: string; mid: string } }>('/api/projects/:id/materials/:mid/kopieren', async (req, reply) => {
+    const a = await member(req, reply, 'teacher');
+    if (!a) return;
+    const body = CopyBody.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Zielprojekt angeben' });
+    const src = await s.materials.one(Number(req.params.mid));
+    if (!src || src.projectId !== a.projectId) return reply.code(404).send({ error: 'Material nicht gefunden' });
+    if ((await s.projects.roleOf(a.userId, body.data.to)) !== 'teacher') return reply.code(403).send({ error: 'Nur in eigene Projekte' });
+    try {
+      const id = await s.materials.copy(src.id, body.data.to, a.userId, { visible: body.data.visible, audience: await cleanAudience(body.data.to, body.data.audience) });
+      await s.audit.append({ actorId: a.userId, action: 'material.copied', projectId: body.data.to, data: { id, from: src.id, fromProject: a.projectId } });
+      return { id };
     } catch (e) {
       return fail(reply, e);
     }
@@ -114,7 +190,7 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     const a = await member(req, reply, 'member');
     if (!a) return;
     const f = await s.materials.file(Number(req.params.mid));
-    if (!f || f.projectId !== a.projectId || (!f.visible && a.role !== 'teacher')) return reply.code(404).send({ error: 'Datei nicht gefunden' });
+    if (!f || f.projectId !== a.projectId || !reaches(f, await viewer(a))) return reply.code(404).send({ error: 'Datei nicht gefunden' });
     const inline = !req.query.laden && /^(application\/pdf|image\/|video\/|audio\/|text\/plain)/.test(f.mime);
     reply
       .header('content-type', f.mime)

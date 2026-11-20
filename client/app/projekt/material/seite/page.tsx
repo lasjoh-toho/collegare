@@ -258,8 +258,8 @@ export default function SeitePage() {
       fill={editing}
       actions={
         <>
-          <a className="btn" href={href(`/projekt/material/?id=${id}`)}>
-            ← Material
+          <a className="btn" href={href(project.werkstatt ? '/materialien/' : `/projekt/material/?id=${id}`)}>
+            ← {project.werkstatt ? 'Materialien' : 'Material'}
           </a>
           {canEdit && (
             <button className={`btn ${editing ? 'on' : ''}`} onClick={() => setEditing((e) => !e)}>

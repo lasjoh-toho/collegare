@@ -111,6 +111,8 @@ export interface ProjectView {
   role: 'teacher' | 'student';
   myGroupId: number | null;
   board: Board;
+  /** Werkstatt der Lehrkraft: Werkzeuge ausprobieren und Materialien sammeln, ohne Lernende */
+  werkstatt?: boolean;
   codesValidUntil?: Record<number, number>;
 }
 

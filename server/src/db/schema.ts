@@ -5,7 +5,8 @@ type Ms = number;
 
 export interface ContextsTable {
   id: Generated<number>;
-  kind: 'system' | 'school' | 'course';
+  /** werkstatt: eigener Kontext einer Lehrkraft für ihre Werkstatt (ohne Elternkontext, auch die Administration sieht ihn nicht) */
+  kind: 'system' | 'school' | 'course' | 'werkstatt';
   parent_id: number | null;
   title: string;
   lti_platform_id: number | null;
@@ -101,6 +102,8 @@ export interface ProjectsTable {
   context_id: number;
   title: string;
   mode: 'group' | 'single';
+  /** werkstatt = Werkzeuge und Materialien einer Lehrkraft, erscheint in keiner Projektliste */
+  kind: Generated<'project' | 'werkstatt'>;
   settings: string;
   created_by: number;
   created_at: Ms;
@@ -227,6 +230,12 @@ export interface MaterialsTable {
   position: number;
   /** 1 = Lernende sehen es, 0 = nur Lehrkräfte (in Vorbereitung) */
   visible: Generated<number>;
+  /** Schlagworte, durch Komma getrennt */
+  tags: Generated<string>;
+  /** Für wen: null = alle Lernenden des Projekts, sonst JSON {"groups":[…],"users":[…]} */
+  audience: string | null;
+  /** Herkunft: Material aus den „Materialien“ der Lehrkraft, aus dem dieses kopiert wurde */
+  source_id: number | null;
   created_by: number;
   created_at: Ms;
 }

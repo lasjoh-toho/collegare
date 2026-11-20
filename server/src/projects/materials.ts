@@ -43,24 +43,110 @@ export interface MaterialView {
   position: number;
   /** Für Lernende freigegeben */
   visible: boolean;
+  /** Schlagworte zum Sortieren und Suchen */
+  tags: string[];
+  /** null = alle Lernenden des Projekts, sonst nur diese Gruppen und Personen */
+  audience: Audience | null;
+  /** kopiert aus diesem Material der „Materialien“ */
+  sourceId: number | null;
   createdAt: number;
 }
+
+export interface Audience {
+  groups: number[];
+  users: number[];
+}
+
+/** Wer liest: Lehrkräfte sehen alles, Lernende nur Freigegebenes für alle, ihre Gruppe oder sich selbst. */
+export type Viewer = { teacher: true } | { teacher: false; userId: number; groupId: number | null };
+
+export const parseTags = (raw: string): string[] => [...new Set(raw.split(',').map((t) => t.trim()).filter(Boolean))];
+export const joinTags = (tags: string[]): string =>
+  [...new Set(tags.map((t) => t.replace(/,/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 20).join(', ').slice(0, 1000);
+
+export function parseAudience(raw: string | null): Audience | null {
+  if (!raw) return null;
+  try {
+    const a = JSON.parse(raw) as Partial<Audience>;
+    const groups = Array.isArray(a.groups) ? a.groups.filter(Number.isInteger) : [];
+    const users = Array.isArray(a.users) ? a.users.filter(Number.isInteger) : [];
+    return groups.length || users.length ? { groups, users } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Darf diese Person (Lernende) das Material sehen? */
+export function reaches(m: { visible: boolean; audience: Audience | null }, v: Viewer): boolean {
+  if (v.teacher) return true;
+  if (!m.visible) return false;
+  if (!m.audience) return true;
+  return m.audience.users.includes(v.userId) || (v.groupId !== null && m.audience.groups.includes(v.groupId));
+}
+
+const COLS = ['id', 'kind', 'title', 'url', 'note', 'file_name', 'mime', 'size', 'position', 'visible', 'tags', 'audience', 'source_id', 'created_at'] as const;
+type Row = { id: number; kind: MaterialView['kind']; title: string; url: string | null; note: string; file_name: string | null; mime: string | null; size: number | null; position: number; visible: number; tags: string; audience: string | null; source_id: number | null; created_at: number };
+const view = (r: Row): MaterialView => ({
+  id: r.id,
+  kind: r.kind,
+  title: r.title,
+  url: r.url,
+  note: r.note,
+  fileName: r.file_name,
+  mime: r.mime,
+  size: r.size,
+  position: r.position,
+  visible: !!r.visible,
+  tags: parseTags(r.tags ?? ''),
+  audience: parseAudience(r.audience),
+  sourceId: r.source_id ?? null,
+  createdAt: Number(r.created_at),
+});
 
 export class Materials {
   constructor(private db: Db, private now: () => number = Date.now) {}
 
-  /** Alles des Projekts; mit onlyVisible nur, was Lernende sehen dürfen */
-  async list(projectId: number, onlyVisible = false): Promise<MaterialView[]> {
-    let q = this.db
-      .selectFrom('materials')
-      .select(['id', 'kind', 'title', 'url', 'note', 'file_name', 'mime', 'size', 'position', 'visible', 'created_at'])
-      .where('project_id', '=', projectId);
-    if (onlyVisible) q = q.where('visible', '=', 1);
-    const rows = await q
-      .orderBy('position')
-      .orderBy('id')
-      .execute();
-    return rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, url: r.url, note: r.note, fileName: r.file_name, mime: r.mime, size: r.size, position: r.position, visible: !!r.visible, createdAt: Number(r.created_at) }));
+  /** Material des Projekts, soweit die Person es sehen darf (Lehrkräfte alles) */
+  async list(projectId: number, viewer: Viewer = { teacher: true }): Promise<MaterialView[]> {
+    const rows = await this.db.selectFrom('materials').select([...COLS]).where('project_id', '=', projectId).orderBy('position').orderBy('id').execute();
+    return rows.map((r) => view(r as Row)).filter((m) => reaches(m, viewer));
+  }
+
+  async one(id: number): Promise<(MaterialView & { projectId: number }) | null> {
+    const r = await this.db.selectFrom('materials').select([...COLS, 'project_id']).where('id', '=', id).executeTakeFirst();
+    return r ? { ...view(r as Row), projectId: r.project_id } : null;
+  }
+
+  /**
+   * Material in ein anderes Projekt übernehmen (aus den „Materialien“ der Lehrkraft als einführendes Material):
+   * eine Kopie mit allem Inhalt, damit spätere Änderungen in der Werkstatt laufende Projekte nicht verändern.
+   */
+  async copy(id: number, toProjectId: number, by: number, opts: { visible: boolean; audience: Audience | null }): Promise<number> {
+    const r = await this.db.selectFrom('materials').selectAll().where('id', '=', id).executeTakeFirst();
+    if (!r) throw new MaterialError('Material nicht gefunden', 404);
+    const res = await this.db
+      .insertInto('materials')
+      .values({
+        project_id: toProjectId,
+        kind: r.kind,
+        title: r.title,
+        url: r.url,
+        body: r.body,
+        note: r.note,
+        file_name: r.file_name,
+        mime: r.mime,
+        size: r.size,
+        data: r.data,
+        position: await this.nextPosition(toProjectId),
+        visible: opts.visible ? 1 : 0,
+        tags: r.tags ?? '',
+        audience: opts.audience ? JSON.stringify(opts.audience) : null,
+        source_id: r.id,
+        created_by: by,
+        created_at: this.now(),
+      })
+      .executeTakeFirstOrThrow();
+    return Number(res.insertId);
   }
 
   private async nextPosition(projectId: number) {
@@ -110,11 +196,13 @@ export class Materials {
   async page(projectId: number, id: number): Promise<(MaterialView & { body: string }) | null> {
     const r = await this.db.selectFrom('materials').selectAll().where('id', '=', id).where('project_id', '=', projectId).where('kind', '=', 'page').executeTakeFirst();
     if (!r) return null;
-    return { id: r.id, kind: 'page', title: r.title, url: null, note: r.note, fileName: null, mime: null, size: r.size, position: r.position, visible: !!r.visible, createdAt: Number(r.created_at), body: r.body ?? '' };
+    return { ...view(r as unknown as Row), body: r.body ?? '' };
   }
 
-  async update(projectId: number, id: number, patch: { title?: string; note?: string; position?: number; body?: string; visible?: boolean }) {
+  async update(projectId: number, id: number, patch: { title?: string; note?: string; position?: number; body?: string; visible?: boolean; tags?: string[]; audience?: Audience | null }) {
     const set: Record<string, unknown> = {};
+    if (patch.tags !== undefined) set.tags = joinTags(patch.tags);
+    if (patch.audience !== undefined) set.audience = patch.audience && (patch.audience.groups.length || patch.audience.users.length) ? JSON.stringify(patch.audience) : null;
     if (patch.visible !== undefined) set.visible = patch.visible ? 1 : 0;
     if (patch.body !== undefined) {
       set.body = patch.body;
@@ -137,9 +225,9 @@ export class Materials {
     await this.db.deleteFrom('materials').where('id', '=', id).where('project_id', '=', projectId).execute();
   }
 
-  async file(id: number): Promise<{ projectId: number; name: string; mime: string; data: Buffer; visible: boolean } | null> {
-    const r = await this.db.selectFrom('materials').select(['project_id', 'file_name', 'mime', 'data', 'visible']).where('id', '=', id).executeTakeFirst();
+  async file(id: number): Promise<{ projectId: number; name: string; mime: string; data: Buffer; visible: boolean; audience: Audience | null } | null> {
+    const r = await this.db.selectFrom('materials').select(['project_id', 'file_name', 'mime', 'data', 'visible', 'audience']).where('id', '=', id).executeTakeFirst();
     if (!r?.data || !r.mime) return null;
-    return { projectId: r.project_id, name: r.file_name ?? 'datei', mime: r.mime, data: Buffer.from(r.data), visible: !!r.visible };
+    return { projectId: r.project_id, name: r.file_name ?? 'datei', mime: r.mime, data: Buffer.from(r.data), visible: !!r.visible, audience: parseAudience(r.audience) };
   }
 }

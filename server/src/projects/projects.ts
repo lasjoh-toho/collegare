@@ -51,6 +51,35 @@ export class Projects {
     return Number(res.insertId);
   }
 
+  /**
+   * Werkstatt einer Lehrkraft (Jo, 20. November 2026): ein verborgenes Projekt in einem eigenen Kontext ohne
+   * Elternkontext, in dem sie die Werkzeuge an eigenem Unterrichtsmaterial übt und ihre „Materialien“ sammelt.
+   * Lernende gibt es darin nie; die Werkzeuge laufen im Testbereich t<id>.
+   */
+  async werkstatt(userId: number): Promise<number> {
+    const found = await this.db
+      .selectFrom('projects')
+      .innerJoin('memberships', 'memberships.context_id', 'projects.context_id')
+      .select('projects.id')
+      .where('projects.kind', '=', 'werkstatt')
+      .where('projects.created_by', '=', userId)
+      .where('memberships.user_id', '=', userId)
+      .orderBy('projects.id')
+      .executeTakeFirst();
+    if (found) return found.id;
+    const ctx = await this.db
+      .insertInto('contexts')
+      .values({ kind: 'werkstatt', parent_id: null, title: 'Werkstatt', lti_platform_id: null, lti_context_id: null, nrps_url: null, created_at: this.now() })
+      .executeTakeFirstOrThrow();
+    const contextId = Number(ctx.insertId);
+    await this.db.insertInto('memberships').values({ user_id: userId, context_id: contextId, role: 'teacher', created_at: this.now() }).execute();
+    const res = await this.db
+      .insertInto('projects')
+      .values({ context_id: contextId, title: 'Werkstatt', mode: 'single', kind: 'werkstatt', settings: JSON.stringify(DEFAULT_SETTINGS), created_by: userId, created_at: this.now(), archived_at: null })
+      .executeTakeFirstOrThrow();
+    return Number(res.insertId);
+  }
+
   async get(id: number) {
     const p = await this.db.selectFrom('projects').selectAll().where('id', '=', id).executeTakeFirst();
     if (!p) return undefined;
@@ -84,7 +113,7 @@ export class Projects {
       frontier = kids.map((k) => k.id).filter((k) => !ctxIds.has(k));
     }
     const asTeacher = ctxIds.size
-      ? await this.db.selectFrom('projects').selectAll().where('context_id', 'in', [...ctxIds]).where('archived_at', 'is', null).orderBy('created_at', 'desc').execute()
+      ? await this.db.selectFrom('projects').selectAll().where('context_id', 'in', [...ctxIds]).where('archived_at', 'is', null).where('kind', '=', 'project').orderBy('created_at', 'desc').execute()
       : [];
     const asStudent = await this.db
       .selectFrom('projects')
@@ -92,6 +121,7 @@ export class Projects {
       .selectAll('projects')
       .where('group_members.user_id', '=', userId)
       .where('projects.archived_at', 'is', null)
+      .where('projects.kind', '=', 'project')
       .execute();
     const seen = new Set<number>();
     const out: { id: number; title: string; mode: string; contextId: number; role: 'teacher' | 'student'; createdAt: number }[] = [];

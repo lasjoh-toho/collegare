@@ -6,7 +6,9 @@
  *
  * Geordnet nach der Rolle im Projekt (Wunsch Jo, 14. November 2026): erst Allgemeines, dann je Phase ein Abschnitt in
  * der Reihenfolge des Seitenmenüs. Fährt man im Seitenmenü über eine Phase, leuchten ihre Kacheln auf. Was Lernende
- * (noch) nicht sehen, trägt für die Lehrkraft das Zeichen „nur du“; ganz unten liegt ihr Testbereich ohne Gruppen.
+ * (noch) nicht sehen, trägt für die Lehrkraft das Zeichen „nur du“. Den Bereich „Nur für dich“ mit dem Testbereich gibt es
+ * nicht mehr (Jo, 20. November 2026): Ausprobieren und Material vorbereiten geht im Portal unter „Werkzeuge“ und
+ * „Materialien“; Korrektur und Einstellungen stehen für die Lehrkraft bei „Allgemein“.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
@@ -38,7 +40,8 @@ export default function Projekt() {
   const load = useCallback(() => {
     if (!Number.isInteger(id)) return;
     get<ProjectView>(`/api/projects/${id}`)
-      .then(setProject)
+      // die Werkstatt der Lehrkraft hat keine Übersicht, ihre Werkzeuge stehen im Portal
+      .then((p) => (p.werkstatt ? location.replace(href('/werkzeuge/')) : setProject(p)))
       .catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
     // Zustand der Kacheln (Gliederung übernommen, Abschnitte fertig); ohne Gruppe einfach leer
     get<DocSummary>(`/api/projects/${id}/documents`).then(setDocs, () => setDocs(null));
@@ -155,13 +158,34 @@ export default function Projekt() {
           };
           const general = tiles.filter((x) => x.phase === null);
           const shown = phases.filter((ph) => ph.state !== 'off' && tiles.some((x) => x.phase === ph.key));
-          const testTiles = TILES.filter((x) => ['map', 'notes', 'sections', 'pinnwand', 'slides'].includes(x.key) && (!x.docType || project.settings.docTypes[x.docType]));
           return (
             <>
-              {general.length > 0 && (
+              {(general.length > 0 || teacher) && (
                 <section className={t.section}>
                   <h2 className={t.head}>Allgemein</h2>
-                  <div className={t.grid}>{general.map((x) => card(x))}</div>
+                  <div className={t.grid}>
+                    {general.map((x) => card(x))}
+                    {teacher && (
+                      <>
+                        <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/projekt/korrektur/?id=${id}`)}>
+                          <span className={t.icon}>
+                            <Icon name="check" size={26} />
+                          </span>
+                          <span className={t.title}>Korrektur</span>
+                          <span className={t.line}>Bewerten und Rückmeldung geben</span>
+                          <span className={t.onlyMe}>nur du</span>
+                        </a>
+                        <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/einstellungen/?id=${id}`)}>
+                          <span className={t.icon}>
+                            <Icon name="gear" size={26} />
+                          </span>
+                          <span className={t.title}>Einstellungen</span>
+                          <span className={t.line}>Phasen, Gruppen, Dokumente, Regeln</span>
+                          <span className={t.onlyMe}>nur du</span>
+                        </a>
+                      </>
+                    )}
+                  </div>
                 </section>
               )}
               {shown.map((ph, i) => {
@@ -177,33 +201,6 @@ export default function Projekt() {
                   </section>
                 );
               })}
-              {teacher && (
-                <section className={`${t.section} ${t.teacherOnly}`}>
-                  <h2 className={t.head}>
-                    Nur für dich <span className={t.hiddenNote}>Lernende sehen diesen Bereich nicht</span>
-                  </h2>
-                  <p className={t.sub}>Dein Testbereich: Mindmap, Notizen, Texte und Präsentationen ohne Gruppen ausprobieren oder eine Demo vorbereiten.</p>
-                  <div className={t.grid}>
-                    {testTiles.map((x) => card(x, { bereich: 't' + me.id, onlyMe: 'Testbereich, für Lernende unsichtbar' }))}
-                    <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/projekt/korrektur/?id=${id}`)}>
-                      <span className={t.icon}>
-                        <Icon name="check" size={26} />
-                      </span>
-                      <span className={t.title}>Korrektur</span>
-                      <span className={t.line}>Bewerten und Rückmeldung geben</span>
-                      <span className={t.onlyMe}>nur du</span>
-                    </a>
-                    <a className={`${t.tile} ${t.released} ${t.hidden}`} href={href(`/einstellungen/?id=${id}`)}>
-                      <span className={t.icon}>
-                        <Icon name="gear" size={26} />
-                      </span>
-                      <span className={t.title}>Einstellungen</span>
-                      <span className={t.line}>Phasen, Gruppen, Dokumente, Regeln</span>
-                      <span className={t.onlyMe}>nur du</span>
-                    </a>
-                  </div>
-                </section>
-              )}
             </>
           );
         })()}

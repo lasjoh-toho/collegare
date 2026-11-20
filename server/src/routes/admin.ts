@@ -25,7 +25,7 @@ export function adminRoutes(app: FastifyInstance, s: Services) {
   app.get('/api/admin/teachers', async (req, reply) => {
     if (!(await requireAdmin(s, req, reply))) return;
     const list = await s.accounts.list();
-    const counts = await s.db.selectFrom('projects').select(['created_by', (eb) => eb.fn.countAll().as('n')]).where('archived_at', 'is', null).groupBy('created_by').execute();
+    const counts = await s.db.selectFrom('projects').select(['created_by', (eb) => eb.fn.countAll().as('n')]).where('archived_at', 'is', null).where('kind', '=', 'project').groupBy('created_by').execute();
     const by = new Map(counts.map((c) => [Number(c.created_by), Number(c.n)]));
     return { teachers: list.map((t) => ({ ...t, projects: by.get(t.id) ?? 0 })) };
   });
@@ -67,7 +67,7 @@ export function adminRoutes(app: FastifyInstance, s: Services) {
     if (id === actor) return reply.code(400).send({ error: 'Das eigene Konto lässt sich nicht löschen' });
     const acc = await s.db.selectFrom('local_accounts').select('login').where('user_id', '=', id).executeTakeFirst();
     if (!acc) return reply.code(404).send({ error: 'Konto nicht gefunden' });
-    const open = await s.db.selectFrom('projects').select((eb) => eb.fn.countAll().as('n')).where('created_by', '=', id).where('archived_at', 'is', null).executeTakeFirst();
+    const open = await s.db.selectFrom('projects').select((eb) => eb.fn.countAll().as('n')).where('created_by', '=', id).where('archived_at', 'is', null).where('kind', '=', 'project').executeTakeFirst();
     if (Number(open?.n ?? 0) > 0) return reply.code(409).send({ error: `Diese Lehrkraft hat noch ${open!.n} Projekt(e). Erst die Projekte abschließen oder löschen.` });
     await s.sessions.destroyAllFor(id);
     await s.db.deleteFrom('local_accounts').where('user_id', '=', id).execute();

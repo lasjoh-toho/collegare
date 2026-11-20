@@ -85,7 +85,7 @@ export async function ltiRoutes(app: FastifyInstance, s: Services, bc: BoardBroa
     if (!a) return;
     const ctx = await s.contexts.get(a.link.context_id);
     const projects = a.teacher
-      ? await s.db.selectFrom('projects').select(['id', 'title', 'mode']).where('context_id', '=', a.link.context_id).where('archived_at', 'is', null).orderBy('created_at', 'desc').execute()
+      ? await s.db.selectFrom('projects').select(['id', 'title', 'mode']).where('context_id', '=', a.link.context_id).where('archived_at', 'is', null).where('kind', '=', 'project').orderBy('created_at', 'desc').execute()
       : [];
     return { id: a.link.id, title: a.link.title, course: ctx?.title, projectId: a.link.project_id, teacher: a.teacher, projects };
   });

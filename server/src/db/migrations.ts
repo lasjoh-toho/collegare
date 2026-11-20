@@ -461,6 +461,17 @@ migrations['0017_note_lines'] = {
   },
 };
 
+// Werkzeuge und Materialien in der Übersicht (Jo, 20. November 2026): eigene Werkstatt je Lehrkraft (Projekt der Art
+// 'werkstatt' in einem eigenen Kontext), Schlagworte, Freigabe für Gruppen und Einzelne, Herkunft beim Übernehmen
+migrations['0019_werkstatt_material'] = {
+  async up(db) {
+    await db.schema.alterTable('projects').addColumn('kind', 'varchar(16)', (c) => c.notNull().defaultTo('project')).execute();
+    await db.schema.alterTable('materials').addColumn('tags', 'varchar(1000)', (c) => c.notNull().defaultTo('')).execute();
+    await db.schema.alterTable('materials').addColumn('audience', sql`text`).execute();
+    await db.schema.alterTable('materials').addColumn('source_id', 'integer').execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

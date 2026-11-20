@@ -124,6 +124,8 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
       id: p!.id,
       title: p!.title,
       mode: p!.mode,
+      // Werkstatt der Lehrkraft (Werkzeuge und Materialien im Portal), kein echtes Projekt
+      werkstatt: p!.kind === 'werkstatt',
       // wirksame Einstellungen: der Rahmen der Administration gilt sofort
       settings: clampToFrame(p!.settings, await s.frame.get()),
       course: { id: ctx?.id, title: ctx?.title, moodle: ctx?.lti_platform_id != null },
