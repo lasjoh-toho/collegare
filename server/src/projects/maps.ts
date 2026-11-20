@@ -83,7 +83,7 @@ export interface MindMap {
   roots: string[];
   links: MapLink[];
   outline: { sections: OutlineSection[]; at: number; by: number } | null;
-  /** Gliederung als zwei U-Bahn-Linien (Präsentation, Ausarbeitung), Konzept 8g; fehlt bei alten Mindmaps */
+  /** Gliederung als zwei U-Bahn-Linien (Präsentation, Ausarbeitung), Konzept 8h; fehlt bei alten Mindmaps */
   lines?: Lines;
 }
 

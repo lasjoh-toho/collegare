@@ -100,7 +100,7 @@ describe('Mindmap-Operationen', () => {
   });
 });
 
-describe('Gliederung als Linien (Konzept 8g)', () => {
+describe('Gliederung als Linien (Konzept 8h)', () => {
   const pt = (id: string, card: string | null, extra: Record<string, unknown> = {}) => ({ id, key: card ?? id, card, title: id, owner: null, hidden: false, removed: false, items: [], sub: [], ...extra });
   it('leitet pick und outline ab, Schloss sperrt Änderungen', () => {
     const m = emptyMap();

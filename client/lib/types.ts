@@ -103,7 +103,7 @@ export interface ProjectSettings {
   slidesImportStudents: boolean;
   /** Lernende dürfen Bilder aus dem Netz direkt auf Folien ziehen (sonst erst über Notizen und Quellen) */
   imagesDirect: boolean;
-  /** welche Gliederungs-Linien Lernende sehen (Konzept 8g) */
+  /** welche Gliederungs-Linien Lernende sehen (Konzept 8h) */
   outlineLines?: 'both' | 'praes' | 'ausarb';
   folienDemo: number[];
   infos: Record<string, { text: string; start: boolean }>;
@@ -197,7 +197,7 @@ export interface MindMap {
   roots: string[];
   links: MapLink[];
   outline: { sections: OutlineSection[]; at: number; by: number } | null;
-  /** Gliederung als zwei U-Bahn-Linien (Konzept 8g), siehe lib/lines.ts */
+  /** Gliederung als zwei U-Bahn-Linien (Konzept 8h), siehe lib/lines.ts */
   lines?: import('./lines').Lines;
 }
 export type MapOp =

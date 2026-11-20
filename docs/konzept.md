@@ -818,17 +818,17 @@ aber nur noch „gemeldet“ statt des Inhalts.
 | Notiz, Quelle, Link | wie bisher | |
 | **Bild** | Bilddatei mit Urheber, Lizenz, Ursprungsseite | vom Thread „Bilder per Drag and drop übernehmen“: Ziehen aus anderen Tabs, Einfügen, Abruf über den Server |
 | **Daten** | kleine Tabelle (Kopfzeile + Zeilen), Einfügen aus Tabellenkalkulation | bis 50 × 12 Zellen; wird in Ausarbeitung und Folien zur Tabelle |
-| **Video**, **Audio** | Datei (Aufnahme am Handy oder Hochladen) oder Link | Grenze aus `maxFileMb`; Aufnahme mit `MediaRecorder` |
+| **Video**, **Audio** | Datei (Aufnahme am Handy oder Hochladen) oder Link | erlaubt und begrenzt durch `notesAudio`, `notesVideo`, `notesMediaMb` (Projekt und Rahmen, 8g.4); Aufnahme mit `MediaRecorder` |
 | **Handschrift** | Foto einer handschriftlichen Notiz plus erkannter Text | Erkennung über Autogra.fi (8d.4), solange das nicht verbunden ist: Text selbst abtippen |
 
 Dateien liegen wie die Pinnwand-Medien unter `DATA_DIR` und kommen in `sichern` mit.
 
-### 8e.6 Bearbeiten im großen Fenster
+### 8e.6 Bearbeiten an Ort und Stelle
 
-Auf dem Desktop öffnet sich die bearbeitete Notiz als **großes Modal** über der Seite (Breite bis 900 px), damit sie
-deutlich hervortritt und Platz für Bild, Tabelle oder Handschrift hat. Am Handy bleibt sie in der Liste.
+Ersetzt am 20. November 2026 das große Modal (Wunsch Jo): Doppelklick auf eine Notiz öffnet sie zum Bearbeiten in der
+Liste, ein Klick daneben speichert und schließt, Esc verwirft. Siehe 8g.2.
 
-### 8e.7 Eigene Linie: Notizen parallel zur Gliederung (U-Bahn) – ersetzt durch 8g
+### 8e.7 Eigene Linie: Notizen parallel zur Gliederung (U-Bahn) – ersetzt durch 8h
 
 Jede Person kann sich ihre Notizen **in eine eigene Reihenfolge** bringen, die parallel zur Gliederung läuft. Bild
 dafür ist eine **U-Bahn-Linie**, wie in der Mindmap-Ansicht „Äste“:
@@ -944,12 +944,72 @@ der passenden Folie, ohne dass zwei Fassungen entstehen.
 - Reicht Stufe 1, bis der eigene Texteditor kommt?
 - Gehört zu einer Folie genau ein Abschnitt, oder darf sie mehrere Unterpunkte bündeln?
 
-## 8g. Gliederung als U-Bahn-Linien, Mindmap mit Abzweigungen (20. November 2026)
+## 8g. Herkunft von Texten und Notizen, dritte Fassung (20. November 2026)
+
+Wünsche von Jo vom 20. November 2026, gebaut am selben Tag.
+
+### 8g.1 Arbeitsprozess: Herkunft von Texten
+
+- Leitsatz für Lernende: „Es ist Bestandteil wissenschaftlichen Arbeitens, bei der Wiedergabe fremder Texte die Quelle
+  anzugeben.“ (in der Frage nach der Herkunft, auf der Seite „Arbeitsprozess“, in den Einstellungen)
+- **Jedes Einsetzen von außen wird protokolliert** (Einstellung `pasteLogAll`, Standard an). Sonst ließe sich die Grenze
+  umgehen, indem man absatzweise kopiert.
+- Die **erlaubte Zeichenzahl** (`pasteThreshold`) legt die Lehrkraft fest. Sie zählt **je Ziel** (Karte, Notiz) alles
+  zusammen, was eine Person von außen eingesetzt hat (`GET …/einfuegen/summe`). Darüber gilt `pasteOutside`: erlauben,
+  nach der Herkunft fragen oder nicht mehr einsetzen lassen.
+- Jeder Eintrag kennt sein Ziel (`card:<id>`, `note:<id>`) und den ganzen Text (höchstens 50 000 Zeichen,
+  Migration 0018). Die Seite ordnet die Einträge nach Ziel.
+- **Texterkennung**: Einträge mit `origin` `print` (Druckschrift) oder `hand` (Handschrift) tragen das Bild als Notiz
+  (`note_id`) und erscheinen mit Vermerk und Bild. Der Server hat dafür `Pastes.addOcr`; es ruft sie auf, sobald die
+  Erkennung über Autogra.fi läuft (8d.4). Bis dahin gibt es keine solchen Einträge.
+- Noch nicht protokolliert: Einsetzen in die Ausarbeitung (OnlyOffice, `web/`). Das braucht ein Signal aus dem Editor per
+  `postMessage`; kommt mit dem Textabgleich aus 8f.
+
+### 8g.2 Paste and Shake
+
+„Paste and Shake“: Stücke aus mehreren Quellen einsetzen, umstellen, ein wenig umformulieren. Ein Vergleich ganzer
+Absätze findet das nicht mehr. Antwort auf Jos Frage, wie wir damit umgehen:
+
+1. **Vorbeugen**: Jedes Einsetzen steht im Protokoll, die Grenze zählt je Karte oder Notiz zusammen, die Frage nach der
+   Herkunft kommt ab der Grenze. Wer korrekt zitiert, gibt die Quelle an und ist damit fertig.
+2. **Sichtbar machen statt beschuldigen**: Die Lehrkraft öffnet bei einer Karte oder Notiz die **Spur im Text**
+   (`GET …/einfuegen/spur`, Vergleich im Browser in `client/lib/trace.ts`). Jede Folge von drei Wörtern, die auch in
+   einer eingesetzten Vorlage steht, färbt ihre Wörter in der Farbe dieser Vorlage; nur Läufe ab fünf Wörtern zählen.
+   Darunter je Vorlage: Anteil am Text, wie viel der Vorlage noch drinsteckt, und „Reihenfolge umgestellt“, wenn die
+   Stücke anders angeordnet sind als in der Vorlage.
+3. **Grenzen**: Gut Umformuliertes ist nicht mehr zu sehen, korrekt Zitiertes ist auch gefärbt. Die Spur ist ein Anlass
+   für das Gespräch, keine Bewertung (wie die Tippfluss-Hinweise, Entscheidung 10.5). Texte, die nicht über Collegare
+   eingefügt wurden (abgetippt), kennt sie nicht.
+
+### 8g.3 Notizen
+
+- **Feld Material** oben in der Notiz: Adresse einfügen, Datei wählen oder Foto aufnehmen, oder leer lassen. Die Art
+  ergibt sich daraus (Bildadresse: der Server holt das Bild; YouTube/Vimeo/Videodatei: Video-Link; sonst Link mit dem
+  Seitentitel als Überschrift) und lässt sich im kleinen Menü „Art“ ändern.
+- **Überschrift aus Markierung**: Wörter im Text markieren, dann „… als Überschrift“.
+- **Bearbeiten** per Doppelklick an Ort und Stelle, Klick daneben speichert (8e.6). Der Stift bleibt für Touch-Geräte.
+- **Auf Notizen verteilen** (nach „Auf Seiten verteilen“ in mod_bento): Ein Stück einer Webseite mit Text und Bildern,
+  eingefügt oder hergezogen, wird zerlegt (`client/lib/splitPaste.ts`): Eine Notiz, je Abschnitt (Überschrift oder Bild)
+  oder je Absatz; die Bildunterschrift kann Überschrift werden. Browser geben beim Kopieren die Seite nicht mit; wir
+  nehmen den Link um ein Bild oder fragen nach der Ursprungsseite und lesen dann Titel, Autor und Lizenz. Der Text geht
+  ins Protokoll (8g.1).
+- **Quellenangabe** als Filter (Alle, Mit Quellenangabe, Quellenangabe fehlt mit Zahl) statt eines roten Hinweises
+  unter jeder Notiz. Eine Angabe brauchen Quellen, Links, Bilder (Ursprungsseite und Urheber oder Lizenz), Daten und
+  verlinkte Videos; eigene Notizen, Aufnahmen und Handschrift nicht.
+- **Symbole** sind Linien-Symbole (`components/Icon.tsx`) statt Unicode-Zeichen.
+
+### 8g.4 Ton und Video begrenzen
+
+Aufnehmen und Hochladen von Ton und Video ist datenintensiv. Die Lehrkraft schaltet beides je Projekt (`notesAudio`,
+`notesVideo`) und legt die Größe je Aufnahme fest (`notesMediaMb`); der Rahmen der Administration begrenzt beides. Der
+Server prüft beim Hochladen. Links auf Videos gehen immer.
+
+## 8h. Gliederung als U-Bahn-Linien, Mindmap mit Abzweigungen (20. November 2026)
 
 Wünsche von Jo vom 20. November 2026 zu Mindmap, Gliederung und der Linie neben den Notizen. Sie ersetzen das
 „Gliederung übernehmen“ aus 8d.1 und „Meine Linie“ aus 8e.7.
 
-### 8g.1 Zwei Linien statt „Gliederung übernehmen“
+### 8h.1 Zwei Linien statt „Gliederung übernehmen“
 
 - Die Gliederung ist eine **senkrechte U-Bahn-Linie** mit weißen Stationen, sofort durchgehend. Es gibt zwei Linien:
   **Präsentation (rot)** und **Ausarbeitung (blau)**. Darüber stehen zwei große Reiter, dazwischen der Schalter
@@ -962,7 +1022,7 @@ Wünsche von Jo vom 20. November 2026 zu Mindmap, Gliederung und der Linie neben
   gezeigte Linie auf; ganze Äste und einzelne Knoten lassen sich auch aus der Mindmap **auf die Linie ziehen** (auf einen
   Punkt: Unterpunkt; ans Ende: neuer Punkt). Vorbild ist der „Rote Faden“ von mod_pinnwand, ein Faden je Gruppe.
 
-### 8g.2 Punkte, Objekte und Schloss
+### 8h.2 Punkte, Objekte und Schloss
 
 - **Punkte** (Stationen) haben höchstens zwei Ebenen. Ein Punkt verweist auf eine Karte der Mindmap (Titel und
   Zuständige kommen von dort) oder ist nur in der Gliederung entstanden: dann **gestrichelt**.
@@ -979,7 +1039,7 @@ Wünsche von Jo vom 20. November 2026 zu Mindmap, Gliederung und der Linie neben
 - „nur meine“ zeigt nur die Objekte, die man selbst angehängt hat. Das ist der erste Schritt zu „jede Person ordnet ihre
   Notizen für sich parallel zur Gliederung“ (siehe offen).
 
-### 8g.3 Beide Linien synchronisieren
+### 8h.3 Beide Linien synchronisieren
 
 In der Ansicht „beides“ stehen gleiche Punkte in **derselben Zeile** und sind zwischen den Linien verbunden. Gleich
 heißt: gleicher Schlüssel, also aus derselben Karte der Mindmap oder mit „in die andere Linie übernehmen“ kopiert. Die
@@ -987,7 +1047,7 @@ Zeilen entstehen wie bei einem Textvergleich (längste gemeinsame Folge); Punkte
 dazwischen. Objekte, die in beiden Linien hängen, tragen „in beiden“. Damit ist die Kopplung von Ausarbeitung und
 Präsentation (8e.8) als Ansicht da; die Kopplung von Folien und Zusatztexten in Bento (8f) baut darauf auf.
 
-### 8g.4 Daten
+### 8h.4 Daten
 
 Die Linien liegen in der Mindmap der Gruppe (`map.lines`) und laufen über dieselbe Operationsschlange
 (`map:op` mit `{type:'lines'}`, ersetzt die ganze Gliederung; die letzte Änderung gewinnt). Der Server prüft Ebenen,
@@ -996,7 +1056,7 @@ Ausarbeitung, ohne sie aus der Präsentation), damit Ausarbeitung, Korrektur und
 Mindmaps bekommen beim Lesen beide Linien aus den übernommenen Ästen. Die Tabelle `note_lines` („Meine Linie“) bleibt
 erhalten, wird aber nicht mehr angezeigt.
 
-### 8g.5 U-Bahn-Mindmap (Ast-Ansicht)
+### 8h.5 U-Bahn-Mindmap (Ast-Ansicht)
 
 - An jedem Zwischenstopp des gewählten Asts steht ein **Plus**. Es öffnet den Dialog **Abzweigung**: Eingabefeld Titel
   (Enter legt an), darunter in einer Zeile „Zwischenstopp löschen“ und „Abbrechen“; ein Klick außerhalb bricht ab.
@@ -1005,7 +1065,7 @@ erhalten, wird aber nicht mehr angezeigt.
 - **Langer Druck** (450 ms) auf einen Knoten packt den **Ansatz** seines Asts; über einem Stopp eines anderen Asts
   rastet er als Abzweigung ein. (Jos Satz „Dann werden diese entweder …“ bricht ab; siehe offen.)
 
-### 8g.6 Karten-Ansicht
+### 8h.6 Karten-Ansicht
 
 - **Neobrutalistisch**: kräftiger Rand, sichtbare harte Schatten; Cluster liegen am höchsten (größter Schatten), Karten
   darin tiefer, Karten in Karten noch tiefer. Farben wie die Äste der Ast-Ansicht.
@@ -1016,7 +1076,7 @@ erhalten, wird aber nicht mehr angezeigt.
   „Ordnen“ von oben nach unten zu einer Reihe. Wächst eine Karte, rücken die Karten darunter nach.
 - **Text ausblenden** je Karte (`card.hideText`) oder für die ganze Mindmap („Text aus“, je Gerät).
 
-### 8g.7 Offen
+### 8h.7 Offen
 
 - Jos Satz zu den Ansätzen bricht ab („Dann werde diese Entweder“): was nach dem Packen passieren soll.
 - Zuständigkeiten aus der Gruppenarbeit (Rollen) im Seitenmenü: bisher nur die zuständige Person je Punkt.

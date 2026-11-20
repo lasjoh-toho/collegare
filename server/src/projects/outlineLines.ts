@@ -1,5 +1,5 @@
 /**
- * Gliederung als U-Bahn-Linien (Konzept 8g, Wünsche von Jo vom 20. November 2026).
+ * Gliederung als U-Bahn-Linien (Konzept 8h, Wünsche von Jo vom 20. November 2026).
  *
  * Je Gruppe gibt es zwei Linien: eine für die Präsentation (rot) und eine für die Ausarbeitung (blau). Stationen sind
  * Punkte der Gliederung (Abschnitte) mit Unterpunkten. Ein Punkt verweist auf eine Karte der Mindmap oder ist neu in der

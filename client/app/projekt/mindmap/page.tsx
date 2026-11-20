@@ -308,7 +308,7 @@ export default function MindmapPage() {
         }
       : undefined;
 
-  // Gliederung neben der Mindmap (Konzept 8g): Umschalten und Ablegen wirken auf die gerade gezeigte Linie
+  // Gliederung neben der Mindmap (Konzept 8h): Umschalten und Ablegen wirken auf die gerade gezeigte Linie
   const lines = map ? linesOf(map) : null;
   const lineHook: LineHook | undefined =
     map && lines && !isTopic

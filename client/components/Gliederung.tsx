@@ -1,6 +1,6 @@
 'use client';
 /**
- * Gliederung als U-Bahn-Linie (Konzept 8g, Wünsche von Jo vom 20. November 2026). Erscheint neben der Mindmap und
+ * Gliederung als U-Bahn-Linie (Konzept 8h, Wünsche von Jo vom 20. November 2026). Erscheint neben der Mindmap und
  * neben „Notizen und Quellen“. Zwei Linien: Präsentation (rot) und Ausarbeitung (blau), darüber zwei große Reiter und
  * dazwischen der Schalter „beides“ für die Vollbild-Ansicht mit beiden Linien nebeneinander.
  *

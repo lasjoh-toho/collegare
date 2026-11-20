@@ -111,7 +111,7 @@ export function MindMap({
   dim?: MapDim;
   /** Themen-Mindmap, Lehrkraft: aus einer Idee eine Gruppe machen */
   onToGroup?: (title: string) => void;
-  /** Gliederung daneben (Konzept 8g) */
+  /** Gliederung daneben (Konzept 8h) */
   line?: LineHook;
 }) {
   const el = useRef<HTMLDivElement>(null);

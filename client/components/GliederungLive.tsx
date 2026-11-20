@@ -1,6 +1,6 @@
 'use client';
 /**
- * Gliederung neben „Notizen und Quellen“ (Konzept 8g, ersetzt „Meine Linie“ aus 8e.7): holt die Mindmap der Gruppe
+ * Gliederung neben „Notizen und Quellen“ (Konzept 8h, ersetzt „Meine Linie“ aus 8e.7): holt die Mindmap der Gruppe
  * über den Socket der Seite (map:join) und zeigt dieselbe Linie wie neben der Mindmap. Notizen zieht man aus dem
  * Thread auf die Punkte.
  */

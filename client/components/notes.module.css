@@ -101,6 +101,16 @@
 /* Thread allein oder neben der eigenen Linie (8e.7): Linie links, Thread als Quelle zum Ziehen rechts */
 .single { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); }
-/* Gliederung rechts neben den Notizen (Konzept 8g) */
+/* Gliederung rechts neben den Notizen (Konzept 8h) */
 .lineCol { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--bg-elev); }
 @media (max-width: 760px) { .split { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .lineCol { max-height: 55vh; border-left: 0; border-top: 1px solid var(--line); } }
+/* Dritte Fassung (Wunsch Jo, 20. November 2026): Feld Material, Überschrift aus Markierung, Filter Quellenangabe */
+.material { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.material > input { flex: 1 1 220px; min-width: 0; }
+.material :global(.btn) { display: inline-flex; align-items: center; gap: 5px; height: 32px; }
+.editor .row > .titleInput { flex: 1; min-width: 0; font-weight: 600; }
+.selTitle { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missingBtn { color: var(--danger); }
+.visTag { display: inline-flex; align-items: center; color: var(--fg-muted); }
+.note[draggable='true']:not(.editing) { user-select: text; }
+.splitList { max-height: 46vh; }

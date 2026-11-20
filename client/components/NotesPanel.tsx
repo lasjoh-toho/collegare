@@ -5,17 +5,29 @@
  * Überarbeitungen der Notiz übernimmt. Als eigene Seite (Kachel in der Phase Recherche) oder als Leiste rechts.
  *
  * Zweite Fassung (8e): Thread von alt nach neu mit großem „+ Neue Notiz“ darunter; Sichtbarkeit Privat / Gruppe /
- * Allgemein je Karte, dasselbe Select in der Kopfzeile filtert; Melden; Bearbeiten auf dem Desktop im großen Fenster.
+ * Allgemein je Karte, dasselbe Select in der Kopfzeile filtert; Melden.
+ *
+ * Dritte Fassung (Wunsch Jo, 20. November 2026): Bearbeiten an Ort und Stelle per Doppelklick, Klick daneben
+ * speichert; Feld „Material“ oben (Adresse, Datei, Foto, Art wird erkannt); Überschrift aus markierten Wörtern;
+ * eingefügter Text von außen steht unter „Arbeitsprozess“; Bilder mit Text aus anderen Tabs „auf Notizen verteilen“;
+ * Filter „Quellenangabe fehlt“ statt eines Hinweises unter jeder Notiz; Ton und Video nur, wenn erlaubt.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { projectSocket } from '@/lib/api';
 import { isChatDrag, setChatDrag } from '@/lib/chatDrag';
-import { imagesFrom, mayHoldImages, noteFileUrl, setImageDrag, takeImages, uploadImage, type ImageNoteInput } from '@/lib/imageDrop';
+import { imageInfo, imagesFrom, looksLikeImage, mayHoldImages, noteFileUrl, proxied, readPage, setImageDrag, takeImages, uploadImage, type ImageNoteInput } from '@/lib/imageDrop';
+import { post } from '@/lib/api';
+import { clipOrigin } from '@/lib/clip';
+import type { PasteRules } from '@/lib/pasteRules';
+import { blocksFrom, textLength, type Block } from '@/lib/splitPaste';
+import { usePasteGuard, type PasteGuard } from '@/lib/usePasteGuard';
+import { Icon } from './Icon';
 import { ImageImport } from './ImageImport';
+import { NoteSplit, type SplitNoteInput } from './NoteSplit';
+import { PasteNotes } from './PasteNotes';
 import type { Me, ProjectView } from '@/lib/types';
 import { GliederungLive } from './GliederungLive';
-import { Icon } from './Icon';
 import c from './notes.module.css';
 
 type Kind = 'note' | 'source' | 'link' | 'image' | 'data' | 'video' | 'audio' | 'hand';
@@ -70,7 +82,7 @@ interface Draft {
   /** Typ der Datei, damit die Vorschau Bild, Ton oder Video zeigt */
   mime?: string;
 }
-type Res = { ok: boolean; error?: string };
+type Res = { ok: boolean; error?: string; id?: number };
 
 /** „Allgemein (alle Gruppen)“, wie SHARED im Server */
 const SHARED = '*';
@@ -94,10 +106,10 @@ const FILE_KINDS: Partial<Record<Kind, { accept: string; capture?: 'environment'
   audio: { accept: 'audio/*,.m4a,.mp3,.ogg,.wav,.webm', what: 'Tonaufnahme' },
 };
 /** Reihenfolge wie im Select gewünscht (Jo): Gruppe in der Mitte */
-const VIS: { v: Visibility; label: string; long: string; icon: string }[] = [
-  { v: 'private', label: 'Privat', long: 'Privat (nur ich und die Lehrkraft)', icon: '🔒' },
-  { v: 'group', label: 'Gruppe', long: 'Gruppe', icon: '👥' },
-  { v: 'all', label: 'Allgemein', long: 'Allgemein (alle im Projekt)', icon: '🌐' },
+const VIS: { v: Visibility; label: string; long: string; icon: 'lock' | 'users' | 'globe' }[] = [
+  { v: 'private', label: 'Privat', long: 'Privat (nur ich und die Lehrkraft)', icon: 'lock' },
+  { v: 'group', label: 'Gruppe', long: 'Gruppe', icon: 'users' },
+  { v: 'all', label: 'Allgemein', long: 'Allgemein (alle im Projekt)', icon: 'globe' },
 ];
 const visOf = (v: Visibility) => VIS.find((x) => x.v === v)!;
 const blankRows = () => [
@@ -117,19 +129,6 @@ function cardText(n: Note) {
   const rights = [n.credit, n.license].filter(Boolean).join(', ');
   const parts = [n.title ? n.body.trim() : n.body.trim().split('\n').slice(1).join('\n').trim(), table, n.source && `Fundstelle: ${n.source}`, rights && `Bild: ${rights}`, n.origin ?? n.url ?? ''];
   return parts.filter(Boolean).join('\n\n').slice(0, 5000);
-}
-
-/** großes Fenster nur auf dem Desktop (8e.6); am Handy bleibt die Eingabe in der Liste */
-function useWide() {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const m = window.matchMedia('(min-width: 760px) and (hover: hover)');
-    const on = () => setWide(m.matches);
-    on();
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, []);
-  return wide;
 }
 
 /** Tabelle bearbeiten: Zellen, Zeile/Spalte dazu, Einfügen aus der Tabellenkalkulation (Tabs und Zeilenumbrüche) */
@@ -188,7 +187,7 @@ function VisSelect({ value, onChange, allowed, small = false }: { value: Visibil
     <select className={small ? c.visSmall : c.vis} value={value} onChange={(e) => onChange(e.target.value as Visibility)} aria-label="Wer sieht die Notiz?" title="Wer sieht die Notiz?">
       {VIS.map((x) => (
         <option key={x.v} value={x.v} disabled={allowed && !allowed.includes(x.v)}>
-          {x.icon} {small ? x.label : x.long}
+          {small ? x.label : x.long}
         </option>
       ))}
     </select>
@@ -230,15 +229,15 @@ function Recorder({ video, onDone, onError }: { video: boolean; onDone: (f: File
     }
   }
   return (
-    <span className={c.recorder}>
+    <span className={c.recorder} data-recording={rec ? '' : undefined}>
       {rec && video && <video ref={live} autoPlay muted playsInline />}
       {rec ? (
         <button type="button" className="btn" onClick={() => rec.r.stop()}>
           <span className={c.recDot} /> Stopp ({Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')})
         </button>
       ) : (
-        <button type="button" className="btn" onClick={() => void start()}>
-          {video ? '● Video aufnehmen' : '● Aufnehmen'}
+        <button type="button" className="btn" onClick={() => void start()} title={video ? 'Video mit der Kamera aufnehmen' : 'Ton mit dem Mikrofon aufnehmen'}>
+          <Icon name={video ? 'video' : 'mic'} size={15} /> {video ? 'Video' : 'Ton'}
         </button>
       )}
     </span>
@@ -252,6 +251,32 @@ function Media({ src, mime, kind, title, className }: { src: string; mime?: stri
   return <img className={className} src={src} alt={title ?? ''} loading="lazy" draggable={false} />;
 }
 
+/** Was Ton und Video in diesem Projekt dürfen (Einstellungen notesAudio, notesVideo, notesMediaMb) */
+interface MediaRules {
+  audio: boolean;
+  video: boolean;
+  mb: number;
+}
+
+const VIDEO_URL = /(youtube\.com\/|youtu\.be\/|vimeo\.com\/|\.(mp4|webm|mov|m4v)(\?|#|$))/i;
+const AUDIO_URL = /\.(mp3|m4a|ogg|oga|wav|flac|opus)(\?|#|$)/i;
+const NEEDS_FILE: Kind[] = ['image', 'audio', 'hand'];
+
+/** Welche Art passt zu einer Datei? null = nicht erlaubt */
+function kindForFile(f: File, current: Kind): Kind | null {
+  if (f.type.startsWith('image/')) return current === 'hand' ? 'hand' : 'image';
+  if (f.type.startsWith('audio/')) return 'audio';
+  if (f.type.startsWith('video/')) return current === 'audio' ? 'audio' : 'video';
+  if (/\.(m4a|mp3|ogg|wav|flac|opus)$/i.test(f.name)) return 'audio';
+  if (/\.(mp4|webm|mov|m4v)$/i.test(f.name)) return 'video';
+  return null;
+}
+
+/**
+ * Notiz bearbeiten, an Ort und Stelle (Wunsch Jo, 20. November 2026): Doppelklick öffnet, Klick daneben speichert und
+ * schließt, Esc verwirft. Oben das Feld „Material“: Adresse einfügen, Datei wählen oder Foto aufnehmen; die Art der
+ * Notiz ergibt sich daraus und lässt sich im kleinen Menü ändern. Wörter im Text markieren macht sie zur Überschrift.
+ */
 function Editor({
   draft,
   setDraft,
@@ -262,134 +287,225 @@ function Editor({
   visAllowed,
   showVis = true,
   pickImage,
+  fromUrl,
+  guard,
+  media,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
   onSave: () => void;
-  onCancel?: () => void;
+  onCancel: () => void;
   busy: boolean;
   adding?: boolean;
   visAllowed?: Visibility[];
   showVis?: boolean;
   /** Datei vom Gerät (oder Aufnahme) hochladen; setzt file, preview und mime im Entwurf */
-  pickImage?: (f: File, d: Draft) => void;
+  pickImage: (f: File, d: Draft) => void;
+  /** Adresse im Feld Material: Bild holen, Seite lesen */
+  fromUrl: (url: string, d: Draft) => void;
+  guard: PasteGuard;
+  media: MediaRules;
 }) {
-  const k = KINDS.find((x) => x.kind === draft.kind)!;
   const fk = FILE_KINDS[draft.kind];
   const hasFile = !!(draft.file || draft.preview);
-  const [recErr, setRecErr] = useState('');
-  const ok =
-    draft.kind === 'image' || draft.kind === 'audio' || draft.kind === 'hand'
-      ? hasFile
-      : draft.kind === 'video'
-        ? hasFile || !!draft.url.trim()
-        : !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
-  const first = useRef<HTMLInputElement>(null);
-  useEffect(() => first.current?.focus(), []);
+  const [err, setErr] = useState('');
+  const [sel, setSel] = useState('');
+  const root = useRef<HTMLFormElement>(null);
+  const body = useRef<HTMLTextAreaElement>(null);
+  const ok = NEEDS_FILE.includes(draft.kind)
+    ? hasFile
+    : draft.kind === 'video'
+      ? hasFile || !!draft.url.trim()
+      : !!(draft.title.trim() || draft.body.trim() || draft.url.trim() || (draft.kind === 'data' && draft.rows.some((r) => r.some((x) => x.trim()))));
+  // aktuelle Werte für den Klick daneben
+  const now = useRef({ ok, busy, onSave, onCancel });
+  now.current = { ok, busy, onSave, onCancel };
+  useEffect(() => {
+    body.current?.focus();
+    const down = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t || root.current?.contains(t) || t.closest('.modal-bg') || document.querySelector('[data-recording]')) return;
+      const n = now.current;
+      if (n.busy) return;
+      if (n.ok) n.onSave();
+      else n.onCancel();
+    };
+    // erst nach dem öffnenden Doppelklick lauschen
+    const id = setTimeout(() => document.addEventListener('pointerdown', down, true), 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('pointerdown', down, true);
+    };
+  }, []);
+
+  function file(f: File) {
+    setErr('');
+    const k = kindForFile(f, draft.kind);
+    if (!k) return setErr('Als Material gehen Bilder, Ton und Video. Andere Dateien gehören ins Material der Lehrkraft oder in die Ausarbeitung.');
+    if (k === 'audio' && !media.audio) return setErr('Ton ist in diesem Projekt ausgeschaltet.');
+    if (k === 'video' && !media.video) return setErr('Videos lassen sich hier nicht hochladen. Ein Link auf ein Video geht.');
+    if ((k === 'audio' || k === 'video') && f.size > media.mb * 1024 * 1024) return setErr(`Die Datei ist größer als ${media.mb} MB.`);
+    pickImage(f, { ...draft, kind: k });
+  }
+
+  function material(raw: string) {
+    const url = raw.trim();
+    setErr('');
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) return setErr('Eine Adresse beginnt mit http:// oder https://');
+    // Bild schon da: die Adresse ist die Ursprungsseite
+    if (draft.kind === 'image' && hasFile) return setDraft({ ...draft, origin: url });
+    if (VIDEO_URL.test(url)) return setDraft({ ...draft, kind: 'video', url });
+    if (AUDIO_URL.test(url)) return setDraft({ ...draft, kind: draft.kind === 'note' ? 'link' : draft.kind, url });
+    fromUrl(url, { ...draft, url });
+  }
+
+  function onSelect() {
+    const ta = body.current;
+    if (!ta) return;
+    const s = ta.value.slice(ta.selectionStart, ta.selectionEnd).replace(/\s+/g, ' ').trim();
+    setSel(s.length >= 2 && s.length <= 200 && s !== draft.title ? s : '');
+  }
+
+  const kindSelect = (
+    <select className={c.visSmall} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as Kind })} aria-label="Art der Notiz" title="Art der Notiz">
+      {KINDS.filter((x) => x.kind !== 'audio' || media.audio || draft.kind === 'audio').map((x) => (
+        <option key={x.kind} value={x.kind} title={x.hint}>
+          {x.label}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <form
+      ref={root}
       className={c.editor}
       onSubmit={(e) => {
         e.preventDefault();
         if (ok) onSave();
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && onCancel) onCancel();
+        if (e.key === 'Escape') onCancel();
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ok) {
           e.preventDefault();
           onSave();
         }
       }}
     >
-      <div className={c.row}>
-        <span className="seg" role="group" aria-label="Art">
-          {KINDS.map((x) => (
-            <button type="button" key={x.kind} className={`btn ${x.kind === draft.kind ? 'on' : ''}`} aria-pressed={x.kind === draft.kind} title={x.hint} onClick={() => setDraft({ ...draft, kind: x.kind })}>
-              {x.label}
-            </button>
-          ))}
-        </span>
-        <span className="grow" />
-        {showVis && <VisSelect value={draft.visibility} onChange={(v) => setDraft({ ...draft, visibility: v })} allowed={visAllowed} />}
+      <div className={c.material}>
+        <input
+          type="url"
+          value={draft.kind === 'image' ? draft.origin || draft.url : draft.url}
+          maxLength={2000}
+          placeholder="Material: Adresse einfügen, Datei wählen oder Foto aufnehmen (freiwillig)"
+          onChange={(e) => setDraft(draft.kind === 'image' ? { ...draft, origin: e.target.value } : { ...draft, url: e.target.value })}
+          onPaste={(e) => {
+            const t = e.clipboardData.getData('text/plain').trim();
+            if (/^https?:\/\/\S+$/i.test(t)) {
+              e.preventDefault();
+              material(t);
+            }
+          }}
+          onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== draft.url && draft.kind !== 'image' && material(e.target.value)}
+          aria-label="Material"
+        />
+        <label className="btn" title="Bild, Ton oder Video vom Gerät">
+          <Icon name="upload" size={15} /> Datei
+          <input type="file" accept={['image/*', media.audio ? 'audio/*,.m4a,.mp3,.ogg,.wav' : '', media.video ? 'video/*' : ''].filter(Boolean).join(',')} hidden onChange={(e) => e.target.files?.[0] && file(e.target.files[0])} />
+        </label>
+        <label className="btn" title="Foto aufnehmen (am Handy öffnet sich die Kamera)">
+          <Icon name="camera" size={15} /> Foto
+          <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && file(e.target.files[0])} />
+        </label>
+        {media.audio && <Recorder video={false} onDone={(f) => pickImage(f, { ...draft, kind: 'audio' })} onError={setErr} />}
+        {media.video && <Recorder video onDone={(f) => pickImage(f, { ...draft, kind: 'video' })} onError={setErr} />}
       </div>
-      <input ref={first} value={draft.title} maxLength={200} placeholder={draft.kind === 'source' ? 'Titel, Autorin oder Autor, Jahr' : draft.kind === 'data' ? 'Was zeigt die Tabelle?' : 'Überschrift (freiwillig)'} onChange={(e) => setDraft({ ...draft, title: e.target.value })} aria-label="Überschrift" />
-      {draft.kind === 'data' && <TableEdit rows={draft.rows} set={(rows) => setDraft({ ...draft, rows })} />}
-      {fk && (
+      {err && <span className="error">{err}</span>}
+      {(hasFile || (fk && NEEDS_FILE.includes(draft.kind))) && (
         <div className={c.imageEdit}>
-          {draft.preview ? (
-            <Media src={draft.preview} mime={draft.mime} kind={draft.kind} />
-          ) : (
-            <span className="muted">
-              {draft.kind === 'image'
-                ? 'Noch kein Bild. Wähle eine Datei, oder schließ das Fenster und zieh Bilder aus einem anderen Tab auf die Notizen.'
-                : draft.kind === 'hand'
-                  ? 'Fotografiere deine handschriftliche Notiz (am Handy öffnet sich die Kamera).'
-                  : draft.kind === 'video'
-                    ? 'Nimm ein Video auf, wähle eine Datei oder trag unten einen Link ein.'
-                    : 'Nimm etwas auf oder wähle eine Datei.'}
-            </span>
-          )}
-          <span className={c.row}>
-            {(draft.kind === 'audio' || draft.kind === 'video') && <Recorder video={draft.kind === 'video'} onDone={(f) => pickImage?.(f, draft)} onError={setRecErr} />}
-            <label className="btn">
-              {hasFile ? `Andere Datei …` : `${fk.what} wählen …`}
-              <input type="file" accept={fk.accept} capture={fk.capture} hidden onChange={(e) => e.target.files?.[0] && pickImage?.(e.target.files[0], draft)} />
-            </label>
-          </span>
-          {recErr && <span className="error">{recErr}</span>}
+          {draft.preview ? <Media src={draft.preview} mime={draft.mime} kind={draft.kind} /> : <span className="muted">{draft.kind === 'hand' ? 'Fotografiere deine handschriftliche Notiz.' : `Noch kein${draft.kind === 'audio' ? 'e Aufnahme' : ' Bild'}: oben wählen oder aufnehmen.`}</span>}
         </div>
       )}
+      <div className={c.row}>
+        <input
+          className={c.titleInput}
+          value={draft.title}
+          maxLength={200}
+          placeholder={draft.kind === 'source' ? 'Titel, Autorin oder Autor, Jahr' : draft.kind === 'data' ? 'Was zeigt die Tabelle?' : 'Überschrift (Wörter im Text markieren)'}
+          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          onPaste={guard.onPaste}
+          aria-label="Überschrift"
+        />
+        {kindSelect}
+        {showVis && <VisSelect small value={draft.visibility} onChange={(v) => setDraft({ ...draft, visibility: v })} allowed={visAllowed} />}
+      </div>
+      {draft.kind === 'data' && <TableEdit rows={draft.rows} set={(rows) => setDraft({ ...draft, rows })} />}
       {draft.kind === 'hand' && (
         <div className={c.row}>
-          <button type="button" className="btn" disabled title="Die Texterkennung kommt über Autogra.fi, sobald Collegare damit verbunden ist (Konzept 8d.4).">
+          <button type="button" className="btn" disabled title="Die Texterkennung kommt über Autogra.fi, sobald Collegare damit verbunden ist (Konzept 8d.4). Erkannter Text erscheint dann auch unter „Arbeitsprozess“.">
             Text erkennen
           </button>
           <span className="muted">Bis dahin den Text unten selbst abtippen.</span>
         </div>
       )}
       <textarea
+        ref={body}
         rows={draft.kind === 'data' ? 2 : 4}
         value={draft.body}
         maxLength={10_000}
-        placeholder={draft.kind === 'source' ? 'Zitat oder Zusammenfassung …' : draft.kind === 'link' ? 'Worum geht es auf der Seite?' : draft.kind === 'hand' ? 'Text der Notiz (abgetippt oder erkannt)' : draft.kind === 'audio' || draft.kind === 'video' ? 'Worum geht es? Wichtige Stellen mit Zeit, z. B. 1:20 …' : draft.kind === 'data' ? 'Erklärung zur Tabelle (freiwillig)' : k.hint + ' …'}
+        placeholder={
+          draft.kind === 'source'
+            ? 'Zitat oder Zusammenfassung …'
+            : draft.kind === 'link'
+              ? 'Worum geht es auf der Seite?'
+              : draft.kind === 'hand'
+                ? 'Text der Notiz (abgetippt oder erkannt)'
+                : draft.kind === 'audio' || draft.kind === 'video'
+                  ? 'Worum geht es? Wichtige Stellen mit Zeit, z. B. 1:20 …'
+                  : draft.kind === 'data'
+                    ? 'Erklärung zur Tabelle (freiwillig)'
+                    : 'Gedanke, Frage, Absprache …'
+        }
         onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+        onSelect={onSelect}
+        onPaste={guard.onPaste}
         aria-label="Text"
       />
+      {sel && (
+        <div className={c.row}>
+          <button
+            type="button"
+            className={`btn ${c.selTitle}`}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setDraft({ ...draft, title: sel.slice(0, 200) });
+              setSel('');
+            }}
+          >
+            „{sel.length > 60 ? sel.slice(0, 57) + '…' : sel}“ als Überschrift
+          </button>
+        </div>
+      )}
+      <PasteNotes g={guard} onCite={(src) => setDraft({ ...draft, source: draft.source || src, kind: draft.kind === 'note' ? 'source' : draft.kind })} citeLabel="Angeben und als Fundstelle eintragen" />
       {(draft.kind === 'source' || draft.kind === 'data') && <input value={draft.source} maxLength={500} placeholder={draft.kind === 'data' ? 'Quelle der Daten, z. B. Statistisches Bundesamt 2024' : 'Fundstelle, z. B. S. 42 oder Kapitel 3'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} aria-label="Fundstelle" />}
-      {!['note', 'image', 'audio', 'hand'].includes(draft.kind) && <input type="url" value={draft.url} maxLength={2000} placeholder="https://…" onChange={(e) => setDraft({ ...draft, url: e.target.value })} aria-label="Link" />}
       {draft.kind === 'image' && (
         <>
           <input value={draft.credit} maxLength={300} placeholder="Urheber: Fotografin, Zeichner, Rechteinhaber" onChange={(e) => setDraft({ ...draft, credit: e.target.value })} aria-label="Urheber" />
           <input value={draft.license} maxLength={200} placeholder="Lizenz, z. B. CC BY-SA 4.0 oder gemeinfrei" onChange={(e) => setDraft({ ...draft, license: e.target.value })} aria-label="Lizenz" />
-          <input type="url" value={draft.origin} maxLength={2000} placeholder="Ursprungsseite: wo du das Bild gefunden hast (https://…)" onChange={(e) => setDraft({ ...draft, origin: e.target.value })} aria-label="Ursprungsseite" />
         </>
       )}
       <div className={c.row}>
-        <span className="muted">Strg+Enter speichert</span>
+        <span className="muted">Klick daneben speichert, Esc verwirft</span>
         <span className="grow" />
-        {onCancel && (
-          <button type="button" className="btn" onClick={onCancel}>
-            Abbrechen
-          </button>
-        )}
+        <button type="button" className="btn" onClick={onCancel}>
+          Verwerfen
+        </button>
         <button className="btn primary" type="submit" disabled={!ok || busy}>
-          {adding ? 'Hinzufügen' : 'Speichern'}
+          {adding ? 'Hinzufügen' : 'Fertig'}
         </button>
       </div>
     </form>
-  );
-}
-
-/** Editor als großes Fenster (Desktop) oder an Ort und Stelle (Handy) */
-function EditShell({ wide, title, onClose, children }: { wide: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
-  if (!wide) return <div className={`${c.note} ${c.editing}`}>{children}</div>;
-  return (
-    <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${c.modal}`} role="dialog" aria-label={title}>
-        <h2>{title}</h2>
-        {children}
-      </div>
-    </div>
   );
 }
 
@@ -421,9 +537,20 @@ function Table({ rows }: { rows: string[][] }) {
   );
 }
 
+/** Braucht die Notiz eine Quellenangabe? Eigene Gedanken, Aufnahmen und Handschrift nicht */
+const needsSource = (n: Note) => n.kind === 'source' || n.kind === 'link' || n.kind === 'image' || n.kind === 'data' || (n.kind === 'video' && !n.file);
+/** Hat sie eine? Bilder: Ursprungsseite und Urheber oder Lizenz; sonst Fundstelle oder Link */
+const hasSource = (n: Note) => (n.kind === 'image' ? !!(n.origin && (n.credit || n.license)) : !!(n.source.trim() || n.url || n.origin));
+const host = (u: string) => {
+  try {
+    return new URL(u).hostname.replace(/^www\./, '');
+  } catch {
+    return u;
+  }
+};
+
 export function NotesPanel({ me, project, panel = false, onClose, wanted = null }: { me: Me; project: ProjectView; panel?: boolean; onClose?: () => void; wanted?: string | null }) {
   const id = project.id;
-  const wide = useWide();
   const [join, setJoin] = useState<JoinAck | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [scope, setScope] = useState<string | null>(null);
@@ -434,7 +561,11 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   const [edit, setEdit] = useState<{ id: number; d: Draft } | null>(null);
   const [reporting, setReporting] = useState<{ id: number; reason: string } | null>(null);
   const [kind, setKind] = useState<Kind | 'all'>('all');
-  // Gliederung rechts neben dem Thread (Konzept 8g, früher „Meine Linie“), nur auf der eigenen Seite, nicht in der Leiste
+  // Quellenangabe: alle, mit, fehlt (Wunsch Jo: Filter statt Hinweis unter jeder Notiz)
+  const [cited, setCited] = useState<'all' | 'with' | 'missing'>('all');
+  // Stück einer Webseite mit Text und Bildern: auf Notizen verteilen
+  const [split, setSplit] = useState<Block[] | null>(null);
+  // Gliederung rechts neben dem Thread (Konzept 8h, früher „Meine Linie“), nur auf der eigenen Seite, nicht in der Leiste
   const [lineView, setLineView] = useState(false);
   useEffect(() => {
     try {
@@ -459,6 +590,13 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   const ownScope = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const toBottom = useRef(false);
+
+  const st = project.settings;
+  const media = { audio: st.notesAudio !== false, video: st.notesVideo !== false, mb: st.notesMediaMb ?? 25 };
+  const rules: PasteRules | null = scope ? { projectId: id, scope, outside: st.pasteOutside, threshold: st.pasteThreshold, logAll: st.pasteLogAll !== false } : null;
+  const placeOf = (d: Draft) => `Notiz „${(d.title || d.body.split('\n')[0] || 'Ohne Titel').slice(0, 120)}“`;
+  const addGuard = usePasteGuard(rules, null, () => placeOf(draft));
+  const editGuard = usePasteGuard(rules, edit ? `note:${edit.id}` : null, () => (edit ? placeOf(edit.d) : 'Notiz'));
 
   const show = (msg: string) => {
     setToast(msg);
@@ -543,6 +681,14 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   /** Bilder aus anderen Tabs, Bildschirmfotos, Dateien: ablegen oder einfügen (lib/imageDrop.ts) */
   async function takeDropped(dt: DataTransfer) {
     if (!scope) return;
+    // Stück einer Seite mit Text (und vielleicht Bildern): verteilen statt nur Bilder übernehmen
+    const html = dt.getData('text/html');
+    const plain = dt.getData('text/plain');
+    if (html || plain) {
+      const blocks = blocksFrom(html, html ? '' : plain);
+      const fromProject = !!clipOrigin(dt, id, plain);
+      if (!fromProject && textLength(blocks) >= 30) return setSplit(blocks);
+    }
     const { images, pageLink } = imagesFrom(dt);
     if (!images.length) {
       if (pageLink) setPageImport(pageLink);
@@ -557,17 +703,41 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   async function pickImage(f: File, d: Draft, put: (d: Draft) => void) {
     if (!scope) return;
     try {
-      if (FILE_KINDS[d.kind]?.what !== 'Bild' && FILE_KINDS[d.kind]?.what !== 'Foto') show('Wird hochgeladen …');
-      const up = await uploadImage(id, scope, { file: f });
+      if (d.kind === 'audio' || d.kind === 'video') show('Wird hochgeladen …');
+      const up = await uploadImage(id, scope, { file: f, art: d.kind === 'audio' ? 'audio' : undefined });
       put({ ...d, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
     } catch (e) {
       show(e instanceof Error ? e.message : 'Hochladen fehlgeschlagen');
     }
   }
 
+  /** Adresse im Feld Material: Bild über den Server holen, sonst Seite lesen (Titel, Autor) und als Link bzw. Quelle */
+  async function fromUrl(url: string, d: Draft, put: (d: Draft) => void) {
+    if (!scope) return;
+    if (looksLikeImage(url)) {
+      try {
+        show('Bild wird geholt …');
+        const info = await imageInfo(url, null).catch(() => null);
+        const up = await uploadImage(id, scope, { url: info?.imageUrl ?? url });
+        put({ ...d, kind: 'image', url, file: up.file, mime: up.mime, preview: proxied(url), title: d.title || info?.title || '', credit: d.credit || info?.credit || '', license: d.license || info?.license || '', origin: d.origin || info?.origin || '' });
+        return;
+      } catch (e) {
+        const x = e as Error & { page?: boolean };
+        if (!x.page) return show(x.message);
+      }
+    }
+    put({ ...d, kind: d.kind === 'note' ? 'link' : d.kind });
+    try {
+      const pg = await readPage(url);
+      put({ ...d, kind: d.kind === 'note' ? 'link' : d.kind, title: d.title || pg.title.slice(0, 200), source: d.source || (d.kind === 'source' ? [pg.author, pg.site].filter(Boolean).join(', ').slice(0, 500) : '') });
+    } catch {
+      /* Seite nicht lesbar: Link bleibt */
+    }
+  }
+
   function openAdd() {
     // neue Notiz bekommt die Stufe, die gerade im Filter steht
-    setDraft(empty(draft.kind, teacher ? (shared ? 'all' : 'group') : level));
+    setDraft(empty('note', teacher ? (shared ? 'all' : 'group') : level));
     setEdit(null);
     setAdding(true);
   }
@@ -579,7 +749,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     sock.current.emit('notes:add', { projectId: id, scope, note: payload(draft) }, (r: Res) => {
       setBusy(false);
       if (r.ok) {
-        setDraft(empty(draft.kind, draft.visibility));
+        if (r.id) addGuard.flush(`note:${r.id}`);
+        setDraft(empty('note', draft.visibility));
         setAdding(false);
       } else show(r.error ?? 'Speichern fehlgeschlagen');
     });
@@ -641,23 +812,58 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   // Thread wie ein Chat: alt oben, neu unten (Server liefert neu zuerst)
   const ordered = [...notes].reverse();
   const byLevel = !teacher && !shared && level === 'private' ? ordered.filter((n) => n.visibility === 'private' && n.userId === me.id) : ordered;
-  const shown = kind === 'all' ? byLevel : byLevel.filter((n) => n.kind === kind);
-  const editing = edit ? notes.find((n) => n.id === edit.id) : undefined;
+  const byKind = kind === 'all' ? byLevel : byLevel.filter((n) => n.kind === kind);
+  const missingCount = byKind.filter((n) => needsSource(n) && !hasSource(n)).length;
+  const shown = cited === 'all' ? byKind : cited === 'with' ? byKind.filter(hasSource) : byKind.filter((n) => needsSource(n) && !hasSource(n));
 
+  const putEdit = (n: Note) => (nd: Draft) => setEdit((cur) => (cur?.id === n.id ? { id: n.id, d: nd } : cur));
   const editorFor = (n: Note) =>
     edit && (
       <Editor
+        key={n.id}
         draft={edit.d}
         setDraft={(d) => setEdit({ id: n.id, d })}
         onSave={save}
         onCancel={() => setEdit(null)}
         busy={busy}
         visAllowed={allowedFor(n)}
-        pickImage={(f, d) => void pickImage(f, d, (nd) => setEdit({ id: n.id, d: nd }))}
+        pickImage={(f, d) => void pickImage(f, d, putEdit(n))}
+        fromUrl={(u, d) => void fromUrl(u, d, putEdit(n))}
+        guard={editGuard}
+        media={media}
       />
     );
 
-  const addEditor = <Editor draft={draft} setDraft={setDraft} onSave={add} onCancel={() => setAdding(false)} busy={busy} adding showVis={!shared} pickImage={(f, d) => void pickImage(f, d, setDraft)} />;
+  const addEditor = (
+    <Editor
+      draft={draft}
+      setDraft={setDraft}
+      onSave={add}
+      onCancel={() => setAdding(false)}
+      busy={busy}
+      adding
+      showVis={!shared}
+      pickImage={(f, d) => void pickImage(f, d, setDraft)}
+      fromUrl={(u, d) => void fromUrl(u, d, setDraft)}
+      guard={addGuard}
+      media={media}
+    />
+  );
+
+  /** Notiz aus „Auf Notizen verteilen“ */
+  function addSplitNote(x: SplitNoteInput): Promise<Res> {
+    return new Promise((resolve) => {
+      if (!scope || !sock.current?.connected) return resolve({ ok: false, error: 'Keine Verbindung zum Server. Bitte kurz warten.' });
+      sock.current.emit('notes:add', { projectId: id, scope, note: { ...x, visibility: levelNow() } }, (r: Res) => resolve(r));
+    });
+  }
+  /** Text von außen, der über „Auf Notizen verteilen“ kam, ins Protokoll */
+  function logSplit(text: string, noteId: number, title: string) {
+    if (!rules || shared) return;
+    if (!rules.logAll && [...text].length < rules.threshold) return;
+    void post(`/api/projects/${id}/einfuegen`, { scope: rules.scope, place: `Notiz „${(title || text.split('\n')[0]).slice(0, 120)}“`, text, target: `note:${noteId}` }).catch(() => {});
+  }
+
 
   // Ablegen nur für Bilder und Links von außen, nicht für eigene Karten (die gehen in die Mindmap)
   const canDrop = (e: React.DragEvent) => !!scope && !isChatDrag(e) && mayHoldImages(e.dataTransfer);
@@ -685,7 +891,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         const t = e.target as HTMLElement;
         if (!scope || t.closest('input, textarea, [contenteditable="true"]')) return;
         const { images, pageLink } = imagesFrom(e.clipboardData);
-        if (!images.length && !pageLink) return;
+        if (!images.length && !pageLink && textLength(blocksFrom(e.clipboardData.getData('text/html'), e.clipboardData.getData('text/plain'))) < 30) return;
         e.preventDefault();
         void takeDropped(e.clipboardData);
       }}
@@ -700,7 +906,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                 {x.title}
               </option>
             ))}
-            <option value={SHARED}>🌐 Allgemein (alle Gruppen)</option>
+            <option value={SHARED}>Allgemein (alle Gruppen)</option>
           </select>
         ) : (
           join &&
@@ -709,7 +915,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
               <select className={c.vis} value={level} onChange={(e) => chooseLevel(e.target.value as Visibility)} aria-label="Welche Notizen zeigen?" title="Privat: nur deine eigenen. Gruppe: alles deiner Gruppe. Allgemein: was die Gruppen für alle freigegeben haben.">
                 {VIS.map((x) => (
                   <option key={x.v} value={x.v}>
-                    {x.icon} {x.label}
+                    {x.label}
                   </option>
                 ))}
               </select>
@@ -725,12 +931,12 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         <span className="grow" />
         {scope && (
           <button className={`btn icon ${c.fromPage}`} onClick={() => setPageImport('')} title="Bilder von einer Seite übernehmen: Adresse einfügen, Bilder auswählen. Einzelne Bilder kannst du auch einfach aus einem anderen Tab hierher ziehen." aria-label="Bilder von einer Seite">
-            🖼
+            <Icon name="image" />
           </button>
         )}
         {onClose && (
           <button className={`btn icon ${c.close}`} onClick={onClose} title="Schließen" aria-label="Notizen schließen">
-            ×
+            <Icon name="close" />
           </button>
         )}
       </div>
@@ -748,7 +954,20 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                   </button>
                 ))}
               </span>
-              <span className="muted">{panel ? 'In die Mindmap ziehen' : 'Karten lassen sich in die Mindmap ziehen'}</span>
+              <span className="seg" role="group" aria-label="Quellenangabe">
+                {(
+                  [
+                    ['all', 'Alle'],
+                    ['with', 'Mit Quellenangabe'],
+                    ['missing', `Quellenangabe fehlt${missingCount ? ` (${missingCount})` : ''}`],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button key={k} className={`btn ${cited === k ? 'on' : ''} ${k === 'missing' && missingCount ? c.missingBtn : ''}`} aria-pressed={cited === k} onClick={() => setCited(k)}>
+                    {label}
+                  </button>
+                ))}
+              </span>
+              <span className="muted">{panel ? 'Doppelklick bearbeitet, ziehen in die Mindmap' : 'Doppelklick bearbeitet; Karten lassen sich in die Mindmap ziehen'}</span>
             </div>
             {join && shown.length === 0 && (
               <p className={`muted ${c.empty}`}>
@@ -758,12 +977,21 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
             {shown.map((n) => {
               const mine = n.userId === me.id;
               const canEdit = teacher || mine;
-              if (edit?.id === n.id && !wide) return <div key={n.id} className={`${c.note} ${c.editing}`}>{editorFor(n)}</div>;
+              if (edit?.id === n.id) return <div key={n.id} className={`${c.note} ${c.editing}`}>{editorFor(n)}</div>;
+              const startEdit = () => {
+                setAdding(false);
+                setEdit({ id: n.id, d: toDraft(n) });
+              };
               return (
                 <article
                   key={n.id}
                   className={`${c.note} ${c[n.kind]} ${n.visibility === 'all' && !shared ? c.released : ''} ${n.visibility === 'private' ? c.private : ''} ${n.reported ? c.reported : ''}`}
                   draggable={!n.reported}
+                  onDoubleClick={(e) => {
+                    if (!canEdit || shared || (e.target as Element).closest('a, audio, video, select, button, input')) return;
+                    window.getSelection()?.removeAllRanges();
+                    startEdit();
+                  }}
                   onDragStart={(e) => {
                     setChatDrag(e, { name: n.name, body: [n.title, n.body].filter(Boolean).join('\n'), note: { id: n.id, title: cardTitle(n), text: cardText(n) } });
                     // Bilder auch auf Folien (Bento übernimmt Bild und Quellenangabe)
@@ -774,7 +1002,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                         citation: { author: [n.credit, n.license].filter(Boolean).join(', ') || undefined, title: n.title || undefined, sourceUrl: n.origin || n.url || '', retrievedAt: new Date(n.at).toISOString().slice(0, 10) },
                       });
                   }}
-                  title={n.reported ? undefined : n.kind === 'image' ? 'In die Mindmap oder auf eine Folie ziehen' : 'In die Mindmap ziehen'}
+                  title={n.reported ? undefined : `${canEdit && !shared ? 'Doppelklick zum Bearbeiten. ' : ''}${n.kind === 'image' ? 'In die Mindmap oder auf eine Folie ziehen' : 'In die Mindmap ziehen'}`}
                 >
                   <header className={c.head}>
                     <span className={c.kind}>{KINDS.find((k) => k.kind === n.kind)?.label ?? (n.kind === 'image' ? 'Bild' : n.kind)}</span>
@@ -785,39 +1013,31 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                     {canEdit && !shared ? (
                       <VisSelect small value={n.visibility} allowed={allowedFor(n)} onChange={(v) => update(n, { ...toDraft(n), visibility: v })} />
                     ) : (
-                      <span className={c.visTag} title={visOf(n.visibility).long}>
-                        {visOf(n.visibility).icon}
+                      <span className={c.visTag} title={visOf(n.visibility).long} aria-label={visOf(n.visibility).long}>
+                        <Icon name={visOf(n.visibility).icon} size={14} />
                       </span>
                     )}
                     <span className={c.tools}>
-                      {canEdit && (
-                        <button
-                          className="btn icon"
-                          onClick={() => {
-                            setAdding(false);
-                            setEdit({ id: n.id, d: toDraft(n) });
-                          }}
-                          title="Überarbeiten"
-                          aria-label="Überarbeiten"
-                        >
-                          ✎
+                      {canEdit && !shared && (
+                        <button className="btn icon" onClick={startEdit} title="Überarbeiten (oder Doppelklick auf die Notiz)" aria-label="Überarbeiten">
+                          <Icon name="pen" size={15} />
                         </button>
                       )}
                       {!mine && !n.reportedByMe && (
                         <button className="btn icon" onClick={() => setReporting({ id: n.id, reason: '' })} title="Melden: Die Karte sehen dann nur noch die Lehrkraft, wer sie geschrieben hat, und du." aria-label="Melden">
-                          ⚑
+                          <Icon name="flag" size={15} />
                         </button>
                       )}
                       {canEdit && (
                         <button className="btn icon" onClick={() => remove(n)} title="Löschen" aria-label="Löschen">
-                          ×
+                          <Icon name="trash" size={15} />
                         </button>
                       )}
                     </span>
                   </header>
                   {n.reported && (
                     <div className={c.reportBox}>
-                      <strong>⚑ Gemeldet.</strong>{' '}
+                      <strong>Gemeldet.</strong>{' '}
                       {teacher ? (
                         <>
                           {n.reports?.map((r) => `${r.name}${r.reason ? ': „' + r.reason + '“' : ''}`).join('; ')}{' '}
@@ -850,24 +1070,16 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                   {n.file && n.kind !== 'image' && <Media className={c.picture} src={noteFileUrl(id, n.id, n.updatedAt)} mime={n.file.mime} kind={n.kind} title={n.title} />}
                   {n.kind === 'image' && n.file && <img className={c.picture} src={noteFileUrl(id, n.id, n.updatedAt)} alt={n.title} loading="lazy" draggable={false} />}
                   {n.title && <h3 className={c.title}>{n.title}</h3>}
-                  {n.kind === 'image' && (
+                  {n.kind === 'image' && (n.credit || n.license || n.origin) && (
                     <p className={c.place}>
-                      {[n.credit && `Urheber: ${n.credit}`, n.license && `Lizenz: ${n.license}`].filter(Boolean).join(' · ') || 'Urheber und Lizenz fehlen noch.'}
-                      {n.origin ? (
+                      {[n.credit && `Urheber: ${n.credit}`, n.license && `Lizenz: ${n.license}`].filter(Boolean).join(' · ')}
+                      {n.origin && (
                         <>
-                          {' · '}
+                          {n.credit || n.license ? ' · ' : ''}
                           <a href={n.origin} target="_blank" rel="noopener noreferrer">
-                            {(() => {
-                              try {
-                                return new URL(n.origin).hostname.replace(/^www\./, '');
-                              } catch {
-                                return n.origin;
-                              }
-                            })()}
+                            {host(n.origin)}
                           </a>
                         </>
-                      ) : (
-                        <span className={c.missing}> · Ursprungsseite fehlt{canEdit ? ', bitte mit ✎ nachtragen' : ''}</span>
                       )}
                     </p>
                   )}
@@ -882,7 +1094,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                 </article>
               );
             })}
-            {join && scope && (adding && !wide ? addEditor : <button className={c.addBig} onClick={openAdd}>
+            {join && scope && (adding ? <div className={`${c.note} ${c.editing}`}>{addEditor}</div> : <button className={c.addBig} onClick={openAdd}>
                 <span aria-hidden>+</span> Neue Notiz
               </button>)}
           </div>
@@ -894,18 +1106,20 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         )}
         </div>
       )}
-      {wide && adding && (
-        <EditShell wide title={shared ? 'Neue Notiz für alle' : 'Neue Notiz'} onClose={() => setAdding(false)}>
-          {addEditor}
-        </EditShell>
-      )}
-      {wide && editing && (
-        <EditShell wide title="Notiz überarbeiten" onClose={() => setEdit(null)}>
-          {editorFor(editing)}
-        </EditShell>
+      {split && scope && (
+        <NoteSplit
+          projectId={id}
+          scope={scope}
+          blocks={split}
+          limit={!shared && st.pasteOutside === 'limit' ? st.pasteThreshold : null}
+          addNote={addSplitNote}
+          logPaste={logSplit}
+          onClose={() => setSplit(null)}
+          onDone={show}
+        />
       )}
       {pageImport !== null && scope && <ImageImport projectId={id} scope={scope} start={pageImport} addNote={addImageNote} onClose={() => setPageImport(null)} onDone={show} />}
-      {dropping && <div className={c.dropHint}>Bilder hier ablegen: Sie kommen mit Urheber, Lizenz und Ursprungsseite in die Notizen.</div>}
+      {dropping && <div className={c.dropHint}>Hier ablegen: Bilder kommen mit Urheber, Lizenz und Ursprungsseite in die Notizen, Text mit Bildern lässt sich auf mehrere Notizen verteilen.</div>}
       {toast && <div className={c.toast}>{toast}</div>}
     </div>
   );

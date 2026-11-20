@@ -49,7 +49,7 @@ const PATHS: Record<string, string> = {
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
   mic: 'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8',
   video: 'M23 7l-7 5 7 5zM1 5h15v14H1z',
-  /* Gliederung (Konzept 8g) */
+  /* Gliederung (Konzept 8h) */
   up: 'M12 19V5M5 12l7-7 7 7',
   down: 'M12 5v14M19 12l-7 7-7-7',
   plus: 'M12 5v14M5 12h14',

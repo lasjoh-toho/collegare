@@ -1,4 +1,4 @@
-/* Gliederung als U-Bahn-Linie (Konzept 8g): durchgehende dicke Linie, weiße Stationen, Objekte als Karten mit Schatten */
+/* Gliederung als U-Bahn-Linie (Konzept 8h): durchgehende dicke Linie, weiße Stationen, Objekte als Karten mit Schatten */
 .wrap { --metro: #2b579a; --ink: var(--fg); display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .top { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 6px; border-bottom: 1px solid var(--line); }
 .tabs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: stretch; }

@@ -385,7 +385,7 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   return { nodes, height: Math.max(hr, hl, 200) };
 }
 
-/** Verbindung zur Gliederung (Konzept 8g): in der gerade gezeigten Linie? umschalten, ausgegraut, Ablegen auf der Linie */
+/** Verbindung zur Gliederung (Konzept 8h): in der gerade gezeigten Linie? umschalten, ausgegraut, Ablegen auf der Linie */
 export interface LineHook {
   has: (id: string) => boolean;
   toggle: (c: MapCard, whole?: boolean) => void;

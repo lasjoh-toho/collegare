@@ -1,5 +1,5 @@
 /**
- * Gliederung als U-Bahn-Linien (Konzept 8g): Typen wie im Server (server/src/projects/outlineLines.ts) und kleine
+ * Gliederung als U-Bahn-Linien (Konzept 8h): Typen wie im Server (server/src/projects/outlineLines.ts) und kleine
  * Helfer, die eine neue Fassung der Linien bauen. Gesendet wird immer die ganze Gliederung (Map-Op `lines`).
  */
 import type { MapCard, MindMap } from './types';
