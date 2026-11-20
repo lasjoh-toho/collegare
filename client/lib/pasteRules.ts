@@ -9,7 +9,12 @@ export interface PasteRules {
   scope: string;
   outside: 'allow' | 'ask' | 'limit';
   threshold: number;
+  /** jedes Einsetzen von außen protokollieren, nicht erst ab threshold */
+  logAll: boolean;
 }
+
+/** Hinweis an Lernende (Wortlaut Jo, 20. November 2026) */
+export const CITE_RULE = 'Es ist Bestandteil wissenschaftlichen Arbeitens, bei der Wiedergabe fremder Texte die Quelle anzugeben.';
 
 export const PasteRulesContext = createContext<PasteRules | null>(null);
 export const usePasteRules = () => useContext(PasteRulesContext);

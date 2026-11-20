@@ -70,6 +70,15 @@ export const SettingsSchema = z.object({
   pasteThreshold: z.number().int().min(20).max(100_000),
   /** Einsetzen von außen (Konzept 8d.3): erlauben, nach der Herkunft fragen, nur bis pasteThreshold Zeichen */
   pasteOutside: z.enum(['allow', 'ask', 'limit']),
+  /** jedes Einsetzen von außen protokollieren, nicht erst ab pasteThreshold (Wunsch Jo, 20. November 2026: Standard an) */
+  pasteLogAll: z.boolean(),
+  /**
+   * Ton und Video in den Notizen (aufnehmen und hochladen, Wunsch Jo, 20. November 2026): datenintensiv, daher von
+   * Lehrkraft und Administration erlaubt und begrenzt. Video-Links bleiben immer möglich.
+   */
+  notesAudio: z.boolean(),
+  notesVideo: z.boolean(),
+  notesMediaMb: z.number().min(1).max(200),
   logbookRequired: z.boolean(),
   aiFeedback: z.boolean(),
   aiDailyLimit: z.number().int().min(0).max(100),
@@ -119,6 +128,10 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   reopenBy: 'teacher',
   pasteThreshold: 200,
   pasteOutside: 'allow',
+  pasteLogAll: true,
+  notesAudio: true,
+  notesVideo: true,
+  notesMediaMb: 25,
   logbookRequired: true,
   aiFeedback: false,
   aiDailyLimit: 5,
@@ -158,6 +171,10 @@ export const FrameSchema = z.object({
   /** Tippfluss-Hinweise (Entscheidung 10.5): aus, nur Lernende, Lernende und Lehrkraft */
   typingHints: z.enum(['off', 'students', 'students_teachers']),
   openOffice: z.boolean(),
+  /** Ton und Video in den Notizen überhaupt erlauben, und bis zu welcher Größe */
+  notesAudio: z.boolean(),
+  notesVideo: z.boolean(),
+  notesMediaMb: z.number().min(1).max(200),
 });
 export type Frame = z.infer<typeof FrameSchema>;
 
@@ -169,6 +186,9 @@ export const DEFAULT_FRAME: Frame = {
   ai: true,
   typingHints: 'off',
   openOffice: false,
+  notesAudio: true,
+  notesVideo: true,
+  notesMediaMb: 100,
 };
 
 /** Liest gespeichertes JSON robust ein: Standardwerte für Fehlendes, Ungültiges fällt auf den Standard zurück. */
@@ -205,6 +225,9 @@ export function clampToFrame(s: ProjectSettings, f: Frame): ProjectSettings {
     exportFormats: and(s.exportFormats, f.exportFormats),
     maxFileMb: Math.min(s.maxFileMb, f.maxFileMb),
     aiFeedback: s.aiFeedback && f.ai,
+    notesAudio: s.notesAudio && f.notesAudio,
+    notesVideo: s.notesVideo && f.notesVideo,
+    notesMediaMb: Math.min(s.notesMediaMb, f.notesMediaMb),
   };
 }
 

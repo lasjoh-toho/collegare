@@ -4,7 +4,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { requireSession } from '../http/auth.js';
-import { PasteAnswer, PasteInput } from '../projects/pastes.js';
+import { PasteAnswer, PasteInput, TARGET } from '../projects/pastes.js';
 import type { Services } from '../services.js';
 import { mapScopes } from './maps.js';
 
@@ -35,7 +35,48 @@ export function pasteRoutes(app: FastifyInstance, s: Services) {
     if (!a.scopes.some((x) => x.scope === body.data.scope)) return reply.code(403).send({ error: 'Kein Zugriff auf diesen Bereich' });
     const id = await s.pastes.add(a.projectId, a.userId, body.data);
     await s.audit.append({ actorId: a.userId, action: 'paste.outside', projectId: a.projectId, data: { id, scope: body.data.scope, chars: [...body.data.text].length } });
-    return { id };
+    return { id, total: await s.pastes.totalFor(a.projectId, a.userId, body.data.target) };
+  });
+
+  /** Was die Person schon von außen in dieses Ziel eingesetzt hat (die Grenze zählt je Karte bzw. Notiz zusammen) */
+  app.get<{ Params: { id: string }; Querystring: { ziel?: string } }>('/api/projects/:id/einfuegen/summe', async (req, reply) => {
+    const a = await member(req, reply);
+    if (!a) return;
+    const target = String(req.query.ziel ?? '');
+    if (!TARGET.test(target)) return reply.code(400).send({ error: 'Ungültiges Ziel' });
+    return { total: await s.pastes.totalFor(a.projectId, a.userId, target) };
+  });
+
+  /**
+   * Spur im Text (nur Lehrkraft): heutiger Text der Karte bzw. Notiz und alle Texte, die von außen hineinkamen. Der
+   * Vergleich läuft im Browser (client/lib/trace.ts).
+   */
+  app.get<{ Params: { id: string }; Querystring: { ziel?: string } }>('/api/projects/:id/einfuegen/spur', async (req, reply) => {
+    const a = await member(req, reply);
+    if (!a) return;
+    if (a.role !== 'teacher') return reply.code(403).send({ error: 'Nur für Lehrkräfte' });
+    const target = String(req.query.ziel ?? '');
+    if (!TARGET.test(target)) return reply.code(400).send({ error: 'Ungültiges Ziel' });
+    const own = new Set(a.scopes.map((x) => x.scope));
+    const pastes = (await s.pastes.trace(a.projectId, target)).filter((p) => own.has(p.scope));
+    const [type, key] = target.split(':') as ['card' | 'note', string];
+    let title = '';
+    let text: string | null = null;
+    if (type === 'note') {
+      const n = await s.notes.get(Number(key));
+      if (n && n.projectId === a.projectId && own.has(n.scope)) {
+        title = n.title;
+        text = [n.title, n.body, n.source && `Fundstelle: ${n.source}`].filter(Boolean).join('\n\n');
+      }
+    } else {
+      const scope = pastes[0]?.scope;
+      const card = scope ? (await s.maps.get(a.projectId, scope)).map.cards[key] : undefined;
+      if (card) {
+        title = card.title;
+        text = [card.title, card.text].filter(Boolean).join('\n\n');
+      }
+    }
+    return { target, title, text, pastes };
   });
 
   app.post<{ Params: { id: string; pid: string } }>('/api/projects/:id/einfuegen/:pid', async (req, reply) => {

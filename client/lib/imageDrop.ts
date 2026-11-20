@@ -136,9 +136,11 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 /** Bild in die Ablage der Notizen: Datei hochladen oder den Server die Adresse holen lassen */
-export async function uploadImage(projectId: number, scope: string, img: { file?: File; url?: string }): Promise<UploadedFile> {
+export async function uploadImage(projectId: number, scope: string, img: { file?: File; url?: string; art?: string }): Promise<UploadedFile> {
   if (img.file) {
     const q = new URLSearchParams({ scope, name: img.file.name || 'bild' });
+    // art: audio bei Tonaufnahmen in WebM/MP4 (der Server sieht sonst ein Video)
+    if (img.art) q.set('art', img.art);
     return json(await fetch(api(`/api/projects/${projectId}/notizen/datei?${q}`), { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/octet-stream' }, body: img.file }));
   }
   return json(await fetch(api(`/api/projects/${projectId}/notizen/datei`), { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scope, url: img.url }) }));

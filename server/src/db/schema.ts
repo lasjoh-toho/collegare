@@ -333,6 +333,14 @@ export interface PastesTable {
   note: string;
   created_at: Ms;
   answered_at: Ms | null;
+  /** ganzer Text (für die Spur im Text), seit 0018 */
+  full_text: string | null;
+  /** Ziel: card:<id> oder note:<id>; leer bei älteren Einträgen */
+  target: Generated<string>;
+  /** paste: eingefügt; print/hand: per Texterkennung aus Druckschrift bzw. Handschrift */
+  origin: Generated<string>;
+  /** Notiz mit dem Bild (Texterkennung) */
+  note_id: number | null;
 }
 
 /** Eigene Linie (Konzept 8e.7): Stationen mit Notiz, Abschnitt der Gliederung und angehängten Karten, als JSON */

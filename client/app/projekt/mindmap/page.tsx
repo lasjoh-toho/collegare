@@ -297,7 +297,7 @@ export default function MindmapPage() {
         }
       : undefined;
 
-  const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold } : null;
+  const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold, logAll: settings.pasteLogAll !== false } : null;
 
   return (
     <PasteRulesContext.Provider value={pasteRules}>

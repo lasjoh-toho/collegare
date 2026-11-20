@@ -461,6 +461,17 @@ migrations['0017_note_lines'] = {
   },
 };
 
+// Herkunft von Texten (Wunsch Jo, 20. November 2026): ganzer Text für die Spur im Text (Paste and Shake), Ziel (Karte
+// oder Notiz), Art des Eintrags (eingefügt oder per Texterkennung aus Druck- bzw. Handschrift) und das Bild dazu
+migrations['0018_paste_trace'] = {
+  async up(db) {
+    await db.schema.alterTable('pastes').addColumn('full_text', isMysql(db) ? sql`mediumtext` : sql`text`).execute();
+    await db.schema.alterTable('pastes').addColumn('target', 'varchar(60)', (c) => c.notNull().defaultTo('')).execute();
+    await db.schema.alterTable('pastes').addColumn('origin', 'varchar(10)', (c) => c.notNull().defaultTo('paste')).execute();
+    await db.schema.alterTable('pastes').addColumn('note_id', 'integer').execute();
+  },
+};
+
 // Werkzeuge und Materialien in der Übersicht (Jo, 20. November 2026): eigene Werkstatt je Lehrkraft (Projekt der Art
 // 'werkstatt' in einem eigenen Kontext), Schlagworte, Freigabe für Gruppen und Einzelne, Herkunft beim Übernehmen
 migrations['0019_werkstatt_material'] = {

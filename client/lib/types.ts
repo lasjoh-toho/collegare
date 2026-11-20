@@ -92,6 +92,11 @@ export interface ProjectSettings {
   reopenBy: 'teacher' | 'group';
   pasteThreshold: number;
   pasteOutside: 'allow' | 'ask' | 'limit';
+  /** jedes Einsetzen von außen protokollieren (Standard), sonst erst ab pasteThreshold */
+  pasteLogAll: boolean;
+  notesAudio: boolean;
+  notesVideo: boolean;
+  notesMediaMb: number;
   logbookRequired: boolean;
   aiFeedback: boolean;
   aiDailyLimit: number;
@@ -124,6 +129,9 @@ export interface Frame {
   ai: boolean;
   typingHints: 'off' | 'students' | 'students_teachers';
   openOffice: boolean;
+  notesAudio: boolean;
+  notesVideo: boolean;
+  notesMediaMb: number;
 }
 
 /** Mindmap (Phase Orientierung), wie vom Server verteilt (server/src/projects/maps.ts). */

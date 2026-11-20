@@ -361,6 +361,14 @@ export default function Einstellungen() {
             <label>Höchstgröße je Datei (MB, Rahmen: {f.maxFileMb})</label>
             <input type="number" min={1} max={f.maxFileMb} value={s.maxFileMb} onChange={(ev) => set('maxFileMb', Math.min(Number(ev.target.value), f.maxFileMb))} />
           </div>
+          <h4>Ton und Video in den Notizen</h4>
+          <p className="muted">Aufnahmen und hochgeladene Filme brauchen viel Speicher. Links auf Videos gehen immer.</p>
+          <Check label="Ton aufnehmen und hochladen" checked={s.notesAudio} disabled={f.notesAudio === false} onChange={(v) => set('notesAudio', v)} />
+          <Check label="Video aufnehmen und hochladen" checked={s.notesVideo} disabled={f.notesVideo === false} onChange={(v) => set('notesVideo', v)} />
+          <div className="field" style={{ maxWidth: 260 }}>
+            <label>Höchstgröße je Aufnahme (MB, Rahmen: {f.notesMediaMb})</label>
+            <input type="number" min={1} max={f.notesMediaMb} value={s.notesMediaMb} onChange={(ev) => set('notesMediaMb', Math.max(1, Math.min(Number(ev.target.value) || 1, f.notesMediaMb)))} />
+          </div>
         </AccBox>
 
         <AccBox open={open.has('formula')} onToggle={toggle} id="formula" title="Formeln" inactive={!s.docTypes.formula}>
@@ -389,18 +397,26 @@ export default function Einstellungen() {
         </AccBox>
 
         <AccBox open={open.has('log')} onToggle={toggle} id="log" title="Protokoll und Logbuch">
-          <div className="field" style={{ maxWidth: 260 }}>
-            <label>Einfügen von außen protokollieren ab (Zeichen)</label>
+          <p className="muted">Es ist Bestandteil wissenschaftlichen Arbeitens, bei der Wiedergabe fremder Texte die Quelle anzugeben. Was von außen eingesetzt wird, steht unter „Arbeitsprozess“, mit der Spur, wie viel davon noch im Text steckt.</p>
+          <Check
+            label="Jedes Einsetzen von außen protokollieren"
+            checked={s.pasteLogAll}
+            onChange={(v) => set('pasteLogAll', v)}
+            hint="Empfohlen: So lässt sich die Grenze nicht umgehen, indem man absatzweise kopiert. Ohne Häkchen erst ab der erlaubten Zeichenzahl."
+          />
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label>Erlaubte Zeichen von außen je Karte bzw. Notiz</label>
             <input type="number" min={20} value={s.pasteThreshold} onChange={(ev) => set('pasteThreshold', Number(ev.target.value))} />
           </div>
           <div className="field" style={{ maxWidth: 420 }}>
-            <label>Einsetzen von außen (ab dieser Länge)</label>
+            <label>Wenn es mehr wird</label>
             <select value={s.pasteOutside} onChange={(ev) => set('pasteOutside', ev.target.value as typeof s.pasteOutside)}>
               <option value="allow">Erlauben und protokollieren</option>
               <option value="ask">Nach der Herkunft fragen</option>
-              <option value="limit">Nur kürzere Stellen erlauben</option>
+              <option value="limit">Nicht mehr einsetzen lassen</option>
             </select>
           </div>
+          <p className="muted">Die Zeichen zählen je Karte bzw. Notiz zusammen, auch wenn sie in mehreren Stücken eingesetzt wurden.</p>
           <p className="muted">Kopieren und Einsetzen innerhalb des Projekts ist immer erlaubt; die Herkunft lässt sich als Zuschreibung anfügen.</p>
           <Check label="Logbuch verpflichtend" checked={s.logbookRequired} onChange={(v) => set('logbookRequired', v)} />
           {f.typingHints === 'off' && <p className="muted">Tippfluss-Hinweise sind von der Administration abgeschaltet.</p>}
