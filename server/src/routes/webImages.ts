@@ -12,6 +12,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
 import { MEDIA_MAX_BYTES } from '../projects/noteFiles.js';
+import { clampToFrame, DEFAULT_SETTINGS } from '../projects/settings.js';
 import { Notes, serveMime, sniffNoteFile } from '../projects/notes.js';
 import { SHARED, sharedTarget } from './notes.js';
 import { fetchImage, IMAGE_MAX_BYTES, imageInfo, readPage, type Allowed } from '../projects/webImport.js';
@@ -89,7 +90,7 @@ export function webImageRoutes(app: FastifyInstance, s: Services, allowed: Allow
   }
 
   const FromUrl = z.object({ scope: z.string().max(20), url: z.string().max(2000) });
-  app.post<{ Params: { id: string }; Querystring: { scope?: string; name?: string } }>('/api/projects/:id/notizen/datei', { bodyLimit: MEDIA_MAX_BYTES + 64 * 1024 }, async (req, reply) => {
+  app.post<{ Params: { id: string }; Querystring: { scope?: string; name?: string; art?: string } }>('/api/projects/:id/notizen/datei', { bodyLimit: MEDIA_MAX_BYTES + 64 * 1024 }, async (req, reply) => {
     const a = await project(req, reply);
     if (!a || !s.notes.files) return a && reply.code(503).send({ error: 'Kein Ablageordner' });
     let scope: string, name: string, data: Buffer;
@@ -116,8 +117,12 @@ export function webImageRoutes(app: FastifyInstance, s: Services, allowed: Allow
     if (mime.startsWith('image/')) {
       if (data.length > IMAGE_MAX_BYTES) return fail(reply, 'toolarge');
     } else {
-      // Audio und Video: Grenze aus den Projekt-Einstellungen (maxFileMb)
-      const mb = (await s.projects.get(a.projectId))?.settings.maxFileMb ?? 25;
+      // Audio und Video: erlaubt und begrenzt von Lehrkraft und Administration (notesAudio, notesVideo, notesMediaMb)
+      const p = await s.projects.get(a.projectId);
+      const set = clampToFrame(p?.settings ?? DEFAULT_SETTINGS, await s.frame.get());
+      const audio = mime.startsWith('audio/') || (req.query.art === 'audio' && (mime === 'video/webm' || mime === 'video/mp4'));
+      if (audio ? !set.notesAudio : !set.notesVideo) return reply.code(403).send({ error: audio ? 'Tonaufnahmen sind in diesem Projekt ausgeschaltet.' : 'Videos sind in diesem Projekt ausgeschaltet. Ein Link auf ein Video geht trotzdem.', code: 'off' });
+      const mb = set.notesMediaMb;
       if (data.length > Math.min(mb * 1024 * 1024, MEDIA_MAX_BYTES)) return reply.code(413).send({ error: `Die Datei ist größer als ${mb} MB (Grenze in den Projekt-Einstellungen).`, code: 'toolarge' });
     }
     const file = await s.notes.files.store(a.projectId, scope, name, data);

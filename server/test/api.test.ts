@@ -642,6 +642,24 @@ describe('Mindmap in Echtzeit', () => {
     expect((await call('POST', `/api/projects/${project}/einfuegen/${id}`, anna, { answer: 'quote', note: 'Schulbuch S. 42' })).status).toBe(200);
     own = (await call('GET', `/api/projects/${project}/einfuegen`, t)).json.pastes as J[];
     expect(own[0]).toMatchObject({ answer: 'quote', note: 'Schulbuch S. 42', scope: 'g' + g1 });
+
+    // Grenze je Ziel zählt zusammen, Spur im Text nur für die Lehrkraft (Wunsch Jo, 20. November 2026)
+    const part = 'Inflation entsteht, wenn die Geldmenge schneller wächst als die Gütermenge einer Volkswirtschaft.';
+    const r1 = (await call('POST', `/api/projects/${project}/einfuegen`, anna, { scope: 'g' + g1, place: 'Karte „Geld“', text: part, target: 'card:k1' })).json;
+    expect(r1.total).toBe([...part].length);
+    const r2 = (await call('POST', `/api/projects/${project}/einfuegen`, anna, { scope: 'g' + g1, place: 'Karte „Geld“', text: part, target: 'card:k1' })).json;
+    expect(r2.total).toBe(2 * [...part].length);
+    expect((await call('GET', `/api/projects/${project}/einfuegen/summe?ziel=card:k1`, anna)).json.total).toBe(2 * [...part].length);
+    expect((await call('GET', `/api/projects/${project}/einfuegen/summe?ziel=card:k1`, ben)).json.total).toBe(0);
+    expect((await call('POST', `/api/projects/${project}/einfuegen`, anna, { scope: 'g' + g1, place: 'x', text: part, target: 'karte' })).status).toBe(400);
+    expect((await call('GET', `/api/projects/${project}/einfuegen/spur?ziel=card:k1`, anna)).status).toBe(403);
+    const spur = (await call('GET', `/api/projects/${project}/einfuegen/spur?ziel=card:k1`, t)).json;
+    expect(spur.pastes).toHaveLength(2);
+    expect(spur.pastes[0]).toMatchObject({ text: part, origin: 'paste', name: expect.any(String) });
+    // die Karte gibt es (noch) nicht: kein Text, aber die Einträge
+    expect(spur.text).toBeNull();
+    own = (await call('GET', `/api/projects/${project}/einfuegen`, t)).json.pastes as J[];
+    expect(own[0]).toMatchObject({ target: 'card:k1', origin: 'paste', noteId: null });
   });
 
   it('Pinnwand: Präsentation als eigenständige Datei', async () => {

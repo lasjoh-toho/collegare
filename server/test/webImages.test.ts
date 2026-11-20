@@ -105,7 +105,7 @@ describe('Bilder aus dem Netz in Notizen und Quellen', () => {
   }
 
   it('holt Bilder über den Server, liest Seiten, legt Bildquellen mit Datei an', async () => {
-    const { project, anna, clara, scope } = await setup();
+    const { t, project, anna, clara, scope } = await setup();
     expect((await call('GET', '/api/bild-holen?url=' + encodeURIComponent(web + '/bild.png'))).status).toBe(401);
     const img = await call('GET', '/api/bild-holen?url=' + encodeURIComponent(web + '/bild.png'), anna);
     expect(img).toMatchObject({ status: 200, type: 'image/png' });
@@ -163,6 +163,13 @@ describe('Bilder aus dem Netz in Notizen und Quellen', () => {
     expect(part.headers.get('content-range')).toBe(`bytes 0-99/${WEBM.length}`);
     expect((await part.arrayBuffer()).byteLength).toBe(100);
     expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'video', title: 'Film', url: 'https://example.org/film' } })).ok).toBe(true);
+    // Ton und Video lassen sich ausschalten (Wunsch Jo, 20. November 2026); Video-Links bleiben
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { notesVideo: false } })).status).toBe(200);
+    const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(2000, 1)]);
+    expect((await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=film.mp4`, anna, undefined, MP4)).json).toMatchObject({ code: 'off' });
+    expect((await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=a.webm&art=audio`, anna, undefined, WEBM)).status).toBe(200);
+    expect((await call('PATCH', `/api/projects/${project}`, t, { settings: { notesAudio: false, notesMediaMb: 1 } })).status).toBe(200);
+    expect((await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=a.webm&art=audio`, anna, undefined, WEBM)).status).toBe(403);
     const ph = (await call('POST', `/api/projects/${project}/notizen/datei?scope=${scope}&name=zettel.png`, anna, undefined, PNG)).json;
     expect((await emit(sa, 'notes:add', { projectId: project, scope, note: { kind: 'hand', body: 'Ursachen der Inflation: Kriegsschulden', file: ph.file } })).ok).toBe(true);
   });
