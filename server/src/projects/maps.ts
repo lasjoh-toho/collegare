@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Db } from '../db/index.js';
+import { applyLines, emptyLines, forgetCards, Lines, linesFromPicks, LinesError } from './outlineLines.js';
 
 /**
  * Mindmap der Phase „Orientierung“ (Konzept Abschnitt 4, Issue #7): Karten auf einer Fläche, Cluster als Rahmen
@@ -53,6 +54,8 @@ export interface MapCard {
   pick?: boolean;
   /** Karte stammt aus „Notizen und Quellen“: Titel und Text folgen der Notiz (Konzept 8d.2) */
   noteId?: number | null;
+  /** Karten-Ansicht: Text dieser Karte ausgeblendet (nur Titel und darin liegende Karten) */
+  hideText?: boolean;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
   via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
@@ -80,6 +83,8 @@ export interface MindMap {
   roots: string[];
   links: MapLink[];
   outline: { sections: OutlineSection[]; at: number; by: number } | null;
+  /** Gliederung als zwei U-Bahn-Linien (Präsentation, Ausarbeitung), Konzept 8g; fehlt bei alten Mindmaps */
+  lines?: Lines;
 }
 
 export const emptyMap = (): MindMap => ({ v: 1, cards: {}, roots: [], links: [], outline: null });
@@ -118,6 +123,7 @@ export const MapOp = z.discriminatedUnion('type', [
       under: Id.nullable().optional(),
       pick: z.boolean().optional(),
       noteId: z.number().int().positive().nullable().optional(),
+      hideText: z.boolean().optional(),
       via: Via.optional(),
     }),
   }),
@@ -125,7 +131,7 @@ export const MapOp = z.discriminatedUnion('type', [
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), pick: z.boolean(), via: Via })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), pick: z.boolean(), hideText: z.boolean(), via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),
@@ -133,6 +139,8 @@ export const MapOp = z.discriminatedUnion('type', [
   z.object({ type: z.literal('link'), id: Id, from: Id, to: Id }),
   z.object({ type: z.literal('unlink'), id: Id }),
   z.object({ type: z.literal('outline') }),
+  /** ganze Gliederung (beide Linien) ersetzen; die letzte Änderung gewinnt */
+  z.object({ type: z.literal('lines'), lines: Lines }),
 ]);
 export type MapOp = z.infer<typeof MapOp>;
 
@@ -249,6 +257,7 @@ export function applyOp(m: MindMap, op: MapOp, actor: number, people: Set<number
       return;
     }
     case 'remove': {
+      forgetCards(m, new Set(op.ids));
       const gone = new Set<string>();
       for (const id of op.ids) {
         const c = m.cards[id];
@@ -281,6 +290,14 @@ export function applyOp(m: MindMap, op: MapOp, actor: number, people: Set<number
     case 'unlink':
       m.links = m.links.filter((l) => l.id !== op.id);
       return;
+    case 'lines':
+      try {
+        applyLines(m, op.lines, actor, people, now);
+      } catch (e) {
+        if (e instanceof LinesError) throw new MapError(e.message);
+        throw e;
+      }
+      return;
     case 'outline': {
       const sections = buildOutline(m);
       if (!sections.length) throw new MapError('Noch nichts für die Gliederung übernommen: Hauptast oder Cluster wählen und „In die Gliederung“ tippen');
@@ -295,7 +312,11 @@ export function parseMap(json: string | undefined): MindMap {
   if (!json) return emptyMap();
   try {
     const m = JSON.parse(json) as MindMap;
-    return m && m.v === 1 && m.cards && Array.isArray(m.roots) ? { ...emptyMap(), ...m } : emptyMap();
+    if (!(m && m.v === 1 && m.cards && Array.isArray(m.roots))) return emptyMap();
+    const full = { ...emptyMap(), ...m };
+    // alte Mindmaps: Gliederung aus den übernommenen Ästen als Linien aufbauen
+    if (!full.lines) full.lines = Object.values(full.cards).some((c) => c.pick) ? linesFromPicks(full, buildOutline(full)) : emptyLines();
+    return full;
   } catch {
     return emptyMap();
   }
@@ -322,6 +343,8 @@ export class MapStore {
       const copy: MindMap = JSON.parse(JSON.stringify(source));
       for (const c of Object.values(copy.cards)) c.owner = null;
       copy.outline = null;
+      copy.lines = emptyLines();
+      for (const c of Object.values(copy.cards)) c.pick = false;
       await this.save(projectId, scope, copy, version);
       return { map: copy, version: version + 1 };
     });

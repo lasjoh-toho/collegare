@@ -7,41 +7,54 @@
 .panning { cursor: grabbing; }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 
+/* Karten neobrutalistisch (Wunsch Jo, 20. November 2026): kräftiger Rand, harter Schatten, Ebenen durch Schatten.
+   Farbe wie der Ast in der Ast-Ansicht (--c). Cluster liegen am höchsten, Karten darin tiefer, Karten in Karten noch tiefer. */
+.board { --ink: var(--fg); }
 .card {
-  position: absolute; border-radius: 6px; background: var(--bg-elev);
-  border: 1px solid color-mix(in srgb, var(--c) 55%, var(--line));
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --lvl: 1; position: absolute; border-radius: 8px; border: 2px solid var(--ink);
+  background: color-mix(in srgb, var(--c) 16%, var(--bg-elev));
+  box-shadow: calc(5px - var(--lvl) * 1px) calc(5px - var(--lvl) * 1px) 0 var(--ink);
+  display: flex; flex-direction: column;
 }
 .card:not(.cluster) { overflow: hidden; }
 .card:hover, .card.sel { overflow: visible; }
-.cluster { background: color-mix(in srgb, var(--c) 7%, var(--bg-elev)); }
-.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
-/* Hervorheben: Karten grau; ein Cluster nur am Rahmen, damit seine Karten ihren eigenen Stand zeigen */
+.cluster { background: color-mix(in srgb, var(--c) 9%, var(--bg-elev)); box-shadow: 7px 7px 0 var(--ink); }
+.inner { position: relative; left: auto; top: auto; width: auto; box-shadow: 2px 2px 0 var(--ink); background: color-mix(in srgb, var(--c) 26%, var(--bg-elev)); }
+.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* Hervorheben bzw. in der Gliederung ausgeblendet: grau; ein Cluster nur am Rahmen */
 .dim { filter: grayscale(1); opacity: 0.4; }
 .dimFrame { --c: var(--fg-faint) !important; border-style: dashed; }
 .dimFrame > .head { opacity: 0.55; }
-.mark { font-size: 12px; font-weight: 700; color: color-mix(in srgb, var(--c) 70%, var(--fg)); }
+.mark { display: inline-flex; color: var(--ink); }
 .drop, .wired {
-  outline: 2px dashed var(--accent); outline-offset: 2px;
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev));
+  outline: 3px dashed var(--accent); outline-offset: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elev));
 }
-.moving { pointer-events: none; opacity: 0.85; box-shadow: var(--shadow); z-index: 5; }
+.moving { pointer-events: none; opacity: 0.9; box-shadow: 10px 10px 0 var(--ink); z-index: 5; }
 
 .head {
-  display: flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 5px 5px 0 0;
-  background: color-mix(in srgb, var(--c) 16%, var(--bg-elev));
-  border-bottom: 1px solid color-mix(in srgb, var(--c) 30%, var(--line));
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 6px 6px 0 0;
+  background: var(--c); color: #fff; border-bottom: 2px solid var(--ink);
 }
-.t { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inner > .head { padding: 2px 8px; }
+.t { flex: 1; min-width: 0; font-size: 14px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+.titleInput { flex: 1; min-width: 0; height: 24px; padding: 0 6px; border: 2px solid var(--ink); border-radius: 5px; background: var(--bg); color: var(--fg); font: inherit; font-size: 13.5px; font-weight: 650; }
 .owner {
   flex: none; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; display: grid; place-items: center;
-  font-size: 10.5px; font-weight: 700; color: #fff; background: var(--attr);
+  font-size: 10.5px; font-weight: 700; color: var(--ink); background: var(--bg-elev); border: 1.5px solid var(--ink);
 }
-.text { padding: 6px 10px; font-size: 13px; line-height: 1.45; color: var(--fg-muted); overflow: hidden; max-height: calc(100% - 30px); }
+.textWrap { flex: none; }
+.text { padding: 6px 10px; font-size: 13px; line-height: 1.45; color: var(--fg); overflow: hidden; }
+.placeholder { color: var(--fg-faint); font-style: italic; font-size: 12px; }
+.textInput { display: block; width: calc(100% - 12px); margin: 6px; padding: 4px 6px; border: 2px solid var(--ink); border-radius: 5px; background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; line-height: 1.4; resize: vertical; }
 .text h3, .text h4, .text h5 { margin: 0.2em 0; font-size: 1.1em; color: var(--fg); }
 .text p, .text ul, .text ol { margin: 0.3em 0; padding-left: 0; }
 .text li { margin-left: 1.2em; }
 .text code { font-family: var(--mono); font-size: 0.9em; background: var(--bg-sunken); padding: 0 3px; border-radius: 3px; }
+/* Karten in der Karte: unter dem Text, von oben nach unten */
+.nest { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 10px 8px; }
+.long { }
+@media (max-width: 700px) { .long { display: none; } }
 .body { position: absolute; right: 0; bottom: 0; }
 
 /* Griffe wie in brausa: Punkt rechts für Pfeile, Ecke unten rechts für die Größe */

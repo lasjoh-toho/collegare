@@ -828,7 +828,7 @@ Dateien liegen wie die Pinnwand-Medien unter `DATA_DIR` und kommen in `sichern` 
 Auf dem Desktop öffnet sich die bearbeitete Notiz als **großes Modal** über der Seite (Breite bis 900 px), damit sie
 deutlich hervortritt und Platz für Bild, Tabelle oder Handschrift hat. Am Handy bleibt sie in der Liste.
 
-### 8e.7 Eigene Linie: Notizen parallel zur Gliederung (U-Bahn)
+### 8e.7 Eigene Linie: Notizen parallel zur Gliederung (U-Bahn) – ersetzt durch 8g
 
 Jede Person kann sich ihre Notizen **in eine eigene Reihenfolge** bringen, die parallel zur Gliederung läuft. Bild
 dafür ist eine **U-Bahn-Linie**, wie in der Mindmap-Ansicht „Äste“:
@@ -943,6 +943,87 @@ der passenden Folie, ohne dass zwei Fassungen entstehen.
 - Soll die Ausarbeitung führen (Vorschlag), oder darf auch der Zusatztext direkt zurückschreiben?
 - Reicht Stufe 1, bis der eigene Texteditor kommt?
 - Gehört zu einer Folie genau ein Abschnitt, oder darf sie mehrere Unterpunkte bündeln?
+
+## 8g. Gliederung als U-Bahn-Linien, Mindmap mit Abzweigungen (20. November 2026)
+
+Wünsche von Jo vom 20. November 2026 zu Mindmap, Gliederung und der Linie neben den Notizen. Sie ersetzen das
+„Gliederung übernehmen“ aus 8d.1 und „Meine Linie“ aus 8e.7.
+
+### 8g.1 Zwei Linien statt „Gliederung übernehmen“
+
+- Die Gliederung ist eine **senkrechte U-Bahn-Linie** mit weißen Stationen, sofort durchgehend. Es gibt zwei Linien:
+  **Präsentation (rot)** und **Ausarbeitung (blau)**. Darüber stehen zwei große Reiter, dazwischen der Schalter
+  **„beides“** (zwei parallele Striche) für die Vollbild-Ansicht, in der beide Linien in der Mitte nebeneinander laufen.
+- Die Lehrkraft legt in den Einstellungen (Ergebnisse) fest, ob Lernende beide Linien oder nur eine sehen
+  (`outlineLines`: both, praes, ausarb). Lehrkräfte sehen immer beide.
+- Die Linie steht **neben der Mindmap** (Seitenleiste, auf breiten Bildschirmen offen) und **rechts neben „Notizen und
+  Quellen“**. Es ist dieselbe Linie: Was in der einen Ansicht geändert wird, erscheint sofort in der anderen.
+- Der Knopf „Gliederung übernehmen“ entfällt. „In die Gliederung“ an einem Ast oder einer Idee nimmt sie in die gerade
+  gezeigte Linie auf; ganze Äste und einzelne Knoten lassen sich auch aus der Mindmap **auf die Linie ziehen** (auf einen
+  Punkt: Unterpunkt; ans Ende: neuer Punkt). Vorbild ist der „Rote Faden“ von mod_pinnwand, ein Faden je Gruppe.
+
+### 8g.2 Punkte, Objekte und Schloss
+
+- **Punkte** (Stationen) haben höchstens zwei Ebenen. Ein Punkt verweist auf eine Karte der Mindmap (Titel und
+  Zuständige kommen von dort) oder ist nur in der Gliederung entstanden: dann **gestrichelt**.
+- **Ausblenden** (Auge) lässt einen Punkt in der Gliederung stehen, zählt aber nicht für Ausarbeitung und Folien;
+  **Entfernen** legt ihn unter „Entfernt“ ab, wo man ihn zurückholen kann. In der Mindmap erscheinen solche Karten
+  **ausgegraut**.
+- **Objekte** (Notizen aus dem Thread, Karten) zieht man von überall auf einen Punkt. Sie lassen sich von oben nach
+  unten sortieren (an die obere Kante eines Objekts ziehen) und **ineinander legen** (auf ein Objekt ziehen), höchstens
+  dreifach; dann wandern sie gemeinsam. Jedes Objekt hat ein Auge (sichtbar: erscheint auf derselben Folie bzw. im
+  selben Absatz; ausgeblendet: bleibt als Beleg dabei). Gestaltung neobrutalistisch: Rand, harter Schatten, tiefere
+  Ebenen mit größerem Schatten.
+- **Schloss:** Sobald die Gliederung mit Objekten überarbeitet ist, erscheint ein Schloss. Gesperrt ändert sich die
+  Gliederung nicht mehr, auch nicht aus der Mindmap, bis jemand aus der Gruppe oder die Lehrkraft es öffnet.
+- „nur meine“ zeigt nur die Objekte, die man selbst angehängt hat. Das ist der erste Schritt zu „jede Person ordnet ihre
+  Notizen für sich parallel zur Gliederung“ (siehe offen).
+
+### 8g.3 Beide Linien synchronisieren
+
+In der Ansicht „beides“ stehen gleiche Punkte in **derselben Zeile** und sind zwischen den Linien verbunden. Gleich
+heißt: gleicher Schlüssel, also aus derselben Karte der Mindmap oder mit „in die andere Linie übernehmen“ kopiert. Die
+Zeilen entstehen wie bei einem Textvergleich (längste gemeinsame Folge); Punkte, die nur eine Linie hat, stehen
+dazwischen. Objekte, die in beiden Linien hängen, tragen „in beiden“. Damit ist die Kopplung von Ausarbeitung und
+Präsentation (8e.8) als Ansicht da; die Kopplung von Folien und Zusatztexten in Bento (8f) baut darauf auf.
+
+### 8g.4 Daten
+
+Die Linien liegen in der Mindmap der Gruppe (`map.lines`) und laufen über dieselbe Operationsschlange
+(`map:op` mit `{type:'lines'}`, ersetzt die ganze Gliederung; die letzte Änderung gewinnt). Der Server prüft Ebenen,
+Personen und Schloss und leitet daraus `card.pick` (in der Gliederung) und `map.outline` ab (Abschnitte aus der
+Ausarbeitung, ohne sie aus der Präsentation), damit Ausarbeitung, Korrektur und Pinnwand weiterarbeiten. Alte
+Mindmaps bekommen beim Lesen beide Linien aus den übernommenen Ästen. Die Tabelle `note_lines` („Meine Linie“) bleibt
+erhalten, wird aber nicht mehr angezeigt.
+
+### 8g.5 U-Bahn-Mindmap (Ast-Ansicht)
+
+- An jedem Zwischenstopp des gewählten Asts steht ein **Plus**. Es öffnet den Dialog **Abzweigung**: Eingabefeld Titel
+  (Enter legt an), darunter in einer Zeile „Zwischenstopp löschen“ und „Abbrechen“; ein Klick außerhalb bricht ab.
+- Eine Abzweigung am Hauptast wird eine **lockere Idee** ohne Anbindung an spätere Knoten (kein Abschnitt), sonst ein
+  Geschwister im selben Ast. Der Ast beginnt am Stopp (`card.fork`).
+- **Langer Druck** (450 ms) auf einen Knoten packt den **Ansatz** seines Asts; über einem Stopp eines anderen Asts
+  rastet er als Abzweigung ein. (Jos Satz „Dann werden diese entweder …“ bricht ab; siehe offen.)
+
+### 8g.6 Karten-Ansicht
+
+- **Neobrutalistisch**: kräftiger Rand, sichtbare harte Schatten; Cluster liegen am höchsten (größter Schatten), Karten
+  darin tiefer, Karten in Karten noch tiefer. Farben wie die Äste der Ast-Ansicht.
+- **Direkt schreiben**: Doppelklick auf den Kopf ändert den Titel, auf den Text schreibt man darunter; Enter im Titel
+  springt in den Text. Längeres Einsetzen von außen läuft über den Karten-Editor, damit die Einfüge-Regeln greifen.
+- **Karten in Karten**: Eine Karte auf eine andere gezogen liegt darunter in ihr (`card.under`, wie in der Ast-Ansicht)
+  und wandert mit. An die obere Kante gezogen wird sie davor einsortiert; „Herausnehmen“ löst sie. Cluster ordnet
+  „Ordnen“ von oben nach unten zu einer Reihe. Wächst eine Karte, rücken die Karten darunter nach.
+- **Text ausblenden** je Karte (`card.hideText`) oder für die ganze Mindmap („Text aus“, je Gerät).
+
+### 8g.7 Offen
+
+- Jos Satz zu den Ansätzen bricht ab („Dann werde diese Entweder“): was nach dem Packen passieren soll.
+- Zuständigkeiten aus der Gruppenarbeit (Rollen) im Seitenmenü: bisher nur die zuständige Person je Punkt.
+- Jede Person ordnet ihre Notizen in eigenen Clustern parallel zur Gliederung (eigene Ebene neben der Linie).
+- Punkte, die nur in der Gliederung stehen, werden noch keine Dokumente der Ausarbeitung.
+- Folien in Bento an Punkte koppeln (8f), Zusatztexte über gemeinsame Objekte.
+- Gleichzeitiges Bearbeiten der Gliederung: die letzte Änderung gewinnt (später einzelne Operationen).
 
 ## 9. Umsetzungsplan
 

@@ -90,6 +90,8 @@ export const SettingsSchema = z.object({
    * auf die Folie ziehen. Lehrkräfte dürfen immer.
    */
   imagesDirect: z.boolean(),
+  /** Gliederung (Konzept 8g): welche Linien die Lernenden sehen, Präsentation, Ausarbeitung oder beide */
+  outlineLines: z.enum(['both', 'praes', 'ausarb']),
   /**
    * Erklärungen hinter den i-Knöpfen der Seiten (Wunsch Jo, 14. November 2026): je Schlüssel eigener Text der
    * Lehrkraft (leer = Standardtext) und ob die Erklärung beim ersten Öffnen von selbst aufgeht.
@@ -137,6 +139,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   aiDailyLimit: 5,
   slidesImportStudents: false,
   imagesDirect: false,
+  outlineLines: 'both',
   folienDemo: [],
   infos: {},
 };

@@ -312,6 +312,12 @@ function underOf(map: MapData, c: MapCard): string | null {
   return u.id;
 }
 
+/** Farbe je Karte wie in der Ast-Ansicht (Hauptast, darin dieselbe Farbe, lockere Ideen grau): für die Karten-Ansicht */
+export function branchColors(map: MapData): Map<string, string> {
+  return new Map(layout(map).nodes.map((n) => [n.card.id, n.card.color ?? n.color]));
+}
+export { underOf };
+
 function layout(map: MapData): { nodes: Node[]; height: number } {
   // Knoten an Knoten: Karten mit „under“ hängen in der Ast-Ansicht an einer anderen Karte (beliebig tief)
   const subs = new Map<string, MapCard[]>();
@@ -379,7 +385,17 @@ function layout(map: MapData): { nodes: Node[]; height: number } {
   return { nodes, height: Math.max(hr, hl, 200) };
 }
 
-export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onToGroup }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean>; dim?: MapDim; onToGroup?: (title: string) => void }) {
+/** Verbindung zur Gliederung (Konzept 8g): in der gerade gezeigten Linie? umschalten, ausgegraut, Ablegen auf der Linie */
+export interface LineHook {
+  has: (id: string) => boolean;
+  toggle: (c: MapCard, whole?: boolean) => void;
+  greyed: Set<string>;
+  /** Karte wurde über der Gliederung losgelassen: true, wenn sie dort angekommen ist */
+  drop: (id: string, x: number, y: number) => boolean;
+  hover: (x: number | null, y?: number) => void;
+}
+
+export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onToGroup, line }: { map: MapData; topic: string; people: Person[]; canEdit: boolean; send: (op: MapOp, join?: boolean) => Promise<boolean>; dim?: MapDim; onToGroup?: (title: string) => void; line?: LineHook }) {
   const { nodes, height } = useMemo(() => layout(map), [map]);
   const mains = nodes.filter((n) => n.depth === 1 && !n.idea);
   const [sel, setSel] = useState<string | null>(null);
@@ -399,6 +415,13 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
   // angetippter Punkt am gewählten Ast (Stopp, Bézier-Griff oder Ansatz): Entf entfernt nur ihn
   const [pick, setPick] = useState<{ kind: 'start' | 'via' | 'hand'; i: number } | null>(null);
   useEffect(() => setPick(null), [sel]);
+  // Abzweigung am Zwischenstopp: Auswahldialog (Titel, Zwischenstopp löschen, Abbrechen)
+  const [forkAt, setForkAt] = useState<{ id: string; i: number } | null>(null);
+  const [forkTitle, setForkTitle] = useState('');
+  useEffect(() => setForkAt(null), [sel]);
+  // langer Druck auf einen Knoten packt den Ansatz seines Asts
+  const press = useRef<number | null>(null);
+  const grab = useRef<string | null>(null);
 
   // Breiten der Knoten messen, damit die Linien genau an den Kanten ansetzen
   useLayoutEffect(() => {
@@ -718,22 +741,55 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
         if (!h) return;
         // nur angetippt (zum Auswählen für Entf): nichts speichern
         if (!h.moved) return setHd(null);
-        const c = g.n.card;
-        const r = Math.round;
-        const patch =
-          h.kind === 'start'
-            ? (() => {
-                const f = snapFork(g.n, [h.x, h.y]);
-                return f ? { fork: f, start: null } : { start: anchorFrom(g.from, [h.x, h.y]), fork: null };
-              })()
-            : { via: (c.via ?? []).map((v, j): MapVia => (j !== h.i ? v : h.kind === 'via' ? (v.length === 4 ? [h.x, h.y, v[2], v[3]] : [h.x, h.y]) : [v[0], v[1], r(h.x - v[0]), r(h.y - v[1])])) };
-        void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
+        commitHandle(g, h);
       },
     };
   };
 
+  /** gezogenen Griff speichern: Ansatz (rastet als Abzweigung an Stopps ein), Zwischenstopp oder Bézier-Griff */
+  function commitHandle(g: Geo, h: NonNullable<typeof hd>) {
+    const c = g.n.card;
+    const r = Math.round;
+    const patch =
+      h.kind === 'start'
+        ? (() => {
+            const f = snapFork(g.n, [h.x, h.y]);
+            return f ? { fork: f, start: null } : { start: anchorFrom(g.from, [h.x, h.y]), fork: null };
+          })()
+        : { via: (c.via ?? []).map((v, j): MapVia => (j !== h.i ? v : h.kind === 'via' ? (v.length === 4 ? [h.x, h.y, v[2], v[3]] : [h.x, h.y]) : [v[0], v[1], r(h.x - v[0]), r(h.y - v[1])])) };
+    void send({ type: 'update', id: c.id, patch }).then(() => setHd(null));
+  }
+
+  /**
+   * Abzweigung am Zwischenstopp i (Wunsch Jo, 20. November 2026): neue Idee, deren Ast an diesem Stopp beginnt. Am
+   * Hauptast wird sie eine lockere Idee (ohne Anbindung an spätere Knoten), sonst ein Geschwister im selben Ast.
+   */
+  async function addFork(g: Geo, i: number, title: string) {
+    const c = g.n.card;
+    const main = g.n.depth === 1;
+    const v = g.via[i];
+    const next = g.via[i + 1] ?? g.z.p;
+    const dl = Math.hypot(next[0] - v[0], next[1] - v[1]) || 1;
+    const nrm: V = [-(next[1] - v[1]) / dl, (next[0] - v[0]) / dl];
+    // die Seite nehmen, auf der weniger Knoten stehen
+    const room = (sg: number) => Math.min(...nodes.map((o) => Math.hypot(o.x - (v[0] + sg * nrm[0] * 150), o.y - (v[1] + sg * nrm[1] * 150))), 1e9);
+    const sg = room(1) >= room(-1) ? 1 : -1;
+    const bx = Math.round(v[0] + sg * nrm[0] * 150 + (next[0] - v[0]) * 0.4);
+    const by = Math.round(v[1] + sg * nrm[1] * 150 + (next[1] - v[1]) * 0.4);
+    const id = newId();
+    // Lage in der Karten-Ansicht: am Hauptast unter allem anderen, sonst unter dem Geschwister im Cluster
+    const kx = main ? 0 : c.x;
+    const ky = main ? Math.max(0, ...Object.values(map.cards).filter((k) => !k.parent).map((k) => k.y + k.h)) + 30 : c.y + c.h + 10;
+    const ok = await send({
+      type: 'add',
+      card: { id, kind: 'card', title: title.slice(0, 200), text: '', x: kx, y: ky, w: 180, h: 100, color: null, parent: main ? null : c.parent, owner: null, under: main ? null : (c.under ?? null), fork: { from: c.id, i }, bx, by },
+    });
+    if (ok) setSel(id);
+  }
+
   /** Ast oder Karte aktiv in die Gliederung nehmen bzw. herausnehmen (ein Rückgängig-Schritt) */
   async function togglePick(c: MapCard, whole = false) {
+    if (line) return line.toggle(c, whole);
     const ops = pickOps(map, c, whole);
     for (let i = 0; i < ops.length; i++) if (!(await send(ops[i], i > 0))) return;
   }
@@ -756,8 +812,8 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
     return (
       <div
         key={c.id}
-        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''} ${isDimmed(map, c, dim) ? b.dim : ''}`}
-        title={isPicked(map, c) ? 'In der Gliederung' : undefined}
+        className={`${b.node} ${b['s_' + shape]} ${n.depth === 1 && !n.idea ? b.main : b.sub} ${n.idea ? b.idea : ''} ${isSel ? b.sel : ''} ${n.side === -1 ? b.left : ''} ${isDimmed(map, c, dim) || line?.greyed.has(c.id) ? b.dim : ''}`}
+        title={line?.greyed.has(c.id) ? 'In der Gliederung ausgeblendet oder entfernt' : isPicked(map, c) ? 'In der Gliederung' : undefined}
         style={style}
         data-node={c.id}
         data-clip={`Idee „${c.title || 'Ohne Titel'}“`}
@@ -767,19 +823,50 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
           if (!canEdit || edit === c.id || (e.target as HTMLElement).closest('button')) return;
           drag.current = { id: c.id, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y, moved: false };
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          const at = toStage(e);
+          if (press.current) clearTimeout(press.current);
+          press.current = window.setTimeout(() => {
+            press.current = null;
+            const d = drag.current;
+            if (!d || d.moved || d.id !== c.id) return;
+            // gepackt: ab jetzt zieht der Zeiger den Ansatz (an Stopps anderer Äste: Abzweigung)
+            drag.current = null;
+            grab.current = c.id;
+            setSel(c.id);
+            const g0 = geo.find((x) => x.n.card.id === c.id);
+            setHd({ id: c.id, kind: 'start', i: -1, x: g0 ? g0.a.p[0] : at[0], y: g0 ? g0.a.p[1] : at[1] });
+            navigator.vibrate?.(15);
+          }, 450);
         }}
         onPointerMove={(e) => {
+          if (grab.current === c.id) {
+            const [x, y] = toStage(e);
+            return setHd((h) => (h ? { ...h, x, y, moved: true } : h));
+          }
           const d = drag.current;
           if (!d || d.id !== c.id) return;
           const mx = (e.clientX - d.sx) / cam.k;
           const my = (e.clientY - d.sy) / cam.k;
           if (!d.moved && Math.hypot(mx, my) < 4) return;
           d.moved = true;
+          if (press.current) (clearTimeout(press.current), (press.current = null));
           setDragPos({ id: c.id, x: d.x + mx, y: d.y + my });
+          line?.hover(e.clientX, e.clientY);
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          if (press.current) (clearTimeout(press.current), (press.current = null));
+          if (grab.current === c.id) {
+            grab.current = null;
+            const g0 = geo.find((x) => x.n.card.id === c.id);
+            if (hd?.moved && g0) commitHandle(g0, hd);
+            else setHd(null);
+            return;
+          }
           const d = drag.current;
           drag.current = null;
+          line?.hover(null);
+          // auf der Gliederung losgelassen: Ast bzw. Idee kommt in die Linie, die Lage in der Mindmap bleibt
+          if (d?.moved && line?.drop(c.id, e.clientX, e.clientY)) return setDragPos(null);
           if (d?.moved && dragPos) void send({ type: 'update', id: c.id, patch: { bx: Math.round(dragPos.x), by: Math.round(dragPos.y) } }).then(() => setDragPos(null));
           else setDragPos(null);
         }}
@@ -803,9 +890,9 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
         ) : (
           <span className={b.text}>{text}</span>
         )}
-        {isPicked(map, c) && (
+        {(line ? line.has(c.id) : isPicked(map, c)) && (
           <span className={b.mark} aria-label="in der Gliederung">
-            ✓
+            <Icon name="check" size={12} />
           </span>
         )}
         {owner && <span className={b.owner}>{owner}</span>}
@@ -860,7 +947,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
       <div ref={stage} className={b.stage} style={{ transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})` }}>
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
           {geo.map((g) => (
-            <g key={g.n.card.id} style={{ color: g.color }} className={isDimmed(map, g.n.card, dim) ? b.dimLine : undefined}>
+            <g key={g.n.card.id} style={{ color: g.color }} className={isDimmed(map, g.n.card, dim) || line?.greyed.has(g.n.card.id) ? b.dimLine : undefined}>
               <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" opacity={g.n.idea ? 0.75 : 1} />
               <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
               {sel === g.n.card.id && canEdit && g.hv.map((h, i) => (
@@ -911,6 +998,23 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
                 onDoubleClick={() => void send({ type: 'update', id: selGeo.n.card.id, patch: { via: selGeo.n.card.via!.filter((_, j) => j !== i) } }).then((ok) => void (ok && shiftForks(selGeo.n.card.id, i, -1)))}
               />
             ))}
+            {selGeo.via.map((v, i) => (
+              <button
+                key={`f${i}`}
+                className={b.forkPlus}
+                style={{ left: v[0] + 16, top: v[1] - 16, ['--c' as string]: selGeo.color }}
+                title="Abzweigung an diesem Zwischenstopp"
+                aria-label="Abzweigung an diesem Zwischenstopp"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setForkTitle('');
+                  setForkAt({ id: selGeo.n.card.id, i });
+                }}
+              >
+                <Icon name="plus" size={11} />
+              </button>
+            ))}
             {selGeo.hv.flatMap((h, i) =>
               [1, -1].map((sg) => (
                 <div
@@ -927,6 +1031,59 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
         )}
       </div>
 
+      {forkAt &&
+        selGeo &&
+        selGeo.n.card.id === forkAt.id &&
+        selGeo.via[forkAt.i] &&
+        (() => {
+          const v = selGeo.via[forkAt.i];
+          const close = () => setForkAt(null);
+          const create = () => {
+            const t = forkTitle.trim();
+            close();
+            void addFork(selGeo, forkAt.i, t);
+          };
+          return (
+            <>
+              {/* Klick außerhalb bricht ab */}
+              <div className={b.backdrop} onPointerDown={(e) => (e.stopPropagation(), close())} />
+              <div className={b.forkDlg} style={{ left: cam.x + v[0] * cam.k + 14, top: cam.y + v[1] * cam.k + 14 }} role="dialog" aria-label="Abzweigung" onPointerDown={(e) => e.stopPropagation()}>
+                <label className={b.forkLabel} htmlFor="cg-fork-title">
+                  Abzweigung
+                </label>
+                <input
+                  id="cg-fork-title"
+                  autoFocus
+                  value={forkTitle}
+                  maxLength={200}
+                  placeholder="Titel (Enter legt an)"
+                  onChange={(e) => setForkTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') create();
+                    if (e.key === 'Escape') close();
+                  }}
+                />
+                <div className={b.forkRow}>
+                  <button
+                    className="btn danger"
+                    onClick={() => {
+                      const id = selGeo.n.card.id;
+                      const i = forkAt.i;
+                      close();
+                      void send({ type: 'update', id, patch: { via: (selGeo.n.card.via ?? []).filter((_, j) => j !== i) } }).then((ok) => void (ok && shiftForks(id, i, -1)));
+                    }}
+                  >
+                    Zwischenstopp löschen
+                  </button>
+                  <button className="btn" onClick={close}>
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       {canEdit && (
         <div className={b.adders} onPointerDown={(e) => e.stopPropagation()}>
           <button className="btn" onClick={addIdea} title="Lockere Idee am Thema (Tab)">
@@ -1031,17 +1188,17 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
               ))}
             </select>
           )}
-          {(selected.kind === 'cluster' || selected.parent) && (
+          {(selected.kind === 'cluster' || selected.parent || line) && (
             <button
-              className={`btn ${isPicked(map, selected) ? 'on' : ''}`}
-              aria-pressed={isPicked(map, selected)}
+              className={`btn ${(line ? line.has(selected.id) : isPicked(map, selected)) ? 'on' : ''}`}
+              aria-pressed={line ? line.has(selected.id) : isPicked(map, selected)}
               onClick={() => void togglePick(selected)}
-              title={selected.kind === 'cluster' ? 'Dieser Ast wird ein Abschnitt der Gliederung' : 'Diese Karte wird ein Unterpunkt in ihrem Abschnitt'}
+              title={selected.kind === 'cluster' ? 'Dieser Ast wird ein Abschnitt der Gliederung (oder auf die Gliederung ziehen)' : 'Diese Idee wird ein Punkt der Gliederung (oder auf die Gliederung ziehen)'}
             >
-              {isPicked(map, selected) ? '✓ In der Gliederung' : 'In die Gliederung'}
+              {(line ? line.has(selected.id) : isPicked(map, selected)) ? <><Icon name="check" size={13} /> In der Gliederung</> : 'In die Gliederung'}
             </button>
           )}
-          {selected.kind === 'cluster' && selected.children.some((id) => !map.cards[id]?.pick) && (
+          {selected.kind === 'cluster' && selected.children.some((id) => (line ? !line.has(id) : !map.cards[id]?.pick)) && (
             <button className="btn" onClick={() => void togglePick(selected, true)} title="Ast übernehmen">
               Ganzer Ast
             </button>

@@ -162,7 +162,7 @@ export function mapSocket(nsp: Namespace, s: Services) {
         if (r.scope.readOnly) return ack?.({ ok: false, error: 'Diese Mindmap bearbeitet die Lehrkraft' });
         const op = MapOp.safeParse(msg.op);
         if (!op.success) return ack?.({ ok: false, error: 'Ungültige Änderung' });
-        if (op.data.type === 'outline' && r.scope.scope === TOPIC) return ack?.({ ok: false, error: 'Die Gliederung entsteht in den Mindmaps der Gruppen' });
+        if ((op.data.type === 'outline' || op.data.type === 'lines') && r.scope.scope === TOPIC) return ack?.({ ok: false, error: 'Die Gliederung entsteht in den Mindmaps der Gruppen' });
         const people = new Set(r.scope.people.map((p) => p.id));
         const res = await s.maps.apply(r.projectId, r.scope.scope, op.data, sess().userId, people);
         if (op.data.type === 'outline') {

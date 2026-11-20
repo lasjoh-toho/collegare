@@ -99,3 +99,29 @@ describe('Mindmap-Operationen', () => {
     ]);
   });
 });
+
+describe('Gliederung als Linien (Konzept 8g)', () => {
+  const pt = (id: string, card: string | null, extra: Record<string, unknown> = {}) => ({ id, key: card ?? id, card, title: id, owner: null, hidden: false, removed: false, items: [], sub: [], ...extra });
+  it('leitet pick und outline ab, Schloss sperrt Änderungen', () => {
+    const m = emptyMap();
+    applyOp(m, add('ast01', 0, 0, { kind: 'cluster', title: 'Ursachen' }), 1, people);
+    applyOp(m, add('kar01', 0, 0, { parent: 'ast01', owner: 2 }), 1, people);
+    applyOp(m, add('kar02', 0, 100, { parent: 'ast01' }), 1, people);
+    const lines = {
+      praes: { points: [pt('p0001', 'ast01')] },
+      ausarb: { points: [pt('p0002', 'ast01', { sub: [pt('p0003', 'kar01'), pt('p0004', 'kar02', { hidden: true }), pt('p0005', null)] }), pt('p0006', null, { title: 'Neu' })] },
+      locked: false,
+      at: null,
+    };
+    applyOp(m, { type: 'lines', lines }, 1, people, 500);
+    expect(m.cards.ast01.pick).toBe(true);
+    expect(m.cards.kar01.pick).toBe(true);
+    expect(m.cards.kar02.pick).toBe(true);
+    expect(m.outline).toMatchObject({ at: 500, sections: [{ id: 'ast01', title: 'Ursachen', cards: ['kar01'], owners: [2] }, { id: 'p0006', title: 'Neu', cards: [] }] });
+    applyOp(m, { type: 'lines', lines: { ...lines, locked: true } }, 1, people);
+    expect(() => applyOp(m, { type: 'lines', lines: { ...lines, praes: { points: [] }, locked: true } }, 1, people)).toThrow('gesperrt');
+    applyOp(m, { type: 'lines', lines: { ...lines, locked: false } }, 1, people);
+    applyOp(m, { type: 'remove', ids: ['kar01'] }, 1, people);
+    expect(m.lines!.ausarb.points[0].sub[0]).toMatchObject({ card: null, title: 'kar01' });
+  });
+});

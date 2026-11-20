@@ -103,6 +103,8 @@ export interface ProjectSettings {
   slidesImportStudents: boolean;
   /** Lernende dürfen Bilder aus dem Netz direkt auf Folien ziehen (sonst erst über Notizen und Quellen) */
   imagesDirect: boolean;
+  /** welche Gliederungs-Linien Lernende sehen (Konzept 8g) */
+  outlineLines?: 'both' | 'praes' | 'ausarb';
   folienDemo: number[];
   infos: Record<string, { text: string; start: boolean }>;
 }
@@ -161,6 +163,8 @@ export interface MapCard {
   pick?: boolean;
   /** folgt dieser Notiz aus „Notizen und Quellen“ */
   noteId?: number | null;
+  /** Karten-Ansicht: Text ausgeblendet */
+  hideText?: boolean;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
   via?: MapVia[];
   children: string[];
@@ -193,15 +197,18 @@ export interface MindMap {
   roots: string[];
   links: MapLink[];
   outline: { sections: OutlineSection[]; at: number; by: number } | null;
+  /** Gliederung als zwei U-Bahn-Linien (Konzept 8g), siehe lib/lines.ts */
+  lines?: import('./lines').Lines;
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'pick' | 'via'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'pick' | 'hideText' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }
   | { type: 'unlink'; id: string }
-  | { type: 'outline' };
+  | { type: 'outline' }
+  | { type: 'lines'; lines: import('./lines').Lines };
 
 /** Hervorheben in der Mindmap: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen */
 export type MapDim = 'none' | 'open' | 'picked';

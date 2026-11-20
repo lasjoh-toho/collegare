@@ -192,6 +192,15 @@ export default function Einstellungen() {
               <small className="muted">{r.help}</small>
             </div>
           ))}
+          <div className="field" style={{ maxWidth: 520 }}>
+            <label>Gliederung für die Lernenden</label>
+            <select value={s.outlineLines ?? 'both'} onChange={(ev) => set('outlineLines', ev.target.value as 'both' | 'praes' | 'ausarb')}>
+              <option value="both">Präsentation und Ausarbeitung (zwei Linien, auch nebeneinander)</option>
+              <option value="praes">nur Präsentation</option>
+              <option value="ausarb">nur Ausarbeitung</option>
+            </select>
+            <small className="muted">Die Gliederung erscheint als U-Bahn-Linie neben Mindmap und Notizen: rot für die Präsentation, blau für die Ausarbeitung.</small>
+          </div>
         </AccBox>
 
         <AccBox open={open.has('groups')} onToggle={toggle} id="groups" title="Gruppenbildung" inactive={page.mode === 'single'}>

@@ -6,7 +6,9 @@
 import { PasteRulesContext, type PasteRules } from '@/lib/pasteRules';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { BranchMap } from '@/components/BranchMap';
+import { BranchMap, type LineHook } from '@/components/BranchMap';
+import { Gliederung, hoverLineTarget, lineTargetAt, useLineTab } from '@/components/Gliederung';
+import { addCard, cardPoint, greyedCards, linesOf, removeCard, visibleKinds } from '@/lib/lines';
 import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
@@ -23,7 +25,7 @@ function fieldDefault(c: MapCard, k: string): unknown {
   if (k === 'shape') return c.kind === 'card' && !c.parent ? 'none' : 'rect';
   if (k === 'route') return c.kind === 'card' && !c.parent ? 'curve' : 'metro';
   if (k === 'bend') return 0.5;
-  if (k === 'pick') return false;
+  if (k === 'pick' || k === 'hideText') return false;
   return null;
 }
 
@@ -56,6 +58,8 @@ function inverse(m: MapData, op: MapOp): MapOp[] | null {
     }
     case 'link':
       return [{ type: 'unlink', id: op.id }];
+    case 'lines':
+      return [{ type: 'lines', lines: linesOf(m) }];
     case 'unlink': {
       const l = m.links.find((x) => x.id === op.id);
       return l ? [{ type: 'link', id: l.id, from: l.from, to: l.to }] : null;
@@ -117,6 +121,8 @@ export default function MindmapPage() {
   const redoStack = useRef<MapOp[][]>([]);
   const [hist, setHist] = useState({ u: 0, r: 0 });
   const syncHist = () => setHist({ u: undoStack.current.length, r: redoStack.current.length });
+  const kinds = visibleKinds(project?.settings.outlineLines, project?.role === 'teacher');
+  const [lineTab, setLineTab] = useLineTab(kinds);
   // geschlossene Erklärblase: gemerkt wird ihr Text, damit ein neuer Text der Lehrkraft wieder erscheint
 
 
@@ -126,7 +132,20 @@ export default function MindmapPage() {
   // Kachel „Gliederung“ öffnet die Mindmap mit aufgeklappter Gliederung
   useEffect(() => {
     if (outlineParam) setOutlineOpen(true);
+    else
+      try {
+        // die Gliederung steht neben der Mindmap (Wunsch Jo); auf breiten Bildschirmen offen, sonst wie zuletzt gewählt
+        const v = localStorage.getItem('collegare-mindmap-gliederung');
+        setOutlineOpen(v ? v === '1' : window.innerWidth >= 1100);
+      } catch {}
   }, [outlineParam]);
+  const toggleOutline = () =>
+    setOutlineOpen((o) => {
+      try {
+        localStorage.setItem('collegare-mindmap-gliederung', o ? '0' : '1');
+      } catch {}
+      return !o;
+    });
 
   useEffect(() => {
     if (Number.isInteger(id)) get<ProjectView>(`/api/projects/${id}`).then(setProject, (e) => setToast(String(e.message ?? e)));
@@ -252,14 +271,6 @@ export default function MindmapPage() {
     );
   }
 
-  async function takeOutline() {
-    if (map?.outline && !confirm('Die Gliederung wurde schon übernommen. Mit dem jetzigen Stand der Cluster neu übernehmen?')) return;
-    if (await send({ type: 'outline' })) {
-      setOutlineOpen(true);
-      show('Gliederung übernommen');
-    }
-  }
-
   if (!me || !project) return <Topbar me={me ?? null} />;
   const teacher = project.role === 'teacher';
   const people = join?.people ?? [];
@@ -297,6 +308,35 @@ export default function MindmapPage() {
         }
       : undefined;
 
+  // Gliederung neben der Mindmap (Konzept 8g): Umschalten und Ablegen wirken auf die gerade gezeigte Linie
+  const lines = map ? linesOf(map) : null;
+  const lineHook: LineHook | undefined =
+    map && lines && !isTopic
+      ? {
+          has: (cid) => !!cardPoint(lines, lineTab, cid),
+          greyed: greyedCards(lines),
+          hover: (x, y) => hoverLineTarget(x, y),
+          toggle: (c, whole) => {
+            if (!canEdit) return;
+            if (lines.locked) return show('Die Gliederung ist gesperrt. Zum Ändern das Schloss in der Gliederung öffnen.');
+            const next = cardPoint(lines, lineTab, c.id) && !whole ? removeCard(lines, lineTab, c.id) : addCard(map, lines, lineTab, c, { whole });
+            void send({ type: 'lines', lines: next });
+            if (!outlineOpen) setOutlineOpen(true);
+          },
+          drop: (cid, x, y) => {
+            const t = lineTargetAt(x, y);
+            const c = map.cards[cid];
+            if (!t || !c || !canEdit) return false;
+            if (lines.locked) {
+              show('Die Gliederung ist gesperrt. Zum Ändern das Schloss öffnen.');
+              return true;
+            }
+            void send({ type: 'lines', lines: addCard(map, lines, t.kind, c, { whole: true, target: t.point }) });
+            if (t.kind !== lineTab && kinds.length > 1) setLineTab(t.kind);
+            return true;
+          },
+        }
+      : undefined;
   const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold, logAll: settings.pasteLogAll !== false } : null;
 
   return (
@@ -336,11 +376,8 @@ export default function MindmapPage() {
                       <option value="picked">Offenes hervorheben</option>
                       <option value="open">Übernommenes hervorheben</option>
                     </select>
-                    <button className={`btn ${outlineOpen ? 'on' : ''}`} onClick={() => setOutlineOpen((o) => !o)}>
-                      Gliederung {map.outline ? `(${map.outline.sections.length})` : ''}
-                    </button>
-                    <button className="btn primary" onClick={takeOutline} title="Übernommenes wird zu Abschnitten">
-                      <span className={s.long}>Gliederung </span>übernehmen
+                    <button className={`btn ${outlineOpen ? 'on' : ''}`} aria-pressed={outlineOpen} onClick={toggleOutline} title="Gliederung neben der Mindmap">
+                      <Icon name="outline" size={14} /> <span className={s.long}>Gliederung</span>
                     </button>
                   </>
                 )}
@@ -376,49 +413,11 @@ export default function MindmapPage() {
               </button>
             </div>
           )}
-          {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} />}
-          {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} />}
+          {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} line={lineHook} />}
+          {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} line={lineHook} />}
           {map && outlineOpen && !isTopic && (
-            <aside className={s.outline}>
-              <div className="row">
-                <h3>Gliederung</h3>
-                <span className="grow" />
-                <button className="btn icon" onClick={() => setOutlineOpen(false)} title="Schließen">
-                  ×
-                </button>
-              </div>
-              {!map.outline ? (
-                <p className="muted">
-                  Noch nicht übernommen. Wählt einen Hauptast (in der Karten-Ansicht: einen Cluster) und tippt „In die Gliederung“, für Unterpunkte ebenso bei den Karten. Nicht alles muss hinein, und
-                  Zuständige sind freiwillig. Mit „Hervorheben“ seht ihr, was schon drin ist. Tippt dann auf „Gliederung übernehmen“.
-                </p>
-              ) : (
-                <>
-                  <p className="muted">
-                    Übernommen am{' '}
-                    {new Date(map.outline.at).toLocaleString('de-DE', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                    . Die Abschnitte werden in der Ausarbeitung zu Dokumenten.
-                  </p>
-                  <ol className={s.sections}>
-                    {map.outline.sections.map((sec) => (
-                      <li key={sec.id}>
-                        <strong>{map.cards[sec.id]?.title || sec.title}</strong>
-                        <ul>
-                          {sec.cards
-                            .filter((c) => map.cards[c])
-                            .map((c) => (
-                              <li key={c}>{map.cards[c].title || 'Ohne Titel'}</li>
-                            ))}
-                        </ul>
-                        <span className={s.owners}>{sec.owners.length ? sec.owners.map(name).join(', ') : 'noch niemand zuständig'}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </>
-              )}
+            <aside className={s.outline} aria-label="Gliederung">
+              <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} />
             </aside>
           )}
         </div>

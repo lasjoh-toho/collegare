@@ -14,7 +14,8 @@ import { isChatDrag, setChatDrag } from '@/lib/chatDrag';
 import { imagesFrom, mayHoldImages, noteFileUrl, setImageDrag, takeImages, uploadImage, type ImageNoteInput } from '@/lib/imageDrop';
 import { ImageImport } from './ImageImport';
 import type { Me, ProjectView } from '@/lib/types';
-import { NoteLine } from './NoteLine';
+import { GliederungLive } from './GliederungLive';
+import { Icon } from './Icon';
 import c from './notes.module.css';
 
 type Kind = 'note' | 'source' | 'link' | 'image' | 'data' | 'video' | 'audio' | 'hand';
@@ -433,8 +434,20 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
   const [edit, setEdit] = useState<{ id: number; d: Draft } | null>(null);
   const [reporting, setReporting] = useState<{ id: number; reason: string } | null>(null);
   const [kind, setKind] = useState<Kind | 'all'>('all');
-  // eigene Linie neben dem Thread (8e.7), nur auf der eigenen Seite, nicht in der Leiste
+  // Gliederung rechts neben dem Thread (Konzept 8g, früher „Meine Linie“), nur auf der eigenen Seite, nicht in der Leiste
   const [lineView, setLineView] = useState(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('collegare-notizen-gliederung');
+      setLineView(v ? v === '1' : window.innerWidth >= 1000);
+    } catch {}
+  }, []);
+  const toggleLine = (on: boolean) => {
+    setLineView(on);
+    try {
+      localStorage.setItem('collegare-notizen-gliederung', on ? '1' : '0');
+    } catch {}
+  };
   // Bilder aus dem Netz: Auswahl von einer Seite, Hervorheben beim Ziehen
   const [pageImport, setPageImport] = useState<string | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -705,14 +718,9 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
           )
         )}
         {!panel && scope && !shared && (
-          <span className="seg" role="group" aria-label="Ansicht">
-            <button className={`btn ${!lineView ? 'on' : ''}`} aria-pressed={!lineView} onClick={() => setLineView(false)}>
-              Thread
-            </button>
-            <button className={`btn ${lineView ? 'on' : ''}`} aria-pressed={lineView} onClick={() => setLineView(true)} title="Deine Notizen als eigene Linie neben der Gliederung">
-              Meine Linie
-            </button>
-          </span>
+          <button className={`btn ${lineView ? 'on' : ''}`} aria-pressed={lineView} onClick={() => toggleLine(!lineView)} title="Gliederung als U-Bahn-Linie rechts neben den Notizen: Notizen auf die Punkte ziehen">
+            <Icon name="outline" size={14} /> Gliederung
+          </button>
         )}
         <span className="grow" />
         {scope && (
@@ -730,11 +738,6 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         <div className={`panel ${c.notice}`}>{teacher ? 'Noch keine Gruppen.' : 'Du bist noch keiner Gruppe zugeordnet.'}</div>
       ) : (
         <div className={lineView && !panel && !shared ? c.split : c.single}>
-        {lineView && !panel && !shared && scope && (
-          <div className={c.lineCol}>
-            <NoteLine sock={sock.current} projectId={id} scope={scope} notes={notes} show={show} />
-          </div>
-        )}
         <div className={c.list} ref={listRef}>
           <div className={c.inner}>
             <div className={c.filter}>
@@ -884,6 +887,11 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
               </button>)}
           </div>
         </div>
+        {lineView && !panel && !shared && scope && (
+          <div className={c.lineCol}>
+            <GliederungLive sock={sock.current} project={project} scope={scope} meId={me.id} noteInfo={(nid) => { const n = notes.find((x) => x.id === nid); return n ? { label: n.title || n.body.split('\n')[0].slice(0, 90), kind: n.kind } : undefined; }} show={show} onClose={() => toggleLine(false)} />
+          </div>
+        )}
         </div>
       )}
       {wide && adding && (
