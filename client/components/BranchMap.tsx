@@ -52,6 +52,9 @@ interface Geo {
   color: string;
   /** Vorschau beim Packen: würde frei */
   loose?: boolean;
+  /** Eckpunkte der gezeichneten Linie (U-Bahn, rechtwinklig, gerade) und Radius der Rundung */
+  poly?: V[];
+  rad?: number;
 }
 
 interface Node {
@@ -97,7 +100,7 @@ function rounded(pts: [number, number][], r = 12): string {
 
 const LEAD = 18; // gerades Stück vor der Pfeilspitze
 const LINE = 14; // alle Äste gleich dick, breit wie ein Schriftband (Wunsch Jo)
-const TIP = 1.25; // Länge der Spitze in Linienbreiten (stumpfer, Wunsch Jo)
+const TIP = 1.5; // Länge der Spitze in Linienbreiten (ohne Widerhaken, Wunsch Jo)
 
 type V = [number, number];
 interface Box {
@@ -114,15 +117,16 @@ interface Box {
 function port(box: Box, tx: number, ty: number, middle = false): { p: V; dir: V } {
   const dx = tx - box.x;
   const dy = ty - box.y;
-  const m = 8; // nicht ganz in die Ecke
+  // nicht in die Ecke: der Ast (halbe Linienbreite) soll ganz an der Seite ansetzen, auch neben abgerundeten Ecken
+  const m = LINE / 2 + 6;
   // Seite nach dem Abstand außerhalb der Form wählen, nicht nach dem Winkel (breite Formen sonst fast nur oben/unten)
   if (Math.abs(dx) - box.w / 2 >= Math.abs(dy) - box.h / 2) {
     const s = dx >= 0 ? 1 : -1;
-    const y = middle ? box.y : Math.max(box.y - box.h / 2 + m, Math.min(box.y + box.h / 2 - m, ty));
+    const y = middle || box.h / 2 <= m ? box.y : Math.max(box.y - box.h / 2 + m, Math.min(box.y + box.h / 2 - m, ty));
     return { p: [box.x + (s * box.w) / 2, y], dir: [s, 0] };
   }
   const s = dy >= 0 ? 1 : -1;
-  const x = middle ? box.x : Math.max(box.x - box.w / 2 + m, Math.min(box.x + box.w / 2 - m, tx));
+  const x = middle || box.w / 2 <= m ? box.x : Math.max(box.x - box.w / 2 + m, Math.min(box.x + box.w / 2 - m, tx));
   return { p: [x, box.y + (s * box.h) / 2], dir: [0, s] };
 }
 
@@ -195,9 +199,12 @@ function handles(a: V, da: V, via: V[], end: V, db: V, bend: number, hs: (V | nu
  * Weg von Anschluss a (Richtung da nach außen) über die Zwischenstopps zu Anschluss b (Richtung db nach außen aus
  * dem Ziel). Zwischen zwei Stopps läuft die Linie im gewählten Stil; das letzte Stück zeigt gerade in das Ziel.
  */
-function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V, hs: (V | null)[] = []): string {
+function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V, hs: (V | null)[] = [], out?: { pts: V[]; r: number }): string {
   const end: V = endOf(b, db);
-  if (kind === 'straight') return rounded([a, ...via, b], 10);
+  if (kind === 'straight') {
+    if (out) (out.pts = [a, ...via, b]), (out.r = 10);
+    return rounded([a, ...via, b], 10);
+  }
   const stops: V[] = [a, ...via, end];
   if (kind === 'curve') {
     // Bézierkurve durch alle Stopps; an jedem Stopp ein Griff (von Hand gezogen oder automatisch glatt)
@@ -225,6 +232,7 @@ function route(kind: MapRoute, bend: number, a: V, da: V, via: V[], b: V, db: V,
     const dq: V = last ? db : dp[0] !== 0 ? [0, Math.sign(p[1] - q[1]) || 1] : [Math.sign(p[0] - q[0]) || 1, 0];
     pts.push(...leg(kind, bend, p, dp, q, dq).slice(1));
   }
+  if (out) (out.pts = [...pts, b]), (out.r = 14);
   return rounded([...pts, b], 14);
 }
 
@@ -265,18 +273,42 @@ function segDist([px, py]: V, [ax, ay]: V, [bx, by]: V): number {
   return Math.hypot(px - ax - t * (bx - ax), py - ay - t * (by - ay));
 }
 
+/**
+ * Punkt auf der gezeichneten Linie am Zwischenstopp c: an Ecken rundet rounded() ab, die Linie läuft dort nicht genau
+ * durch c. Abzweigungen setzen an diesem Punkt an, damit ihr Anfang ganz unter dem Hauptast liegt.
+ */
+function onLine(poly: V[] | undefined, r: number, c: V): V {
+  if (!poly) return c;
+  const k = poly.findIndex((p, i) => i > 0 && i < poly.length - 1 && Math.hypot(p[0] - c[0], p[1] - c[1]) < 0.5);
+  if (k < 0) return c;
+  const [pv, nx] = [poly[k - 1], poly[k + 1]];
+  const l1 = Math.hypot(c[0] - pv[0], c[1] - pv[1]) || 1;
+  const l2 = Math.hypot(nx[0] - c[0], nx[1] - c[1]) || 1;
+  const rr = Math.min(r, l1 / 2, l2 / 2);
+  const a: V = [c[0] - ((c[0] - pv[0]) / l1) * rr, c[1] - ((c[1] - pv[1]) / l1) * rr];
+  const b: V = [c[0] + ((nx[0] - c[0]) / l2) * rr, c[1] + ((nx[1] - c[1]) / l2) * rr];
+  return [0.25 * a[0] + 0.5 * c[0] + 0.25 * b[0], 0.25 * a[1] + 0.5 * c[1] + 0.25 * b[1]];
+}
+
 const snap = (v: number) => Math.round(v / 10) * 10;
 
-/** Spitze ohne Widerhaken: so breit wie die Linie, kurz und an der Spitze leicht gerundet. */
+/**
+ * Spitze ohne Widerhaken (Wunsch Jo): an der Wurzel so breit wie die Linie und tangential aus ihr heraus, die Flanken
+ * leicht gewölbt bis zu einer fein gerundeten Spitze, damit Linie und Spitze wie aus einem Stück wirken.
+ */
 function arrow(x: number, y: number, [dx, dy]: [number, number], w: number): string {
   const px = (-dy * w) / 2;
   const py = (dx * w) / 2;
-  const bx = x - dx * w * TIP;
-  const by = y - dy * w * TIP;
-  const f = 0.22; // Anteil der Flanke, der in die Rundung geht
-  const l: V = [x + (bx + px - x) * f, y + (by + py - y) * f];
-  const r: V = [x + (bx - px - x) * f, y + (by - py - y) * f];
-  return `M${bx + px},${by + py} L${l[0]},${l[1]} Q${x},${y} ${r[0]},${r[1]} L${bx - px},${by - py} Z`;
+  const L = w * TIP;
+  const bx = x - dx * L;
+  const by = y - dy * L;
+  // Kontrollpunkte: an der Wurzel noch parallel zur Linie, dann zur Spitze hin einziehen
+  const c = (sg: number): V => [bx + dx * L * 0.45 + sg * px * 0.95, by + dy * L * 0.45 + sg * py * 0.95];
+  const r = 0.08; // Rundung der Spitze
+  const t1: V = [x - dx * L * r + px * r * 0.9, y - dy * L * r + py * r * 0.9];
+  const t2: V = [x - dx * L * r - px * r * 0.9, y - dy * L * r - py * r * 0.9];
+  const [c1, c2] = [c(1), c(-1)];
+  return `M${bx + px},${by + py} Q${c1[0]},${c1[1]} ${t1[0]},${t1[1]} Q${x},${y} ${t2[0]},${t2[1]} Q${c2[0]},${c2[1]} ${bx - px},${by - py} Z`;
 }
 
 /** Farbe leicht abwandeln (k-te Abzweigung): Farbton abwechselnd nach beiden Seiten, etwas heller. */
@@ -675,7 +707,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
     let loose = false;
     if (fork && trunk) {
       // Abzweigung läuft zunächst in Fahrtrichtung des Hauptasts weiter (wie eine Weiche) und biegt dann ab
-      const p = trunk.via[fork.i];
+      const p = onLine(trunk.poly, trunk.rad ?? 0, trunk.via[fork.i]);
       const nextT = trunk.via[fork.i + 1] ?? trunk.z.p;
       let fwd: V = trunk.kind === 'curve' ? trunk.hv[fork.i] : [nextT[0] - p[0], nextT[1] - p[1]];
       const fl = Math.hypot(fwd[0], fwd[1]) || 1;
@@ -699,8 +731,8 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
     const stop: V = [tip[0] + z.dir[0] * w * TIP, tip[1] + z.dir[1] * w * TIP];
     // Linie endet etwas in der Spitze, damit kein Haarspalt bleibt; Abzweigungen beginnen leicht im Hauptast
     const into: V = [stop[0] - z.dir[0] * 2, stop[1] - z.dir[1] * 2];
-    const a0: { p: V; dir: V } = fork ? { p: [a.p[0] - a.dir[0] * (w / 2), a.p[1] - a.dir[1] * (w / 2)], dir: a.dir } : a;
-    const d = route(kind, bend, a0.p, a0.dir, via, into, z.dir, hs);
+    const out = { pts: [] as V[], r: 0 };
+    const d = route(kind, bend, a.p, a.dir, via, into, z.dir, hs, out);
     const hv = kind === 'curve' ? handles(a.p, a.dir, via, endOf(stop, z.dir), z.dir, bend, hs) : [];
     // Farbe: eigene Wahl, sonst bei jeder Abzweigung leicht abgewandelt
     let color = n.color;
@@ -708,7 +740,7 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
       if (fork && trunk) color = shade(trunk.color, nodes.filter((o) => o.parentId === n.parentId && o.card.fork?.from === fork.from).indexOf(n) + 1);
       else if (parent) color = shade(geoOf(parent).color, nodes.filter((o) => o.parentId === parent.card.id).indexOf(n) + 1);
     }
-    const g: Geo = { n, from, a, z, via, hv, tip, w, d, kind, fork, color, loose };
+    const g: Geo = { n, from, a, z, via, hv, tip, w, d, kind, fork, color, loose, poly: out.pts.length ? out.pts : undefined, rad: out.r };
     busy.delete(n.card.id);
     memo.set(n.card.id, g);
     return g;
@@ -1059,8 +1091,13 @@ export function BranchMap({ map, topic, people, canEdit, send, dim = 'none', onT
         <svg className={b.svg} width="1" height="1" overflow="visible" aria-hidden="true">
           {[...geo.filter((g) => g.fork), ...geo.filter((g) => !g.fork && !g.n.card.free)].map((g) => (
             <g key={g.n.card.id} style={{ color: g.color }} className={isDimmed(map, g.n.card, dim) || line?.greyed.has(g.n.card.id) ? b.dimLine : undefined}>
-              <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" opacity={g.loose ? 0.45 : g.n.idea ? 0.75 : 1} strokeDasharray={g.loose ? '14 10' : undefined} />
-              <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" opacity={g.n.idea ? 0.75 : 1} />
+              {/* Deckkraft für Linie und Spitze gemeinsam: keine dunklere Naht, wo sie sich überlappen */}
+              <g opacity={g.loose ? 0.45 : 1}>
+                {/* Abzweigung: runder Anfang, liegt ganz unter dem Hauptast */}
+                {g.fork && <circle cx={g.a.p[0]} cy={g.a.p[1]} r={g.w / 2} fill="currentColor" />}
+                <path d={g.d} fill="none" stroke="currentColor" strokeWidth={g.w} strokeLinecap="butt" strokeLinejoin="round" strokeDasharray={g.loose ? '14 10' : undefined} />
+                <path d={arrow(g.tip[0], g.tip[1], [-g.z.dir[0], -g.z.dir[1]], g.w)} fill="currentColor" />
+              </g>
               {sel === g.n.card.id && canEdit && g.hv.map((h, i) => (
                 <line key={i} className={b.tangent} x1={g.via[i][0] - h[0]} y1={g.via[i][1] - h[1]} x2={g.via[i][0] + h[0]} y2={g.via[i][1] + h[1]} />
               ))}
