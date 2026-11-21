@@ -58,6 +58,8 @@ export interface AccessCodesTable {
   expires_at: Ms;
   revoked_at: Ms | null;
   redeem_count: number;
+  /** 1: Ende folgt den Freigaben der Phasen, beim Speichern der Einstellungen neu gesetzt */
+  follow_release: Generated<number>;
   created_by: number;
   created_at: Ms;
 }

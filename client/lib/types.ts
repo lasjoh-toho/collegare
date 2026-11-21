@@ -121,6 +121,8 @@ export interface ProjectView {
   /** Werkstatt der Lehrkraft: Werkzeuge ausprobieren und Materialien sammeln, ohne Lernende */
   werkstatt?: boolean;
   codesValidUntil?: Record<number, number>;
+  /** Personen, deren Codes „solange das Projekt freigegeben ist“ gelten */
+  codesFollowRelease?: number[];
 }
 
 export interface Frame {

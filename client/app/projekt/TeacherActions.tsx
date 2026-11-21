@@ -49,7 +49,7 @@ export function TeacherActions({ project, onChanged }: { project: ProjectView; o
       </div>
       {toast && <div className={p.toast}>{toast}</div>}
       {dialog === 'codes' && (
-        <CodesDialog projectId={project.id} title={project.title} members={project.board.members} validUntil={project.codesValidUntil} onClose={() => (setDialog(null), onChanged())} />
+        <CodesDialog projectId={project.id} title={project.title} members={project.board.members} validUntil={project.codesValidUntil} followRelease={project.codesFollowRelease} onClose={() => (setDialog(null), onChanged())} />
       )}
       {dialog === 'students' && <StudentsDialog projectId={project.id} onClose={() => (setDialog(null), onChanged())} />}
     </>

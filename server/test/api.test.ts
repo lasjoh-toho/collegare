@@ -330,6 +330,37 @@ describe('Projekte und Kanban', () => {
     expect((await call('POST', '/api/access/redeem', undefined, { code: codes.codes[0].code })).status).toBe(404);
   });
 
+  it('Zugangscodes: Ende mit Uhrzeit oder solange das Projekt freigegeben ist', async () => {
+    const { t, project, ids } = await setup();
+    const at = Date.now() + 3 * 3600_000;
+    const timed = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]], until: at })).json.codes[0];
+    expect(timed).toMatchObject({ expiresAt: at, followRelease: false });
+    expect((await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[0]], until: Date.now() - 1000 })).status).toBe(400);
+
+    const phases = (await call('GET', `/api/projects/${project}`, t)).json.settings.phases;
+    const end = Date.now() + 5 * 86_400_000;
+    const scheduled = Object.fromEntries(Object.keys(phases).map((k) => [k, { state: k === 'research' ? 'scheduled' : 'off', from: null, to: k === 'research' ? end : null }]));
+    await call('PATCH', `/api/projects/${project}`, t, { settings: { phases: scheduled } });
+    const rel = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: [ids[1]], release: true })).json.codes[0];
+    expect(rel).toMatchObject({ expiresAt: end, followRelease: true });
+    const view = (await call('GET', `/api/projects/${project}`, t)).json;
+    expect(view.codesFollowRelease).toEqual([ids[1]]);
+    expect(view.codesValidUntil[ids[1]]).toBe(end);
+
+    // Lehrkraft verlängert die Phase: der Code zieht mit
+    const later = end + 2 * 86_400_000;
+    await call('PATCH', `/api/projects/${project}`, t, { settings: { phases: { ...scheduled, research: { state: 'scheduled', from: null, to: later } } } });
+    expect((await call('GET', `/api/projects/${project}`, t)).json.codesValidUntil[ids[1]]).toBe(later);
+    // alles geschlossen: Code gilt nicht mehr; wieder freigegeben: gilt wieder
+    await call('PATCH', `/api/projects/${project}`, t, { settings: { phases: { ...scheduled, research: { state: 'closed', from: null, to: null } } } });
+    expect((await call('POST', '/api/access/redeem', undefined, { code: rel.code })).status).toBe(404);
+    await call('PATCH', `/api/projects/${project}`, t, { settings: { phases: { ...scheduled, research: { state: 'on', from: null, to: null } } } });
+    expect((await call('POST', '/api/access/redeem', undefined, { code: rel.code })).status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}`, t)).json.codesValidUntil[ids[1]]).toBeGreaterThan(Date.now() + 170 * 86_400_000);
+    // der Code mit fester Uhrzeit bleibt unberührt
+    expect((await call('GET', `/api/projects/${project}`, t)).json.codesValidUntil[ids[0]]).toBe(at);
+  });
+
   it('Korrektur: Übersicht nach Gruppen, Note je Person, nur für Lehrkräfte', async () => {
     const { t, project, ids } = await setup();
     const g1 = (await call('POST', `/api/projects/${project}/groups`, t, {})).json.id;

@@ -34,6 +34,22 @@ const PhaseSchema = z.object({
   to: z.number().int().nullable().default(null),
 });
 
+/** Höchstdauer für Zugangscodes „solange freigegeben“, wenn eine Phase ohne Ende offen ist; beim Speichern neu gesetzt. */
+export const RELEASE_OPEN_DAYS = 180;
+
+/**
+ * Ende der Zugangscodes „solange das Projekt freigegeben ist“ (Wunsch Jo, 21. November 2026, wie in Autogra.fi):
+ * das späteste Ende aller freigegebenen Phasen. Ist eine Phase „offen“ oder hat ihr Zeitraum kein Ende, gilt der
+ * Code 180 Tage ab jetzt. Geschlossene und nicht vorgesehene Phasen zählen nicht; sind alle zu, ist das Ende jetzt.
+ * Der Beginn zählt nicht: Lernende dürfen sich vorher anmelden, die Phasen zeigen dann „ab …“.
+ */
+export function releaseEnd(phases: Record<string, { state: string; to: number | null }>, now: number): number {
+  const live = Object.values(phases).filter((p) => p.state === 'on' || p.state === 'scheduled');
+  if (!live.length) return now;
+  if (live.some((p) => p.state === 'on' || p.to == null)) return now + RELEASE_OPEN_DAYS * 86_400_000;
+  return Math.max(...live.map((p) => p.to!));
+}
+
 const flags = <T extends readonly string[]>(keys: T) =>
   z.object(Object.fromEntries(keys.map((k) => [k, z.boolean()])) as { [K in T[number]]: z.ZodBoolean });
 

@@ -483,6 +483,13 @@ migrations['0019_werkstatt_material'] = {
   },
 };
 
+// Zugangscodes „solange das Projekt freigegeben ist“ (Wunsch Jo, 21. November 2026): Ende folgt den Freigaben der Phasen
+migrations['0020_access_codes_release'] = {
+  async up(db) {
+    await db.schema.alterTable('access_codes').addColumn('follow_release', 'integer', (c) => c.notNull().defaultTo(0)).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

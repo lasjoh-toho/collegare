@@ -133,6 +133,7 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
       myGroupId: me?.groupId ?? null,
       board,
       codesValidUntil: a.role === 'teacher' ? await s.accessCodes.validUntil(a.projectId) : undefined,
+      codesFollowRelease: a.role === 'teacher' ? await s.accessCodes.followingRelease(a.projectId) : undefined,
     };
   });
 
@@ -150,6 +151,7 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
       const frame = await s.frame.get();
       const wanted = clampToFrame({ ...p!.settings, ...body.data.settings }, frame);
       const res = await s.projects.updateSettings(a.projectId, wanted, body.data.revision);
+      if (body.data.settings.phases) await s.accessCodes.syncRelease(a.projectId);
       await s.audit.append({ actorId: a.userId, action: 'project.settings_changed', projectId: a.projectId, data: { keys: Object.keys(body.data.settings), revision: res.revision } });
       await bc.push(a.projectId);
       return { ok: true, ...res };
@@ -346,14 +348,19 @@ export function projectRoutes(app: FastifyInstance, s: Services, bc: BoardBroadc
   app.post<P>('/api/projects/:id/access-codes', async (req, reply) => {
     const a = await access(req, reply, 'teacher');
     if (!a) return;
-    const body = z.object({ userIds: z.array(z.number().int()).min(1).max(200), days: z.number().min(1 / 24).max(60).optional() }).safeParse(req.body);
+    const body = z
+      .object({ userIds: z.array(z.number().int()).min(1).max(200), days: z.number().min(1 / 24).max(60).optional(), until: z.number().int().optional(), release: z.boolean().optional() })
+      .safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Personen auswählen' });
+    const now = Date.now();
+    if (body.data.until !== undefined && (body.data.until <= now || body.data.until > now + 60 * 86_400_000))
+      return reply.code(400).send({ error: 'Das Ende muss in der Zukunft liegen, höchstens 60 Tage.' });
     const board = await s.projects.board(a.projectId);
     const allowed = new Set(board.members.map((m) => m.userId));
     const ids = body.data.userIds.filter((id) => allowed.has(id));
-    const ttl = (body.data.days ?? s.config.accessCodeDays) * 86_400_000;
-    const codes = await s.accessCodes.issue(a.projectId, ids, ttl, a.userId);
-    await s.audit.append({ actorId: a.userId, action: 'access.codes_issued', projectId: a.projectId, data: { count: codes.length } });
+    const validity = body.data.release ? ({ release: true } as const) : { until: body.data.until ?? now + (body.data.days ?? s.config.accessCodeDays) * 86_400_000 };
+    const codes = await s.accessCodes.issue(a.projectId, ids, validity, a.userId);
+    await s.audit.append({ actorId: a.userId, action: 'access.codes_issued', projectId: a.projectId, data: { count: codes.length, release: !!body.data.release } });
     const names = new Map(board.members.map((m) => [m.userId, m.name]));
     return {
       codes: codes.map((c) => ({ ...c, name: names.get(c.userId), url: `${s.config.appUrl}/zugang#k=${c.secret}` })),
