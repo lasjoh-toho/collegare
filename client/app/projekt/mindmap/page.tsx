@@ -25,7 +25,7 @@ function fieldDefault(c: MapCard, k: string): unknown {
   if (k === 'shape') return c.kind === 'card' && !c.parent ? 'none' : 'rect';
   if (k === 'route') return c.kind === 'card' && !c.parent ? 'curve' : 'metro';
   if (k === 'bend') return 0.5;
-  if (k === 'pick' || k === 'hideText' || k === 'free') return false;
+  if (k === 'pick' || k === 'hideText' || k === 'free' || k === 'docked') return false;
   return null;
 }
 
@@ -291,7 +291,7 @@ export default function MindmapPage() {
       : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
     : canEdit
       ? view === 'karten'
-        ? 'Cluster: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an; Doppelklick auf eine Karte schreibt direkt darin. Zieht Zusammengehöriges in einen Cluster, Karten auch in Karten. Ein Schatten zeigt, dass eine Karte herausgehoben ist (gewählt oder gezogen). „Text aus“ blendet alle Texte aus; einzelne zeigt ihr danach über „Text zeigen“ an der Karte. Strg+Z nimmt zurück.' + outlineHelp
+        ? 'Cluster: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an; Doppelklick auf eine Karte schreibt direkt darin. Zieht Zusammengehöriges in einen Cluster, Karten auch in Karten. Zieht ihr eine Karte im Cluster direkt unter den Rand, dockt sie an eine Linie an: Die Punkte stehen dort in voller Breite untereinander und sind zugeklappt; ein Klick auf die Titelleiste klappt auf, ein Klick auf den Anschlusspunkt links löst die Karte wieder. Ein Schatten zeigt, dass eine Karte herausgehoben ist (gewählt oder gezogen). „Text aus“ blendet alle Texte aus; einzelne zeigt ihr danach über „Text zeigen“ an der Karte. Strg+Z nimmt zurück.' + outlineHelp
         : 'Mindmap: + am Thema oder Tab legt eine Idee an, „+ Abschnitt“ einen Hauptast, „+ Frei“ einen freien Knoten ohne Ast (später anbinden oder eigene Ideen daran sammeln, wie ein zweites Zentrum). Doppelklick auf einen Ast setzt einen Zwischenstopp; antippen eines Zwischenstopps legt dort eine Abzweigung an, die Form und Linie des Asts erbt. Langer Druck auf einen Knoten packt seinen Ansatz: an einem anderen Knoten loslassen bindet ihn dort an, weit weg loslassen stellt ihn frei, auf der Gliederung loslassen nimmt ihn dorthin. Strg+Z nimmt zurück.' + outlineHelp
       : 'Hier seht ihr die Mindmap der Gruppe.';
   const info = isTopic ? { key: 'mindmap-topic', title: 'Themen-Mindmap', text: helpText, start: true } : { key: 'mindmap', title: 'Mindmap der Gruppe', text: helpText, start: true };

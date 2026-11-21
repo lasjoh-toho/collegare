@@ -60,6 +60,27 @@
 @media (max-width: 700px) { .long { display: none; } }
 .body { position: absolute; right: 0; bottom: 0; }
 
+/* Linie oben im Cluster (Konzept 8h.9): angedockte Punkte in voller Breite untereinander, links die Linie in der
+   Farbe des Clusters mit einem Anschlusspunkt je Karte; ein Klick auf den Punkt löst die Karte wieder */
+.dock { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 6px; padding-left: 26px; }
+.dock::before {
+  content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 5px; border-radius: 3px;
+  background: var(--c); box-shadow: 0 0 0 1.5px var(--ink);
+}
+.stop { position: relative; }
+.port {
+  position: absolute; left: -24px; top: 6px; z-index: 2; width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  background: var(--bg-elev); border: 3px solid var(--ink); cursor: pointer;
+}
+.port::after { content: ''; position: absolute; left: 100%; top: 50%; width: 6px; height: 3px; margin-top: -1.5px; background: var(--ink); }
+.port:hover:not(:disabled) { background: var(--c); }
+.port:disabled { cursor: default; }
+.docked { position: relative; left: auto; top: auto; width: auto; }
+.docked > .head { cursor: pointer; border-radius: 6px; }
+.docked:has(> .textWrap) > .head, .docked:has(> .nest) > .head { border-radius: 6px 6px 0 0; }
+.docked:not(:has(> .textWrap)):not(:has(> .nest)) > .head { border-bottom: 0; }
+.fold { flex: none; font-size: 12px; font-weight: 700; opacity: 0.9; }
+
 /* Griffe wie in brausa: Punkt rechts für Pfeile, Ecke unten rechts für die Größe */
 .h { position: absolute; display: none; z-index: 2; }
 .card:hover > .h, .card.sel > .h { display: block; }

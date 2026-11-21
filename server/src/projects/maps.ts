@@ -58,6 +58,8 @@ export interface MapCard {
   hideText?: boolean;
   /** Ast-Ansicht: freier Knoten ohne Ast zum Thema (Konzept 8h); kann angebunden oder zum Hauptknoten werden */
   free?: boolean;
+  /** Karten-Ansicht: als Punkt an der Linie oben im Cluster angedockt */
+  docked?: boolean;
   /** Zwischenstopps des Asts (Ast-Ansicht), in Reihenfolge vom Ursprung zum Ziel */
   via?: ([number, number] | [number, number, number, number])[];
   /** Karten im Cluster, hinten nach vorn */
@@ -129,6 +131,7 @@ export const MapOp = z.discriminatedUnion('type', [
       noteId: z.number().int().positive().nullable().optional(),
       hideText: z.boolean().optional(),
       free: z.boolean().optional(),
+      docked: z.boolean().optional(),
       via: Via.optional(),
     }),
   }),
@@ -136,7 +139,7 @@ export const MapOp = z.discriminatedUnion('type', [
     type: z.literal('update'),
     id: Id,
     patch: z
-      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), pick: z.boolean(), hideText: z.boolean(), free: z.boolean(), via: Via })
+      .object({ title: z.string().max(200), text: z.string().max(5000), color: Color, owner: z.number().int().nullable(), w: Size, h: Size, shape: z.enum(SHAPES), route: z.enum(ROUTES), bend: z.number().min(0).max(1), bx: Num.nullable(), by: Num.nullable(), start: Start, fork: Fork, under: Id.nullable(), pick: z.boolean(), hideText: z.boolean(), free: z.boolean(), docked: z.boolean(), via: Via })
       .partial(),
   }),
   z.object({ type: z.literal('move'), id: Id, x: Num, y: Num, parent: Id.nullable() }),

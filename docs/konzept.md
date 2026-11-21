@@ -1109,6 +1109,21 @@ erhalten, wird aber nicht mehr angezeigt.
 - **Kopfzeile:** Auswahl der Mindmap in der Mitte, Ansicht (Mindmap/Cluster), Auge (Hervorheben) und Gliederung oben
   rechts in der Fläche, neue Knoten oben links. Alle Hinweise stehen in der Erklärung hinter dem i-Knopf.
 
+### 8h.9 Linie oben im Cluster (21. November 2026)
+
+Wunsch von Jo: Wird eine Karte im Cluster direkt unter den Rand gezogen, entsteht dort eine Gliederungslinie. Die Punkte
+stehen in einem festen Raster in voller Breite untereinander; ein Klick auf den Anschlusspunkt löst eine Karte wieder.
+Die Punkte sind zugeklappt und klappen mit einem Klick auf die Titelleiste auf.
+
+- Karte bekommt das Feld `docked`; `y` ist an der Linie nur die Reihenfolge. Andocken, wenn die Oberkante der gezogenen
+  Karte höchstens 18 px unter dem Ende der Linie (bzw. dem Kopf des Clusters) liegt; eingereiht nach der Zeigerlage
+  zwischen den vorhandenen Punkten oder vor einem Punkt (obere Kante). Wird eine angedockte Karte woanders abgelegt,
+  ist sie wieder frei.
+- Die Linie liegt unter Kopf und Text des Clusters, die übrigen Karten beginnen darunter. Karten in einer angedockten
+  Karte wandern mit und erscheinen erst aufgeklappt (zugeklappt zeigt der Pfeil ihre Zahl).
+- Auf- und Zuklappen gilt nur auf dem eigenen Gerät und wird nicht gespeichert.
+- In „Als Gliederung“ und beim Übernehmen eines Clusters kommen angedockte Punkte zuerst, in ihrer Reihenfolge.
+
 ## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
 
 Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf

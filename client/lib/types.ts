@@ -169,6 +169,8 @@ export interface MapCard {
   hideText?: boolean;
   /** Ast-Ansicht: freier Knoten ohne Ast zum Thema */
   free?: boolean;
+  /** Karten-Ansicht: als Punkt an der Linie oben im Cluster angedockt */
+  docked?: boolean;
   /** Zwischenstopps: x, y, optional Bézier-Griff hx, hy */
   via?: MapVia[];
   children: string[];
@@ -207,7 +209,7 @@ export interface MindMap {
 }
 export type MapOp =
   | { type: 'add'; card: Omit<MapCard, 'children'> }
-  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'pick' | 'hideText' | 'free' | 'via'>> }
+  | { type: 'update'; id: string; patch: Partial<Pick<MapCard, 'title' | 'text' | 'color' | 'owner' | 'w' | 'h' | 'shape' | 'route' | 'bend' | 'bx' | 'by' | 'start' | 'fork' | 'under' | 'pick' | 'hideText' | 'free' | 'docked' | 'via'>> }
   | { type: 'move'; id: string; x: number; y: number; parent: string | null }
   | { type: 'remove'; ids: string[] }
   | { type: 'link'; id: string; from: string; to: string }

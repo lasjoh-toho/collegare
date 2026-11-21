@@ -136,7 +136,8 @@ function kidsOf(m: MindMap, k: MapCard): MapCard[] {
     k.kind === 'cluster'
       ? k.children.map((x) => m.cards[x]).filter((x) => x && !(x.under && m.cards[x.under]?.parent === k.id))
       : Object.values(m.cards).filter((x) => x.under === k.id && x.id !== k.id && x.parent === k.parent);
-  return list.sort((a, b) => a.y - b.y || a.x - b.x);
+  // angedockte Punkte (Linie oben im Cluster) kommen zuerst
+  return list.sort((a, b) => Number(!!b.docked) - Number(!!a.docked) || a.y - b.y || a.x - b.x);
 }
 export const newPoint = (title: string): LinePoint => {
   const id = rid();
