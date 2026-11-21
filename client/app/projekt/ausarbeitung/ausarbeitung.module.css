@@ -1,29 +1,41 @@
 .scope { height: 28px; max-width: 30vw; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); font-size: 12px; }
+.seg { display: inline-flex; gap: 0; }
+.seg :global(.btn) { border-radius: 0; }
+.seg :global(.btn):first-child { border-radius: 8px 0 0 8px; }
+.seg :global(.btn):last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
 .area { flex: 1; min-height: 0; display: flex; }
-.side { width: 280px; flex: none; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--line); background: var(--bg-elev); }
-.side p { margin: 0; font-size: 12.5px; }
-.sections { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 12px; }
-.secTitle { font-weight: 650; margin-bottom: 4px; }
-/* Abschnitte mit den Zuständen aus docs/gestaltung.md: offen = Rand in Textfarbe der Office-Art, fertig = Haken */
-.doc { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 6px 8px 6px 10px; border-radius: 8px; text-align: left; border-left: 3px solid var(--office-word); }
-.doc:hover { background: var(--bg-sunken); }
-.doc.on { background: color-mix(in srgb, var(--office-word) 12%, transparent); }
-.docTitle { font-size: 13px; }
-.meta { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--fg-faint); }
-.done { padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); font-weight: 600; }
-.doneChip { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); font-weight: 600; }
-.status { max-width: 22vw; overflow: hidden; text-overflow: ellipsis; }
-.editor { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-/* etwa 1,5 mm kräftiger Streifen in der Farbe der Office-Art, darunter OnlyOffice unverändert */
+/* Gliederung links, solange geschrieben wird (vor der Gliederung liegende Schritte zeigen sie rechts) */
+.line { width: 300px; flex: none; overflow: auto; border-right: 1px solid var(--line); background: var(--bg-elev); }
+.col { flex: 1; min-width: 0; overflow: auto; background: var(--bg-sunken); counter-reset: ednote; }
+.cards { max-width: 1180px; margin: 0 auto; padding: 18px 20px 90px; display: flex; flex-direction: column; gap: 14px; }
+.empty { padding: 30px 0; text-align: center; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.secTitle { margin: 12px 0 0 4px; font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.6rem; }
+.outside { opacity: 0.75; }
+.outside .secTitle { font-family: inherit; font-style: normal; font-size: 14px; color: var(--fg-muted); }
+.terms dl { margin: 0; padding: 14px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-elev); display: grid; gap: 6px; font-family: Georgia, serif; }
+.terms dl > div { display: grid; grid-template-columns: minmax(120px, 28%) 1fr; gap: 12px; }
+.terms dt { font-weight: 600; }
+.terms dd { margin: 0; }
+.missing { color: var(--fg-faint); font-style: italic; }
+/* „Zurück“ unten, bleibt beim Rollen sichtbar */
+.backBar { position: sticky; bottom: 12px; display: flex; justify-content: flex-start; pointer-events: none; }
+.backBar :global(.btn) { pointer-events: auto; box-shadow: var(--shadow); background: var(--bg-elev); }
+.read { padding: 18px 16px 40px; }
+.officeModal { width: min(1100px, 96vw); height: 88dvh; display: flex; flex-direction: column; gap: 6px; }
+.officeModal h2 { margin: 0; font-size: 16px; }
+.officeModal p { margin: 0; font-size: 12.5px; }
 .stripe { flex: none; height: 6px; background: var(--office-word); }
-.back { display: none; }
 .frame { flex: 1; width: 100%; border: 0; background: #fff; }
-.placeholder { margin: auto; color: var(--fg-faint); }
-@media (max-width: 760px) {
-  .side { width: 100%; border-right: 0; }
-  .hideOnPhone { display: none; }
-  .area:has(.hideOnPhone) .editor { display: flex; }
-  .area:not(:has(.hideOnPhone)) .editor { display: none; }
-  .back { display: inline-flex; }
-  .status { display: none; }
+
+@media screen and (max-width: 900px) {
+  .line { position: absolute; z-index: 20; left: 0; top: 0; bottom: 0; box-shadow: var(--shadow); }
+  .area { position: relative; }
 }
+@media (max-width: 760px) {
+  .wide { display: none; }
+  .cards { padding: 10px 8px 80px; }
+  .read { padding: 0; }
+  .terms dl > div { grid-template-columns: 1fr; gap: 0; }
+}
+

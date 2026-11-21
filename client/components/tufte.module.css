@@ -105,7 +105,7 @@
 }
 
 /* Smartphone: Notizen rücken als eingerückter Kasten in den Text, ohne Antippen */
-@media (max-width: 760px) {
+@media screen and (max-width: 760px) {
   .t { padding: 1.5rem 16px 2.5rem; font-size: 17px; border-radius: 0; }
   .t h1, .t :global(.subtitle), .t h2, .t h3, .t p, .t ul, .t ol, .t blockquote, .t :global(figure), .t :global(figure.fullwidth) { width: 100%; }
   .t h1 { font-size: 2rem; }
@@ -131,4 +131,18 @@
     color: var(--muted);
     font-size: 0.88rem;
   }
+}
+
+/* Hervorhebung wie mit dem Textmarker (Ausarbeitung) */
+.t mark { background: color-mix(in srgb, #ffd84d 55%, transparent); color: inherit; padding: 0 0.08em; border-radius: 2px; }
+:global([data-theme='dark']) .t mark { background: color-mix(in srgb, #c9a400 45%, transparent); }
+
+/* Druck: Papierweiß, Text links, Rand rechts bleibt; Abschnitte trennen sich nicht mitten in der Überschrift */
+@media print {
+  .t { background: #fff; color: #000; padding: 0 0 0 0; font-size: 11pt; max-width: none; border-radius: 0; --paper: #fff; --ink: #000; --muted: #444; }
+  .t h1 { font-size: 22pt; }
+  .t h2, .t h3 { break-after: avoid; }
+  .t :global(figure), .t blockquote { break-inside: avoid; }
+  .t :global(.iframe-wrapper) { display: none; }
+  .t mark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

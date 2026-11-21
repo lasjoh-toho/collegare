@@ -11,7 +11,8 @@
 .slipHint { font-size: 10.5px; color: #6b6b66; }
 
 @media print {
-  :global(body) * { visibility: hidden; }
+  /* nur, wenn Zettel offen sind: sonst blendete die Regel jeden Druck der Oberfläche aus (z. B. die Ausarbeitung) */
+  :global(body):has(.slips) * { visibility: hidden; }
   .slips, .slips * { visibility: visible; }
   .slips { position: absolute; left: 0; top: 0; width: 100%; grid-template-columns: 1fr 1fr; }
   .modal { box-shadow: none; overflow: visible; max-height: none; }

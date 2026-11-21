@@ -1,0 +1,117 @@
+/*
+ * Abschnitt der Ausarbeitung als Karte: nur die Überschrift, Text links, Rand rechts (Bemerkungen, Randnotizen,
+ * Bildunterschriften stehen schon beim Schreiben dort, wo sie später auf der Seite stehen). Schrift wie die Ausgabe.
+ */
+.card {
+  position: relative;
+  padding: 18px 22px 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper, #fffff8);
+  color: var(--ink, #111);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.55;
+  --text: 60%;
+  --paper: #fffff8;
+  --ink: #111;
+  --rule: #d6d3c8;
+  --muted: #666;
+}
+:global([data-theme='dark']) .card { --paper: #1b1b1a; --ink: #ddd; --rule: #444; --muted: #aaa; }
+.card.focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 0 0 3px var(--accent-soft); }
+.card.done { opacity: 0.86; }
+.head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.title { margin: 0; width: var(--text); font-style: italic; font-weight: 400; font-size: 1.4rem; line-height: 1.2; }
+.meta {
+  margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+  font-family: var(--sans, system-ui, sans-serif); font-size: 11.5px; color: var(--fg-faint);
+}
+.state { white-space: nowrap; }
+.err { color: var(--danger); font-weight: 600; }
+.doneChip { padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); font-weight: 600; }
+.menuWrap { position: relative; }
+.more { height: 24px; min-width: 24px; padding: 0 6px; font-size: 15px; line-height: 1; }
+.menu { position: absolute; right: 0; top: 28px; z-index: 30; display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 210px; }
+.menu :global(.btn) { justify-content: flex-start; border: 0; }
+.office { width: var(--text); font-family: var(--sans, system-ui, sans-serif); font-size: 13px; color: var(--fg-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Schreibfeld: ohne Rahmen, so breit wie der Text der Seite; Bausteine wandern in den Rand */
+.write { width: var(--text); counter-reset: none; }
+.write :global([role='textbox']), .readonly {
+  border: 0; border-radius: 0; padding: 0; min-height: 3.2em; max-height: none; overflow: visible; background: transparent;
+  font: inherit; color: inherit; line-height: inherit;
+}
+.write :global([role='textbox']):focus { box-shadow: none; border: 0; }
+.write :global([role='textbox']) p, .readonly p { margin: 0 0 0.9em; }
+.write :global([role='textbox']) h3, .readonly h3 { font-style: italic; font-weight: 400; font-size: 1.15rem; margin: 1em 0 0.4em; }
+.write :global([role='textbox']) blockquote, .readonly blockquote { margin: 0.8em 0; padding-left: 1em; border-left: 2px solid var(--rule); font-style: italic; color: inherit; }
+.write mark, .readonly mark { background: color-mix(in srgb, #ffd84d 55%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+.write :global(.ed-gloss), .readonly :global(.ed-gloss) { font-weight: 600; border-bottom: 1px dotted var(--accent); }
+
+/* Randnotiz: Zählmarke im Text, Inhalt rechts am Rand (wie die Seitennotiz der Ausgabe) */
+.write :global(.ed-note), .readonly :global(.ed-note) {
+  display: inline; max-width: none; margin: 0; padding: 0; background: none; border-radius: 0; font-size: inherit;
+  white-space: normal; overflow: visible; cursor: pointer;
+}
+.write :global(.ed-note)::before, .readonly :global(.ed-note)::before { content: none; }
+.card :global(.ed-note.ed-note) { counter-increment: ednote; }
+.card :global(.ed-margin.ed-margin) { counter-increment: none; }
+.card :global(.ed-mark) { display: inline; font-family: var(--sans, system-ui, sans-serif); font-size: 0.65em; color: var(--accent); font-weight: 700; padding: 0 1px; }
+.card :global(.ed-note:not(.ed-margin) .ed-mark)::after { content: counter(ednote); }
+.card :global(.ed-margin .ed-mark)::after { content: '⊕'; font-weight: 400; }
+.card :global(.ed-body) {
+  float: right; clear: right; width: 56%; margin-right: -62%; margin-top: 0.25rem; margin-bottom: 0.4rem;
+  font-size: 0.76em; line-height: 1.4; font-style: normal; font-weight: 400; color: var(--ink);
+  padding: 2px 6px; border-radius: 6px; border-left: 2px solid transparent;
+}
+.card :global(.ed-note:not(.ed-margin) .ed-body)::before { content: counter(ednote) '\00a0'; font-size: 0.85em; vertical-align: super; line-height: 0; }
+.write :global(.ed-note):hover :global(.ed-body) { background: var(--accent-soft); border-left-color: var(--accent); }
+/* Bilder im Text, Unterschrift am Rand */
+.write :global(.ed-img), .readonly :global(.ed-img) { margin: 0.6em 0 1em; }
+.write :global(.ed-img img), .readonly :global(.ed-img img) { max-width: 100%; max-height: none; border-radius: 0; display: block; }
+.write :global(.ed-img:not([data-full='1']) figcaption), .readonly :global(.ed-img:not([data-full='1']) figcaption) {
+  float: right; width: 56%; margin-right: -62%; margin-top: -2.4em; font-size: 0.76em; color: var(--muted);
+}
+.write :global(.ed-img[data-full='1']), .readonly :global(.ed-img[data-full='1']) { width: 160%; }
+
+/* Bausteine an der Schreibmarke: unten im Rand der Karte, in der gerade geschrieben wird */
+.insert {
+  position: absolute; right: 16px; bottom: 14px; width: calc(100% - var(--text) - 60px); display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;
+  font-family: var(--sans, system-ui, sans-serif);
+}
+.insert :global(.btn) { height: 26px; padding: 0 8px; font-size: 12px; }
+.markIcon { background: color-mix(in srgb, #ffd84d 60%, transparent); padding: 0 3px; border-radius: 2px; }
+
+/* Baustein ändern: Kasten im Rand neben der Stelle */
+.atom {
+  position: absolute; right: 12px; z-index: 40; width: min(340px, calc(100% - var(--text) - 30px)); min-width: 240px; display: grid; gap: 6px; padding: 10px;
+  font-family: var(--sans, system-ui, sans-serif); font-size: 13px; box-shadow: var(--shadow), 0 0 0 1px var(--accent);
+}
+.atom input, .atom textarea { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; background: var(--bg-elev); color: var(--fg); font: inherit; }
+.check { display: flex; gap: 6px; align-items: center; }
+
+.revModal { width: min(900px, 96vw); font-family: var(--font); font-size: 13px; color: var(--fg); }
+.revBody { display: grid; grid-template-columns: 240px 1fr; gap: 12px; min-height: 300px; max-height: 60dvh; }
+.revList { list-style: none; margin: 0; padding: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.revList :global(.btn) { width: 100%; justify-content: flex-start; text-align: left; font-size: 12.5px; height: auto; padding: 5px 8px; }
+.revPeek { overflow: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-family: Georgia, serif; font-size: 15px; }
+.revPeek :global(.ed-mark) { display: none; }
+.revPeek :global(.ed-body) { display: inline-block; margin: 0 3px; padding: 0 5px; border-radius: 5px; background: var(--accent-soft); font-size: 0.85em; }
+
+/* Handy: eine Spalte, Randnotizen als eingerückter Kasten direkt im Text */
+@media (max-width: 760px) {
+  .card { padding: 14px 14px 16px; --text: 100%; border-radius: 10px; }
+  .head { flex-wrap: wrap; }
+  .meta { margin-left: 0; justify-content: flex-start; }
+  .card :global(.ed-body) {
+    display: block; float: none; width: auto; margin: 0.4rem 0 0.6rem 0.6rem; padding: 0.25rem 0 0.25rem 0.7rem; border-left: 2px solid var(--rule); color: var(--muted);
+  }
+  .write :global(.ed-img figcaption), .readonly :global(.ed-img figcaption) { float: none !important; width: auto !important; margin: 0.3rem 0 0 !important; }
+  .write :global(.ed-img[data-full='1']), .readonly :global(.ed-img[data-full='1']) { width: 100%; }
+  .insert { position: static; width: auto; justify-content: flex-start; margin-top: 8px; }
+  .atom { position: static; width: auto; min-width: 0; margin-top: 8px; }
+  .revBody { grid-template-columns: 1fr; }
+}
+/* Werkzeuge über der Markierung in der Schrift der Oberfläche, nicht in der Schrift des Textes */
+.write :global([role='toolbar']) { font-family: var(--font); font-size: 12.5px; }

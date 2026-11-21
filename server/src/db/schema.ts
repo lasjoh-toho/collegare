@@ -161,6 +161,23 @@ export interface DocumentsTable {
   done_at: Ms | null;
   done_by: number | null;
   created_at: Ms;
+  /** Text aus dem eigenen Schreibeditor (Markdown wie lib/tufte.ts im Client); null = noch nie geschrieben */
+  body: string | null;
+  /** zählt jedes Speichern; wer mit altem Stand speichert, bekommt 409 */
+  rev: Generated<number>;
+  text_at: Ms | null;
+  text_by: number | null;
+}
+
+/** Frühere Fassungen eines Abschnitts (Schnappschüsse beim Schreiben, vor dem Wiederherstellen) */
+export interface DocRevisionsTable {
+  id: Generated<number>;
+  doc_id: number;
+  rev: number;
+  body: string;
+  at: Ms;
+  by: number | null;
+  reason: string;
 }
 
 /** Folien: Freigabe und Sperre je Präsentation (fehlt eine Zeile: nicht freigegeben, nicht gesperrt) */
@@ -377,6 +394,7 @@ export interface Database {
   maps: MapsTable;
   documents: DocumentsTable;
   doc_changes: DocChangesTable;
+  doc_revisions: DocRevisionsTable;
   bento_decks: BentoDecksTable;
   deck_access: DeckAccessTable;
   ydocs: YdocsTable;

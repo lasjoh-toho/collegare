@@ -174,6 +174,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     pinnwandSocket(nsp, s);
     documentRoutes(http, s, {
       changed: (projectId, scope) => nsp.to('project:' + projectId).emit('docs', { projectId, scope }),
+      text: (projectId, scope, docId, rev, by) => nsp.to('project:' + projectId).emit('doctext', { projectId, scope, docId, rev, by }),
       lockChanged: (docId) => co.disconnectDoc(collabId(docId)),
     });
 

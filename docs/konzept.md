@@ -1085,6 +1085,53 @@ erhalten, wird aber nicht mehr angezeigt.
 - Folien in Bento an Punkte koppeln (8f), Zusatztexte über gemeinsame Objekte.
 - Gleichzeitiges Bearbeiten der Gliederung: die letzte Änderung gewinnt (später einzelne Operationen).
 
+## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
+
+Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf
+Karten, die nur die Überschrift tragen; die Gliederung wird von selbst übernommen und synchron gehalten. Standard der
+Ausarbeitung ist eine Seite mit Text links und breitem Rand rechts (Randnotizen, Begriffe, Bilder, Zwischentitel,
+Statistiken); der Name des Vorbilds (Tufte) erscheint in der Oberfläche nie.
+
+### 8i.1 Stufe 1: Schreiben (gebaut)
+
+- **Karten statt Office:** je Punkt der Gliederung eine Karte (`documents`, Art `word`), nur die Überschrift aus der
+  Gliederung, keine eigene Leiste. Punkte ohne Karte (gestrichelt, nur in der Gliederung entstanden) werden selbst ein
+  Abschnitt. Verschwindet ein Punkt, bleibt der Text unter „Nicht mehr in der Gliederung“ stehen.
+- **Format:** Markdown wie die Lernseiten (`client/lib/tufte.ts`), neu `==hervorgehoben==`. Bearbeitet wird „wie in
+  Word“ (`RichText` + `lib/tufteEdit.ts`); Randnotizen, Bemerkungen und Bildunterschriften stehen schon beim Schreiben
+  rechts am Rand, auf dem Handy als eingerückter Kasten im Text.
+- **Werkzeuge:** über der Markierung Hervorheben, Randnotiz, Begriff (Wort mit Erklärung, gesammelt in „Begriffe“ am
+  Ende); im Rand der aktiven Karte „+ Randnotiz“, „+ Bemerkung“, „+ Bild“.
+- **Speichern:** von selbst, `PUT /api/documents/:id/text` mit Stand `rev` (409 bei veraltetem Stand, der eigene Text
+  gilt, der andere bleibt als Fassung). Tabelle `doc_revisions` (Migration 0021): Fassung alle 10 Minuten oder beim
+  Wechsel der Schreibenden, höchstens 40 je Abschnitt; „Frühere Fassungen“ an jeder Karte.
+- **Abgleich mit der Gliederung:** beim Öffnen und bei jeder Änderung der Gliederung (Socket `map`) zuerst
+  `…/documents/merken`, dann `…/documents/sync`. **„Zurück“** unten (Tooltip „Zurück zu meinem letzten Zustand im
+  Editor“) setzt die Texte auf den gemerkten Stand; der Stand davor bleibt als Fassung.
+- **Lesen und Drucken:** „Lesen“ zeigt die ganze Ausarbeitung als Webseite (mobil einspaltig), „Drucken“ öffnet sie
+  allein in einem Fenster (Text links, Rand rechts, A4).
+- Alte Abschnitte aus dem Office-Editor bleiben über „⋯ → Text aus dem früheren Editor“ lesbar (zum Herauskopieren).
+- Die Gliederung steht beim Schreiben links (`GliederungLive`), in den Schritten davor rechts (Thread Mindmap/Gliederung).
+
+### 8i.2 Stufe 2: Ausgabe als Webseite und Druck
+
+Texttypen als Bausteine: Zitat mit Satz- bzw. Zeilenzählung, Zwischentitel am Rand, Statistik/Zahl am Rand,
+Randabbildung; Schriften einbinden (OFL, im Paket); eigenständige HTML-Datei zum Weitergeben; Druck über Typst
+(Entscheidung 14, unsichtbar für Lernende, nur „Für Fortgeschrittene“).
+
+### 8i.3 Stufe 3: Broschüre und Poster
+
+- **Broschüre:** Layoutsysteme (Text innen, Rand außen; 1–3 Spalten oder Boxen), verbundene Textrahmen, gemeinsame
+  Oberlinien für Grafiken, Umfluss; Markierung der Bereiche, die die Mittelfalte stört, Berechnung der Mittelseite,
+  Umsortieren der Seiten für den Broschürendruck (Ausschießen).
+- **Science-Poster:** Spalten, Boxen, Überschriften, Grafiken mit Umfluss und Bildunterschrift; Druck auf mehrere
+  Blätter verteilt mit Klebelaschen.
+
+### 8i.4 Stufe 4: Bilder für die Reproduktion
+
+Filter an Bildern der Ausarbeitung: Dithern, Tontrennung, Negativ, Solarisation, Verpixeln, Vektorisieren, Vignette
+(im Browser auf Canvas, Original bleibt erhalten).
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |

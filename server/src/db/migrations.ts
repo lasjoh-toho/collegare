@@ -490,6 +490,29 @@ migrations['0020_access_codes_release'] = {
   },
 };
 
+// Eigener Schreibeditor der Ausarbeitung (Wunsch Jo, 21. November 2026): Text je Abschnitt als Markdown wie die
+// Lernseiten (Randnotizen, Hervorhebungen, Begriffe), Stand mit Zähler gegen Überschreiben, frühere Fassungen
+migrations['0021_doc_text'] = {
+  async up(db) {
+    const long = isMysql(db) ? sql`longtext` : sql`text`;
+    await db.schema.alterTable('documents').addColumn('body', long).execute();
+    await db.schema.alterTable('documents').addColumn('rev', 'integer', (c) => c.notNull().defaultTo(0)).execute();
+    await db.schema.alterTable('documents').addColumn('text_at', 'bigint').execute();
+    await db.schema.alterTable('documents').addColumn('text_by', 'integer').execute();
+    await db.schema
+      .createTable('doc_revisions')
+      .addColumn('id', 'integer', (c) => (isMysql(db) ? c.autoIncrement().primaryKey() : c.primaryKey().autoIncrement()))
+      .addColumn('doc_id', 'integer', (c) => c.notNull())
+      .addColumn('rev', 'integer', (c) => c.notNull())
+      .addColumn('body', long, (c) => c.notNull())
+      .addColumn('at', 'bigint', (c) => c.notNull())
+      .addColumn('by', 'integer')
+      .addColumn('reason', 'varchar(12)', (c) => c.notNull().defaultTo('auto'))
+      .execute();
+    await db.schema.createIndex('doc_revisions_doc').on('doc_revisions').columns(['doc_id', 'at']).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

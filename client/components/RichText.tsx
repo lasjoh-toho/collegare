@@ -49,6 +49,7 @@ export function RichText({
   onAtom,
   placeholder = 'Schreib hier. Markiere Text, um ihn fett, kursiv oder als Liste zu setzen.',
   className = '',
+  tip = true,
 }: {
   value: string;
   onChange: (md: string) => void;
@@ -68,6 +69,8 @@ export function RichText({
   onAtom?: (el: HTMLElement, api: EditorApi) => void;
   placeholder?: string;
   className?: string;
+  /** Hinweis unter dem Feld; aus, wo die Erklärung im ⓘ der Kopfzeile steht */
+  tip?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const emitted = useRef<string | null>(null);
@@ -94,7 +97,8 @@ export function RichText({
     const first = emitted.current === null;
     el.innerHTML = render(value);
     emitted.current = value;
-    if (!first) caretToEnd(el);
+    // nur wer gerade in diesem Feld schreibt, bekommt die Schreibmarke ans Ende (neuer Stand von anderen stiehlt keinen Fokus)
+    if (!first && document.activeElement === el) caretToEnd(el);
   }, [value, render]);
 
   function emit() {
@@ -319,7 +323,7 @@ export function RichText({
           )}
         </div>
       )}
-      {!pinned && !float && linkAsk === null && <div className={r.tip}>Text markieren, dann erscheinen die Werkzeuge darüber. 📌 heftet sie als Leiste an.</div>}
+      {tip && !pinned && !float && linkAsk === null && <div className={r.tip}>Text markieren, dann erscheinen die Werkzeuge darüber. 📌 heftet sie als Leiste an.</div>}
     </div>
   );
 }

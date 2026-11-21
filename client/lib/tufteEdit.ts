@@ -37,7 +37,7 @@ export const plain = (md: string) => md.replace(/\\(.)/g, '$1').replace(/\*\*|__
 
 /** Baustein für eine Randnotiz oder Marginalie (Inhalt bleibt Markdown im Attribut) */
 export const noteHtml = (kind: 'note' | 'margin', md: string) =>
-  `<span class="ed-note ed-${kind}" contenteditable="false" data-kind="${kind}" data-text="${esc(md)}" title="Antippen zum Ändern">${esc(plain(md)) || '…'}</span>`;
+  `<span class="ed-note ed-${kind}" contenteditable="false" data-kind="${kind}" data-text="${esc(md)}" title="Antippen zum Ändern"><sup class="ed-mark"></sup><span class="ed-body">${esc(plain(md)) || '…'}</span></span>`;
 export const glossHtml = (word: string, explain: string) => `<span class="ed-gloss" data-explain="${esc(explain)}" title="Worterklärung, antippen zum Ändern">${esc(word)}</span>`;
 export const imageHtml = (src: string, cap: string, full: boolean) =>
   `<figure class="ed-img" contenteditable="false" data-src="${esc(src)}" data-cap="${esc(cap)}" data-full="${full ? '1' : ''}" title="Antippen zum Ändern"><img src="${esc(src)}" alt=""/><figcaption>${esc(plain(cap)) || 'ohne Unterschrift'}${full ? ' · ganze Breite' : ''}</figcaption></figure>`;
@@ -69,6 +69,14 @@ function inline(s: string, notes = true): string {
       if (end > 0 && bar > i && bar < end) {
         out += `<span class="ed-gloss" data-explain="${esc(s.slice(bar + 1, end))}" title="Worterklärung, antippen zum Ändern">${inline(s.slice(i + 1, bar), false)}</span>`;
         i = end + 1;
+        continue;
+      }
+    }
+    if (c === '=' && s.startsWith('==', i) && s[i + 2] && s[i + 2] !== ' ') {
+      const end = s.indexOf('==', i + 2);
+      if (end > i + 2) {
+        out += `<mark>${inline(s.slice(i + 2, end), notes)}</mark>`;
+        i = end + 2;
         continue;
       }
     }
@@ -183,7 +191,7 @@ export function tufteToEdit(src: string): string {
 }
 
 /** Zeichen, die im Markdown etwas bedeuten, im Fließtext maskieren */
-const escText = (s: string) => s.replace(/[\\*_`[\]{}^]/g, (c) => '\\' + c);
+const escText = (s: string) => s.replace(/[\\*_`[\]{}^]/g, (c) => '\\' + c).replace(/==/g, '\\=\\=');
 
 /** Inhalt des Editierfelds → Markdown der Lernseite */
 export function editToTufte(root: Node): string {
@@ -202,6 +210,7 @@ export function editToTufte(root: Node): string {
     if (n.classList.contains('ed-gloss')) return inner.trim() ? `{${inner}|${n.dataset.explain ?? ''}}` : '';
     if (tag === 'STRONG' || tag === 'B') return mark('**', inner);
     if (tag === 'EM' || tag === 'I') return mark('*', inner);
+    if (tag === 'MARK') return mark('==', inner);
     if (tag === 'CODE') return inner ? '`' + (n.textContent ?? '').replace(/`/g, "'") + '`' : '';
     if (tag === 'A') {
       const url = n.getAttribute('href') ?? '';
@@ -294,4 +303,23 @@ export function editToTufte(root: Node): string {
   for (const c of root.childNodes) block(c);
   flushRun();
   return blocks.join('\n\n') + (blocks.length ? '\n' : '');
+}
+
+/** Begriffe ({Wort|Erklärung}) eines Textes, für das Glossar der Ausarbeitung */
+export function termsOf(md: string): { word: string; explain: string }[] {
+  const out: { word: string; explain: string }[] = [];
+  for (let i = 0; i < md.length; i++) {
+    if (md[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (md[i] !== '{') continue;
+    const end = closing(md, i, '{', '}');
+    const bar = end > 0 ? md.indexOf('|', i) : -1;
+    if (end > 0 && bar > i && bar < end) {
+      out.push({ word: plain(md.slice(i + 1, bar)).trim(), explain: plain(md.slice(bar + 1, end)).trim() });
+      i = end;
+    }
+  }
+  return out;
 }

@@ -976,5 +976,55 @@ describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
     expect((await call('POST', `/api/documents/${list.docs[0].id}/reopen`, t)).status).toBe(200);
     expect((await call('GET', `/api/projects/${project}/documents?bereich=g${g1}`, t)).json.docs[0].doneAt).toBeNull();
   });
+
+  it('Schreibeditor: Text je Abschnitt mit Stand, Fassungen, Zurück, Punkte ohne Karte', async () => {
+    const { t, project, ids } = await setup();
+    const g1 = (await call('POST', `/api/projects/${project}/groups`, t, { title: 'Inflation' })).json.id;
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[0], groupId: g1, position: 0 });
+    await call('POST', `/api/projects/${project}/moves`, t, { userId: ids[1], groupId: g1, position: 1 });
+    const codes = (await call('POST', `/api/projects/${project}/access-codes`, t, { userIds: ids.slice(0, 2) })).json.codes as J[];
+    const [anna, ben] = await Promise.all(codes.map(async (c) => (await call('POST', '/api/access/redeem', undefined, { code: c.code })).json.token as string));
+    const people = new Set([ids[0], ids[1]]);
+    const add = (id: string, extra: J) => s.maps.apply(project, 'g' + g1, { type: 'add', card: { id, kind: 'card', title: id, text: '', x: 0, y: 0, w: 160, h: 90, color: null, parent: null, owner: null, ...extra } } as never, ids[0], people);
+    await add('clus1', { kind: 'cluster', title: 'Ursachen', pick: true });
+    await add('karteA', { parent: 'clus1', title: 'Reparationen', owner: ids[0], pick: true });
+    await s.maps.apply(project, 'g' + g1, { type: 'outline' }, ids[0], people);
+    const sc = { scope: 'g' + g1 };
+    await call('POST', `/api/projects/${project}/documents/sync`, anna, sc);
+    const doc = (await call('GET', `/api/projects/${project}/documents`, anna)).json.docs[0];
+    expect(doc).toMatchObject({ title: 'Reparationen', body: null, rev: 0, office: false });
+
+    // Speichern mit Stand; wer mit altem Stand speichert, bekommt den aktuellen Text zurück
+    expect((await call('PUT', `/api/documents/${doc.id}/text`, anna, { body: 'Erste Fassung^[Notiz]', rev: 0 })).json).toEqual({ rev: 1 });
+    const clash = await call('PUT', `/api/documents/${doc.id}/text`, ben, { body: 'Ben', rev: 0 });
+    expect(clash.status).toBe(409);
+    expect(clash.json).toMatchObject({ body: 'Erste Fassung^[Notiz]', rev: 1 });
+    // Lehrkraft liest nur
+    expect((await call('PUT', `/api/documents/${doc.id}/text`, t, { body: 'x', rev: 1 })).status).toBe(403);
+    // Ben schreibt weiter: Annas Stand bleibt als frühere Fassung
+    expect((await call('PUT', `/api/documents/${doc.id}/text`, ben, { body: 'Zweite Fassung', rev: 1 })).json).toEqual({ rev: 2 });
+    const revs = (await call('GET', `/api/documents/${doc.id}/fassungen`, anna)).json.revisions as J[];
+    expect(revs.length).toBe(1);
+    expect((await call('GET', `/api/documents/${doc.id}/fassungen/${revs[0].id}`, anna)).json.body).toBe('Erste Fassung^[Notiz]');
+
+    // Stand merken, weiterschreiben, „Zurück zu meinem letzten Zustand im Editor“
+    expect((await call('POST', `/api/projects/${project}/documents/merken`, anna, sc)).json).toEqual({ saved: 1 });
+    await call('PUT', `/api/documents/${doc.id}/text`, anna, { body: 'Durcheinander', rev: 2 });
+    expect((await call('POST', `/api/projects/${project}/documents/zurueck`, anna, sc)).json).toEqual({ restored: 1 });
+    expect((await call('GET', `/api/documents/${doc.id}/text`, anna)).json).toMatchObject({ body: 'Zweite Fassung', rev: 4 });
+
+    // Fassung wieder herstellen
+    expect((await call('POST', `/api/documents/${doc.id}/fassungen/${revs[0].id}/zurueck`, ben)).json).toEqual({ rev: 5 });
+    expect((await call('GET', `/api/documents/${doc.id}/text`, anna)).json.body).toBe('Erste Fassung^[Notiz]');
+
+    // Karte verschwindet aus der Gliederung: der Text bleibt am Ende stehen
+    await s.maps.apply(project, 'g' + g1, { type: 'update', id: 'karteA', patch: { pick: false } } as never, ids[0], people);
+    await s.maps.apply(project, 'g' + g1, { type: 'outline' }, ids[0], people);
+    await call('POST', `/api/projects/${project}/documents/sync`, anna, sc);
+    const after = (await call('GET', `/api/projects/${project}/documents`, anna)).json.docs as J[];
+    const old = after.find((d) => d.id === doc.id)!;
+    expect(old.sectionTitle).toBe('Nicht mehr in der Gliederung');
+    expect(old.body).toBe('Erste Fassung^[Notiz]');
+  });
 });
 

@@ -38,3 +38,6 @@
 .box :global(.ed-video) { margin: 8px 0; padding: 14px; border-radius: 8px; background: var(--bg-sunken); color: var(--fg-muted); cursor: pointer; user-select: none; overflow-wrap: anywhere; }
 .box :global(.ed-who) { font-size: 0.9em; }
 .box h2 { font-size: 18px; margin: 12px 0 6px; }
+/* Zählmarke der Randnotiz zeigt nur der Schreibeditor der Ausarbeitung (Text und Rand nebeneinander) */
+.box :global(.ed-mark) { display: none; }
+.box mark { background: color-mix(in srgb, #ffd84d 55%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }

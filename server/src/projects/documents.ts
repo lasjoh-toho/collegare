@@ -21,7 +21,19 @@ export interface DocRow {
   position: number;
   doneAt: number | null;
   doneBy: number | null;
+  /** Text aus dem eigenen Schreibeditor; null = noch nie dort geschrieben */
+  body: string | null;
+  rev: number;
+  textAt: number | null;
+  textBy: number | null;
 }
+
+/** Höchstlänge eines Abschnitts (Bilder stecken als data:-Adressen im Text) */
+export const MAX_BODY = 4_000_000;
+/** Schnappschuss beim Schreiben höchstens alle 10 Minuten je Abschnitt */
+const SNAP_EVERY = 10 * 60_000;
+/** so viele frühere Fassungen bleiben je Abschnitt */
+const KEEP_REVISIONS = 40;
 
 export class DocError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -31,6 +43,8 @@ export class DocError extends Error {
 
 /** Abschnitt-Kennung der Folienpräsentation einer Gruppe */
 export const DECK = '__folien';
+/** Abschnitt für Texte, deren Punkt aus der Gliederung verschwunden ist */
+export const OUTSIDE = '__ohne';
 
 export const collabId = (id: number) => 'cg' + id;
 export function parseCollabId(docId: string): number | null {
@@ -50,6 +64,10 @@ const toRow = (r: {
   position: number;
   done_at: number | null;
   done_by: number | null;
+  body?: string | null;
+  rev?: number;
+  text_at?: number | null;
+  text_by?: number | null;
 }): DocRow => ({
   id: r.id,
   scope: r.scope,
@@ -62,6 +80,10 @@ const toRow = (r: {
   position: r.position,
   doneAt: r.done_at === null ? null : Number(r.done_at),
   doneBy: r.done_by,
+  body: r.body ?? null,
+  rev: Number(r.rev ?? 0),
+  textAt: r.text_at == null ? null : Number(r.text_at),
+  textBy: r.text_by ?? null,
 });
 
 export class Documents {
@@ -90,11 +112,13 @@ export class Documents {
     const now = Date.now();
     for (const sec of map.outline.sections) {
       const sectionTitle = (map.cards[sec.id]?.title || sec.title).slice(0, 255);
-      for (const cardId of sec.cards) {
-        const card = map.cards[cardId];
-        if (!card) continue;
+      // Punkt der Gliederung ohne Karten (z. B. gestrichelt, nur in der Gliederung entstanden): ein Abschnitt für den Punkt selbst
+      const entries = sec.cards.filter((c) => map.cards[c]).map((c) => ({ key: c, title: map.cards[c].title, owner: map.cards[c].owner }));
+      if (!entries.length) entries.push({ key: sec.id, title: sectionTitle, owner: map.cards[sec.id]?.owner ?? sec.owners?.[0] ?? null });
+      for (const { key: cardId, title: cardTitle, owner } of entries) {
+        const card = { owner };
         position++;
-        const title = (card.title || 'Ohne Titel').slice(0, 255);
+        const title = (cardTitle || 'Ohne Titel').slice(0, 255);
         const old = byCard.get(cardId);
         if (old) {
           await this.db
@@ -110,6 +134,21 @@ export class Documents {
           created++;
         }
       }
+    }
+    // Abschnitte, deren Punkt nicht mehr in der Gliederung steht, bleiben mit ihrem Text am Ende stehen
+    const seen = new Set<string>();
+    for (const sec of map.outline.sections) {
+      const cards = sec.cards.filter((c) => map.cards[c]);
+      for (const c of cards.length ? cards : [sec.id]) seen.add(c);
+    }
+    let rest = 0;
+    for (const d of existing) {
+      if (d.kind !== 'word' || !d.cardId || seen.has(d.cardId)) continue;
+      await this.db
+        .updateTable('documents')
+        .set({ section_id: OUTSIDE, section_title: 'Nicht mehr in der Gliederung', position: 100_000 + ++rest })
+        .where('id', '=', d.id)
+        .execute();
     }
     return { created, total: position };
   }
@@ -127,6 +166,117 @@ export class Documents {
 
   async rename(id: number, title: string): Promise<void> {
     await this.db.updateTable('documents').set({ title }).where('id', '=', id).execute();
+  }
+
+  /**
+   * Text aus dem Schreibeditor speichern. Wer mit einem älteren Stand speichert (rev passt nicht), bekommt den
+   * aktuellen zurück und nichts wird überschrieben. Alle zehn Minuten bleibt eine frühere Fassung stehen.
+   */
+  async saveText(id: number, body: string, rev: number, by: number): Promise<{ ok: true; rev: number } | { ok: false; current: DocRow }> {
+    const doc = await this.get(id);
+    if (!doc) throw new DocError('Dokument nicht gefunden', 404);
+    if (doc.rev !== rev) return { ok: false, current: doc };
+    const now = Date.now();
+    if (doc.body !== null && doc.body !== body) {
+      const last = await this.db.selectFrom('doc_revisions').select('at').where('doc_id', '=', id).orderBy('at', 'desc').limit(1).executeTakeFirst();
+      // neue Fassung, wenn lange nichts gesichert wurde oder jemand anderes weiterschreibt
+      if (!last || now - Number(last.at) > SNAP_EVERY || (doc.textBy !== null && doc.textBy !== by)) await this.snapshot(doc, 'auto');
+    }
+    const r = await this.db
+      .updateTable('documents')
+      .set({ body, rev: rev + 1, text_at: now, text_by: by })
+      .where('id', '=', id)
+      .where('rev', '=', rev)
+      .executeTakeFirst();
+    if (Number(r.numUpdatedRows) !== 1) return { ok: false, current: (await this.get(id))! };
+    return { ok: true, rev: rev + 1 };
+  }
+
+  private async snapshot(doc: DocRow, reason: string, by: number | null = doc.textBy): Promise<void> {
+    if (doc.body === null) return;
+    await this.db.insertInto('doc_revisions').values({ doc_id: doc.id, rev: doc.rev, body: doc.body, at: Date.now(), by, reason }).execute();
+    const old = await this.db.selectFrom('doc_revisions').select('id').where('doc_id', '=', doc.id).orderBy('at', 'desc').orderBy('id', 'desc').offset(KEEP_REVISIONS).limit(1000).execute();
+    if (old.length)
+      await this.db
+        .deleteFrom('doc_revisions')
+        .where(
+          'id',
+          'in',
+          old.map((o) => o.id),
+        )
+        .execute();
+  }
+
+  /** Frühere Fassungen eines Abschnitts, neueste zuerst (ohne Text) */
+  async revisions(id: number): Promise<{ id: number; rev: number; at: number; by: number | null; reason: string; length: number }[]> {
+    const rows = await this.db.selectFrom('doc_revisions').select(['id', 'rev', 'at', 'by', 'reason', 'body']).where('doc_id', '=', id).orderBy('at', 'desc').orderBy('id', 'desc').execute();
+    return rows.map((r) => ({ id: r.id, rev: r.rev, at: Number(r.at), by: r.by, reason: r.reason, length: r.body.length }));
+  }
+
+  async revision(docId: number, revId: number): Promise<string | null> {
+    const r = await this.db.selectFrom('doc_revisions').select('body').where('id', '=', revId).where('doc_id', '=', docId).executeTakeFirst();
+    return r?.body ?? null;
+  }
+
+  /** Stand aller Texte eines Bereichs sichern, bevor die Gliederung etwas verschiebt („Zurück“ holt ihn wieder) */
+  async snapshotScope(projectId: number, scope: string, by: number): Promise<number> {
+    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && d.body !== null);
+    let n = 0;
+    for (const d of docs) {
+      // nur sichern, was sich seit der letzten Fassung geändert hat (jedes Öffnen merkt sich den Stand)
+      const last = await this.db.selectFrom('doc_revisions').select(['id', 'body', 'reason']).where('doc_id', '=', d.id).orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      if (last && last.body === d.body) {
+        if (last.reason !== 'mark') await this.db.updateTable('doc_revisions').set({ reason: 'mark' }).where('id', '=', last.id).execute();
+        continue;
+      }
+      await this.snapshot(d, 'mark', by);
+      n++;
+    }
+    return n;
+  }
+
+  /**
+   * „Zurück zu meinem letzten Zustand im Editor“: setzt jeden Text des Bereichs auf die letzte Sicherung vor einem
+   * Abgleich mit der Gliederung zurück. Der Stand davor bleibt als frühere Fassung erhalten, „Zurück“ lässt sich also
+   * selbst zurücknehmen.
+   */
+  async restoreScope(projectId: number, scope: string, by: number): Promise<number> {
+    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && !d.doneAt);
+    let n = 0;
+    for (const d of docs) {
+      const mark = await this.db.selectFrom('doc_revisions').select(['body']).where('doc_id', '=', d.id).where('reason', '=', 'mark').orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();
+      if (!mark || mark.body === d.body) continue;
+      await this.snapshot(d, 'undo', by);
+      await this.db.updateTable('documents').set({ body: mark.body, rev: d.rev + 1, text_at: Date.now(), text_by: by }).where('id', '=', d.id).execute();
+      n++;
+    }
+    return n;
+  }
+
+  /** Eine frühere Fassung wieder herstellen (der jetzige Stand wird vorher gesichert) */
+  async restoreRevision(id: number, revId: number, by: number): Promise<number | null> {
+    const doc = await this.get(id);
+    const body = doc ? await this.revision(id, revId) : null;
+    if (!doc || body === null) return null;
+    await this.snapshot(doc, 'undo', by);
+    await this.db.updateTable('documents').set({ body, rev: doc.rev + 1, text_at: Date.now(), text_by: by }).where('id', '=', id).execute();
+    return doc.rev + 1;
+  }
+
+  /** Hat der Abschnitt noch Inhalt aus dem früheren Office-Editor? */
+  async hasOfficeText(ids: number[]): Promise<Set<number>> {
+    if (!ids.length) return new Set();
+    const rows = await this.db
+      .selectFrom('doc_changes')
+      .select('doc_id')
+      .distinct()
+      .where(
+        'doc_id',
+        'in',
+        ids.map(collabId),
+      )
+      .execute();
+    return new Set(rows.map((r) => parseCollabId(r.doc_id)!).filter((x) => x !== null));
   }
 
   async setDone(id: number, by: number | null): Promise<void> {

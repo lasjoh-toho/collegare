@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requireSession } from '../http/auth.js';
-import { DocError, collabId } from '../projects/documents.js';
+import { DocError, MAX_BODY, collabId } from '../projects/documents.js';
 import type { Services } from '../services.js';
 import { deckWritable } from './bento.js';
 import { folienScopes, mapScopes } from './maps.js';
@@ -9,6 +9,8 @@ import { folienScopes, mapScopes } from './maps.js';
 /** Meldet geänderte Dokumente an offene Projektseiten und trennt bei „Fertig“ die Editoren. */
 export interface DocEvents {
   changed(projectId: number, scope: string): void;
+  /** Text eines Abschnitts gespeichert (offene Ausarbeitungen laden ihn nach) */
+  text(projectId: number, scope: string, docId: number, rev: number, by: number): void;
   lockChanged(docId: number): void;
 }
 
@@ -33,7 +35,18 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     if (!a.scope) return { ...base, scope: null, people: [], docs: [], outlineAt: null };
     const { map } = await s.maps.get(projectId, a.scope.scope);
     const docs = (await s.documents.list(projectId, a.scope.scope)).filter((d) => d.kind === 'word');
-    return { ...base, scope: a.scope.scope, people: a.scope.people, docs, outlineAt: map.outline?.at ?? null };
+    const office = await s.documents.hasOfficeText(docs.filter((d) => d.body === null).map((d) => d.id));
+    const test = !!a.scope.test;
+    return {
+      ...base,
+      scope: a.scope.scope,
+      test,
+      people: a.scope.people,
+      docs: docs.map((d) => ({ ...d, office: office.has(d.id) })),
+      outlineAt: map.outline?.at ?? null,
+      // Zwischenüberschriften der tieferen Gliederungsebenen (falls die Gliederung sie liefert)
+      subs: Object.fromEntries((map.outline?.sections ?? []).map((x) => [x.id, (x as { subs?: unknown }).subs ?? []])),
+    };
   });
 
   // Folienpräsentationen: die eigene (Gruppe bzw. Testbereich der Lehrkraft), für die Lehrkraft alle Gruppen, für Lernende
@@ -182,6 +195,71 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     ev.lockChanged(a.doc.id);
     ev.changed(a.doc.projectId, a.doc.scope);
     return { ok: true };
+  });
+
+  /** Darf diese Person den Text schreiben? Gruppe (nicht fertig), Lehrkraft nur im eigenen Testbereich */
+  const writable = (a: { role: string; scope: { test?: boolean } | null; doc: { doneAt: number | null } }) => !a.doc.doneAt && (a.role !== 'teacher' || !!a.scope?.test);
+
+  app.put<{ Params: { id: string } }>('/api/documents/:id/text', { bodyLimit: MAX_BODY * 2 + 1000 }, async (req, reply) => {
+    const body = z.object({ body: z.string().max(MAX_BODY), rev: z.number().int().min(0) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Text fehlt oder ist zu lang' });
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    if (a.doc.kind !== 'word') return reply.code(400).send({ error: 'Kein Textabschnitt' });
+    if (!writable(a)) return reply.code(403).send({ error: a.doc.doneAt ? 'Der Abschnitt ist fertig gemeldet' : 'Lehrkräfte lesen hier nur' });
+    const r = await s.documents.saveText(a.doc.id, body.data.body, body.data.rev, a.userId);
+    if (!r.ok) return reply.code(409).send({ error: 'Inzwischen hat jemand anderes weitergeschrieben', body: r.current.body ?? '', rev: r.current.rev, by: r.current.textBy });
+    ev.text(a.doc.projectId, a.doc.scope, a.doc.id, r.rev, a.userId);
+    return { rev: r.rev };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/documents/:id/text', async (req, reply) => {
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    return { body: a.doc.body ?? '', rev: a.doc.rev, by: a.doc.textBy, at: a.doc.textAt };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/documents/:id/fassungen', async (req, reply) => {
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    return { revisions: await s.documents.revisions(a.doc.id) };
+  });
+
+  app.get<{ Params: { id: string; rev: string } }>('/api/documents/:id/fassungen/:rev', async (req, reply) => {
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    const b = await s.documents.revision(a.doc.id, Number(req.params.rev));
+    if (b === null) return reply.code(404).send({ error: 'Fassung nicht gefunden' });
+    return { body: b };
+  });
+
+  app.post<{ Params: { id: string; rev: string } }>('/api/documents/:id/fassungen/:rev/zurueck', async (req, reply) => {
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    if (!writable(a)) return reply.code(403).send({ error: 'Hier darfst du nicht schreiben' });
+    const rev = await s.documents.restoreRevision(a.doc.id, Number(req.params.rev), a.userId);
+    if (rev === null) return reply.code(404).send({ error: 'Fassung nicht gefunden' });
+    await s.audit.append({ actorId: a.userId, action: 'document.restored', projectId: a.doc.projectId, data: { doc: a.doc.id, revision: Number(req.params.rev) } });
+    ev.text(a.doc.projectId, a.doc.scope, a.doc.id, rev, a.userId);
+    return { rev };
+  });
+
+  /** Stand merken (vor dem Abgleich mit der Gliederung) bzw. „Zurück zu meinem letzten Zustand im Editor“ */
+  app.post<{ Params: { id: string; what: string } }>('/api/projects/:id/documents/:what', async (req, reply) => {
+    const what = req.params.what;
+    if (what !== 'merken' && what !== 'zurueck') return reply.code(404).send({ error: 'Unbekannt' });
+    const projectId = Number(req.params.id);
+    const body = z.object({ scope: z.string() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Bereich fehlt' });
+    const a = await scopeAccess(req, reply, projectId, body.data.scope);
+    if (!a) return;
+    if (!a.scope) return reply.code(403).send({ error: 'Kein Zugriff auf diese Gruppe' });
+    if (a.role === 'teacher' && !a.scope.test) return reply.code(403).send({ error: 'Lehrkräfte lesen hier nur' });
+    if (what === 'merken') return { saved: await s.documents.snapshotScope(projectId, a.scope.scope, a.userId) };
+    const n = await s.documents.restoreScope(projectId, a.scope.scope, a.userId);
+    await s.audit.append({ actorId: a.userId, action: 'documents.restored', projectId, data: { scope: a.scope.scope, count: n } });
+    ev.changed(projectId, a.scope.scope);
+    return { restored: n };
   });
 
   return { collabId };

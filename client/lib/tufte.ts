@@ -4,6 +4,7 @@
  * Schreibweise:
  *   # Abschnitt, ## Unterabschnitt          Überschriften
  *   **fett**, *kursiv*, `Code`, [Text](https://…)
+ *   ==hervorgehoben==                       Hervorhebung (Textmarker)
  *   Text^[nummerierte Randnotiz]            Seitennotiz wie bei Tufte
  *   Text^^[Randbemerkung ohne Nummer]       Marginalie
  *   {Wort|Erklärung}                        Worterklärung: Wort etwas kräftiger, Erklärung erst nach Antippen
@@ -93,6 +94,15 @@ function inline(s: string, ctx: Ctx, notes = true): string {
         const id = `gl-${++ctx.n}`;
         out += `<label for="${id}" class="gloss" title="Erklärung anzeigen">${inline(s.slice(i + 1, bar), ctx, false)}</label><input type="checkbox" id="${id}" class="gloss-toggle"/><label for="${id}" class="glossnote" title="Schließen">${inline(s.slice(bar + 1, end), ctx, false)}</label>`;
         i = end + 1;
+        continue;
+      }
+    }
+    // Hervorhebung wie mit dem Textmarker
+    if (c === '=' && s.startsWith('==', i) && s[i + 2] && s[i + 2] !== ' ') {
+      const end = s.indexOf('==', i + 2);
+      if (end > i + 2) {
+        out += `<mark>${inline(s.slice(i + 2, end), ctx, notes)}</mark>`;
+        i = end + 2;
         continue;
       }
     }
