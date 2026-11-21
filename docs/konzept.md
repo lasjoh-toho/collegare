@@ -1085,6 +1085,30 @@ erhalten, wird aber nicht mehr angezeigt.
 - Folien in Bento an Punkte koppeln (8f), Zusatztexte über gemeinsame Objekte.
 - Gleichzeitiges Bearbeiten der Gliederung: die letzte Änderung gewinnt (später einzelne Operationen).
 
+### 8h.8 Zweite Runde (21. November 2026)
+
+- **Gliederung:** Alle Stationen sitzen genau auf der Mitte der Linie. Vier Ebenen: großer Kreis (Abschnitt), kleiner
+  Kreis, Punkt in der Linie, kurzer Strich (etwa 1 mm) zur Beschriftung hin; Ein- und Ausrücken per Knopf. Beschriftungen
+  näher an der Linie, Objekte flach ohne Schatten. In „beides“ liegen die Linien weiter auseinander. Notizen, Karten und
+  Äste lassen sich direkt auf die Linie legen; an der Stelle entsteht ein neuer Kreis (Geisterkreis zeigt sie an).
+- **Seite der Gliederung:** rechts in den Schritten davor (Mindmap, Cluster, Notizen), links beim Schreiben
+  (Ausarbeitung); beim Wechsel gleitet die Seite hinüber. Auf der Schreibseite ist die Linie „Ausarbeitung“ vorgewählt.
+- **Schnittstelle zum Schreibeditor (8i):** `map.outline.sections` bleibt {id, title, cards, owners}; neu ist je
+  Abschnitt `subs: {id, title, level}[]` mit den Ebenen 2 bis 4. Punkte ohne Karte sind Abschnitte mit der Punkt-id.
+  Der Schreibeditor gleicht selbst ab, sobald sich `map.outline.at` ändert, und trägt den Knopf „Zurück“.
+- **Mindmap:** Antippen eines Zwischenstopps öffnet den Dialog „Abzweigung“ (kein eigenes Plus mehr). Neue Abzweigungen
+  und Unteräste erben Linie, Form und Knick vom zuletzt dort angehängten Ast bzw. vom Ast selbst, die Farbe leicht
+  abgewandelt. Abzweigungen laufen zunächst in Fahrtrichtung des Hauptasts weiter (wie hinter einer Weiche) und liegen
+  unter ihm; Linien enden ohne Spalt in der Pfeilspitze. Langer Druck packt den Ansatz: an einem Stopp abzweigen, an
+  einem anderen Knoten neu anbinden, auf der Gliederung ablegen oder weit weg loslassen (dann frei, gestrichelt
+  angezeigt). Freie Knoten (`card.free`) haben keinen Ast; sie lassen sich anbinden, zum Abschnitt machen oder sammeln
+  eigene Ideen wie ein weiteres Zentrum.
+- **Cluster (Karten-Ansicht):** Schatten nur, wenn eine Karte herausgehoben ist (gewählt oder gezogen). „Text aus“ gilt
+  für alle; einzelne Texte lassen sich danach zeigen, ohne die Einstellung zu ändern. „Als Gliederung“ zeigt einen
+  Cluster oder Ast vorübergehend als Linie.
+- **Kopfzeile:** Auswahl der Mindmap in der Mitte, Ansicht (Mindmap/Cluster), Auge (Hervorheben) und Gliederung oben
+  rechts in der Fläche, neue Knoten oben links. Alle Hinweise stehen in der Erklärung hinter dem i-Knopf.
+
 ## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
 
 Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf

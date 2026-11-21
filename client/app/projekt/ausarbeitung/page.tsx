@@ -290,7 +290,7 @@ export default function Ausarbeitung() {
       <div className={`${s.area} ${view === 'read' ? s.reading : ''}`}>
         {view === 'write' && line && data?.scope && (
           <aside className={s.line}>
-            <GliederungLive sock={sock} project={project} scope={data.scope} meId={me.id} show={show} onClose={() => setLine(false)} />
+            <GliederungLive sock={sock} project={project} scope={data.scope} meId={me.id} show={show} onClose={() => setLine(false)} side="left" prefer="ausarb" />
           </aside>
         )}
         <div className={s.col}>

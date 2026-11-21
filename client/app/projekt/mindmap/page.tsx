@@ -7,8 +7,8 @@ import { PasteRulesContext, type PasteRules } from '@/lib/pasteRules';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { BranchMap, type LineHook } from '@/components/BranchMap';
-import { Gliederung, hoverLineTarget, lineTargetAt, useLineTab } from '@/components/Gliederung';
-import { addCard, cardPoint, greyedCards, linesOf, removeCard, visibleKinds } from '@/lib/lines';
+import { Gliederung, hoverLineTarget, LinePreview, lineTargetAt, useLineTab } from '@/components/Gliederung';
+import { addCard, cardPoint, greyedCards, LINE_COLOR, linesOf, previewRows, removeCard, visibleKinds } from '@/lib/lines';
 import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
@@ -25,7 +25,7 @@ function fieldDefault(c: MapCard, k: string): unknown {
   if (k === 'shape') return c.kind === 'card' && !c.parent ? 'none' : 'rect';
   if (k === 'route') return c.kind === 'card' && !c.parent ? 'curve' : 'metro';
   if (k === 'bend') return 0.5;
-  if (k === 'pick' || k === 'hideText') return false;
+  if (k === 'pick' || k === 'hideText' || k === 'free') return false;
   return null;
 }
 
@@ -97,6 +97,8 @@ export default function MindmapPage() {
   const [outlineOpen, setOutlineOpen] = useState(false);
   // Hervorheben: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen (Wunsch Jo, 13. November 2026)
   const [dim, setDim] = useState<MapDim>('none');
+  // Ast bzw. Cluster vorübergehend als Gliederung zeigen
+  const [preview, setPreview] = useState<string | null>(null);
   // Ansicht: Äste (wie eine klassische Mindmap) oder Karten-Fläche (brausa); gleiche Daten, Wahl je Gerät
   const [view, setView] = useState<'aeste' | 'karten'>('aeste');
   useEffect(() => {
@@ -281,14 +283,16 @@ export default function MindmapPage() {
   const empty = !!map && Object.keys(map.cards).length === 0;
   // Erklärung hinter dem i-Knopf (früher eine Blase über der Fläche); Text anpassbar durch die Lehrkraft
   const settings = project.settings;
+  const outlineHelp =
+    ' Gliederung (Knopf oben rechts): zwei Linien, rot für die Präsentation, blau für die Ausarbeitung, mit „beides“ nebeneinander. Zieht Äste, Ideen oder Cluster auf einen Punkt oder direkt auf die Linie (dort entsteht ein neuer Kreis). Große Kreise sind Abschnitte, kleine Kreise Unterpunkte, Punkte in der Linie und kurze Striche die dritte und vierte Ebene; mit den Pfeil-Knöpfen rückt ihr ein oder aus. Gestrichelt: nur in der Gliederung, nicht in der Mindmap. Grau in der Mindmap: in der Gliederung ausgeblendet oder entfernt. Das Schloss hält die Gliederung fest. „Als Gliederung“ zeigt einen Ast oder Cluster vorübergehend als Linie. Das Auge oben rechts hebt Offenes oder schon Übernommenes hervor.';
   const helpText = isTopic
     ? canEdit
       ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
       : 'Themen-Mindmap: Hier umreißt deine Lehrkraft das Thema. Du kannst sie ansehen.'
     : canEdit
       ? view === 'karten'
-        ? 'Sammelt Ideen: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an. Zieht Zusammengehöriges in einen Cluster. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
-        : 'Sammelt Ideen: + am Thema oder Tab. Zeigt sich ein Thema, wird eine Idee „Als Abschnitt“ zum Hauptast; andere Ideen hängt ihr daran. Was in die Arbeit soll, nehmt ihr mit „In die Gliederung“ auf. Strg+Z nimmt zurück.'
+        ? 'Cluster: Doppelklick auf die Fläche oder „+ Karte“ legt eine Karte an; Doppelklick auf eine Karte schreibt direkt darin. Zieht Zusammengehöriges in einen Cluster, Karten auch in Karten. Ein Schatten zeigt, dass eine Karte herausgehoben ist (gewählt oder gezogen). „Text aus“ blendet alle Texte aus; einzelne zeigt ihr danach über „Text zeigen“ an der Karte. Strg+Z nimmt zurück.' + outlineHelp
+        : 'Mindmap: + am Thema oder Tab legt eine Idee an, „+ Abschnitt“ einen Hauptast, „+ Frei“ einen freien Knoten ohne Ast (später anbinden oder eigene Ideen daran sammeln, wie ein zweites Zentrum). Doppelklick auf einen Ast setzt einen Zwischenstopp; antippen eines Zwischenstopps legt dort eine Abzweigung an, die Form und Linie des Asts erbt. Langer Druck auf einen Knoten packt seinen Ansatz: an einem anderen Knoten loslassen bindet ihn dort an, weit weg loslassen stellt ihn frei, auf der Gliederung loslassen nimmt ihn dorthin. Strg+Z nimmt zurück.' + outlineHelp
       : 'Hier seht ihr die Mindmap der Gruppe.';
   const info = isTopic ? { key: 'mindmap-topic', title: 'Themen-Mindmap', text: helpText, start: true } : { key: 'mindmap', title: 'Mindmap der Gruppe', text: helpText, start: true };
   const center = isTopic ? project.title : join?.scopes?.find((x) => x.scope === scope)?.title || project.title;
@@ -316,6 +320,7 @@ export default function MindmapPage() {
           has: (cid) => !!cardPoint(lines, lineTab, cid),
           greyed: greyedCards(lines),
           hover: (x, y) => hoverLineTarget(x, y),
+          preview: (cid) => setPreview(cid),
           toggle: (c, whole) => {
             if (!canEdit) return;
             if (lines.locked) return show('Die Gliederung ist gesperrt. Zum Ändern das Schloss in der Gliederung öffnen.');
@@ -331,7 +336,7 @@ export default function MindmapPage() {
               show('Die Gliederung ist gesperrt. Zum Ändern das Schloss öffnen.');
               return true;
             }
-            void send({ type: 'lines', lines: addCard(map, lines, t.kind, c, { whole: true, target: t.point }) });
+            void send({ type: 'lines', lines: addCard(map, lines, t.kind, c, { whole: true, target: t.point, after: 'after' in t ? t.after : undefined }) });
             if (t.kind !== lineTab && kinds.length > 1) setLineTab(t.kind);
             return true;
           },
@@ -348,45 +353,20 @@ export default function MindmapPage() {
         phase={isTopic ? 'topic' : 'orientation'}
         fill
         info={info}
-        actions={
-          <>
-            {join?.scopes && join.scopes.length > 1 && (
-              <select className={s.scope} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Welche Mindmap?">
-                {join.scopes.map((x) => (
-                  <option key={x.scope} value={x.scope}>
-                    {x.title}
-                  </option>
-                ))}
-              </select>
-            )}
-            {map && (
-              <>
-                <span className="seg" role="group" aria-label="Ansicht">
-                  <button className={`btn ${view === 'aeste' ? 'on' : ''}`} onClick={() => switchView('aeste')} aria-pressed={view === 'aeste'} title="Äste: Thema in der Mitte">
-                    <Icon name="map" size={14} /> <span className={s.long}>Äste</span>
-                  </button>
-                  <button className={`btn ${view === 'karten' ? 'on' : ''}`} onClick={() => switchView('karten')} aria-pressed={view === 'karten'} title="Karten frei auf der Fläche">
-                    <Icon name="grid" size={14} /> <span className={s.long}>Karten</span>
-                  </button>
-                </span>
-                {!isTopic && (
-                  <>
-                    <select className={s.scope} value={dim} onChange={(e) => setDim(e.target.value as MapDim)} title="Was soll kräftig erscheinen?" aria-label="Hervorheben">
-                      <option value="none">Alles kräftig</option>
-                      <option value="picked">Offenes hervorheben</option>
-                      <option value="open">Übernommenes hervorheben</option>
-                    </select>
-                    <button className={`btn ${outlineOpen ? 'on' : ''}`} aria-pressed={outlineOpen} onClick={toggleOutline} title="Gliederung neben der Mindmap">
-                      <Icon name="outline" size={14} /> <span className={s.long}>Gliederung</span>
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </>
+        center={
+          join?.scopes && join.scopes.length > 1 ? (
+            <select className={s.scopeCenter} value={scope ?? ''} onChange={(e) => doJoin(e.target.value)} title="Welche Mindmap?" aria-label="Welche Mindmap?">
+              {join.scopes.map((x) => (
+                <option key={x.scope} value={x.scope}>
+                  {x.title}
+                </option>
+              ))}
+            </select>
+          ) : undefined
         }
       >
         <div className={s.area}>
+          <div className={s.map}>
           {join && !scope && (
             <div className={`panel ${s.notice}`}>
               {teacher ? 'Noch keine Gruppen. Bilde zuerst die Gruppen auf dem Board.' : 'Du bist noch keiner Gruppe zugeordnet. Sobald die Gruppen stehen, erscheint hier eure Mindmap.'}
@@ -413,8 +393,36 @@ export default function MindmapPage() {
               </button>
             </div>
           )}
+          {map && (
+            <div className={s.viewbar} data-ui onPointerDown={(e) => e.stopPropagation()}>
+              {!isTopic && <DimButton dim={dim} onDim={setDim} />}
+              <span className="seg" role="group" aria-label="Ansicht">
+                <button className={`btn ${view === 'aeste' ? 'on' : ''}`} onClick={() => switchView('aeste')} aria-pressed={view === 'aeste'} title="Mindmap: Thema in der Mitte, Äste">
+                  <Icon name="map" size={14} /> <span className={s.long}>Mindmap</span>
+                </button>
+                <button className={`btn ${view === 'karten' ? 'on' : ''}`} onClick={() => switchView('karten')} aria-pressed={view === 'karten'} title="Cluster: Karten frei auf der Fläche">
+                  <Icon name="grid" size={14} /> <span className={s.long}>Cluster</span>
+                </button>
+              </span>
+              {!isTopic && (
+                <button className={`btn ${outlineOpen ? 'on' : ''}`} aria-pressed={outlineOpen} onClick={toggleOutline} title="Gliederung rechts neben der Mindmap">
+                  <Icon name="outline" size={14} /> <span className={s.long}>Gliederung</span>
+                </button>
+              )}
+            </div>
+          )}
           {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} line={lineHook} />}
           {map && view === 'aeste' && <BranchMap key={scope} map={map} topic={center} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} line={lineHook} />}
+            {map && lines && preview && map.cards[preview] && (
+              <LinePreview
+                rows={previewRows(map, preview)}
+                color={LINE_COLOR[lineTab]}
+                onClose={() => setPreview(null)}
+                taken={!!cardPoint(lines, lineTab, preview)}
+                onTake={canEdit && !lines.locked ? () => lineHook?.toggle(map.cards[preview], true) : undefined}
+              />
+            )}
+          </div>
           {map && outlineOpen && !isTopic && (
             <aside className={s.outline} aria-label="Gliederung">
               <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} />
@@ -424,5 +432,34 @@ export default function MindmapPage() {
         {toast && <div className={p.toast}>{toast}</div>}
       </ProjectShell>
     </PasteRulesContext.Provider>
+  );
+}
+
+/** Auge oben rechts: was kräftig erscheint (alles, Offenes oder schon Übernommenes) */
+function DimButton({ dim, onDim }: { dim: MapDim; onDim: (d: MapDim) => void }) {
+  const [open, setOpen] = useState(false);
+  const opts: { key: MapDim; label: string }[] = [
+    { key: 'none', label: 'Alles kräftig' },
+    { key: 'picked', label: 'Offenes hervorheben' },
+    { key: 'open', label: 'Übernommenes hervorheben' },
+  ];
+  return (
+    <span className={s.dimWrap}>
+      <button className={`btn icon ${dim !== 'none' ? 'on' : ''}`} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} title={`Hervorheben: ${opts.find((o) => o.key === dim)?.label}`} aria-label="Hervorheben">
+        <Icon name="eye" size={15} />
+      </button>
+      {open && (
+        <>
+          <span className={s.dimBack} onClick={() => setOpen(false)} />
+          <span className={s.dimMenu} role="menu">
+            {opts.map((o) => (
+              <button key={o.key} role="menuitemradio" aria-checked={dim === o.key} className={`btn ${dim === o.key ? 'on' : ''}`} onClick={() => (onDim(o.key), setOpen(false))}>
+                {o.label}
+              </button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
   );
 }

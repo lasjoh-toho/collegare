@@ -2,21 +2,21 @@
 /**
  * Gliederung neben „Notizen und Quellen“ (Konzept 8h, ersetzt „Meine Linie“ aus 8e.7): holt die Mindmap der Gruppe
  * über den Socket der Seite (map:join) und zeigt dieselbe Linie wie neben der Mindmap. Notizen zieht man aus dem
- * Thread auf die Punkte.
+ * Thread auf die Punkte. side="left" beim Schreiben (Ausarbeitung, Präsentation), sonst rechts.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { visibleKinds } from '@/lib/lines';
+import { visibleKinds, type LineKind } from '@/lib/lines';
 import type { MapOp, MindMap, ProjectView } from '@/lib/types';
 import { Gliederung, useLineTab } from './Gliederung';
 
-export function GliederungLive({ sock, project, scope, meId, noteInfo, show, onClose }: { sock: Socket | null; project: ProjectView; scope: string; meId: number; noteInfo?: (id: number) => { label: string; kind: string } | undefined; show: (m: string) => void; onClose?: () => void }) {
+export function GliederungLive({ sock, project, scope, meId, noteInfo, show, onClose, side = 'right', prefer }: { sock: Socket | null; project: ProjectView; scope: string; meId: number; noteInfo?: (id: number) => { label: string; kind: string } | undefined; show: (m: string) => void; onClose?: () => void; side?: 'left' | 'right'; prefer?: LineKind }) {
   const [map, setMap] = useState<MindMap | null>(null);
   const [people, setPeople] = useState<{ id: number; name: string }[]>([]);
   const [readOnly, setReadOnly] = useState(false);
   const version = useRef(0);
   const kinds = visibleKinds(project.settings.outlineLines, project.role === 'teacher');
-  const [tab, setTab] = useLineTab(kinds);
+  const [tab, setTab] = useLineTab(kinds, prefer);
   const showRef = useRef(show);
   showRef.current = show;
 
@@ -60,5 +60,5 @@ export function GliederungLive({ sock, project, scope, meId, noteInfo, show, onC
   );
 
   if (!map) return <p className="muted" style={{ padding: 12 }}>Gliederung wird geladen …</p>;
-  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} />;
+  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} side={side} />;
 }

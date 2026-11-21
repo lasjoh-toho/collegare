@@ -967,7 +967,6 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                   </button>
                 ))}
               </span>
-              <span className="muted">{panel ? 'Doppelklick bearbeitet, ziehen in die Mindmap' : 'Doppelklick bearbeitet; Karten lassen sich in die Mindmap ziehen'}</span>
             </div>
             {join && shown.length === 0 && (
               <p className={`muted ${c.empty}`}>

@@ -16,6 +16,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import {
   addItem,
+  flatPoints,
+  indentPoint,
+  insertAfterRow,
+  MAX_LEVELS,
   alignRows,
   clone,
   copyPoint,
@@ -56,19 +60,39 @@ export interface GliederungProps {
   noteInfo?: (id: number) => { label: string; kind: string } | undefined;
   show?: (msg: string) => void;
   onClose?: () => void;
+  /** rechts (vor der Gliederung: Mindmap, Cluster, Notizen) oder links (beim Schreiben) */
+  side?: 'left' | 'right';
 }
 
 /** Ziel eines Ablegens aus der Mindmap (Zeiger, kein HTML-Ziehen): steht als data-line-drop an Punkten und am Ende */
 export interface LineDropTarget {
   kind: LineKind;
   point: string | null;
+  /** abgelegt direkt auf der Linie: neuer Punkt unter dieser Zeile (null = ganz oben) */
+  after?: string | null;
+}
+/**
+ * Stelle auf der Linie unter dem Zeiger: die letzte Station, deren Mitte darüber liegt. y ist die Höhe im Schienen-
+ * Element (für den Geisterkreis).
+ */
+export function railSpot(rail: HTMLElement, clientY: number): { after: string | null; y: number } {
+  const track = rail.parentElement!;
+  let after: string | null = null;
+  for (const h of track.querySelectorAll<HTMLElement>('[data-row]')) {
+    const r = h.getBoundingClientRect();
+    if (r.top + r.height / 2 < clientY) after = h.dataset.row!;
+  }
+  return { after, y: clientY - rail.getBoundingClientRect().top };
 }
 export function lineTargetAt(x: number, y: number): LineDropTarget | null {
   for (const n of document.elementsFromPoint(x, y)) {
-    const raw = (n as HTMLElement).closest?.('[data-line-drop]')?.getAttribute('data-line-drop');
+    const el = (n as HTMLElement).closest?.('[data-line-drop]') as HTMLElement | null;
+    const raw = el?.getAttribute('data-line-drop');
     if (raw) {
       try {
-        return JSON.parse(raw) as LineDropTarget;
+        const t = JSON.parse(raw) as LineDropTarget;
+        if (el!.hasAttribute('data-line-rail')) t.after = railSpot(el!, y).after ?? t.after ?? null;
+        return t;
       } catch {
         return null;
       }
@@ -81,14 +105,36 @@ export function hoverLineTarget(x: number | null, y = 0) {
   document.querySelectorAll('[data-line-over]').forEach((n) => n.removeAttribute('data-line-over'));
   if (x === null) return;
   for (const n of document.elementsFromPoint(x, y)) {
-    const t = (n as HTMLElement).closest?.('[data-line-drop]');
-    if (t) return void t.setAttribute('data-line-over', '1');
+    const t = (n as HTMLElement).closest?.('[data-line-drop]') as HTMLElement | null;
+    if (t) {
+      if (t.hasAttribute('data-line-rail')) t.style.setProperty('--gy', railSpot(t, y).y + 'px');
+      return void t.setAttribute('data-line-over', '1');
+    }
   }
 }
 
-export function useLineTab(kinds: LineKind[]): [LineKind, (k: LineKind) => void] {
-  const [tab, setTab] = useState<LineKind>(kinds[0] ?? 'ausarb');
+/** Seite der Gliederung: rechts bei Mindmap und Cluster, links beim Schreiben; beim Wechsel gleitet die Seite hinüber */
+const SIDE_KEY = 'collegare-gliederung-seite';
+function useSideSlide(side: 'left' | 'right') {
   useEffect(() => {
+    let prev: string | null = null;
+    try {
+      prev = sessionStorage.getItem(SIDE_KEY);
+      sessionStorage.setItem(SIDE_KEY, side);
+    } catch {}
+    if (!prev || prev === side) return;
+    const b = document.body;
+    b.dataset.gSlide = side;
+    const t = window.setTimeout(() => delete b.dataset.gSlide, 700);
+    return () => window.clearTimeout(t);
+  }, [side]);
+}
+
+/** prefer: auf Schreibseiten die passende Linie vorwählen (Ausarbeitung bzw. Präsentation), statt der zuletzt gewählten */
+export function useLineTab(kinds: LineKind[], prefer?: LineKind): [LineKind, (k: LineKind) => void] {
+  const [tab, setTab] = useState<LineKind>(prefer && kinds.includes(prefer) ? prefer : (kinds[0] ?? 'ausarb'));
+  useEffect(() => {
+    if (prefer && kinds.includes(prefer)) return;
     try {
       const t = localStorage.getItem(TAB_KEY) as LineKind | null;
       if (t && kinds.includes(t)) setTab(t);
@@ -110,17 +156,18 @@ export function useLineTab(kinds: LineKind[]): [LineKind, (k: LineKind) => void]
 }
 
 export function Gliederung(props: GliederungProps) {
-  const { map, send, kinds, tab, onTab, onClose } = props;
+  const { map, send, kinds, tab, onTab, onClose, side = 'right' } = props;
   const lines = linesOf(map);
+  useSideSlide(side);
   const [both, setBoth] = useState(false);
   const [mine, setMine] = useState(false);
-  const hasItems = (['praes', 'ausarb'] as const).some((k) => lines[k].points.some((p) => p.items.length || p.sub.some((s) => s.items.length)));
+  const hasItems = (['praes', 'ausarb'] as const).some((k) => flatPoints(lines[k].points).some((r) => r.p.items.length));
   const editable = props.canEdit && !lines.locked;
   const put = (next: Lines) => send({ type: 'lines', lines: next });
   const color = LINE_COLOR[tab];
 
   return (
-    <div className={g.wrap} style={{ ['--metro' as string]: color }}>
+    <div className={`${g.wrap} ${side === 'left' ? g.fromLeft : g.fromRight}`} style={{ ['--metro' as string]: color }}>
       <div className={g.top}>
         {kinds.length > 1 ? (
           <div className={g.tabs} role="tablist" aria-label="Gliederung">
@@ -197,8 +244,17 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
   const { lines, put, meId, editable } = ctx;
   const [over, setOver] = useState<string | null>(null);
   const accept = (e: React.DragEvent) => editable && (isChatDrag(e) || e.dataTransfer.types.includes(ITEM_MIME));
-  /** point: Ziel-Punkt (null = neuer Punkt am Ende), into: in dieses Objekt legen, before: vor dieses Objekt */
-  const drop = (e: React.DragEvent, point: string | null, into: string | null = null, before: string | null = null) => {
+  /**
+   * point: Ziel-Punkt (null = neuer Punkt am Ende), into: in dieses Objekt legen, before: vor dieses Objekt,
+   * after: abgelegt auf der Linie, neuer Punkt unter dieser Zeile (null = ganz oben)
+   */
+  const drop = (e: React.DragEvent, point: string | null, into: string | null = null, before: string | null = null, after?: string | null) => {
+    const fresh = (l0: Lines, title: string) => {
+      const np = newPoint(title);
+      const l = after !== undefined ? insertAfterRow(l0, kind, after, np) : clone(l0);
+      if (after === undefined) l[kind].points.push(np);
+      return { l, id: np.id };
+    };
     if (!accept(e)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -209,10 +265,9 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
       let l = lines;
       let target = point;
       if (!target) {
-        const np = newPoint('Neuer Punkt');
-        l = clone(l);
-        l[kind].points.push(np);
-        target = np.id;
+        const f = fresh(l, findItemLabel(lines, moving) ?? 'Neuer Punkt');
+        l = f.l;
+        target = f.id;
       }
       return void put(moveItem(l, moving, { kind, point: target, into, before }));
     }
@@ -221,15 +276,13 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
     const label = (d.note?.title || d.body.split('\n')[0] || 'Beitrag').slice(0, 200);
     const it = { note: d.note?.id ?? null, card: null, label, kind: d.note ? 'note' : 'chat', visible: true, by: meId };
     if (!point) {
-      const np = newPoint(label);
-      const l = clone(lines);
-      l[kind].points.push(np);
-      return void put(addItem(l, kind, np.id, it));
+      const f = fresh(lines, label);
+      return void put(addItem(f.l, kind, f.id, it));
     }
     let l = addItem(lines, kind, point, it, into);
     if (before) {
       // neues Objekt landet am Ende; vor das Ziel schieben
-      const found = l[kind].points.flatMap((p) => [p, ...p.sub]).find((p) => p.id === point);
+      const found = flatPoints(l[kind].points).find((r) => r.p.id === point)?.p;
       const last = found ? lastItem(found.items, into) : null;
       if (last) l = moveItem(l, last.id, { kind, point, before });
     }
@@ -244,6 +297,22 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
   };
   return { over, setOver, drop, allow };
 }
+function findItemLabel(l: Lines, id: string): string | null {
+  for (const k of ['praes', 'ausarb'] as const)
+    for (const r of flatPoints(l[k].points)) {
+      const f = findIn(r.p.items, id);
+      if (f) return f.label;
+    }
+  return null;
+}
+const findIn = (items: LineItem[], id: string): LineItem | null => {
+  for (const it of items) {
+    if (it.id === id) return it;
+    const f = findIn(it.items, id);
+    if (f) return f;
+  }
+  return null;
+};
 function lastItem(items: LineItem[], into: string | null): LineItem | null {
   if (!into) return items[items.length - 1] ?? null;
   for (const it of items) {
@@ -254,11 +323,29 @@ function lastItem(items: LineItem[], into: string | null): LineItem | null {
   return null;
 }
 
+/** Schiene über der Linie: Objekte direkt auf die Linie legen erzeugt dort einen neuen Punkt */
+function Rail({ kind, dz, fallback = null }: { kind: LineKind; dz: ReturnType<typeof useDrops>; fallback?: string | null }) {
+  return (
+    <div
+      className={`${g.rail} ${dz.over === 'rail' ? g.railOver : ''}`}
+      data-line-drop={JSON.stringify({ kind, point: null, after: fallback })}
+      data-line-rail=""
+      onDragOver={(e) => {
+        dz.allow('rail')(e);
+        e.currentTarget.style.setProperty('--gy', railSpot(e.currentTarget, e.clientY).y + 'px');
+      }}
+      onDragLeave={() => dz.setOver(null)}
+      onDrop={(e) => dz.drop(e, null, null, null, railSpot(e.currentTarget, e.clientY).after ?? fallback)}
+      title="Hierher ziehen: neuer Punkt an dieser Stelle"
+    />
+  );
+}
+
 function Line(ctx: LineCtx & { kind: LineKind }) {
   const { kind, lines, editable, put } = ctx;
   const pts = lines[kind].points;
-  const live = pts.filter((p) => !p.removed);
-  const gone = useMemo(() => pts.flatMap((p) => [p, ...p.sub]).filter((p) => p.removed), [pts]);
+  const rows = useMemo(() => flatPoints(pts), [pts]);
+  const gone = useMemo(() => allRemoved(pts), [pts]);
   const dz = useDrops(ctx, kind);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -266,18 +353,11 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
 
   return (
     <div className={g.line}>
-      {!live.length && (
-        <p className={`muted ${g.hint}`}>
-          {editable
-            ? 'Noch leer. Zieht Äste und Ideen aus der Mindmap hierher oder tippt dort „In die Gliederung“. Notizen zieht ihr auf einen Punkt.'
-            : lines.locked
-              ? 'Die Gliederung ist gesperrt.'
-              : 'Noch keine Gliederung.'}
-        </p>
-      )}
+      {!rows.length && <p className={`muted ${g.hint}`}>{lines.locked ? 'Die Gliederung ist gesperrt.' : 'Noch leer.'}</p>}
       <ol className={g.track}>
-        {live.map((p, i) => (
-          <PointView key={p.id} ctx={ctx} kind={kind} p={p} first={i === 0} last={i === live.length - 1} dz={dz} />
+        {editable && <Rail kind={kind} dz={dz} />}
+        {rows.map((r, i) => (
+          <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={rows} index={i} dz={dz} />
         ))}
         {editable && (
           <li
@@ -306,7 +386,7 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
               </form>
             ) : (
               <button className={g.addBtn} onClick={() => setAdding(true)}>
-                <Icon name="plus" size={14} /> Punkt · oder hierher ziehen
+                <Icon name="plus" size={14} /> Punkt
               </button>
             )}
           </li>
@@ -336,9 +416,19 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
   );
 }
 
-const titleOf = (m: MindMap, p: LinePoint) => (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel';
+function allRemoved(pts: LinePoint[], out: LinePoint[] = []): LinePoint[] {
+  for (const p of pts) {
+    if (p.removed) out.push(p);
+    else allRemoved(p.sub, out);
+  }
+  return out;
+}
 
-function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCtx; kind: LineKind; p: LinePoint; first: boolean; last: boolean; dz: ReturnType<typeof useDrops>; sub?: boolean }) {
+const titleOf = (m: MindMap, p: LinePoint) => (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel';
+const depthBelow = (p: LinePoint): number => (p.sub.length ? 1 + Math.max(...p.sub.map(depthBelow)) : 0);
+
+/** Eine Station; alle Ebenen sitzen auf derselben Linie (groß, mittel, Punkt in der Linie, Strich) */
+function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kind: LineKind; p: LinePoint; level: number; rows: { p: LinePoint; level: number }[]; index: number; dz: ReturnType<typeof useDrops> }) {
   const { lines, editable, put, map, people } = ctx;
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState('');
@@ -346,9 +436,13 @@ function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCt
   const ownerId = card?.owner ?? p.owner;
   const owner = ownerId != null ? people.find((x) => x.id === ownerId)?.name : null;
   const key = 'p:' + p.id;
-  const subs = p.sub.filter((s) => !s.removed);
   const shared = ctx.kinds.length > 1 && sharedKeys(lines).has('k' + p.key);
   const other: LineKind = kind === 'praes' ? 'ausarb' : 'praes';
+  // Geschwister für oben/unten
+  const sib = rows.filter((r, i) => r.level === level && sameParent(rows, i, index));
+  const pos = sib.findIndex((r) => r.p.id === p.id);
+  const prevSame = rows.slice(0, index).reverse().find((r) => r.level <= level);
+  const canIndent = !!prevSame && prevSame.level === level && level + depthBelow(p) < MAX_LEVELS - 1;
 
   async function rename() {
     setEdit(false);
@@ -360,9 +454,10 @@ function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCt
   }
 
   return (
-    <li className={`${g.point} ${sub ? g.sub : ''} ${p.card ? '' : g.dashed} ${p.hidden ? g.hiddenPt : ''}`}>
+    <li className={`${g.point} ${g['l' + level]} ${p.card ? '' : g.dashed} ${p.hidden ? g.hiddenPt : ''}`}>
       <div
         className={`${g.head} ${dz.over === key ? g.over : ''}`}
+        data-row={p.id}
         data-line-drop={JSON.stringify({ kind, point: p.id })}
         onDragOver={dz.allow(key)}
         onDragLeave={() => dz.setOver(null)}
@@ -383,21 +478,15 @@ function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCt
             maxLength={200}
           />
         ) : (
-          <span
-            className={g.title}
-            onDoubleClick={() => editable && (setDraft(titleOf(map, p)), setEdit(true))}
-            title={p.card ? 'aus der Mindmap' : 'nur in der Gliederung (nicht in der Mindmap)'}
-          >
+          <span className={g.title} onDoubleClick={() => editable && (setDraft(titleOf(map, p)), setEdit(true))} title={p.card ? 'aus der Mindmap' : 'nur in der Gliederung (nicht in der Mindmap)'}>
             {titleOf(map, p)}
           </span>
         )}
-        {shared && (
-          <span className={g.sharedMark} title={`auch in der ${LINE_LABEL[other]}`} style={{ ['--o' as string]: LINE_COLOR[other] }} aria-label={`auch in der ${LINE_LABEL[other]}`} />
-        )}
+        {shared && <span className={g.sharedMark} title={`auch in der ${LINE_LABEL[other]}`} style={{ ['--o' as string]: LINE_COLOR[other] }} aria-label={`auch in der ${LINE_LABEL[other]}`} />}
         {owner && <span className={g.owner}>{owner}</span>}
         {editable && (
           <span className={g.actions}>
-            {!card && !sub && (
+            {!card && level === 0 && (
               <select
                 className={g.ownerSel}
                 value={p.owner ?? ''}
@@ -418,10 +507,20 @@ function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCt
                 <Icon name="copy" size={13} />
               </button>
             )}
-            <button className="btn icon" disabled={first} onClick={() => void put(movePoint(lines, kind, p.id, -1))} title="Nach oben" aria-label="Nach oben">
+            {level > 0 && (
+              <button className="btn icon" onClick={() => void put(indentPoint(lines, kind, p.id, -1))} title="Eine Ebene höher" aria-label="Ausrücken">
+                <Icon name="outdent" size={13} />
+              </button>
+            )}
+            {canIndent && (
+              <button className="btn icon" onClick={() => void put(indentPoint(lines, kind, p.id, 1))} title="Eine Ebene tiefer (unter den Punkt davor)" aria-label="Einrücken">
+                <Icon name="indent" size={13} />
+              </button>
+            )}
+            <button className="btn icon" disabled={pos <= 0} onClick={() => void put(movePoint(lines, kind, p.id, -1))} title="Nach oben" aria-label="Nach oben">
               <Icon name="up" size={13} />
             </button>
-            <button className="btn icon" disabled={last} onClick={() => void put(movePoint(lines, kind, p.id, 1))} title="Nach unten" aria-label="Nach unten">
+            <button className="btn icon" disabled={pos < 0 || pos >= sib.length - 1} onClick={() => void put(movePoint(lines, kind, p.id, 1))} title="Nach unten" aria-label="Nach unten">
               <Icon name="down" size={13} />
             </button>
             <button
@@ -439,15 +538,15 @@ function PointView({ ctx, kind, p, first, last, dz, sub = false }: { ctx: LineCt
         )}
       </div>
       {p.items.length > 0 && <Items ctx={ctx} kind={kind} point={p.id} items={p.items} dz={dz} depth={0} />}
-      {subs.length > 0 && (
-        <ol className={g.subs}>
-          {subs.map((s, i) => (
-            <PointView key={s.id} ctx={ctx} kind={kind} p={s} first={i === 0} last={i === subs.length - 1} dz={dz} sub />
-          ))}
-        </ol>
-      )}
     </li>
   );
+}
+/** Haben die Zeilen i und j (gleiche Ebene) denselben Elternpunkt? Kein flacherer Punkt dazwischen. */
+function sameParent(rows: { level: number }[], i: number, j: number): boolean {
+  const lv = rows[j].level;
+  const [a, b] = i < j ? [i, j] : [j, i];
+  for (let k = a + 1; k < b; k++) if (rows[k].level < lv) return false;
+  return true;
 }
 
 function Items({ ctx, kind, point, items, dz, depth }: { ctx: LineCtx; kind: LineKind; point: string; items: LineItem[]; dz: ReturnType<typeof useDrops>; depth: number }) {
@@ -526,48 +625,79 @@ function Parallel(ctx: LineCtx) {
   );
   const dzA = useDrops(ctx, 'praes');
   const dzB = useDrops(ctx, 'ausarb');
-  const cell = (kind: LineKind, p: LinePoint | null, dz: ReturnType<typeof useDrops>, i: number) =>
-    p ? (
+  // Hauptpunkt vor der Zeile i in einer Linie (für Ablegen auf der Linie in einer Lücke oder über dem ersten Punkt)
+  const prevOf = (side: 'left' | 'right', i: number) => {
+    for (let k = i - 1; k >= 0; k--) if (rows[k][side]) return '^' + rows[k][side]!.id;
+    return null;
+  };
+  const cell = (kind: LineKind, p: LinePoint | null, dz: ReturnType<typeof useDrops>, i: number) => {
+    const flat = p ? flatPoints([p]) : [];
+    return (
       <ol className={`${g.track} ${g.pTrack}`} style={{ ['--metro' as string]: LINE_COLOR[kind] }}>
-        <PointView ctx={ctx} kind={kind} p={p} first={i === 0} last={false} dz={dz} />
+        {ctx.editable && <Rail kind={kind} dz={dz} fallback={prevOf(kind === 'praes' ? 'left' : 'right', i)} />}
+        {flat.map((r, i) => (
+          <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={flat} index={i} dz={dz} />
+        ))}
+        {!p && <li className={g.gap} />}
       </ol>
-    ) : (
-      <div className={g.gap} style={{ ['--metro' as string]: LINE_COLOR[kind] }} />
     );
+  };
   return (
     <div className={g.parallel}>
-      <div className={g.pHint}>
-        Gleiche Punkte stehen in einer Zeile und sind verbunden. Mit <Icon name="copy" size={12} /> übernehmt ihr einen Punkt in die andere Linie; Objekte zieht ihr von überall auf die Punkte.
-      </div>
       {rows.map((r, i) => (
-        <div key={(r.left?.id ?? '') + (r.right?.id ?? '')} className={`${g.row} ${r.left && r.right ? g.linked : ''}`}>
-          <div className={g.left}>{cell('praes', r.left, dzA, i)}</div>
+        <div key={(r.left?.id ?? '') + (r.right?.id ?? '')} className={g.row}>
+          <div className={`${g.left} ${g.mirror}`}>{cell('praes', r.left, dzA, i)}</div>
           <div className={g.bridge} aria-hidden>
-            <span className={g.rail} style={{ background: LINE_COLOR.praes }} />
             {r.left && r.right && <span className={g.connector} />}
-            <span className={g.rail} style={{ background: LINE_COLOR.ausarb }} />
           </div>
           <div className={g.right}>{cell('ausarb', r.right, dzB, i)}</div>
         </div>
       ))}
       {ctx.editable && (
         <div className={g.row}>
-          <div className={g.left}>
+          <div className={`${g.left} ${g.mirror}`}>
             <div className={`${g.endP} ${dzA.over === 'end' ? g.over : ''}`} onDragOver={dzA.allow('end')} onDragLeave={() => dzA.setOver(null)} onDrop={(e) => dzA.drop(e, null)} data-line-drop={JSON.stringify({ kind: 'praes', point: null })}>
-              hierher ziehen: neuer Punkt
+              neuer Punkt
             </div>
           </div>
-          <div className={g.bridge} aria-hidden>
-            <span className={g.rail} style={{ background: LINE_COLOR.praes }} />
-            <span className={g.rail} style={{ background: LINE_COLOR.ausarb }} />
-          </div>
+          <div className={g.bridge} aria-hidden />
           <div className={g.right}>
             <div className={`${g.endP} ${dzB.over === 'end' ? g.over : ''}`} onDragOver={dzB.allow('end')} onDragLeave={() => dzB.setOver(null)} onDrop={(e) => dzB.drop(e, null)} data-line-drop={JSON.stringify({ kind: 'ausarb', point: null })}>
-              hierher ziehen: neuer Punkt
+              neuer Punkt
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Vorübergehende Ansicht eines Asts oder Clusters als Linie (Wunsch Jo, 21. November 2026); nichts wird gespeichert */
+export function LinePreview({ rows, color, onClose, onTake, taken }: { rows: { id: string; title: string; level: number }[]; color: string; onClose: () => void; onTake?: () => void; taken?: boolean }) {
+  return (
+    <div className={g.preview} style={{ ['--metro' as string]: color }} role="dialog" aria-label="Als Gliederung" data-ui onPointerDown={(e) => e.stopPropagation()}>
+      <div className={g.previewHead}>
+        <span className={g.previewTitle}>Als Gliederung</span>
+        <span className="grow" />
+        {onTake && (
+          <button className={`btn ${taken ? 'on' : ''}`} onClick={onTake} disabled={taken} title="In die Gliederung übernehmen">
+            {taken ? <><Icon name="check" size={13} /> In der Gliederung</> : 'Übernehmen'}
+          </button>
+        )}
+        <button className="btn icon" onClick={onClose} title="Schließen" aria-label="Schließen">
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+      <ol className={g.track}>
+        {rows.map((r) => (
+          <li key={r.id} className={`${g.point} ${g['l' + r.level]}`}>
+            <div className={g.head}>
+              <span className={g.stop} aria-hidden />
+              <span className={g.title}>{r.title}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

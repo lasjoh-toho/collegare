@@ -14,7 +14,7 @@
   .long { display: none; }
 }
 /* Erklärblase und Hinweise oben rechts, untereinander */
-.notes { position: absolute; right: 12px; top: 12px; z-index: 5; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+.notes { position: absolute; right: 12px; top: 58px; z-index: 5; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
 .notes > * { pointer-events: auto; }
 .banner { max-width: min(380px, 70vw); padding: 10px 14px; font-size: 13px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .help { position: relative; padding-right: 34px; line-height: 1.4; }
@@ -22,3 +22,11 @@
 /* Rückgängig/Wiederholen unten links */
 .history { position: absolute; left: 12px; bottom: 12px; z-index: 6; display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--bg-elev); box-shadow: var(--shadow); }
 .history :global(.btn) { width: 34px; height: 34px; font-size: 18px; }
+/* Kopfzeile neu (Wunsch Jo, 21. November 2026): Auswahl der Mindmap in der Mitte, Ansicht und Auge oben rechts in der Fläche */
+.scopeCenter { height: 32px; max-width: min(360px, 46vw); padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); font: inherit; font-weight: 650; font-size: 14px; }
+.map { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; }
+.viewbar { position: absolute; right: 12px; top: 10px; z-index: 11; display: flex; align-items: center; gap: 6px; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--bg-elev) 92%, transparent); box-shadow: var(--shadow); }
+.dimWrap { position: relative; display: inline-flex; }
+.dimBack { position: fixed; inset: 0; z-index: 1; }
+.dimMenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 210px; border-radius: 10px; background: var(--bg-elev); box-shadow: var(--shadow); }
+.dimMenu :global(.btn) { justify-content: flex-start; }

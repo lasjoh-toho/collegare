@@ -177,3 +177,10 @@ a { color: var(--accent); text-decoration: none; }
   body { background: #fff; }
 }
 .md-source { font-size: 0.9em; font-style: italic; opacity: 0.8; }
+
+/* Gliederung wechselt die Seite (rechts bei Mindmap und Cluster, links beim Schreiben): die ganze Seite gleitet mit (Konzept 8h) */
+body[data-g-slide='left'] main { animation: gPageFromRight 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+body[data-g-slide='right'] main { animation: gPageFromLeft 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes gPageFromRight { from { transform: translateX(14vw); opacity: 0.4; } }
+@keyframes gPageFromLeft { from { transform: translateX(-14vw); opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { body[data-g-slide] main { animation: none; } }

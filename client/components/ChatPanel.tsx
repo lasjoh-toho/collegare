@@ -157,7 +157,6 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
           <span className="muted">{title}</span>
         )}
         <span className="grow" />
-        {panel && <span className={`muted ${c.tip}`}>Beiträge lassen sich in die Mindmap ziehen</span>}
         {onClose && (
           <button className={`btn icon ${c.close}`} onClick={onClose} title="Schließen" aria-label="Chat schließen">
             ×

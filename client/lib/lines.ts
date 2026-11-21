@@ -45,13 +45,66 @@ export const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 export function allPoints(points: LinePoint[]): LinePoint[] {
   return points.flatMap((p) => [p, ...allPoints(p.sub)]);
 }
-export function findPoint(points: LinePoint[], id: string): { p: LinePoint; list: LinePoint[]; parent: LinePoint | null } | null {
+/** Punkt beliebig tief finden (bis zu vier Ebenen), samt Liste, Elternpunkt und Ebene (0 = Hauptpunkt) */
+export function findPoint(points: LinePoint[], id: string, parent: LinePoint | null = null, level = 0): { p: LinePoint; list: LinePoint[]; parent: LinePoint | null; level: number } | null {
   for (const p of points) {
-    if (p.id === id) return { p, list: points, parent: null };
-    const i = p.sub.findIndex((s) => s.id === id);
-    if (i >= 0) return { p: p.sub[i], list: p.sub, parent: p };
+    if (p.id === id) return { p, list: points, parent, level };
+    const f = findPoint(p.sub, id, p, level + 1);
+    if (f) return f;
   }
   return null;
+}
+/** Ebenen der Gliederung: groß, mittel, Punkt in der Linie, Strich */
+export const MAX_LEVELS = 4;
+const depthOf = (p: LinePoint): number => 1 + Math.max(0, ...p.sub.map(depthOf));
+
+/** Punkte als flache Liste mit Ebene (für die Darstellung: alle Stationen sitzen auf derselben Linie) */
+export function flatPoints(points: LinePoint[], level = 0, out: { p: LinePoint; level: number }[] = []) {
+  for (const p of points) {
+    if (p.removed) continue;
+    out.push({ p, level });
+    flatPoints(p.sub, level + 1, out);
+  }
+  return out;
+}
+
+/** Einrücken: wird letzter Unterpunkt des Punkts davor; Ausrücken: steht hinter dem Elternpunkt */
+export function indentPoint(l0: Lines, kind: LineKind, id: string, dir: 1 | -1): Lines {
+  const l = clone(l0);
+  const pts = l[kind].points;
+  const hit = findPoint(pts, id);
+  if (!hit) return l0;
+  const i = hit.list.indexOf(hit.p);
+  if (dir === 1) {
+    const prev = hit.list.slice(0, i).reverse().find((x) => !x.removed);
+    if (!prev || hit.level + depthOf(hit.p) >= MAX_LEVELS) return l0;
+    hit.list.splice(i, 1);
+    prev.sub.push(hit.p);
+    return l;
+  }
+  if (!hit.parent) return l0;
+  const up = findPoint(pts, hit.parent.id)!;
+  hit.list.splice(i, 1);
+  // die folgenden Geschwister werden Unterpunkte des ausgerückten Punkts (wie in einer Textgliederung)
+  hit.p.sub.push(...hit.list.splice(i));
+  up.list.splice(up.list.indexOf(up.p) + 1, 0, hit.p);
+  return l;
+}
+
+/**
+ * Neuer Punkt direkt auf der Linie, unter der Zeile `after` (null = ganz oben): hat diese Zeile Unterpunkte, wird er
+ * deren erster, sonst steht er auf derselben Ebene dahinter. So erscheint er genau dort, wo man ihn abgelegt hat.
+ */
+export function insertAfterRow(l0: Lines, kind: LineKind, after: string | null, p: LinePoint): Lines {
+  const l = clone(l0);
+  const pts = l[kind].points;
+  // „^id“: immer auf derselben Ebene hinter dem Punkt samt seinen Unterpunkten (Zelle der Ansicht „beides“)
+  const sibling = !!after?.startsWith('^');
+  const hit = after ? findPoint(pts, sibling ? after.slice(1) : after) : null;
+  if (!hit) pts.unshift(p);
+  else if (!sibling && hit.p.sub.some((s) => !s.removed)) hit.p.sub.unshift(p);
+  else hit.list.splice(hit.list.indexOf(hit.p) + 1, 0, p);
+  return l;
 }
 /** Objekt irgendwo in einer Liste (beliebig tief) finden, samt der Liste, in der es steht */
 export function findItem(items: LineItem[], id: string): { it: LineItem; list: LineItem[] } | null {
@@ -73,9 +126,17 @@ export function findItemIn(l: Lines, id: string): { it: LineItem; list: LineItem
 const containsItem = (it: LineItem, id: string): boolean => it.id === id || it.items.some((x) => containsItem(x, id));
 
 /** neuer Punkt aus einer Karte der Mindmap; ein Ast bringt seine Karten als Unterpunkte mit */
-export function pointFromCard(m: MindMap, c: MapCard, withChildren: boolean): LinePoint {
-  const sub = withChildren && c.kind === 'cluster' ? c.children.map((id) => m.cards[id]).filter(Boolean).map((k) => pointFromCard(m, k, false)) : [];
+export function pointFromCard(m: MindMap, c: MapCard, withChildren: boolean, room = MAX_LEVELS - 1): LinePoint {
+  // ein Ast bringt seine Karten mit, eine Karte die Karten, die an ihr hängen (Karten in Karten), solange Ebenen reichen
+  const sub = withChildren && room > 0 ? kidsOf(m, c).map((k) => pointFromCard(m, k, true, room - 1)) : [];
   return { id: rid(), key: c.id, card: c.id, title: c.title, owner: null, hidden: false, removed: false, items: [], sub };
+}
+function kidsOf(m: MindMap, k: MapCard): MapCard[] {
+  const list =
+    k.kind === 'cluster'
+      ? k.children.map((x) => m.cards[x]).filter((x) => x && !(x.under && m.cards[x.under]?.parent === k.id))
+      : Object.values(m.cards).filter((x) => x.under === k.id && x.id !== k.id && x.parent === k.parent);
+  return list.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 export const newPoint = (title: string): LinePoint => {
   const id = rid();
@@ -89,7 +150,12 @@ export const cardPoint = (l: Lines, kind: LineKind, card: string) => allPoints(l
  * Karte bzw. Ast in die Linie nehmen. Eine Karte eines übernommenen Asts wird dessen Unterpunkt; fehlt der Ast, kommt er
  * mit. Steht die Karte schon als entfernter Punkt in der Linie, wird sie zurückgeholt. target: an diesen Punkt hängen.
  */
-export function addCard(m: MindMap, l0: Lines, kind: LineKind, c: MapCard, opts: { whole?: boolean; target?: string | null } = {}): Lines {
+export function addCard(m: MindMap, l0: Lines, kind: LineKind, c: MapCard, opts: { whole?: boolean; target?: string | null; after?: string | null } = {}): Lines {
+  if (opts.after !== undefined && !allPoints(l0[kind].points).some((p) => p.card === c.id && !p.removed)) {
+    const l1 = clone(l0);
+    for (const p of allPoints(l1[kind].points)) if (p.card === c.id) deleteIn(l1[kind].points, p.id);
+    return insertAfterRow(l1, kind, opts.after, pointFromCard(m, c, opts.whole ?? false));
+  }
   const l = clone(l0);
   const pts = l[kind].points;
   const old = allPoints(pts).find((p) => p.card === c.id);
@@ -101,14 +167,12 @@ export function addCard(m: MindMap, l0: Lines, kind: LineKind, c: MapCard, opts:
   }
   const target = opts.target ? findPoint(pts, opts.target) : null;
   if (target) {
-    // auf einen Hauptpunkt: Unterpunkt; auf einen Unterpunkt: dahinter in denselben Abschnitt
-    const host = target.parent ?? target.p;
-    const at = target.parent ? target.list.indexOf(target.p) + 1 : host.sub.length;
-    if (c.kind === 'cluster' && !target.parent) {
-      pts.splice(pts.indexOf(target.p) + 1, 0, pointFromCard(m, c, true));
-      return l;
-    }
-    host.sub.splice(at, 0, pointFromCard(m, c, false));
+    // auf einen Punkt: dessen Unterpunkt; ein Ast bringt seine Karten mit, solange die vier Ebenen reichen;
+    // auf der untersten Ebene: dahinter in denselben Abschnitt
+    const cluster = c.kind === 'cluster';
+    const room = MAX_LEVELS - 1 - target.level; // Ebenen unter dem Ziel
+    if (room >= (cluster ? 2 : 1)) target.p.sub.push(pointFromCard(m, c, cluster));
+    else target.list.splice(target.list.indexOf(target.p) + 1, 0, pointFromCard(m, c, cluster && room >= 1));
     return l;
   }
   if (c.kind === 'card' && c.parent && m.cards[c.parent]) {
@@ -148,6 +212,10 @@ export function movePoint(l0: Lines, kind: LineKind, id: string, dir: -1 | 1): L
   [hit.list[i], hit.list[j]] = [hit.list[j], hit.list[i]];
   return l;
 }
+const deleteIn = (pts: LinePoint[], id: string) => {
+  const hit = findPoint(pts, id);
+  if (hit) hit.list.splice(hit.list.indexOf(hit.p), 1);
+};
 /** endgültig löschen (nur eigene Punkte der Gliederung oder schon entfernte) */
 export function deletePoint(l0: Lines, kind: LineKind, id: string): Lines {
   const l = clone(l0);
@@ -163,13 +231,13 @@ export function copyPoint(l0: Lines, from: LineKind, id: string): Lines {
   if (!hit) return l;
   const fresh = (p: LinePoint): LinePoint => ({ ...clone(p), id: rid(), items: clone(p.items).map(reId), sub: p.sub.map(fresh) });
   if (hit.parent) {
-    let host = l[to].points.find((p) => p.key === hit.parent!.key);
+    let host = allPoints(l[to].points).find((p) => p.key === hit.parent!.key);
     if (!host) {
       host = { ...fresh(hit.parent), sub: [] };
       l[to].points.push(host);
     }
-    if (!host.sub.some((s) => s.key === hit.p.key)) host.sub.push(fresh(hit.p));
-  } else if (!l[to].points.some((p) => p.key === hit.p.key)) l[to].points.push(fresh(hit.p));
+    if (!allPoints(l[to].points).some((s) => s.key === hit.p.key)) host.sub.push(fresh(hit.p));
+  } else if (!allPoints(l[to].points).some((p) => p.key === hit.p.key)) l[to].points.push(fresh(hit.p));
   return l;
 }
 const reId = (it: LineItem): LineItem => ({ ...it, id: rid(), items: it.items.map(reId) });
@@ -267,4 +335,23 @@ export function alignRows(a: LinePoint[], b: LinePoint[]): { left: LinePoint | n
 export function visibleKinds(setting: 'both' | 'praes' | 'ausarb' | undefined, teacher: boolean): LineKind[] {
   if (teacher || !setting || setting === 'both') return ['praes', 'ausarb'];
   return [setting];
+}
+
+/**
+ * Ast bzw. Cluster vorübergehend als Gliederung (Vorschau, nichts wird gespeichert): der Knoten oben, darunter seine
+ * Karten und die Karten in Karten, von oben nach unten, höchstens vier Ebenen.
+ */
+export function previewRows(m: MindMap, id: string): { id: string; title: string; level: number }[] {
+  const c = m.cards[id];
+  if (!c) return [];
+  const out: { id: string; title: string; level: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (k: MapCard, level: number) => {
+    if (seen.has(k.id) || level >= MAX_LEVELS) return;
+    seen.add(k.id);
+    out.push({ id: k.id, title: k.title || 'Ohne Titel', level });
+    for (const x of kidsOf(m, k)) walk(x, level + 1);
+  };
+  walk(c, 0);
+  return out;
 }

@@ -132,10 +132,21 @@ export function outlineFrom(m: MindMap, l: Lines): OutlineSection[] {
   return leadingLine(l)
     .filter((p) => !p.hidden && !p.removed)
     .map((p) => {
-      const cards = p.sub.filter((s) => !s.hidden && !s.removed && s.card && m.cards[s.card]).map((s) => s.card!);
-      const owners = [...new Set([...cards.map((id) => m.cards[id].owner), ...p.sub.map((s) => s.owner), p.owner].filter((o): o is number => o != null))];
+      const live: LinePoint[] = [];
+      const collect = (list: LinePoint[]) => list.forEach((s) => !s.hidden && !s.removed && (live.push(s), collect(s.sub)));
+      collect(p.sub);
+      const cards = live.filter((s) => s.card && m.cards[s.card]).map((s) => s.card!);
+      const owners = [...new Set([...cards.map((id) => m.cards[id].owner), ...live.map((s) => s.owner), p.owner].filter((o): o is number => o != null))];
       const id = p.card && m.cards[p.card] ? p.card : p.id;
-      return { id, title: (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel', cards, owners };
+      // tiefere Ebenen (2 bis 4) als Zwischenüberschriften für den Schreibeditor
+      const subs: { id: string; title: string; level: number }[] = [];
+      const deep = (list: LinePoint[], d: number) => list.forEach((s) => {
+        if (s.hidden || s.removed) return;
+        subs.push({ id: s.card && m.cards[s.card] ? s.card : s.id, title: (s.card && m.cards[s.card]?.title) || s.title || 'Ohne Titel', level: d + 2 });
+        deep(s.sub, d + 1);
+      });
+      deep(p.sub, 0);
+      return { id, title: (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel', cards, owners, ...(subs.length ? { subs } : {}) };
     });
 }
 
@@ -153,7 +164,7 @@ export function applyLines(m: MindMap, next: Lines, actor: number, people: Set<n
   for (const k of ['praes', 'ausarb'] as const) {
     const ids = new Set<string>();
     walk(next[k].points, (p, depth) => {
-      if (depth > 1) throw new LinesError('Die Gliederung hat höchstens zwei Ebenen');
+      if (depth > 3) throw new LinesError('Die Gliederung hat höchstens vier Ebenen');
       if (ids.has(p.id)) throw new LinesError('Punkt doppelt in der Gliederung');
       ids.add(p.id);
       if (p.owner != null && !people.has(p.owner)) throw new LinesError('Diese Person gehört nicht zur Gruppe');

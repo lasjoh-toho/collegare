@@ -56,6 +56,9 @@ const PATHS: Record<string, string> = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   parallel: 'M9 3v18M15 3v18',
   textOff: 'M4 7V5h16v2M9 19h6M12 5v14M3 3l18 18',
+  indent: 'M3 6h18M11 12h10M11 18h10M3 10l4 3-4 3z',
+  outdent: 'M3 6h18M11 12h10M11 18h10M7 10l-4 3 4 3z',
+  unlink: 'M10 14a4 4 0 0 1 0-5.6l2.8-2.8a4 4 0 0 1 5.6 5.6l-1.4 1.4M14 10a4 4 0 0 1 0 5.6l-2.8 2.8a4 4 0 0 1-5.6-5.6l1.4-1.4M3 3l18 18',
 };
 
 export type IconName = keyof typeof PATHS;

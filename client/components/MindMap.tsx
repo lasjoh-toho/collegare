@@ -129,6 +129,8 @@ export function MindMap({
   const [draft, setDraft] = useState('');
   // Text für die ganze Mindmap ausblenden (je Gerät)
   const [hideAll, setHideAll] = useState(false);
+  // bei „Text aus“ einzelne Texte wieder zeigen, ohne die Einstellung für alle zu ändern (nur hier, nicht gespeichert)
+  const [textOn, setTextOn] = useState<Set<string>>(new Set());
   useEffect(() => {
     try {
       setHideAll(localStorage.getItem('collegare-karten-ohne-text') === '1');
@@ -139,6 +141,7 @@ export function MindMap({
       try {
         localStorage.setItem('collegare-karten-ohne-text', h ? '0' : '1');
       } catch {}
+      setTextOn(new Set());
       return !h;
     });
   const colors = useMemo(() => branchColors(shown), [shown]);
@@ -581,7 +584,7 @@ export function MindMap({
     const color = colors.get(id) ?? c.color ?? '#9a9a94';
     const owner = c.owner != null ? personName.get(c.owner) : undefined;
     const kids = nest.get(id) ?? [];
-    const showText = !hideAll && !c.hideText;
+    const showText = hideAll ? textOn.has(id) : !c.hideText;
     const level = c.kind === 'cluster' ? 0 : inCard ? 2 : c.parent ? 1 : 1;
     const over = g?.kind === 'move' && g.moved && g.over === id;
     const cls = [
@@ -840,14 +843,37 @@ export function MindMap({
                   Zur Gruppe
                 </button>
               )}
-              <button
-                className={`btn ${selCard.hideText ? 'on' : ''}`}
-                aria-pressed={!!selCard.hideText}
-                onClick={() => void send({ type: 'update', id: selCard.id, patch: { hideText: !selCard.hideText } })}
-                title={selCard.hideText ? 'Text dieser Karte wieder zeigen' : 'Text dieser Karte ausblenden'}
-              >
-                <Icon name="textOff" size={13} /> Text
-              </button>
+              {hideAll ? (
+                <button
+                  className={`btn ${textOn.has(selCard.id) ? '' : 'on'}`}
+                  aria-pressed={!textOn.has(selCard.id)}
+                  onClick={() =>
+                    setTextOn((s0) => {
+                      const n = new Set(s0);
+                      if (n.has(selCard.id)) n.delete(selCard.id);
+                      else n.add(selCard.id);
+                      return n;
+                    })
+                  }
+                  title={textOn.has(selCard.id) ? 'Text dieser Karte wieder ausblenden' : 'Nur den Text dieser Karte zeigen („Text aus“ bleibt für alle anderen)'}
+                >
+                  <Icon name="textOff" size={13} /> Text {textOn.has(selCard.id) ? 'aus' : 'zeigen'}
+                </button>
+              ) : (
+                <button
+                  className={`btn ${selCard.hideText ? 'on' : ''}`}
+                  aria-pressed={!!selCard.hideText}
+                  onClick={() => void send({ type: 'update', id: selCard.id, patch: { hideText: !selCard.hideText } })}
+                  title={selCard.hideText ? 'Text dieser Karte wieder zeigen' : 'Text dieser Karte ausblenden'}
+                >
+                  <Icon name="textOff" size={13} /> Text
+                </button>
+              )}
+              {line?.preview && (selCard.kind === 'cluster' || nest.get(selCard.id)?.length) && (
+                <button className="btn" onClick={() => line.preview!(selCard.id)} title="Diesen Cluster vorübergehend als Gliederung anzeigen">
+                  <Icon name="outline" size={13} /> Als Gliederung
+                </button>
+              )}
               {selCard.kind === 'cluster' && selCard.children.length > 1 && (
                 <button className="btn" onClick={() => void sortCluster(selCard)} title="Karten von oben nach unten in eine Reihe stellen">
                   Ordnen

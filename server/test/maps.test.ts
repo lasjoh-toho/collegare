@@ -124,4 +124,12 @@ describe('Gliederung als Linien (Konzept 8h)', () => {
     applyOp(m, { type: 'remove', ids: ['kar01'] }, 1, people);
     expect(m.lines!.ausarb.points[0].sub[0]).toMatchObject({ card: null, title: 'kar01' });
   });
+  it('erlaubt vier Ebenen und meldet die tieferen als subs', () => {
+    const m = emptyMap();
+    const deep = (n: number): ReturnType<typeof pt> => pt('p000' + n, null, { title: 'E' + n, sub: n < 4 ? [deep(n + 1)] : [] });
+    applyOp(m, { type: 'lines', lines: { praes: { points: [] }, ausarb: { points: [deep(1)] }, locked: false, at: null } }, 1, people, 9);
+    expect(m.outline!.sections[0]).toMatchObject({ title: 'E1', subs: [{ title: 'E2', level: 2 }, { title: 'E3', level: 3 }, { title: 'E4', level: 4 }] });
+    const five = { ...deep(1), sub: [{ ...deep(2), sub: [{ ...deep(3), sub: [{ ...deep(4), sub: [pt('p0009', null)] }] }] }] };
+    expect(() => applyOp(m, { type: 'lines', lines: { praes: { points: [] }, ausarb: { points: [five] }, locked: false, at: null } }, 1, people)).toThrow('vier Ebenen');
+  });
 });
