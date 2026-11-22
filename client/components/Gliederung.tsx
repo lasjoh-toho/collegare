@@ -430,7 +430,9 @@ function EndPlus({ ctx, kind, dz }: { ctx: LineCtx; kind: LineKind; dz: ReturnTy
           <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => !title.trim() && setAdding(false)} onKeyDown={(e) => e.key === 'Escape' && setAdding(false)} placeholder="Titel des neuen Punkts" maxLength={200} />
         </form>
       ) : (
-        <span className={g.endLabel}>neuer Punkt</span>
+        <button type="button" className={g.endLabel} onClick={() => setAdding(true)}>
+          neuer Punkt
+        </button>
       )}
     </li>
   );

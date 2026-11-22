@@ -94,7 +94,7 @@
   display: grid; place-items: center; cursor: pointer;
 }
 .plusStop:hover { background: var(--metro); color: #fff; }
-.endLabel { font-size: 12.5px; color: var(--fg-faint); }
+.endLabel { padding: 4px 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--fg-faint); cursor: pointer; }
 .end:hover .endLabel { color: var(--fg-muted); }
 /* Linie läuft ohne Absatz bis in den Plus-Kreis (Jo, 22. November 2026) */
 .endTrack { padding-bottom: 0; }
