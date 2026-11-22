@@ -40,9 +40,13 @@
 .l3 > .head { min-height: 24px; padding-inline-start: 30px; }
 /* Strich: steht 1 mm aus der Linie zur Beschriftung hin */
 .l3 .stop { inset-inline-start: calc(var(--cx) + var(--lw) / 2 - 1px); width: 6px; height: 2.5px; border: 0; border-radius: 1px; background: var(--metro); transform: translateY(-50%); }
-.dashed > .head .stop { border-style: dashed; border-color: color-mix(in srgb, var(--metro) 80%, #fff); }
+/* Neuer Punkt: gestrichelter Ring; die Lücken zeigen die Linienfarbe hell, damit der Kreis geschlossen wirkt (Jo, 22. November 2026) */
+.dashed > .head .stop { border-style: dashed; background: linear-gradient(#fff, #fff) padding-box, color-mix(in srgb, var(--metro) 28%, #fff) border-box; }
 .dashed > .head .title { text-decoration: underline dashed color-mix(in srgb, var(--metro) 60%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
-.hiddenPt > .head { opacity: 0.45; }
+/* Ausgeblendet: Beschriftung blass, Station deckend und hell, damit die Linie nicht durchscheint */
+.hiddenPt > .head > :not(.stop) { opacity: 0.45; }
+.hiddenPt > .head .stop { border-color: color-mix(in srgb, var(--metro) 38%, #fff); }
+.l2.hiddenPt > .head .stop { background: color-mix(in srgb, var(--metro) 45%, #fff); }
 .hiddenPt > .head .title { text-decoration: line-through dotted; }
 .title { min-width: 0; flex: 1; font-weight: 650; font-size: 14px; overflow-wrap: anywhere; cursor: default; }
 .l1 .title { font-weight: 560; font-size: 13.5px; }
@@ -92,7 +96,10 @@
 .plusStop:hover { background: var(--metro); color: #fff; }
 .endLabel { font-size: 12.5px; color: var(--fg-faint); }
 .end:hover .endLabel { color: var(--fg-muted); }
-.endTrack::before { bottom: 50%; }
+/* Linie läuft ohne Absatz bis in den Plus-Kreis (Jo, 22. November 2026) */
+.endTrack { padding-bottom: 0; }
+.endTrack::before { top: -8px; bottom: 50%; border-radius: 0 0 5px 5px; }
+.track:has(> .end:last-child)::before { bottom: 25px; }
 .addForm { flex: 1; }
 .addForm input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--metro); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
 .gone { margin: 14px 0 0 32px; font-size: 12.5px; color: var(--fg-muted); }
