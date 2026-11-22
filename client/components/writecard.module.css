@@ -129,3 +129,27 @@
 /* Ziel beim Hineinziehen einer Notiz: Linie zwischen den Absätzen */
 .dropLine { position: absolute; left: 18px; width: calc((100% - 44px) * 0.6 + 8px); height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 @media (max-width: 760px) { .dropLine { width: calc(100% - 36px); } }
+
+/* Kommentar der Lehrkraft als Post-it (hellgelb) */
+.commentable { cursor: text; }
+.commentable:hover { outline: 1px dashed color-mix(in srgb, #e0b400 60%, transparent); outline-offset: 6px; border-radius: 4px; }
+.postits { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 2px 0 10px; }
+.postit { font-family: system-ui, sans-serif; background: #fff6b8; color: #3b3200; border-radius: 3px 3px 10px 3px; padding: 10px 12px 12px; box-shadow: 0 6px 14px -8px rgba(80, 60, 0, 0.45), 0 1px 0 rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; margin: 0 0 12px; transform: rotate(-0.4deg); }
+.postit h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.postit textarea { width: 100%; border: 0; background: rgba(255, 255, 255, 0.45); border-radius: 4px; padding: 6px 8px; font: inherit; color: inherit; resize: vertical; }
+.postit p { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; }
+.postitBtns { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.postitSmall { margin: 0; max-width: 420px; transform: rotate(0.3deg); }
+.postitDone { opacity: 0.55; }
+.postitDone p { text-decoration: line-through; }
+.postitHead { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.postitHead .muted { color: #7a6a20; }
+.postitCheck { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.postitHead :global(.btn.icon) { color: inherit; padding: 0 4px; min-height: 0; }
+.postitToggle { font-size: 12px; padding: 2px 8px; min-height: 0; }
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme='light'])) .postit { background: #5a5020; color: #fff6c8; }
+  :global(:root:not([data-theme='light'])) .postitHead .muted { color: #e6d890; }
+}
+:global(:root[data-theme='dark']) .postit { background: #5a5020; color: #fff6c8; }
+:global(:root[data-theme='dark']) .postitHead .muted { color: #e6d890; }

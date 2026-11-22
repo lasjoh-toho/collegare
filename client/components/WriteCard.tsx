@@ -28,6 +28,17 @@ export interface WriteDoc {
   textBy: number | null;
   textAt: number | null;
   office: boolean;
+  /** Kommentare der Lehrkraft (Post-its) */
+  comments?: DocComment[];
+}
+
+export interface DocComment {
+  id: number;
+  by: number;
+  name: string;
+  body: string;
+  at: number;
+  doneAt: number | null;
 }
 
 type Atom = { el: HTMLElement; api: EditorApi; kind: 'note' | 'margin' | 'gloss' | 'img'; text: string; extra: string; full: boolean };
@@ -106,6 +117,9 @@ export function WriteCard({
   show,
   kind = 'ausarb',
   onNote,
+  commentFor = null,
+  onComment,
+  onCommentState,
 }: {
   doc: WriteDoc;
   meId: number;
@@ -126,7 +140,13 @@ export function WriteCard({
   kind?: 'ausarb' | 'praes';
   /** Notiz wurde in diesen Text gezogen (für die Marke an der Notiz) */
   onNote?: (docId: number, noteId: number, text: string) => void;
+  /** Lehrkraft liest nur mit: Klick ins Panel öffnet ein Post-it „Kommentar für die Gruppe …“ (Name der Gruppe) */
+  commentFor?: string | null;
+  onComment?: (docId: number, body: string) => Promise<boolean>;
+  onCommentState?: (docId: number, commentId: number, change: { done?: boolean; remove?: boolean }) => void;
 }) {
+  const [postit, setPostit] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
   const [body, setBody] = useState(doc.body ?? '');
   const [state, setState] = useState<'' | 'dirty' | 'saving' | 'saved' | 'error'>('');
   const [focused, setFocused] = useState(false);
@@ -410,6 +430,47 @@ export function WriteCard({
   const status =
     state === 'saving' ? 'speichert …' : state === 'dirty' ? 'ungespeichert' : state === 'error' ? 'nicht gespeichert' : state === 'saved' ? 'gespeichert' : when && writer(doc.textBy) ? `zuletzt ${writer(doc.textBy)}` : '';
 
+  async function sendComment() {
+    const text = (postit ?? '').trim();
+    if (!text || !onComment) return;
+    if (await onComment(doc.id, text)) setPostit(null);
+  }
+
+  /** Post-its der Lehrkraft am Panel; erledigte klappen weg */
+  function comments(list: DocComment[]) {
+    if (!list.length) return null;
+    const open = list.filter((c) => !c.doneAt);
+    const done = list.filter((c) => c.doneAt);
+    const one = (c: DocComment) => (
+      <div key={c.id} className={`${w.postit} ${w.postitSmall} ${c.doneAt ? w.postitDone : ''}`}>
+        <div className={w.postitHead}>
+          <strong>{c.name || 'Lehrkraft'}</strong>
+          <span className="muted">{new Date(c.at).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}</span>
+          <label className={w.postitCheck}>
+            <input type="checkbox" checked={!!c.doneAt} onChange={(e) => onCommentState?.(doc.id, c.id, { done: e.target.checked })} /> erledigt
+          </label>
+          {c.by === meId && (
+            <button className="btn icon" onClick={() => onCommentState?.(doc.id, c.id, { remove: true })} aria-label="Kommentar löschen" title="Kommentar löschen">
+              ×
+            </button>
+          )}
+        </div>
+        <p>{c.body}</p>
+      </div>
+    );
+    return (
+      <div className={w.postits}>
+        {open.map(one)}
+        {done.length > 0 && (
+          <button className={`btn ${w.postitToggle}`} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
+            {showDone ? 'Erledigte ausblenden' : `${done.length} erledigt`}
+          </button>
+        )}
+        {showDone && done.map(one)}
+      </div>
+    );
+  }
+
   return (
     <article ref={card} className={`${w.card} ${doc.doneAt ? w.done : ''} ${focused ? w.focus : ''}`} data-doc={doc.id}>
       <header className={w.head}>
@@ -446,6 +507,32 @@ export function WriteCard({
           </span>
         </div>
       </header>
+      {comments(doc.comments ?? [])}
+      {postit !== null && (
+        <div className={w.postit} role="dialog" aria-label={`Kommentar für die Gruppe ${commentFor ?? ''}`}>
+          <h4>Kommentar für die Gruppe {commentFor}</h4>
+          <textarea
+            autoFocus
+            value={postit}
+            onChange={(e) => setPostit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setPostit(null);
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void sendComment();
+            }}
+            rows={4}
+            maxLength={4000}
+            aria-label="Kommentar"
+          />
+          <div className={w.postitBtns}>
+            <button className="btn" onClick={() => setPostit(null)}>
+              Abbrechen
+            </button>
+            <button className="btn primary" disabled={!postit.trim()} onClick={() => void sendComment()}>
+              Für die Gruppe speichern
+            </button>
+          </div>
+        </div>
+      )}
       {doc.office && !body && (
         <p className={w.office}>
           Hier liegt noch Text aus dem früheren Office-Editor.{' '}
@@ -487,7 +574,11 @@ export function WriteCard({
             placeholder="Hier schreiben …"
           />
         ) : (
-          <div className={w.readonly} dangerouslySetInnerHTML={{ __html: tufteToEdit(body) || '<p class="muted">Noch kein Text.</p>' }} />
+          <div
+            className={`${w.readonly} ${commentFor ? w.commentable : ''}`}
+            onClick={() => commentFor && postit === null && setPostit('')}
+            title={commentFor ? `Kommentar für die Gruppe ${commentFor}` : undefined}
+            dangerouslySetInnerHTML={{ __html: tufteToEdit(body) || '<p class="muted">Noch kein Text.</p>' }} />
         )}
       </div>
       {dropY !== null && <div className={w.dropLine} style={{ top: dropY }} aria-hidden="true" />}

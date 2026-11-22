@@ -192,6 +192,16 @@ export interface NoteUsesTable {
   by: number | null;
 }
 
+/** Kommentar der Lehrkraft an einem Abschnitt der Ausarbeitung (Post-it) */
+export interface DocCommentsTable {
+  id: Generated<number>;
+  doc_id: number;
+  by: number;
+  body: string;
+  at: Ms;
+  done_at: Ms | null;
+}
+
 /** Folien: Freigabe und Sperre je Präsentation (fehlt eine Zeile: nicht freigegeben, nicht gesperrt) */
 export interface DeckAccessTable {
   doc_id: number;
@@ -408,6 +418,7 @@ export interface Database {
   doc_changes: DocChangesTable;
   doc_revisions: DocRevisionsTable;
   note_uses: NoteUsesTable;
+  doc_comments: DocCommentsTable;
   bento_decks: BentoDecksTable;
   deck_access: DeckAccessTable;
   ydocs: YdocsTable;

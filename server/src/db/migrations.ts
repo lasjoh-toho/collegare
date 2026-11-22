@@ -532,6 +532,22 @@ migrations['0022_note_uses'] = {
   },
 };
 
+migrations['0023_doc_comments'] = {
+  async up(db) {
+    // Kommentare der Lehrkraft an einem Abschnitt (Post-it, Wunsch Jo vom 22. November 2026)
+    await db.schema
+      .createTable('doc_comments')
+      .addColumn('id', 'integer', (c) => (isMysql(db) ? c.autoIncrement().primaryKey() : c.primaryKey().autoIncrement()))
+      .addColumn('doc_id', 'integer', (c) => c.notNull())
+      .addColumn('by', 'integer', (c) => c.notNull())
+      .addColumn('body', 'text', (c) => c.notNull())
+      .addColumn('at', 'bigint', (c) => c.notNull())
+      .addColumn('done_at', 'bigint')
+      .execute();
+    await db.schema.createIndex('doc_comments_doc').on('doc_comments').column('doc_id').execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

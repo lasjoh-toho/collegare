@@ -40,12 +40,13 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     const docs = (await s.documents.list(projectId, a.scope.scope)).filter((d) => d.kind === 'word' && d.line === line);
     const office = await s.documents.hasOfficeText(docs.filter((d) => d.body === null).map((d) => d.id));
     const test = !!a.scope.test;
+    const comments = await s.docComments.forDocs(docs.map((d) => d.id));
     return {
       ...base,
       scope: a.scope.scope,
       test,
       people: a.scope.people,
-      docs: docs.map((d) => ({ ...d, office: office.has(d.id) })),
+      docs: docs.map((d) => ({ ...d, office: office.has(d.id), comments: comments[d.id] ?? [] })),
       outlineAt: map.outline?.at ?? null,
       line,
       // Präsentationslinie: erst vorhanden, wenn die Gliederung nach dem Update gespeichert wurde
@@ -267,6 +268,35 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     await s.audit.append({ actorId: a.userId, action: 'documents.restored', projectId, data: { scope: a.scope.scope, count: n } });
     ev.changed(projectId, a.scope.scope);
     return { restored: n };
+  });
+
+  /** Kommentar der Lehrkraft an einem Abschnitt (Post-it für die Gruppe) */
+  app.post<{ Params: { id: string } }>('/api/documents/:id/kommentar', async (req, reply) => {
+    const body = z.object({ body: z.string().trim().min(1).max(4000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Der Kommentar ist leer' });
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    if (a.role !== 'teacher') return reply.code(403).send({ error: 'Kommentare schreibt die Lehrkraft' });
+    const id = await s.docComments.add(a.doc.id, a.userId, body.data.body);
+    await s.audit.append({ actorId: a.userId, action: 'document.comment', projectId: a.doc.projectId, data: { doc: a.doc.id, comment: id } });
+    ev.changed(a.doc.projectId, a.doc.scope);
+    return { id };
+  });
+
+  /** Kommentar abhaken (Gruppe und Lehrkraft) oder löschen (nur wer ihn geschrieben hat) */
+  app.post<{ Params: { id: string; cid: string } }>('/api/documents/:id/kommentar/:cid', async (req, reply) => {
+    const body = z.object({ done: z.boolean().optional(), remove: z.boolean().optional() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Ungültig' });
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    const c = await s.docComments.get(Number(req.params.cid));
+    if (!c || c.doc_id !== a.doc.id) return reply.code(404).send({ error: 'Kommentar nicht gefunden' });
+    if (body.data.remove) {
+      if (c.by !== a.userId) return reply.code(403).send({ error: 'Löschen kann nur, wer den Kommentar geschrieben hat' });
+      await s.docComments.remove(c.id);
+    } else await s.docComments.setDone(c.id, !!body.data.done);
+    ev.changed(a.doc.projectId, a.doc.scope);
+    return { ok: true };
   });
 
   /** Notiz wurde in den Text gezogen (für die Marke „verbaut“ an der Notiz) */

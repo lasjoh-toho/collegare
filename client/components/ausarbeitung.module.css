@@ -43,4 +43,3 @@
   .read { padding: 0; }
   .terms dl > div { grid-template-columns: 1fr; gap: 0; }
 }
-.readOnly { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-size: 13px; }

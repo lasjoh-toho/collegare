@@ -336,6 +336,19 @@ export function AusarbeitungCards({
   const teacher = project.role === 'teacher';
   const name = (uid: number | null) => (uid === null ? null : (data?.people.find((x) => x.id === uid)?.name ?? (uid === me.id ? me.name : null)));
   const inTest = !!data?.test;
+  /** Post-it der Lehrkraft für die Gruppe */
+  const comment = async (docId: number, body: string) => {
+    try {
+      await post(`/api/documents/${docId}/kommentar`, { body });
+      void load(data?.scope ?? null);
+      return true;
+    } catch (e) {
+      fail(e);
+      return false;
+    }
+  };
+  const commentState = (docId: number, cid: number, change: { done?: boolean; remove?: boolean }) =>
+    void post(`/api/documents/${docId}/kommentar/${cid}`, change).then(() => load(data?.scope ?? null), fail);
   const canEdit = (d: WriteDoc) => (!teacher || inTest) && !d.doneAt;
   const mayFinish = (d: WriteDoc) => !!data?.finishLock && (!teacher || inTest) && !d.doneAt && (d.ownerId === null || d.ownerId === me.id);
   const mayReopen = (d: WriteDoc) => !!d.doneAt && (teacher || data?.reopenBy === 'group');
@@ -375,11 +388,6 @@ export function AusarbeitungCards({
       {data && !data.scope && <p className="muted">{teacher ? 'Noch keine Gruppen.' : 'Du bist noch keiner Gruppe zugeordnet.'}</p>}
       {data?.scope && view === 'write' && (
         <div className={s.cards}>
-          {teacher && !inTest && (
-            <p className={s.readOnly}>
-              Lehrkräfte lesen hier nur mit.{data.scopes.some((x) => x.test) && <> Zum Ausprobieren oben die Gruppe „Test / Demo“ wählen.</>}
-            </p>
-          )}
           {sections.length === 0 && (
             <p className={`muted ${s.empty}`}>
               {kind === 'praes' && !data.hasPraes ? 'Sobald die Gliederung der Präsentation einmal gespeichert ist, erscheinen hier ihre Punkte.' : data.outlineAt ? 'Die Gliederung hat noch keine Punkte.' : 'Sobald eure Gliederung Punkte hat, erscheinen hier die Karten zum Schreiben.'}
@@ -410,6 +418,9 @@ export function AusarbeitungCards({
                       onNote={noteUsed}
                       onOffice={() => setOffice(d)}
                       show={show}
+                      commentFor={teacher && !inTest ? groupTitle || 'ohne Namen' : null}
+                      onComment={comment}
+                      onCommentState={commentState}
                     />
                   </div>
                 );

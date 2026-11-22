@@ -1035,6 +1035,15 @@ describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
     const uses = (await call('GET', `/api/projects/${project}/notizen-verwendung?bereich=g${g1}`, anna)).json.uses;
     expect(uses[note.id]).toEqual([{ kind: 'ausarb', where: 'text', label: sec.title, docId: sec.id, point: null }]);
 
+    // Kommentar der Lehrkraft (Post-it): nur Lehrkraft schreibt, Gruppe hakt ab, löschen nur die Verfasserin
+    expect((await call('POST', `/api/documents/${sec.id}/kommentar`, anna, { body: 'x' })).status).toBe(403);
+    const cid = (await call('POST', `/api/documents/${sec.id}/kommentar`, t, { body: 'Quelle für den Brotpreis?' })).json.id;
+    const withC = (await call('GET', `/api/projects/${project}/documents`, anna)).json.docs.find((d: J) => d.id === sec.id);
+    expect(withC.comments).toMatchObject([{ id: cid, body: 'Quelle für den Brotpreis?', doneAt: null }]);
+    expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, anna, { done: true })).json).toEqual({ ok: true });
+    expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, anna, { remove: true })).status).toBe(403);
+    expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, t, { remove: true })).json).toEqual({ ok: true });
+
     // Präsentationslinie hat eigene Abschnitte (leer, solange outline.praes fehlt)
     expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1, line: 'praes' })).status).toBe(200);
     const pr = (await call('GET', `/api/projects/${project}/documents?linie=praes`, anna)).json;
