@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { projectSocket } from '@/lib/api';
+import { href, projectSocket } from '@/lib/api';
 import { setChatDrag } from '@/lib/chatDrag';
 import type { Me, ProjectView } from '@/lib/types';
 import c from './chat.module.css';
@@ -31,16 +31,23 @@ interface JoinAck {
 const day = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 const time = (ms: number) => new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-/** Links im Text anklickbar machen, sonst reiner Text (kein HTML aus Nachrichten). */
+/** Links im Text anklickbar machen, sonst reiner Text (kein HTML aus Nachrichten). Adressen innerhalb von Collegare
+ * (/projekt/…, etwa vom Kommentar der Lehrkraft) werden zu „Zur Stelle springen“ im selben Fenster. */
 function Body({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s<>"]+)/g);
+  const parts = text.split(/(https?:\/\/[^\s<>"]+|(?<![\w/])\/projekt\/[^\s<>"]+)/g);
   return (
     <>
       {parts.map((t, i) =>
         i % 2 ? (
-          <a key={i} href={t} target="_blank" rel="noopener noreferrer">
-            {t}
-          </a>
+          t.startsWith('/') ? (
+            <a key={i} href={href(t)}>
+              Zur Stelle springen
+            </a>
+          ) : (
+            <a key={i} href={t} target="_blank" rel="noopener noreferrer">
+              {t}
+            </a>
+          )
         ) : (
           t
         ),

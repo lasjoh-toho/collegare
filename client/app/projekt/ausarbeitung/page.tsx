@@ -37,6 +37,7 @@ export default function Ausarbeitung() {
   const idParam = useQuery('id');
   const lineParam = useQuery('linie');
   const jumpParam = useQuery('abschnitt');
+  const scopeParam = useQuery('bereich');
   const id = idParam ? Number(idParam) : NaN;
   const [project, setProject] = useState<ProjectView | null>(null);
   const [scope, setScope] = useState<string | null>(null);
@@ -70,6 +71,9 @@ export default function Ausarbeitung() {
   useEffect(() => {
     if (lineParam === 'praes') setKind('praes');
   }, [lineParam]);
+  useEffect(() => {
+    if (scopeParam) setScope(scopeParam);
+  }, [scopeParam]);
   // Gliederung links: auf breiten Bildschirmen von Anfang an offen
   useEffect(() => {
     setLine(matchMedia('(min-width: 1180px)').matches);

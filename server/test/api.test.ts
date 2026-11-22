@@ -1040,6 +1040,8 @@ describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
     const cid = (await call('POST', `/api/documents/${sec.id}/kommentar`, t, { body: 'Quelle für den Brotpreis?' })).json.id;
     const withC = (await call('GET', `/api/projects/${project}/documents`, anna)).json.docs.find((d: J) => d.id === sec.id);
     expect(withC.comments).toMatchObject([{ id: cid, body: 'Quelle für den Brotpreis?', doneAt: null }]);
+    const chat = await s.chat.list(project, 'g' + g1);
+    expect(chat.at(-1)!.body).toContain(`/projekt/ausarbeitung/?id=${project}&bereich=g${g1}&abschnitt=${sec.id}`);
     expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, anna, { done: true })).json).toEqual({ ok: true });
     expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, anna, { remove: true })).status).toBe(403);
     expect((await call('POST', `/api/documents/${sec.id}/kommentar/${cid}`, t, { remove: true })).json).toEqual({ ok: true });

@@ -12,6 +12,8 @@ export interface DocEvents {
   /** Text eines Abschnitts gespeichert (offene Ausarbeitungen laden ihn nach) */
   text(projectId: number, scope: string, docId: number, rev: number, by: number): void;
   lockChanged(docId: number): void;
+  /** neue Nachricht im Chat eines Bereichs (Kommentar der Lehrkraft erscheint auch im Gruppenchat) */
+  chat?(projectId: number, scope: string, message: unknown): void;
 }
 
 /** Ausarbeitung: Dokumente je Karte der Gliederung, „Fertig“ und „Wieder öffnen“ (Issue #9). */
@@ -279,6 +281,13 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     if (a.role !== 'teacher') return reply.code(403).send({ error: 'Kommentare schreibt die Lehrkraft' });
     const id = await s.docComments.add(a.doc.id, a.userId, body.data.body);
     await s.audit.append({ actorId: a.userId, action: 'document.comment', projectId: a.doc.projectId, data: { doc: a.doc.id, comment: id } });
+    // auch in den Gruppenchat, mit Link zum Panel (Jo, 22. November 2026)
+    if (/^g\d+$/.test(a.doc.scope) && a.settings.chatGroups !== false) {
+      const link = `/projekt/ausarbeitung/?id=${a.doc.projectId}&bereich=${a.doc.scope}${a.doc.line === 'praes' ? '&linie=praes' : ''}&abschnitt=${a.doc.id}`;
+      const text = `📌 Kommentar zu „${a.doc.title}“ (${a.doc.line === 'praes' ? 'Präsentation' : 'Ausarbeitung'}):\n${body.data.body.slice(0, 1500)}\n${link}`;
+      const message = await s.chat.add(a.doc.projectId, a.doc.scope, a.userId, text);
+      ev.chat?.(a.doc.projectId, a.doc.scope, message);
+    }
     ev.changed(a.doc.projectId, a.doc.scope);
     return { id };
   });
