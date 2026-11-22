@@ -10,10 +10,25 @@
   Läuft im iframe der Seite /projekt/pinnwand/; Adresse: ./?id=<Projekt>&bereich=<g…|u…>
 -->
 <style>
-  html, body { margin: 0; height: 100%; background: #101114; color: #f2f3f5; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; height: 100%; background: #1a1a19; color: #ecece8; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  html.pw-light, html.pw-light body { background: #e4e4e0; color: #1c1c1a; }
   #status { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
   #status p { max-width: 460px; line-height: 1.5; }
 </style>
+<script>
+  // Tag/Nacht wie Collegare (localStorage collegare-theme: light | dark, sonst nach Gerät); vor dem ersten Bild setzen
+  var pwTheme = 'auto';
+  try { var t = localStorage.getItem('collegare-theme'); if (t === 'light' || t === 'dark') pwTheme = t; } catch (e) {}
+  if (pwTheme === 'light' || (pwTheme === 'auto' && window.matchMedia && !matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('pw-light');
+  // Schaltet jemand in Collegare um, kommt das hier als storage-Ereignis an
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'collegare-theme') return;
+    var v = e.newValue === 'light' || e.newValue === 'dark' ? e.newValue : 'auto';
+    if (window.PinnwandTheme) window.PinnwandTheme.set(v);
+    else document.documentElement.classList.toggle('pw-light', v === 'light' || (v === 'auto' && window.matchMedia && !matchMedia('(prefers-color-scheme: dark)').matches));
+    pwTheme = v;
+  });
+</script>
 </head>
 <body>
 <div id="status"><p>Pinnwand wird geladen …</p></div>
@@ -111,6 +126,7 @@
     cfg.wwwroot = root;
     cfg.strings = strings;
     cfg.transport = transport;
+    cfg.theme = pwTheme;
     window.pinnwandConfig = cfg;
     var css = document.createElement('link');
     css.rel = 'stylesheet'; css.href = root + '/mod/pinnwand/styles.css?v=' + v;

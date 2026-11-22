@@ -1,5 +1,5 @@
 .scope { height: 28px; max-width: 34vw; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); font-size: 12px; }
-.area { position: relative; flex: 1; min-height: 0; display: flex; background: #101114; }
+.area { position: relative; flex: 1; min-height: 0; display: flex; background: var(--ui-bg); }
 .frame { flex: 1; width: 100%; height: 100%; border: 0; display: block; }
 .notice { margin: 20px; padding: 16px; max-width: 480px; height: fit-content; }
 .stale {

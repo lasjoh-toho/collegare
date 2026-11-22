@@ -50,4 +50,4 @@
 .insertBack { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(10, 12, 16, 0.55); padding: 16px; }
 .insertBox { width: min(1180px, 100%); height: min(860px, 100%); padding: 0; overflow: hidden; border-radius: 12px; }
 .insertFormula { width: min(720px, 100%); height: min(620px, 100%); }
-.insertFrame { width: 100%; height: 100%; border: 0; display: block; background: #1b1d22; }
+.insertFrame { width: 100%; height: 100%; border: 0; display: block; background: var(--ui-panel); }

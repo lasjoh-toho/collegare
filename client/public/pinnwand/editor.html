@@ -12,11 +12,26 @@
     zurück:   {pinnwandEditor:'ready'} · {pinnwandEditor:'done', svg?, data?, tex?} · {pinnwandEditor:'cancel'}
 -->
 <style>
-  html, body { margin: 0; height: 100%; background: #1b1d22; color: #f2f3f5; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; height: 100%; background: #1a1a19; color: #ecece8; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  html.pw-light, html.pw-light body { background: #ffffff; color: #1c1c1a; }
   #status { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
   /* Formel-Editor: der Dialog füllt das Fenster, der Hintergrund bleibt ruhig */
   .ic-formula-overlay { background: transparent !important; }
 </style>
+<script>
+  // Tag/Nacht wie Collegare (localStorage collegare-theme: light | dark, sonst nach Gerät); vor dem ersten Bild setzen
+  var pwTheme = 'auto';
+  try { var t = localStorage.getItem('collegare-theme'); if (t === 'light' || t === 'dark') pwTheme = t; } catch (e) {}
+  if (pwTheme === 'light' || (pwTheme === 'auto' && window.matchMedia && !matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('pw-light');
+  // Schaltet jemand in Collegare um, kommt das hier als storage-Ereignis an
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'collegare-theme') return;
+    var v = e.newValue === 'light' || e.newValue === 'dark' ? e.newValue : 'auto';
+    if (window.PinnwandTheme) window.PinnwandTheme.set(v);
+    else document.documentElement.classList.toggle('pw-light', v === 'light' || (v === 'auto' && window.matchMedia && !matchMedia('(prefers-color-scheme: dark)').matches));
+    pwTheme = v;
+  });
+</script>
 </head>
 <body>
 <div id="status"><p>Editor wird geladen …</p></div>
@@ -48,7 +63,7 @@
     ]).then(function (res) {
       var v = encodeURIComponent((res[1] || '').trim().slice(0, 12));
       window.pinnwandConfig = {
-        cmid: 0, wwwroot: root, strings: res[0], formulatransform: true, formulacalc: true,
+        cmid: 0, wwwroot: root, strings: res[0], formulatransform: true, formulacalc: true, theme: pwTheme,
         editorOnly: {
           kind: init.kind, data: init.data || '', text: init.text || '', edit: !!init.data, teacher: !!init.teacher,
           onDone: function (r) { post({ pinnwandEditor: 'done', svg: r.svg, data: r.data, tex: r.tex }); },
