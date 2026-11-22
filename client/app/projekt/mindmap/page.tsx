@@ -6,14 +6,15 @@
 import { PasteRulesContext, type PasteRules } from '@/lib/pasteRules';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { BranchMap, type LineHook } from '@/components/BranchMap';
+import { BranchMap, branchColors, type LineHook } from '@/components/BranchMap';
 import { Gliederung, hoverLineTarget, LinePreview, lineTargetAt, useLineTab } from '@/components/Gliederung';
-import { addCard, cardPoint, greyedCards, LINE_COLOR, linesOf, previewRows, removeCard, visibleKinds } from '@/lib/lines';
+import { addCard, allPoints, cardPoint, clone, greyedCards, LINE_COLOR, linesOf, previewRows, removeCard, visibleKinds, type LineKind, type Lines } from '@/lib/lines';
 import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { Icon } from '@/components/Icon';
 import { get, href, post, projectSocket } from '@/lib/api';
+import { announceSide, useSideBus } from '@/lib/sides';
 import type { MapCard, MapDim, MapOp, MindMap as MapData, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import p from '../projekt.module.css';
@@ -97,6 +98,8 @@ export default function MindmapPage() {
   const [outlineOpen, setOutlineOpen] = useState(false);
   // Hervorheben: alles kräftig, oder Übernommenes bzw. noch Offenes ausgrauen (Wunsch Jo, 13. November 2026)
   const [dim, setDim] = useState<MapDim>('none');
+  // Ast oder Cluster in die Gliederung: Rückfrage, was mitkommt
+  const [take, setTake] = useState<{ card: MapCard; kind: LineKind; build: (o: TakeOpts) => Lines; after?: () => void } | null>(null);
   // Ast bzw. Cluster vorübergehend als Gliederung zeigen
   const [preview, setPreview] = useState<string | null>(null);
   // Ansicht: Äste (wie eine klassische Mindmap) oder Karten-Fläche (brausa); gleiche Daten, Wahl je Gerät
@@ -145,8 +148,11 @@ export default function MindmapPage() {
         setOutlineOpen(v ? v === '1' : window.innerWidth >= 1100);
       } catch {}
   }, [outlineParam]);
+  // rechts immer nur ein Seitenmenü: Chat, Notizen usw. schließen die Gliederung und umgekehrt
+  useSideBus('right', 'mindmap-outline', outlineOpen, () => setOutlineOpen(false));
   const toggleOutline = () =>
     setOutlineOpen((o) => {
+      if (!o) announceSide('right', 'mindmap-outline');
       try {
         localStorage.setItem('collegare-mindmap-gliederung', o ? '0' : '1');
       } catch {}
@@ -288,7 +294,7 @@ export default function MindmapPage() {
   // Erklärung hinter dem i-Knopf (früher eine Blase über der Fläche); Text anpassbar durch die Lehrkraft
   const settings = project.settings;
   const outlineHelp =
-    ' Gliederung (Knopf oben rechts): zwei Linien, rot für die Präsentation, blau für die Ausarbeitung, mit „beides“ nebeneinander. Zieht Äste, Ideen oder Cluster auf einen Punkt oder direkt auf die Linie (dort entsteht ein neuer Kreis). Große Kreise sind Abschnitte, kleine Kreise Unterpunkte, Punkte in der Linie und kurze Striche die dritte und vierte Ebene; mit den Pfeil-Knöpfen rückt ihr ein oder aus. Gestrichelt: nur in der Gliederung, nicht in der Mindmap. Grau in der Mindmap: in der Gliederung ausgeblendet oder entfernt. Das Schloss hält die Gliederung fest. „Als Gliederung“ zeigt einen Ast oder Cluster vorübergehend als Linie. Das Auge oben rechts hebt Offenes oder schon Übernommenes hervor.';
+    ' Gliederung (Symbol oben rechts in der Kopfzeile): zwei Linien, rot für die Präsentation, blau für die Ausarbeitung, mit „beides“ nebeneinander. Zieht Äste, Ideen oder Cluster auf einen Punkt oder direkt auf die Linie (dort entsteht ein neuer Kreis). Große Kreise sind Abschnitte, kleine Kreise Unterpunkte, Punkte in der Linie und kurze Striche die dritte und vierte Ebene; mit den Pfeil-Knöpfen rückt ihr ein oder aus. Gestrichelt: nur in der Gliederung, nicht in der Mindmap. Grau in der Mindmap: in der Gliederung ausgeblendet oder entfernt. Das Schloss hält die Gliederung fest. „Als Gliederung“ zeigt einen Ast oder Cluster vorübergehend als Linie. Das Auge oben rechts hebt Offenes oder schon Übernommenes hervor.';
   const helpText = isTopic
     ? canEdit
       ? 'Themen-Mindmap für alle: Hier umreißt ihr gemeinsam das Thema, noch vor den Gruppen. Jede Gruppe kann sie später als Start für ihre eigene Mindmap übernehmen.'
@@ -318,6 +324,37 @@ export default function MindmapPage() {
 
   // Gliederung neben der Mindmap (Konzept 8h): Umschalten und Ablegen wirken auf die gerade gezeigte Linie
   const lines = map ? linesOf(map) : null;
+  /**
+   * Ast oder Cluster in die Gliederung (Jo, 22. November 2026): erst fragen, was mitkommt (Titel, Personen, Farbe; alles
+   * angehakt). Einzelne Karten kommen ohne Frage.
+   */
+  function askTake(c: MapCard, kind: LineKind, build: (o: TakeOpts) => Lines, after?: () => void) {
+    const branch = c.kind === 'cluster' || !c.parent;
+    if (!branch) {
+      void send({ type: 'lines', lines: build(TAKE_ALL) });
+      return after?.();
+    }
+    setTake({ card: c, kind, build, after });
+  }
+  function doTake(o: TakeOpts) {
+    if (!take || !map) return;
+    const { card: c, kind, build, after } = take;
+    setTake(null);
+    const next = clone(build(o));
+    const pt = allPoints(next[kind].points).find((p) => p.card === c.id && !p.removed);
+    if (pt) {
+      if (!o.title) {
+        // eigener Punkt mit eigenem Titel, nicht mehr mit der Karte verbunden
+        pt.card = null;
+        pt.title = 'Neuer Punkt';
+      }
+      if (!o.people) (pt.noOwners = true), (pt.owner = null);
+      else if (pt.owner == null && c.owner != null) pt.owner = c.owner;
+      pt.color = o.color ? (branchColors(map).get(c.id) ?? c.color ?? null) : null;
+    }
+    void send({ type: 'lines', lines: next });
+    after?.();
+  }
   const lineHook: LineHook | undefined =
     map && lines && !isTopic
       ? {
@@ -328,9 +365,11 @@ export default function MindmapPage() {
           toggle: (c, whole) => {
             if (!canEdit) return;
             if (lines.locked) return show('Die Gliederung ist gesperrt. Zum Ändern das Schloss in der Gliederung öffnen.');
-            const next = cardPoint(lines, lineTab, c.id) && !whole ? removeCard(lines, lineTab, c.id) : addCard(map, lines, lineTab, c, { whole });
-            void send({ type: 'lines', lines: next });
-            if (!outlineOpen) setOutlineOpen(true);
+            if (cardPoint(lines, lineTab, c.id) && !whole) {
+              void send({ type: 'lines', lines: removeCard(lines, lineTab, c.id) });
+              return;
+            }
+            askTake(c, lineTab, (o) => addCard(map, lines, lineTab, c, { whole }), () => !outlineOpen && setOutlineOpen(true));
           },
           drop: (cid, x, y) => {
             const t = lineTargetAt(x, y);
@@ -340,12 +379,15 @@ export default function MindmapPage() {
               show('Die Gliederung ist gesperrt. Zum Ändern das Schloss öffnen.');
               return true;
             }
-            void send({ type: 'lines', lines: addCard(map, lines, t.kind, c, { whole: true, target: t.point, after: 'after' in t ? t.after : undefined }) });
+            askTake(c, t.kind, () => addCard(map, lines, t.kind, c, { whole: true, target: t.point, after: 'after' in t ? t.after : undefined }));
             if (t.kind !== lineTab && kinds.length > 1) setLineTab(t.kind);
             return true;
           },
         }
       : undefined;
+  const takeDialog = take && (
+    <TakeDialog title={take.card.title || 'Ohne Titel'} color={(map && branchColors(map).get(take.card.id)) ?? take.card.color ?? null} onTake={doTake} onCancel={() => setTake(null)} />
+  );
   const pasteRules: PasteRules | null = scope && !isTopic ? { projectId: project.id, scope, outside: settings.pasteOutside, threshold: settings.pasteThreshold, logAll: settings.pasteLogAll !== false } : null;
 
   return (
@@ -356,6 +398,7 @@ export default function MindmapPage() {
         where={outlineOpen ? 'Mindmap und Gliederung' : 'Mindmap'}
         phase={isTopic ? 'topic' : 'orientation'}
         fill
+        outline={isTopic ? undefined : { on: outlineOpen, toggle: toggleOutline }}
         info={info}
         center={
           join?.scopes && join.scopes.length > 1 ? (
@@ -408,11 +451,6 @@ export default function MindmapPage() {
                   <Icon name="grid" size={14} /> <span className={s.long}>Cluster</span>
                 </button>
               </span>
-              {!isTopic && (
-                <button className={`btn ${outlineOpen ? 'on' : ''}`} aria-pressed={outlineOpen} onClick={toggleOutline} title="Gliederung rechts neben der Mindmap">
-                  <Icon name="outline" size={14} /> <span className={s.long}>Gliederung</span>
-                </button>
-              )}
             </div>
           )}
           {map && view === 'karten' && <MindMap key={scope} map={map} people={people} canEdit={canEdit} send={send} dim={isTopic ? 'none' : dim} onToGroup={toGroup} line={lineHook} />}
@@ -434,6 +472,7 @@ export default function MindmapPage() {
           )}
         </div>
         {toast && <div className={p.toast}>{toast}</div>}
+        {takeDialog}
       </ProjectShell>
     </PasteRulesContext.Provider>
   );
@@ -465,5 +504,45 @@ function DimButton({ dim, onDim }: { dim: MapDim; onDim: (d: MapDim) => void }) 
         </>
       )}
     </span>
+  );
+}
+
+interface TakeOpts {
+  title: boolean;
+  people: boolean;
+  color: boolean;
+}
+const TAKE_ALL: TakeOpts = { title: true, people: true, color: true };
+
+/** Rückfrage beim Übernehmen eines Asts oder Clusters in die Gliederung (Standard: alles angehakt) */
+function TakeDialog({ title, color, onTake, onCancel }: { title: string; color: string | null; onTake: (o: TakeOpts) => void; onCancel: () => void }) {
+  const [o, setO] = useState<TakeOpts>(TAKE_ALL);
+  const box = (k: keyof TakeOpts, label: React.ReactNode) => (
+    <label className={s.takeRow}>
+      <input type="checkbox" checked={o[k]} onChange={(e) => setO({ ...o, [k]: e.target.checked })} /> {label}
+    </label>
+  );
+  return (
+    <div className={s.takeBack} onClick={onCancel}>
+      <div className={`panel ${s.take}`} role="dialog" aria-label="In die Gliederung übernehmen" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onCancel()}>
+        <h3 className={s.takeTitle}>In die Gliederung übernehmen</h3>
+        {box('title', <>Titel „{title}“</>)}
+        {box('people', 'Personen (wer zuständig ist)')}
+        {box(
+          'color',
+          <>
+            Farbe <span className={s.takeSwatch} style={{ background: color ?? 'var(--fg-faint)' }} />
+          </>,
+        )}
+        <div className={s.takeBtns}>
+          <button className="btn" onClick={onCancel}>
+            Abbrechen
+          </button>
+          <button className="btn primary" autoFocus onClick={() => onTake(o)}>
+            Übernehmen
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

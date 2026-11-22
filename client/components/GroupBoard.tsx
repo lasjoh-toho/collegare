@@ -7,7 +7,7 @@
  * Erste Säule „Noch ohne Gruppe“. Lehrkräfte ziehen alle Karten; Lernende im Wahlmodus nur die eigene.
  * Ohne Ziehen geht alles auch über „Verschieben nach …“ in der Karten-Ansicht (Tastatur, Screenreader).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, del, get, patch, post } from '@/lib/api';
 import { COLUMN_COLORS, groupColor } from '@/lib/colors';
 import type { Board, BoardMember, ProjectSettings } from '@/lib/types';
@@ -45,6 +45,19 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
   const [newTitle, setNewTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  // Säulen bis zum unteren Fensterrand (Jo, 22. November 2026); am Handy stehen sie untereinander
+  const [rest, setRest] = useState<number | null>(null);
+  useEffect(() => {
+    const calc = () => {
+      const b = boardRef.current;
+      if (!b) return;
+      const top = b.getBoundingClientRect().top + scrollY;
+      setRest(innerWidth > 640 ? Math.max(200, Math.round(innerHeight - top - 18)) : null);
+    };
+    calc();
+    addEventListener('resize', calc);
+    return () => removeEventListener('resize', calc);
+  }, []);
   // Themen aus der Themen-Mindmap als Gruppen übernehmen (Wunsch Jo, 14. November 2026)
   const [fromMap, setFromMap] = useState<{ title: string; kind: 'cluster' | 'card'; exists: boolean; on: boolean }[] | null>(null);
   async function openFromMap() {
@@ -143,7 +156,7 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
           {choiceOpen && settings.choiceDeadline !== null && ` Wahl offen bis ${new Date(settings.choiceDeadline).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}.`}
         </p>
       )}
-      <div className={k.board} ref={boardRef} style={{ ['--n' as string]: columns.length }}>
+      <div className={k.board} ref={boardRef} style={{ ['--n' as string]: columns.length, ...(rest ? { ['--rest' as string]: rest + 'px' } : {}) }}>
         <div className={k.cols}>
           {columns.map((c, i) => (
             <div key={c.id} className={k.col}>
@@ -216,6 +229,7 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
               )}
             </div>
             <div className={`${k.cell} ${drag?.col === c.id ? k.over : ''}`} data-col={c.id} style={{ ['--cc' as string]: c.color }}>
+              <div className={k.cards}>
               {membersOf(c.groupId).map((m) => (
                 <div
                   key={m.userId}
@@ -232,6 +246,9 @@ export function GroupBoard({ projectId, board, settings, role, meId, onError }: 
                 </div>
               ))}
               {drag?.col === c.id && drag.before === '__end' && <div className={k.endMark} />}
+              </div>
+              {/* Säule reicht bis zum Fensterrand: unter den Karten läuft die Farbe aus, der Rand bleibt (Jo, 22. November 2026) */}
+              <div className={k.fade} />
             </div>
             </div>
           ))}

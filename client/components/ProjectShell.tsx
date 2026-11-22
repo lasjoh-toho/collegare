@@ -14,6 +14,8 @@ import { ChatPanel } from './ChatPanel';
 import { NotesPanel } from './NotesPanel';
 import { Icon } from './Icon';
 import { InfoButton, type InfoSpec } from './InfoButton';
+import { OutlineSide } from './OutlineSide';
+import { announceSide, useSideBus } from '@/lib/sides';
 import { ThemeSwitch } from './ThemeSwitch';
 import sh from './shell.module.css';
 
@@ -21,14 +23,7 @@ const PIN_KEY = 'collegare-menu-pinned';
 const SIDE_KEY = 'collegare-leiste';
 const SIDE_W_KEY = 'collegare-leiste-breite';
 const clampSide = (w: number) => Math.round(Math.max(280, Math.min(w, 900, innerWidth * 0.7)));
-type Side = 'chat' | 'notes' | 'history' | null;
-
-/** Bereich der aktuellen Seite für den Link zur Gliederung (z. B. Testbereich), nicht die Themen-Mindmap */
-function outlineScope(): string {
-  if (typeof window === 'undefined') return '';
-  const b = new URLSearchParams(location.search).get('bereich');
-  return b && b !== 'p' ? `&bereich=${encodeURIComponent(b)}` : '';
-}
+type Side = 'chat' | 'notes' | 'history' | 'outline' | null;
 
 /** ein Schritt im Verlauf (Bento, Pinnwand) */
 export interface UndoEntry {
@@ -72,10 +67,12 @@ interface Props {
   center?: React.ReactNode;
   /** Rückgängig/Wiederholen mit Verlauf (Folien, Pinnwand) */
   undo?: UndoSpec;
+  /** Seite hat ihre eigene Gliederung am Rand (Mindmap): das Symbol oben rechts schaltet diese statt der Leiste */
+  outline?: { on: boolean; toggle: () => void };
   children: React.ReactNode;
 }
 
-export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, center, undo, children }: Props) {
+export function ProjectShell({ me, project, where, phase = null, actions, docs, fill = false, info, crumbs, center, undo, outline, children }: Props) {
   const [open, setOpen] = useState(false);
   const [pinPref, setPinPref] = useState(false);
   const [wide, setWide] = useState(false);
@@ -116,10 +113,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   useEffect(() => {
     try {
       const v = localStorage.getItem(SIDE_KEY) ?? (localStorage.getItem('collegare-chat-offen') === '1' ? 'chat' : '');
-      setSide(v === 'chat' || v === 'notes' || v === 'history' ? v : null);
+      setSide(v === 'chat' || v === 'notes' || v === 'history' || v === 'outline' ? v : null);
     } catch {}
   }, []);
   const toggleSide = (v: Side) => {
+    // links wie rechts immer nur ein Seitenmenü: andere rechts (Gliederung der Mindmap, Pinnwand, Folien) schließen sich
+    if (v) announceSide('right', 'shell');
     setSide(v);
     try {
       localStorage.setItem(SIDE_KEY, v ?? '');
@@ -167,6 +166,13 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   const showChat = chatOn && side === 'chat' && where !== 'Chat';
   const showNotes = side === 'notes' && where !== 'Notizen und Quellen';
   const showHistory = side === 'history' && !!undo?.onGo;
+  const outlineOn = project.settings.phases.orientation?.state !== 'off' && where !== 'Gliederung';
+  const showOutline = side === 'outline' && outlineOn && !outline;
+  useSideBus('right', 'shell', showChat || showNotes || showHistory || showOutline, () => toggleSide(null));
+  useSideBus('left', 'menu', open || pinned, () => {
+    setOpen(false);
+    if (pinned) pin(false);
+  });
   const wantHistory = showHistory ? undo?.onHistory : undefined;
   useEffect(() => {
     wantHistory?.();
@@ -195,7 +201,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   return (
     <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes || showHistory ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
       <header className={sh.head}>
-        <button className={sh.who} onClick={() => (pinned ? pin(false) : setOpen((o) => !o))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
+        <button className={sh.who} onClick={() => (pinned ? pin(false) : (open || announceSide('left', 'menu'), setOpen((o) => !o)))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
           <Icon name="menu" size={18} />
           <span className={sh.whoName}>{me.name}</span>
         </button>
@@ -208,7 +214,6 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             </div>
           )}
           {crumbs}
-          {info && <InfoButton project={project} spec={info} />}
         </div>
         <div className={sh.actions}>
           {me.impersonated && (
@@ -232,11 +237,17 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
               )}
             </span>
           )}
-          {where !== 'Gliederung' && project.settings.phases.orientation?.state !== 'off' && (
-            // synchrone Gliederung: beide Linien nebeneinander (Jo, 22. November 2026)
-            <a className="btn icon" href={href(`/projekt/gliederung/?id=${project.id}${outlineScope()}`)} title="Gliederung: Präsentation und Ausarbeitung nebeneinander" aria-label="Gliederung">
+          {outlineOn && (
+            // Gliederung als Seitenleiste; „‖“ darin führt zur Parallelansicht (Jo, 22. November 2026)
+            <button
+              className={`btn icon ${(outline ? outline.on : showOutline) ? 'on' : ''}`}
+              onClick={() => (outline ? outline.toggle() : toggleSide(showOutline ? null : 'outline'))}
+              title={(outline ? outline.on : showOutline) ? 'Gliederung ausblenden' : 'Gliederung zeigen'}
+              aria-pressed={outline ? outline.on : showOutline}
+              aria-label="Gliederung"
+            >
               <Icon name="outline" size={16} />
-            </a>
+            </button>
           )}
           {where !== 'Notizen und Quellen' && (
             <button className={`btn icon ${showNotes ? 'on' : ''}`} onClick={() => toggleSide(showNotes ? null : 'notes')} title={showNotes ? 'Notizen ausblenden' : 'Notizen zeigen'} aria-pressed={showNotes} aria-label="Notizen und Quellen">
@@ -248,6 +259,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
               <Icon name="chat" size={16} />
             </button>
           )}
+          {info && <InfoButton project={project} spec={info} />}
         </div>
       </header>
 
@@ -383,6 +395,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
         <aside className={sh.chat} aria-label="Verlauf">
           <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
           <HistoryPanel undo={undo} onClose={() => toggleSide(null)} />
+        </aside>
+      )}
+      {showOutline && (
+        <aside className={sh.chat} aria-label="Gliederung">
+          <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
+          <OutlineSide me={me} project={project} onClose={() => toggleSide(null)} />
         </aside>
       )}
       {showNotes && (

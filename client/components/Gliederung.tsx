@@ -453,7 +453,7 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState('');
   const card = p.card ? map.cards[p.card] : null;
-  const ownerId = card?.owner ?? p.owner;
+  const ownerId = p.noOwners ? p.owner : (card?.owner ?? p.owner);
   const owner = ownerId != null ? people.find((x) => x.id === ownerId)?.name : null;
   const key = 'p:' + p.id;
   const shared = ctx.kinds.length > 1 && sharedKeys(lines).has('k' + p.key);
@@ -474,7 +474,7 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
   }
 
   return (
-    <li className={`${g.point} ${g['l' + level]} ${p.card ? '' : g.dashed} ${p.hidden ? g.hiddenPt : ''}`}>
+    <li className={`${g.point} ${g['l' + level]} ${p.card ? '' : g.dashed} ${p.hidden ? g.hiddenPt : ''} ${p.color ? g.colored : ''}`} style={p.color ? { ['--pc' as string]: p.color } : undefined}>
       <div
         className={`${g.head} ${dz.over === key ? g.over : ''}`}
         data-row={p.id}
@@ -707,7 +707,7 @@ function Parallel(ctx: LineCtx) {
     );
   };
   return (
-    <div className={g.parallel} ref={box}>
+    <div className={g.parallel} ref={box} data-parallel>
       <svg className={g.arcs} aria-hidden={!arcs.length}>
         {arcs.map((a) => (
           <g key={a.id} className={editable ? g.arcLive : ''} onClick={() => editable && void put(alignPoint(lines, 'praes', a.id, rows))}>

@@ -196,6 +196,8 @@ export interface OutlineSection {
   title: string;
   cards: string[];
   owners: number[];
+  /** Farbe des Asts bzw. Clusters, falls in die Gliederung übernommen */
+  color?: string;
   subs?: { id: string; title: string; level: number }[];
 }
 export interface MindMap {
