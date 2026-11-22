@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { Socket } from 'socket.io-client';
 import { AusarbeitungCards } from '@/components/AusarbeitungCards';
 import { GliederungBoard } from '@/components/Gliederung';
+import { teacherGroup } from '@/components/TeacherAsk';
 import { Icon } from '@/components/Icon';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
@@ -191,7 +192,7 @@ export default function GliederungPage() {
       {map && scope && (
         <div className={shown === 'both' ? s.both : s.split} key={shown}>
           <div className={shown === 'both' ? s.bothCol : s.lineCol}>
-            <GliederungBoard map={map} send={send} people={join?.people ?? []} canEdit={!join?.readOnly} meId={me.id} kinds={kinds} tab={shown === 'both' ? 'ausarb' : shown} onTab={() => {}} show={show} mode={shown} />
+            <GliederungBoard map={map} send={send} people={join?.people ?? []} canEdit={!join?.readOnly} meId={me.id} kinds={kinds} tab={shown === 'both' ? 'ausarb' : shown} onTab={() => {}} show={show} mode={shown} docs={{ project: id, scope }} teacher={teacherGroup({ role: project.role, scope, scopes: join?.scopes, sock, projectId: id })} />
           </div>
           {shown !== 'both' && (
             <div className={s.work}>

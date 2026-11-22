@@ -12,11 +12,14 @@
  *
  * Gesendet wird die ganze Gliederung als Map-Op `lines`; der Server leitet daraus `pick` und `outline` ab.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { get } from '@/lib/api';
 import { isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import {
   addItem,
+  allPoints,
   flatPoints,
+  pointFromCard,
   indentPoint,
   insertAfterRow,
   MAX_LEVELS,
@@ -43,6 +46,7 @@ import {
 } from '@/lib/lines';
 import type { MapOp, MindMap } from '@/lib/types';
 import { Icon } from './Icon';
+import { useTeacherAsk, type TeacherGroup } from './TeacherAsk';
 import g from './gliederung.module.css';
 
 const ITEM_MIME = 'application/x-collegare-lineitem';
@@ -68,6 +72,10 @@ export interface GliederungProps {
   side?: 'left' | 'right';
   /** „beides“ öffnet die Seite Gliederung (sonst ein Vollbild über der Seite) */
   bothHref?: string;
+  /** Projekt und Bereich: für „Texte vergleichen“ in der Parallelansicht */
+  docs?: { project: number; scope: string | null };
+  /** Lehrkraft in einer Gruppe: vor dem Ändern nachfragen (Nachricht an die Gruppe oder trotzdem ändern) */
+  teacher?: TeacherGroup;
 }
 
 /** Ziel eines Ablegens aus der Mindmap (Zeiger, kein HTML-Ziehen): steht als data-line-drop an Punkten und am Ende */
@@ -161,7 +169,9 @@ export function useLineTab(kinds: LineKind[], prefer?: LineKind): [LineKind, (k:
   ];
 }
 
-export function Gliederung(props: GliederungProps) {
+export function Gliederung(props0: GliederungProps) {
+  const ask = useTeacherAsk(props0.teacher, props0.send);
+  const props = { ...props0, send: ask.guarded };
   const { map, send, kinds, tab, onTab, onClose, side = 'right' } = props;
   const lines = linesOf(map);
   useSideSlide(side);
@@ -235,6 +245,7 @@ export function Gliederung(props: GliederungProps) {
           <Parallel {...props} lines={lines} editable={editable} put={put} mine={mine} />
         </div>
       )}
+      {ask.dialog}
     </div>
   );
 }
@@ -244,6 +255,50 @@ interface LineCtx extends GliederungProps {
   editable: boolean;
   put: (l: Lines) => Promise<boolean>;
   mine: boolean;
+  /** Parallelansicht: Texte der Abschnitte zum Vergleich ausklappen */
+  compare?: boolean;
+}
+
+/** Texte der Abschnitte beider Linien (für „Texte vergleichen“), nach Abschnitt; lädt alle 15 Sekunden neu */
+function useSectionTexts(docs: GliederungProps['docs'], on: boolean) {
+  const [texts, setTexts] = useState<Record<LineKind, Record<string, string>> | null>(null);
+  const project = docs?.project;
+  const scope = docs?.scope ?? null;
+  useEffect(() => {
+    if (!on || !project) return;
+    let live = true;
+    const group = (r: { docs: { sectionId: string; body: string | null }[] }) => {
+      const out: Record<string, string> = {};
+      for (const d of r.docs) if (d.body?.trim()) out[d.sectionId] = (out[d.sectionId] ? out[d.sectionId] + '\n\n' : '') + d.body.trim();
+      return out;
+    };
+    const load = () =>
+      Promise.all((['praes', 'ausarb'] as const).map((k) => get<{ docs: { sectionId: string; body: string | null }[] }>(`/api/projects/${project}/documents?linie=${k}${scope ? `&bereich=${encodeURIComponent(scope)}` : ''}`))).then(
+        ([a, b]) => live && setTexts({ praes: group(a), ausarb: group(b) }),
+        () => {},
+      );
+    void load();
+    const t = setInterval(load, 15000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [on, project, scope]);
+  return texts;
+}
+
+/** Text eines Abschnitts schlicht lesbar: Überschriften fett, Auszeichnungen und Escapes weg */
+function SectionText({ body }: { body: string | undefined }) {
+  if (!body) return <p className={g.noText}>noch kein Text</p>;
+  return (
+    <div className={g.text}>
+      {body.split('\n').map((line, i) => {
+        const h = /^#{1,6}\s+/.test(line);
+        const t = line.replace(/^#{1,6}\s+/, '').replace(/\\([\\*_`[\]{}^])/g, '$1').replace(/(\*\*|__)(.+?)\1/g, '$2');
+        return h ? <b key={i}>{t}</b> : t.trim() ? <p key={i}>{t}</p> : null;
+      })}
+    </div>
+  );
 }
 
 function useDrops(ctx: LineCtx, kind: LineKind) {
@@ -307,7 +362,9 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
     if (!accept(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = e.dataTransfer.types.includes(ITEM_MIME) || e.dataTransfer.types.includes(POINT_MIME) ? 'move' : 'copy';
+    // Punkt aus der anderen Linie: wird verdoppelt (Kopiecursor)
+    const fromOther = e.dataTransfer.types.includes(POINT_MIME + '-' + (kind === 'praes' ? 'ausarb' : 'praes'));
+    e.dataTransfer.dropEffect = !fromOther && (e.dataTransfer.types.includes(ITEM_MIME) || e.dataTransfer.types.includes(POINT_MIME)) ? 'move' : 'copy';
     if (over !== key) setOver(key);
   };
   return { over, setOver, drop, allow };
@@ -338,11 +395,21 @@ function lastItem(items: LineItem[], into: string | null): LineItem | null {
   return null;
 }
 
-/** Schiene über der Linie: Objekte direkt auf die Linie legen erzeugt dort einen neuen Punkt */
-function Rail({ kind, dz, fallback = null }: { kind: LineKind; dz: ReturnType<typeof useDrops>; fallback?: string | null }) {
+/**
+ * Schiene über der Linie: Objekte direkt auf die Linie legen erzeugt dort einen neuen Punkt. Ein Klick auf die Linie
+ * öffnet an der Stelle die Eingabe, die zugleich sucht (Jo, 22. November 2026).
+ */
+function Rail({ ctx, kind, dz, fallback = null }: { ctx: LineCtx; kind: LineKind; dz: ReturnType<typeof useDrops>; fallback?: string | null }) {
+  const [at, setAt] = useState<{ after: string | null; y: number } | null>(null);
   return (
+    <>
     <div
-      className={`${g.rail} ${dz.over === 'rail' ? g.railOver : ''}`}
+      className={`${g.rail} ${dz.over === 'rail' || at ? g.railOver : ''}`}
+      style={at ? { ['--gy' as string]: at.y + 'px' } : undefined}
+      onClick={(e) => {
+        const spot = railSpot(e.currentTarget, e.clientY);
+        setAt({ after: spot.after ?? fallback, y: spot.y });
+      }}
       data-line-drop={JSON.stringify({ kind, point: null, after: fallback })}
       data-line-rail=""
       onDragOver={(e) => {
@@ -351,8 +418,105 @@ function Rail({ kind, dz, fallback = null }: { kind: LineKind; dz: ReturnType<ty
       }}
       onDragLeave={() => dz.setOver(null)}
       onDrop={(e) => dz.drop(e, null, null, null, railSpot(e.currentTarget, e.clientY).after ?? fallback)}
-      title="Hierher ziehen: neuer Punkt an dieser Stelle"
+      title="Klicken: neuer Punkt an dieser Stelle (oder suchen). Hierher ziehen: neuer Punkt mit dem Objekt"
     />
+    {at && (
+      <div className={g.railInput} style={{ top: at.y }}>
+        <PointSearch ctx={ctx} kind={kind} after={at.after} onDone={() => setAt(null)} />
+      </div>
+    )}
+    </>
+  );
+}
+
+/**
+ * Eingabe für einen neuen Punkt, die zugleich sucht: Karten und Äste der Mindmap, Punkte der anderen Linie (werden
+ * verdoppelt) und entfernte Punkte (kommen zurück). Enter ohne Auswahl legt einen neuen Punkt mit dem Text an.
+ * after: Zeile, hinter der eingesetzt wird (null = ganz oben, undefined = am Ende).
+ */
+type Hit = { kind: 'card' | 'other' | 'gone'; id: string; title: string; note: string };
+function PointSearch({ ctx, kind, after, onDone }: { ctx: LineCtx; kind: LineKind; after: string | null | undefined; onDone: () => void }) {
+  const { lines, map, put } = ctx;
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(-1);
+  const other: LineKind = kind === 'praes' ? 'ausarb' : 'praes';
+  const hits = useMemo((): Hit[] => {
+    const t = q.trim().toLowerCase();
+    if (!t) return [];
+    const here = allPoints(lines[kind].points).filter((p) => !p.removed);
+    const cardsHere = new Set(here.map((p) => p.card).filter(Boolean));
+    const keysHere = new Set(here.map((p) => p.key));
+    const out: Hit[] = [];
+    const has = (s: string) => s.toLowerCase().includes(t);
+    for (const p of allPoints(lines[kind].points)) if (p.removed && has(titleOf(map, p))) out.push({ kind: 'gone', id: p.id, title: titleOf(map, p), note: 'entfernt, zurückholen' });
+    if (ctx.kinds.length > 1)
+      for (const p of allPoints(lines[other].points))
+        if (!p.removed && !keysHere.has(p.key) && has(titleOf(map, p))) out.push({ kind: 'other', id: p.id, title: titleOf(map, p), note: `aus der ${LINE_LABEL[other]}` });
+    for (const c of Object.values(map.cards))
+      if (c.title && !cardsHere.has(c.id) && !keysHere.has(c.id) && has(c.title)) out.push({ kind: 'card', id: c.id, title: c.title, note: c.kind === 'cluster' ? 'Ast aus der Mindmap' : 'Karte aus der Mindmap' });
+    return out.slice(0, 7);
+  }, [q, lines, map, kind, other, ctx.kinds.length]);
+  const endAt = () => {
+    const pts = lines[kind].points.filter((p) => !p.removed);
+    return pts.length ? '^' + pts[pts.length - 1].id : null;
+  };
+  const place = (l: Lines, p: LinePoint) => {
+    if (after !== undefined) return insertAfterRow(l, kind, after, p);
+    const n = clone(l);
+    n[kind].points.push(p);
+    return n;
+  };
+  function pick(i: number) {
+    const h = hits[i];
+    const at = after === undefined ? endAt() : after;
+    if (!h) {
+      const t = q.trim();
+      if (t) void put(place(lines, newPoint(t.slice(0, 200))));
+    } else if (h.kind === 'card') {
+      void put(place(lines, pointFromCard(map, map.cards[h.id], true)));
+    } else if (h.kind === 'other') {
+      void put(movePointAfter(lines, kind, other, h.id, at));
+    } else {
+      const l = patchPoint(lines, kind, h.id, (x) => (x.removed = false));
+      void put(at === h.id || at === '^' + h.id ? l : movePointAfter(l, kind, kind, h.id, at));
+    }
+    onDone();
+  }
+  return (
+    <form
+      className={g.search}
+      onSubmit={(e) => {
+        e.preventDefault();
+        pick(sel);
+      }}
+    >
+      <input
+        autoFocus
+        value={q}
+        onChange={(e) => (setQ(e.target.value), setSel(-1))}
+        onBlur={() => !q.trim() && setTimeout(onDone, 150)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onDone();
+          if (e.key === 'ArrowDown') (e.preventDefault(), setSel((i) => Math.min(hits.length - 1, i + 1)));
+          if (e.key === 'ArrowUp') (e.preventDefault(), setSel((i) => Math.max(-1, i - 1)));
+        }}
+        placeholder="Neuer Punkt oder suchen …"
+        maxLength={200}
+        aria-label="Neuer Punkt oder suchen"
+      />
+      {q.trim() && (
+        <ul className={g.hits} role="listbox">
+          <li role="option" aria-selected={sel === -1} className={sel === -1 ? g.hitOn : ''} onMouseDown={(e) => (e.preventDefault(), pick(-1))}>
+            <Icon name="plus" size={12} /> <b>{q.trim()}</b> <span>neuer Punkt</span>
+          </li>
+          {hits.map((h, i) => (
+            <li key={h.kind + h.id} role="option" aria-selected={sel === i} className={sel === i ? g.hitOn : ''} onMouseDown={(e) => (e.preventDefault(), pick(i))}>
+              <b>{h.title}</b> <span>{h.note}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </form>
   );
 }
 
@@ -367,7 +531,7 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
     <div className={g.line}>
       {!rows.length && <p className={`muted ${g.hint}`}>{lines.locked ? 'Die Gliederung ist gesperrt.' : 'Noch leer.'}</p>}
       <ol className={g.track}>
-        {editable && <Rail kind={kind} dz={dz} />}
+        {editable && <Rail ctx={ctx} kind={kind} dz={dz} />}
         {rows.map((r, i) => (
           <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={rows} index={i} dz={dz} />
         ))}
@@ -399,9 +563,7 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
 
 /** Plus im Kreis am Ende der Linie (Jo, 22. November 2026): neuer Punkt; auch Ziel zum Ablegen am Ende */
 function EndPlus({ ctx, kind, dz }: { ctx: LineCtx; kind: LineKind; dz: ReturnType<typeof useDrops> }) {
-  const { lines, put } = ctx;
   const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState('');
   return (
     <li
       className={`${g.end} ${dz.over === 'end' ? g.over : ''}`}
@@ -414,21 +576,9 @@ function EndPlus({ ctx, kind, dz }: { ctx: LineCtx; kind: LineKind; dz: ReturnTy
         <Icon name="plus" size={14} />
       </button>
       {adding ? (
-        <form
-          className={g.addForm}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (title.trim()) {
-              const l = clone(lines);
-              l[kind].points.push(newPoint(title.trim()));
-              void put(l);
-            }
-            setTitle('');
-            setAdding(false);
-          }}
-        >
-          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => !title.trim() && setAdding(false)} onKeyDown={(e) => e.key === 'Escape' && setAdding(false)} placeholder="Titel des neuen Punkts" maxLength={200} />
-        </form>
+        <div className={g.addForm}>
+          <PointSearch ctx={ctx} kind={kind} after={undefined} onDone={() => setAdding(false)} />
+        </div>
       ) : (
         <button type="button" className={g.endLabel} onClick={() => setAdding(true)}>
           neuer Punkt
@@ -454,6 +604,7 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
   const { lines, editable, put, map, people } = ctx;
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState('');
+  const [flip, setFlip] = useState(false);
   const card = p.card ? map.cards[p.card] : null;
   const ownerId = p.noOwners ? p.owner : (card?.owner ?? p.owner);
   const owner = ownerId != null ? people.find((x) => x.id === ownerId)?.name : null;
@@ -485,6 +636,7 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
           // Punkt samt Unterpunkten ziehen: auf die Linie (dazwischen einsetzen) oder auf einen anderen Punkt (dahinter)
           if ((e.target as HTMLElement).closest('button, select, input')) return e.preventDefault();
           e.dataTransfer.setData(POINT_MIME, JSON.stringify({ kind, id: p.id }));
+          e.dataTransfer.setData(POINT_MIME + '-' + kind, '1');
           e.dataTransfer.setData('text/plain', titleOf(map, p));
           e.dataTransfer.effectAllowed = 'move';
         }}
@@ -512,7 +664,16 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
             {titleOf(map, p)}
           </span>
         )}
-        {shared && <span className={g.sharedMark} title={`auch in der ${LINE_LABEL[other]}`} style={{ ['--o' as string]: LINE_COLOR[other] }} aria-label={`auch in der ${LINE_LABEL[other]}`} />}
+        {shared && (
+          <button
+            className={`${g.sharedMark} ${flip ? g.sharedOn : ''}`}
+            onClick={() => setFlip((f) => !f)}
+            aria-pressed={flip}
+            title={`Auch in der ${LINE_LABEL[other]}: Karte umdrehen und die Rückseite zeigen`}
+            aria-label={`Rückseite: ${LINE_LABEL[other]}`}
+            style={{ ['--o' as string]: LINE_COLOR[other] }}
+          />
+        )}
         {owner && <span className={g.owner}>{owner}</span>}
         {editable && (
           <span className={g.actions}>
@@ -567,8 +728,76 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
           </span>
         )}
       </div>
+      {flip && shared && <Backside ctx={ctx} kind={kind} p={p} onClose={() => setFlip(false)} />}
       {p.items.length > 0 && <Items ctx={ctx} kind={kind} point={p.id} items={p.items} dz={dz} depth={0} />}
     </li>
+  );
+}
+
+/**
+ * Rückseite eines Punkts (Jo, 22. November 2026): derselbe Punkt in der anderen Linie, wie die Rückseite einer Karte.
+ * Unterschiede sind markiert: Unterpunkte nur dort (+) oder nur hier (−), anderer Titel, ausgeblendet, Objekte.
+ */
+function Backside({ ctx, kind, p, onClose }: { ctx: LineCtx; kind: LineKind; p: LinePoint; onClose: () => void }) {
+  const { lines, map } = ctx;
+  const other: LineKind = kind === 'praes' ? 'ausarb' : 'praes';
+  const twin = allPoints(lines[other].points).find((x) => x.key === p.key && !x.removed);
+  if (!twin) return null;
+  const subsOf = (x: LinePoint) => flatPoints(x.sub).map((r) => ({ key: r.p.key, title: titleOf(map, r.p), level: r.level }));
+  const front = subsOf(p);
+  const back = subsOf(twin);
+  const frontKeys = new Set(front.map((r) => r.key));
+  const backKeys = new Set(back.map((r) => r.key));
+  const onlyHere = front.filter((r) => !backKeys.has(r.key));
+  const diffTitle = titleOf(map, twin) !== titleOf(map, p);
+  const count = (items: LineItem[]): number => items.reduce((n, it) => n + 1 + count(it.items), 0);
+  const same = !diffTitle && !onlyHere.length && back.every((r) => frontKeys.has(r.key)) && twin.hidden === p.hidden && count(twin.items) === count(p.items);
+  return (
+    <div className={g.back} style={{ ['--o' as string]: LINE_COLOR[other] }} role="region" aria-label={`Rückseite: ${LINE_LABEL[other]}`}>
+      <div className={g.backHead}>
+        <span className={g.backKind}>Rückseite · {LINE_LABEL[other]}</span>
+        <span className="grow" />
+        {ctx.kinds.length > 1 && (
+          <button className={g.backGo} onClick={() => ctx.onTab(other)} title={`Zur ${LINE_LABEL[other]} wechseln`}>
+            zur {LINE_LABEL[other]}
+          </button>
+        )}
+        <button className="btn icon" onClick={onClose} title="Karte zurückdrehen" aria-label="Rückseite schließen">
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+      <div className={`${g.backTitle} ${diffTitle ? g.diff : ''}`}>{titleOf(map, twin)}</div>
+      {twin.hidden && <div className={g.backNote}>dort ausgeblendet</div>}
+      {back.length > 0 && (
+        <ul className={g.backSubs}>
+          {back.map((r) => (
+            <li key={'b' + r.key} className={frontKeys.has(r.key) ? '' : g.onlyThere} style={{ paddingInlineStart: r.level * 12 }} title={frontKeys.has(r.key) ? 'auf beiden Seiten' : `nur in der ${LINE_LABEL[other]}`}>
+              {frontKeys.has(r.key) ? '·' : '+'} {r.title}
+            </li>
+          ))}
+          {onlyHere.map((r) => (
+            <li key={'f' + r.key} className={g.onlyHere} title={`nur in der ${LINE_LABEL[kind]}`}>
+              − {r.title}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!back.length && onlyHere.length > 0 && (
+        <ul className={g.backSubs}>
+          {onlyHere.map((r) => (
+            <li key={'f' + r.key} className={g.onlyHere} title={`nur in der ${LINE_LABEL[kind]}`}>
+              − {r.title}
+            </li>
+          ))}
+        </ul>
+      )}
+      {count(twin.items) > 0 && (
+        <div className={g.backNote}>
+          {count(twin.items)} {count(twin.items) === 1 ? 'Objekt' : 'Objekte'}: {twin.items.map((it) => it.label).join(', ')}
+        </div>
+      )}
+      {same && <div className={g.backNote}>Beide Seiten stimmen überein.</div>}
+    </div>
   );
 }
 /** Haben die Zeilen i und j (gleiche Ebene) denselben Elternpunkt? Kein flacherer Punkt dazwischen. */
@@ -652,7 +881,10 @@ function Items({ ctx, kind, point, items, dz, depth }: { ctx: LineCtx; kind: Lin
  * Punkt der Präsentation seinem Gegenstück gegenüber. Am Ende jeder Linie ein Plus für einen neuen Punkt.
  */
 function Parallel(ctx: LineCtx) {
-  const { lines, editable, put } = ctx;
+  const { lines, editable, put, map } = ctx;
+  const texts = useSectionTexts(ctx.docs, !!ctx.compare);
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const sectionOf = (p: LinePoint) => (p.card && map.cards[p.card] ? p.card : p.id);
   const rows = alignRows(
     lines.praes.points.filter((p) => !p.removed),
     lines.ausarb.points.filter((p) => !p.removed),
@@ -700,7 +932,7 @@ function Parallel(ctx: LineCtx) {
     const flat = p ? flatPoints([p]) : [];
     return (
       <ol className={`${g.track} ${g.pTrack}`} style={{ ['--metro' as string]: LINE_COLOR[kind] }}>
-        {editable && <Rail kind={kind} dz={dz} fallback={prevOf(kind === 'praes' ? 'left' : 'right', i)} />}
+        {editable && <Rail ctx={ctx} kind={kind} dz={dz} fallback={prevOf(kind === 'praes' ? 'left' : 'right', i)} />}
         {flat.map((r, i) => (
           <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={flat} index={i} dz={dz} />
         ))}
@@ -719,8 +951,12 @@ function Parallel(ctx: LineCtx) {
           </g>
         ))}
       </svg>
-      {rows.map((r, i) => (
-        <div key={(r.left?.id ?? '') + (r.right?.id ?? '')} className={g.row} data-prow={i}>
+      {rows.map((r, i) => {
+        const rk = (r.left?.id ?? '') + (r.right?.id ?? '');
+        const open = !shut.has(rk);
+        return (
+        <Fragment key={rk}>
+        <div className={g.row} data-prow={i}>
           <div className={`${g.left} ${g.mirror}`} data-side="left">
             {cell('praes', r.left, dzA, i)}
           </div>
@@ -731,7 +967,35 @@ function Parallel(ctx: LineCtx) {
             {cell('ausarb', r.right, dzB, i)}
           </div>
         </div>
-      ))}
+        {ctx.compare && (
+          <div className={`${g.row} ${g.textRow} ${open ? '' : g.textShut}`}>
+            <div className={`${g.left} ${g.textCell}`} style={{ ['--metro' as string]: LINE_COLOR.praes }}>
+              {open && r.left && <SectionText body={texts?.praes[sectionOf(r.left)]} />}
+            </div>
+            <div className={g.bridge}>
+              <button
+                className={g.textToggle}
+                onClick={() => setShut((s0) => {
+                  const n = new Set(s0);
+                  if (n.has(rk)) n.delete(rk);
+                  else n.add(rk);
+                  return n;
+                })}
+                aria-expanded={open}
+                title={open ? 'Texte einklappen' : 'Texte ausklappen'}
+                aria-label={open ? 'Texte einklappen' : 'Texte ausklappen'}
+              >
+                <Icon name={open ? 'up' : 'down'} size={12} />
+              </button>
+            </div>
+            <div className={`${g.right} ${g.textCell}`} style={{ ['--metro' as string]: LINE_COLOR.ausarb }}>
+              {open && r.right && <SectionText body={texts?.ausarb[sectionOf(r.right)]} />}
+            </div>
+          </div>
+        )}
+        </Fragment>
+        );
+      })}
       {editable && (
         <div className={g.row}>
           <div className={`${g.left} ${g.mirror}`}>
@@ -755,14 +1019,17 @@ function Parallel(ctx: LineCtx) {
  * Seite „Gliederung“ (Jo, 22. November 2026): beide Linien nebeneinander oder eine Linie links (die Seite zeigt daneben
  * die Ausarbeitung bzw. die Präsentation). Sperre und „nur meine“ stehen oben rechts über der Fläche.
  */
-export function GliederungBoard(props: GliederungProps & { mode: 'both' | LineKind }) {
+export function GliederungBoard(props0: GliederungProps & { mode: 'both' | LineKind }) {
+  const ask = useTeacherAsk(props0.teacher, props0.send);
+  const props = { ...props0, send: ask.guarded };
   const { map, send, mode } = props;
   const lines = linesOf(map);
   const [mine, setMine] = useState(false);
+  const [compare, setCompare] = useState(false);
   const editable = props.canEdit && !lines.locked;
   const put = (next: Lines) => send({ type: 'lines', lines: next });
   const hasItems = (['praes', 'ausarb'] as const).some((k) => flatPoints(lines[k].points).some((r) => r.p.items.length));
-  const ctx: LineCtx = { ...props, lines, editable, put, mine };
+  const ctx: LineCtx = { ...props, lines, editable, put, mine, compare };
   return (
     <div className={`${g.board} ${mode === 'both' ? '' : g.boardSingle}`} style={{ ['--metro' as string]: LINE_COLOR[mode === 'both' ? 'ausarb' : mode] }}>
       <div className={g.boardTools}>
@@ -777,11 +1044,17 @@ export function GliederungBoard(props: GliederungProps & { mode: 'both' | LineKi
             <Icon name={lines.locked ? 'lock' : 'unlock'} size={15} />
           </button>
         )}
+        {mode === 'both' && props.docs && (
+          <label className={g.mine} title="Unter jedem Punkt die Texte aus Präsentation und Ausarbeitung nebeneinander, auf gleicher Höhe">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Texte vergleichen
+          </label>
+        )}
         <label className={g.mine} title="Nur Objekte zeigen, die du angehängt hast">
           <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> nur meine
         </label>
       </div>
       {mode === 'both' ? <Parallel {...ctx} /> : <Line {...ctx} kind={mode} />}
+      {ask.dialog}
     </div>
   );
 }

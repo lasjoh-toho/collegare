@@ -1169,6 +1169,26 @@ Wünsche von Jo:
   nur die Personen am Punkt), mit Farbe bekommt der Punkt `color` (Kreis gefüllt, in `outline.sections[].color` für den
   Schreibeditor).
 
+### 8h.12 Verdoppeln, Suche an der Linie, Rückseite, Texte vergleichen, Rückfrage der Lehrkraft (22. November 2026)
+
+Wünsche von Jo:
+
+- Einen Punkt aus der einen Linie auf die andere ziehen verdoppelt ihn (gleicher Schlüssel, Kopiecursor beim Ziehen).
+  Steht er dort schon, wandert das Gegenstück an die Stelle.
+- Ein Klick auf die Linie öffnet an der Stelle die Eingabe für einen neuen Punkt, die zugleich sucht: Karten und Äste
+  der Mindmap, Punkte der anderen Linie (werden verdoppelt) und entfernte Punkte (kommen zurück). Enter ohne Auswahl legt
+  einen neuen Punkt an. Dieselbe Eingabe hat „neuer Punkt“ am Ende der Linie.
+- Vorder- und Rückseite: Steht ein Punkt in beiden Linien, dreht ein Klick auf den farbigen Punkt neben dem Titel die
+  Karte um. Die Rückseite zeigt den Punkt der anderen Linie und markiert Unterschiede: Unterpunkte nur dort (+), nur
+  hier (−), anderer Titel, ausgeblendet, Objekte.
+- Parallelansicht „Texte vergleichen“: Unter jedem Punktpaar stehen die Texte aus Präsentation und Ausarbeitung auf
+  gleicher Höhe, die Linien laufen durch, jede Zeile lässt sich einklappen. Die Rückseite ist der schnelle Blick auf die
+  Gliederung, der Vergleich der Blick auf die Texte; beides ergänzt sich.
+- Lehrkraft in einer Gruppe: Vor der ersten Änderung an der Gliederung fragt ein Fenster „Wollen Sie die Gliederung der
+  Gruppe ändern oder lieber eine Nachricht schreiben?“ mit „Nachricht an Gruppe“ (gelbes Post-it „Kommentar für die
+  Gruppe …“, kommt im Gruppenchat mit „Zur Stelle springen“ an) und „Gliederung trotzdem ändern“ (gilt dann für diese
+  Gruppe bis zum Neuladen). Im eigenen Testbereich und in der Themen-Mindmap fragt nichts.
+
 ## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
 
 Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf

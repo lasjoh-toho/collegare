@@ -1,0 +1,9 @@
+.back { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 0.28); }
+.box { width: min(440px, 100%); padding: 18px 20px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); box-shadow: 0 16px 40px rgb(0 0 0 / 0.25); }
+.box h3 { margin: 0 0 8px; font-size: 16px; }
+.box p { margin: 0 0 14px; font-size: 14px; line-height: 1.45; }
+.buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+/* gelbes Post-it wie der Kommentar in der Ausarbeitung */
+.postit { width: min(460px, 100%); padding: 12px 14px 14px; border-radius: 3px 3px 12px 3px; background: #fff6b8; color: #3b3200; box-shadow: 0 10px 24px -10px rgb(80 60 0 / 0.55); transform: rotate(-0.4deg); font-family: system-ui, sans-serif; }
+.postit h4 { margin: 0 0 8px; font-size: 14.5px; font-weight: 600; }
+.postit textarea { width: 100%; margin-bottom: 10px; padding: 6px 8px; border: 0; border-radius: 4px; background: rgb(255 255 255 / 0.5); color: inherit; font: inherit; font-size: 14px; resize: vertical; }

@@ -243,7 +243,9 @@ export function movePointAfter(l0: Lines, kind: LineKind, from: LineKind, id: st
     hit.list.splice(hit.list.indexOf(hit.p), 1);
     return insertAfterRow(l, kind, after, hit.p);
   }
-  if (allPoints(l[kind].points).some((p) => p.key === hit.p.key && !p.removed)) return l0;
+  // Gibt es den Punkt dort schon (gleicher Schlüssel), wandert das Gegenstück an die Stelle; sonst wird er verdoppelt
+  const twin = allPoints(l[kind].points).find((p) => p.key === hit.p.key && !p.removed);
+  if (twin) return target === twin.id ? l0 : movePointAfter(l0, kind, kind, twin.id, after);
   const fresh = (p: LinePoint): LinePoint => ({ ...clone(p), id: rid(), items: clone(p.items).map(reId), sub: p.sub.map(fresh) });
   return insertAfterRow(l, kind, after, fresh(hit.p));
 }

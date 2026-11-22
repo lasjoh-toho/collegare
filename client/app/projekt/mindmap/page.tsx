@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { BranchMap, branchColors, type LineHook } from '@/components/BranchMap';
 import { Gliederung, hoverLineTarget, LinePreview, lineTargetAt, useLineTab } from '@/components/Gliederung';
+import { teacherGroup } from '@/components/TeacherAsk';
 import { addCard, allPoints, cardPoint, clone, greyedCards, LINE_COLOR, linesOf, previewRows, removeCard, visibleKinds, type LineKind, type Lines } from '@/lib/lines';
 import { MindMap, type Person } from '@/components/MindMap';
 import { ProjectShell } from '@/components/ProjectShell';
@@ -467,7 +468,7 @@ export default function MindmapPage() {
           </div>
           {map && outlineOpen && !isTopic && (
             <aside className={s.outline} aria-label="Gliederung">
-              <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} />
+              <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} teacher={teacherGroup({ role: project.role, scope, scopes: join?.scopes, sock: sock.current, projectId: project.id })} />
             </aside>
           )}
         </div>

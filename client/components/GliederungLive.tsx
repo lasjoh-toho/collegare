@@ -9,12 +9,14 @@ import type { Socket } from 'socket.io-client';
 import { href } from '@/lib/api';
 import { visibleKinds, type LineKind } from '@/lib/lines';
 import type { MapOp, MindMap, ProjectView } from '@/lib/types';
+import { teacherGroup } from './TeacherAsk';
 import { Gliederung, useLineTab } from './Gliederung';
 
 export function GliederungLive({ sock, project, scope: wanted, meId, noteInfo, show, onClose, side = 'right', prefer }: { sock: Socket | null; project: ProjectView; scope?: string | null; meId: number; noteInfo?: (id: number) => { label: string; kind: string } | undefined; show: (m: string) => void; onClose?: () => void; side?: 'left' | 'right'; prefer?: LineKind }) {
   const [map, setMap] = useState<MindMap | null>(null);
   const [people, setPeople] = useState<{ id: number; name: string }[]>([]);
   const [readOnly, setReadOnly] = useState(false);
+  const [scopes, setScopes] = useState<{ scope: string; title: string }[]>([]);
   // ohne vorgegebenen Bereich wählt der Server (Gruppe der Person); er nennt ihn in der Antwort
   const [scope, setScope] = useState<string | null>(wanted ?? null);
   const scopeRef = useRef<string | null>(wanted ?? null);
@@ -27,7 +29,7 @@ export function GliederungLive({ sock, project, scope: wanted, meId, noteInfo, s
   useEffect(() => {
     if (!sock) return;
     const join = () =>
-      sock.emit('map:join', { projectId: project.id, scope: wanted ?? undefined }, (r: { ok: boolean; error?: string; map?: MindMap; version?: number; people?: { id: number; name: string }[]; readOnly?: boolean; scope?: string | null }) => {
+      sock.emit('map:join', { projectId: project.id, scope: wanted ?? undefined }, (r: { ok: boolean; error?: string; map?: MindMap; version?: number; people?: { id: number; name: string }[]; readOnly?: boolean; scope?: string | null; scopes?: { scope: string; title: string }[] }) => {
         if (!r.ok || !r.map) return showRef.current(r.error ?? 'Gliederung nicht geladen');
         scopeRef.current = r.scope ?? wanted ?? null;
         setScope(scopeRef.current);
@@ -35,6 +37,7 @@ export function GliederungLive({ sock, project, scope: wanted, meId, noteInfo, s
         setMap(r.map);
         setPeople(r.people ?? []);
         setReadOnly(!!r.readOnly);
+        setScopes(r.scopes ?? []);
       });
     const onMap = (msg: { projectId: number; scope: string; map: MindMap; version: number }) => {
       if (msg.projectId !== project.id || msg.scope !== scopeRef.current || msg.version <= version.current) return;
@@ -66,5 +69,5 @@ export function GliederungLive({ sock, project, scope: wanted, meId, noteInfo, s
   );
 
   if (!map) return <p className="muted" style={{ padding: 12 }}>Gliederung wird geladen …</p>;
-  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} side={side} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} />;
+  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} side={side} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} teacher={teacherGroup({ role: project.role, scope, scopes, sock, projectId: project.id })} />;
 }

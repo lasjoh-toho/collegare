@@ -59,7 +59,27 @@
 .head:hover .actions, .head:focus-within .actions { display: inline-flex; }
 @media (hover: none) { .actions { display: inline-flex; } }
 .actions :global(.btn.icon) { width: 24px; height: 24px; }
-.sharedMark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--o); box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--o); }
+.sharedMark { flex: none; width: 10px; height: 10px; padding: 0; border: 0; border-radius: 50%; background: var(--o); box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--o); cursor: pointer; }
+.sharedMark:hover, .sharedOn { box-shadow: 0 0 0 2px #fff, 0 0 0 4.5px var(--o); }
+/* Rückseite: derselbe Punkt in der anderen Linie, dreht sich wie eine Karte herein */
+.back {
+  position: relative; z-index: 1; margin-block: 2px 8px; margin-inline: 32px 4px; padding: 6px 9px 8px; border: 1.5px solid var(--o); border-top-width: 5px; border-radius: 8px;
+  background: var(--bg-elev); box-shadow: 0 3px 10px rgb(0 0 0 / 0.1); direction: ltr; transform-origin: 50% 0;
+  animation: gFlip 0.35s ease-out;
+}
+@keyframes gFlip { from { transform: perspective(600px) rotateX(-90deg); opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .back { animation: none; } }
+.backHead { display: flex; align-items: center; gap: 6px; }
+.backHead :global(.btn.icon) { width: 20px; height: 20px; }
+.backKind { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--o); }
+.backGo { padding: 1px 6px; border: 1px solid var(--o); border-radius: 6px; background: none; color: var(--o); font-size: 11px; cursor: pointer; }
+.backTitle { margin-top: 3px; font-weight: 650; font-size: 13.5px; }
+.diff { background: color-mix(in srgb, var(--o) 14%, transparent); border-radius: 4px; padding-inline: 3px; }
+.backSubs { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.backSubs li { padding-block: 1px; }
+.onlyThere { font-weight: 600; color: var(--o); }
+.onlyHere { color: var(--fg-faint); text-decoration: line-through; }
+.backNote { margin-top: 4px; font-size: 11.5px; color: var(--fg-muted); }
 .over, .head[data-line-over] { outline: 2px solid var(--metro); outline-offset: 1px; background: color-mix(in srgb, var(--metro) 10%, transparent); }
 
 /* Schiene: Ablegen direkt auf der Linie erzeugt einen neuen Kreis; der Geisterkreis zeigt die Stelle */
@@ -100,8 +120,17 @@
 .endTrack { padding-bottom: 0; }
 .endTrack::before { top: -8px; bottom: 50%; border-radius: 0 0 5px 5px; }
 .track:has(> .end:last-child)::before { bottom: 25px; }
-.addForm { flex: 1; }
-.addForm input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--metro); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+.addForm { flex: 1; min-width: 0; }
+/* Eingabe an der Linie, zugleich Suche (Jo, 22. November 2026) */
+.railInput { position: absolute; inset-inline: 32px 4px; z-index: 6; transform: translateY(-50%); }
+.search { position: relative; direction: ltr; }
+.search input { width: 100%; height: 30px; padding: 0 8px; border: 1.5px solid var(--metro); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 13.5px; box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); }
+.hits { position: absolute; left: 0; right: 0; top: calc(100% + 3px); z-index: 7; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-elev); box-shadow: 0 6px 18px rgb(0 0 0 / 0.16); }
+.hits li { display: flex; align-items: baseline; gap: 6px; padding: 5px 7px; border-radius: 5px; font-size: 13px; cursor: pointer; }
+.hits li b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hits li span { flex: none; margin-inline-start: auto; font-size: 11px; color: var(--fg-muted); }
+.hits li:hover, .hits .hitOn { background: color-mix(in srgb, var(--metro) 12%, transparent); }
+.rail { cursor: pointer; }
 .gone { margin: 14px 0 0 32px; font-size: 12.5px; color: var(--fg-muted); }
 .goneRow { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .goneTitle { flex: 1; min-width: 0; color: var(--fg-faint); text-decoration: line-through; }
@@ -158,3 +187,18 @@
 .parallel .sharedMark { display: none; }
 /* Farbe des Asts bzw. Clusters, mit übernommen: Kreis in dieser Farbe gefüllt */
 .colored.l0 > .head .stop, .colored.l1 > .head .stop { background: var(--pc); }
+
+/* Texte vergleichen (Jo, 22. November 2026): unter jedem Punktpaar beide Texte auf gleicher Höhe; die Linien laufen durch */
+.textRow .textCell { position: relative; min-height: 22px; padding: 2px 34px 10px; }
+.textRow .textCell::before { content: ''; position: absolute; top: 0; bottom: 0; width: 9px; background: var(--metro); }
+.textRow .left.textCell::before { right: calc(15px - 4.5px); }
+.textRow .right.textCell::before { left: calc(15px - 4.5px); }
+.textRow .bridge { display: flex; justify-content: center; align-items: flex-start; }
+.textToggle { display: grid; place-items: center; width: 24px; height: 20px; margin-top: 2px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-elev); color: var(--fg-muted); cursor: pointer; }
+.textToggle:hover { color: var(--fg); border-color: var(--fg-muted); }
+.text { padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--metro) 30%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--metro) 4%, var(--bg-elev)); font-family: Georgia, 'Times New Roman', serif; font-size: 13.5px; line-height: 1.45; color: var(--fg); }
+.text p { margin: 0 0 5px; }
+.text b { display: block; margin: 6px 0 3px; font-family: system-ui, sans-serif; font-size: 12.5px; }
+.text b:first-child { margin-top: 0; }
+.noText { margin: 4px 0; font-size: 12px; font-style: italic; color: var(--fg-faint); }
+.textShut .textCell { min-height: 24px; padding-bottom: 0; }
