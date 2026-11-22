@@ -1317,6 +1317,31 @@ Im Druckfenster lässt sich außerdem (alles mit der Anmeldung in Autogra.fi, oh
   Teilaufgaben bleiben. Der Text ist dann Grundlage für den Erwartungshorizont und die KI-Bewertung. Nach der
   Freigabe der Ergebnisse sperrt Autogra.fi den Aufgabentext, dann wird nichts übernommen.
 
+### 8j.6 Gestaltung, Korrekturrand, Glossar (Stufe 2, 22. November 2026)
+
+Wünsche von Jo nach dem ersten Ausprobieren:
+
+- **Korrekturrand** für die Korrektur auf Papier, im Blatt eingestellt (rechts oder links, 2 bis 5 cm): dünne,
+  mittlere oder dicke Randlinie, oder die Zeilen enden vor dem Rand. Er gilt für alle Schreiblinien und Karos, auch
+  unter Aufgaben und auf den Füllseiten der Broschüre; ein einzelner Linien-Baustein kann ihn abschalten. Ältere
+  Blätter mit „mit Korrekturrand“ am Linien-Baustein werden übernommen.
+- **Auszeichnungen** im Text wie bei den Lernseiten (gleiche Schreibweise, gleicher Editor `lib/tufteEdit.ts`): fett,
+  kursiv, neu unterstrichen (`++…++`), Textmarker (`==…==`), Fußnote (`^[…]`, fortlaufend nummeriert unten auf der
+  Seite, auf der die Stelle steht, zusammen mit den Quellen der Materialien), Randbemerkung (`^^[…]`) im Rand für
+  Notizen.
+- **Vorlagen und Gestaltung je Baustein:** Jeder Textbaustein hat Vorlagen (Erklärtext: Hinweis grau, Kleingedrucktes,
+  Einleitung; Material: mit Rand für Notizen, kompakt, Zeitungsartikel; Zitat: Balken, eingerückt, groß in der Mitte;
+  Aufgabe: fett, im Kasten; Kasten: grau, Merksatz, gestrichelt). Darüber lassen sich Schriftgröße, Zeilenabstand,
+  Ausrichtung, Einzug, ganz kursiv/fett und die Breite des Rands für Notizen ändern; „Wie in der Vorlage“ nimmt das
+  wieder weg.
+- **Glossar:** Ein Wort markieren und „Glossar“ wählen (`{Wort|Erklärung}`). Der Baustein Glossar sammelt alle Wörter
+  des Blatts (Alphabet oder Reihenfolge im Text, als Liste, im Kasten oder zweispaltig) und wird beim ersten Wort von
+  selbst angelegt; die Erklärungen schreibt man dort oder nach Antippen des Worts. Im Text ist das Wort mit Sternchen,
+  Pfeil oder fett gekennzeichnet. Nach Autogra.fi geht das Glossar als Liste mit.
+- **Bilder von einer Adresse:** Der Server holt das Bild (`/api/bild-holen`, wie bei Notizen und Folien), Urheber und
+  Lizenz kommen, soweit die Seite sie nennt, in die Bildunterschrift.
+- Überschriften bleiben beim Seitenumbruch beim folgenden Baustein.
+
 ### 8j.5 Nächste Stufen
 
 1. Spalten und Randspalte (Bild oder Kasten neben dem Text wie im Beispiel), Bild neben Aufgaben.

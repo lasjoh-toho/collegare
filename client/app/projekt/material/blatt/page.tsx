@@ -10,10 +10,35 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
-import { RichText } from '@/components/RichText';
+import { RichText, type EditorApi } from '@/components/RichText';
+import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { fileUrl, type Material } from '@/components/Materials';
 import { ApiError, get, href, patch } from '@/lib/api';
-import { BLOCK_LABEL, blockSummary, newBlock, paginate, parseDoc, sheetSize, toCriteria, toMarkdown, toSheets, uid, type BlattDoc, type Block, type BlockType, type Copy, type Problem, type Ruling } from '@/lib/blatt';
+import {
+  BLOCK_LABEL,
+  blockSummary,
+  fromEditMd,
+  glossaryTerms,
+  newBlock,
+  paginate,
+  parseDoc,
+  setTerm,
+  sheetSize,
+  styleOf,
+  TEMPLATES,
+  toCriteria,
+  toEditMd,
+  toMarkdown,
+  toSheets,
+  uid,
+  type BlattDoc,
+  type Block,
+  type BlockType,
+  type Copy,
+  type Korr,
+  type Problem,
+  type Ruling,
+} from '@/lib/blatt';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import st from './blatt.module.css';
@@ -26,8 +51,8 @@ interface Page {
   body: string;
 }
 
-const ICON: Record<BlockType, string> = { heading: 'H', text: '¶', material: '❝', quote: '“', image: '▣', task: '✎', box: '▢', lines: '≡', pagebreak: '⤓' };
-const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'lines', 'pagebreak'];
+const ICON: Record<BlockType, string> = { heading: 'H', text: '¶', material: '❝', quote: '“', image: '▣', task: '✎', box: '▢', glossary: 'Aa', lines: '≡', pagebreak: '⤓' };
+const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'glossary', 'lines', 'pagebreak'];
 const MAX = 4_000_000;
 
 const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken.
@@ -36,7 +61,15 @@ Links legst du das Format fest und fügst Bausteine hinzu: Material (mit Zeilenz
 
 In der Mitte siehst du die Seiten so, wie sie gedruckt werden. Ein Klick auf einen Baustein wählt ihn aus; rechts bearbeitest du ihn. Bilder ziehst du einfach auf die Seite. Rot umrandet ist, was nicht auf eine Seite passt.
 
-„Linien bis zum Seitenende“ füllt den Rest einer Seite mit Schreiblinien, Karos (Mathe) oder Freiraum.
+„Linien bis zum Seitenende“ füllt den Rest einer Seite mit Schreiblinien, Karos (Mathe) oder Freiraum. Den Korrekturrand stellst du links unter „Blatt“ ein: eine dünne, mittlere oder dicke Randlinie, oder die Zeilen enden einfach vor dem Rand. Er gilt für alle Schreiblinien und Karos, auch unter den Aufgaben.
+
+Text auszeichnen: Markiere Text, dann setzt die Leiste fett, kursiv, unterstrichen oder den Textmarker. „Fußnote“ setzt eine nummerierte Fußnote unten auf die Seite, „Randbemerkung“ schreibt etwas in den Rand neben die Zeile. Fußnoten und Randbemerkungen tippst du an, um sie zu ändern.
+
+Glossar: Markiere ein Wort und wähle „Glossar“. Das Wort kommt ins Glossar am Ende des Blatts (es wird beim ersten Wort von selbst angelegt), die Erklärung schreibst du dort oder nach Antippen des Worts. Im Text ist das Wort mit einem Sternchen, einem Pfeil oder fett gekennzeichnet.
+
+Gestaltung: Jeder Textbaustein hat Vorlagen (z. B. Material mit Rand für Notizen, Kasten grau hinterlegt, Zitat groß in der Mitte). Unter „Gestaltung“ änderst du für den ganzen Baustein Schriftgröße, Zeilenabstand, Ausrichtung, Einzug, kursiv oder fett und die Breite des Rands für Notizen.
+
+Bilder: hineinziehen, einfügen, aus dem Material wählen oder über ihre Adresse im Netz laden.
 
 Broschüre: Die Seiten werden auf ein Vielfaches von vier aufgefüllt (mit Linien, Karos oder leer) und so auf die Bögen verteilt, dass nach dem Falten alles in der richtigen Reihenfolge liegt; die erste Seite steht also neben der letzten. Aus A5-Seiten werden A4-Bögen (quer), aus A4-Seiten A3-Bögen. Beidseitig drucken und an der kurzen Kante wenden.
 
@@ -390,6 +423,7 @@ export default function BlattPage() {
                         </select>
                       </div>
                     )}
+                    <KorrFields korr={doc.page.korr} set={(k) => setPageOpt({ korr: { ...doc.page.korr, ...k } })} />
                     <label className={st.check}>
                       <input type="checkbox" checked={doc.page.header.show} onChange={(e) => setHeader({ show: e.target.checked })} /> Kopfzeile auf der ersten Seite
                     </label>
@@ -500,7 +534,18 @@ export default function BlattPage() {
           {editing && (
             <aside className={`${st.side} ${st.right}`}>
               {selBlock ? (
-                <Inspector key={selBlock.id} b={selBlock} set={(p) => setBlock(selBlock.id, p)} projectId={id} onImage={(f) => void imageInto(f, selBlock.id)} />
+                <Inspector
+                  key={selBlock.id}
+                  b={selBlock}
+                  doc={doc}
+                  set={(p) => setBlock(selBlock.id, p)}
+                  projectId={id}
+                  onImage={(f) => void imageInto(f, selBlock.id)}
+                  onTerm={(w, e) => change((d) => setTerm(d, w, e))}
+                  ensureGlossary={() =>
+                    change((d) => (d.blocks.some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))
+                  }
+                />
               ) : (
                 <p className={st.hint}>Klick auf einen Baustein in der Liste oder auf der Seite, um ihn hier zu bearbeiten. Bilder kannst du direkt auf die Seite ziehen oder einfügen (Strg+V).</p>
               )}
@@ -513,14 +558,202 @@ export default function BlattPage() {
   );
 }
 
+// ---------- Korrekturrand (links unter „Blatt“) ----------
+function KorrFields({ korr, set }: { korr: Korr; set: (k: Partial<Korr>) => void }) {
+  return (
+    <>
+      <div className={st.grid2}>
+        <div className="field">
+          <label>Korrekturrand</label>
+          <select value={korr.side} onChange={(e) => set({ side: e.target.value as Korr['side'] })}>
+            <option value="none">keiner</option>
+            <option value="right">rechts</option>
+            <option value="left">links</option>
+          </select>
+        </div>
+        {korr.side !== 'none' && (
+          <div className="field">
+            <label>Breite</label>
+            <select value={korr.width} onChange={(e) => set({ width: Number(e.target.value) })}>
+              {[20, 25, 30, 40, 50].map((v) => (
+                <option key={v} value={v}>
+                  {v / 10} cm
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      {korr.side !== 'none' && (
+        <div className="field">
+          <label>Am Rand</label>
+          <div className="seg" role="group" aria-label="Randlinie">
+            {(
+              [
+                ['thin', 'dünne Linie'],
+                ['medium', 'mittel'],
+                ['thick', 'dick'],
+                ['end', 'Zeilen enden'],
+              ] as const
+            ).map(([v, l]) => (
+              <button key={v} type="button" className={`btn ${korr.style === v ? 'on' : ''}`} onClick={() => set({ style: v })} title={v === 'end' ? 'Keine Randlinie: die Zeilen hören vor dem Rand auf' : `Randlinie ${l}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------- rechte Spalte: gewählter Baustein ----------
-function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<Block>) => void; projectId: number; onImage: (f: Blob) => void }) {
-  const rich = (label: string, value: string | undefined, placeholder: string) => (
+interface Atom {
+  el: HTMLElement;
+  api: EditorApi;
+  text: string;
+  extra: string;
+}
+
+function Inspector({
+  b,
+  doc,
+  set,
+  projectId,
+  onImage,
+  onTerm,
+  ensureGlossary,
+}: {
+  b: Block;
+  doc: BlattDoc;
+  set: (p: Partial<Block>) => void;
+  projectId: number;
+  onImage: (f: Blob) => void;
+  onTerm: (word: string, explain: string | null) => void;
+  ensureGlossary: () => void;
+}) {
+  const [atom, setAtom] = useState<Atom | null>(null);
+  function openAtom(el: HTMLElement, api: EditorApi) {
+    if (el.classList.contains('ed-note')) setAtom({ el, api, text: el.dataset.text ?? '', extra: '' });
+    else if (el.classList.contains('ed-gloss')) setAtom({ el, api, text: el.textContent ?? '', extra: el.dataset.explain ?? '' });
+  }
+  function saveAtom(remove = false) {
+    if (!atom) return;
+    const { el, api, text, extra } = atom;
+    if (remove) {
+      // Glossar-Wort: nur die Kennzeichnung entfernen, das Wort bleibt im Text
+      if (el.classList.contains('ed-gloss')) el.replaceWith(document.createTextNode(el.textContent ?? ''));
+      else el.remove();
+    } else {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = el.classList.contains('ed-gloss') ? glossHtml(text.trim(), extra.trim()) : noteHtml(el.dataset.kind === 'margin' ? 'margin' : 'note', text.trim());
+      if (tpl.content.firstChild) el.replaceWith(tpl.content.firstChild);
+    }
+    api.emit();
+    setAtom(null);
+  }
+  const tools = (api: EditorApi) => (
+    <>
+      <button type="button" className="btn" onClick={() => (document.execCommand('underline'), api.emit())} title="Unterstrichen (Strg+U)">
+        <u>U</u>
+      </button>
+      <button
+        type="button"
+        className="btn"
+        title="Textmarker"
+        onClick={() => {
+          const t = api.selectedText();
+          if (!t) return;
+          const sel = getSelection();
+          const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
+          const m = r?.startContainer.parentElement?.closest('mark');
+          if (m) m.replaceWith(...m.childNodes);
+          else if (r) {
+            const mk = document.createElement('mark');
+            mk.appendChild(r.extractContents());
+            r.insertNode(mk);
+          }
+          api.emit();
+        }}
+      >
+        <mark style={{ background: '#fff176', padding: '0 2px' }}>M</mark>
+      </button>
+      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('note', 'Fußnote'))} title="Nummerierte Fußnote unten auf der Seite; antippen zum Ändern">
+        Fußnote
+      </button>
+      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('margin', 'Bemerkung'))} title="Bemerkung im Rand neben der Zeile; antippen zum Ändern">
+        Randbemerkung
+      </button>
+      <button
+        type="button"
+        className="btn"
+        title="Markiertes Wort ins Glossar"
+        onClick={() => {
+          const w = api.selectedText().trim();
+          if (!w) return;
+          const known = glossaryTerms(doc).find((t) => t.word.toLowerCase() === w.toLowerCase());
+          const sel = getSelection();
+          if (sel?.rangeCount) sel.getRangeAt(0).deleteContents();
+          api.insertHtml(glossHtml(w, known?.explain ?? ''));
+          ensureGlossary();
+        }}
+      >
+        Glossar
+      </button>
+    </>
+  );
+  const rich = (label: string, value: string | undefined, placeholder: string, key: 'md' | 'title' = 'md', minimal = false) => (
     <div className="field">
       <label>{label}</label>
-      <div className={st.richBox}>
-        <RichText value={value ?? ''} onChange={(md) => set({ md })} max={200_000} label={label} tools={['bold', 'italic', 'ul', 'ol']} placeholder={placeholder} tip={false} pinKey="collegare-editor-leiste-blatt" defaultPinned />
+      <div className={`${st.richBox} ${minimal ? st.richSmall : ''}`}>
+        <RichText
+          value={toEditMd(value ?? '')}
+          onChange={(md) => set({ [key]: fromEditMd(md) })}
+          max={200_000}
+          label={label}
+          render={tufteToEdit}
+          serialize={editToTufte}
+          tools={minimal ? ['bold', 'italic'] : ['bold', 'italic', 'ul', 'ol']}
+          extraTools={tools}
+          onAtom={openAtom}
+          placeholder={placeholder}
+          tip={false}
+          pinKey="collegare-editor-leiste-blatt"
+          defaultPinned
+        />
       </div>
+      {atom && atom.el.isConnected && (
+        <form
+          className={st.atom}
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveAtom();
+          }}
+        >
+          <strong>{atom.el.classList.contains('ed-gloss') ? 'Glossar' : atom.el.dataset.kind === 'margin' ? 'Randbemerkung' : 'Fußnote'}</strong>
+          {atom.el.classList.contains('ed-gloss') && <input value={atom.text} onChange={(e) => setAtom({ ...atom, text: e.target.value })} aria-label="Wort" placeholder="Wort" />}
+          <textarea
+            autoFocus
+            rows={3}
+            value={atom.el.classList.contains('ed-gloss') ? atom.extra : atom.text}
+            onChange={(e) => setAtom(atom.el.classList.contains('ed-gloss') ? { ...atom, extra: e.target.value } : { ...atom, text: e.target.value })}
+            placeholder={atom.el.classList.contains('ed-gloss') ? 'Erklärung fürs Glossar' : atom.el.dataset.kind === 'margin' ? 'Text im Rand' : 'Text der Fußnote'}
+            aria-label="Inhalt"
+          />
+          <div className="row">
+            <button type="button" className="btn danger" onClick={() => saveAtom(true)}>
+              Entfernen
+            </button>
+            <span className="grow" />
+            <button type="button" className="btn" onClick={() => setAtom(null)}>
+              Abbrechen
+            </button>
+            <button type="submit" className="btn primary">
+              Übernehmen
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
   const ruling = (value: Ruling | undefined, onChange: (r: Ruling) => void, withEmpty = true) => (
@@ -535,6 +768,21 @@ function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<
       <div className={st.secHead}>
         {ICON[b.type]} {BLOCK_LABEL[b.type]}
       </div>
+      {TEMPLATES[b.type] && (
+        <div className="field">
+          <label>Vorlage</label>
+          <select
+            value={b.tpl ?? TEMPLATES[b.type]![0].id}
+            onChange={(e) => set({ tpl: e.target.value, fs: undefined, lh: undefined, ta: undefined, it: undefined, bd: undefined, nm: undefined, ind: undefined, ...(b.type === 'material' ? { justify: undefined } : {}) })}
+          >
+            {TEMPLATES[b.type]!.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {b.type === 'heading' && (
         <>
           <div className="field">
@@ -564,18 +812,12 @@ function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<
               </label>
             </div>
           </div>
-          <div className="field">
-            <label>Titel</label>
-            <input value={b.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder="z. B. Aus dem Schreiben des Reichsarbeitsministers …" />
-          </div>
+          {rich('Titel', b.title, 'z. B. Der Wasserkreislauf der Erde', 'title', true)}
           {rich('Text', b.md, 'Text des Materials. Jede Zeile ist ein Absatz.')}
           <div className="field">
             <label>Quelle (steht als Fußnote unten auf der Seite)</label>
             <input value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="zitiert nach …" />
           </div>
-          <label className={st.check}>
-            <input type="checkbox" checked={b.justify !== false} onChange={(e) => set({ justify: e.target.checked })} /> Blocksatz
-          </label>
         </>
       )}
       {b.type === 'text' && rich('Text', b.md, 'Erklärtext, Hinweise, Einleitung …')}
@@ -584,14 +826,14 @@ function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<
           {rich('Zitat', b.md, 'Zitierter Text')}
           <div className="field">
             <label>Quelle</label>
-            <input value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="z. B. Hannah Arendt, 1951" />
+            <input value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="z. B. Marie Curie, 1921" />
           </div>
         </>
       )}
       {b.type === 'image' && <ImageFields b={b} set={set} projectId={projectId} onImage={onImage} />}
       {b.type === 'task' && (
         <>
-          {rich('Aufgabenstellung', b.md, 'z. B. Geben Sie das Schreiben knapp wieder …')}
+          {rich('Aufgabenstellung', b.md, 'z. B. Beschreiben Sie die Grafik …')}
           <div className={st.grid2}>
             <div className="field">
               <label>Punkte oder Anteil</label>
@@ -616,9 +858,10 @@ function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<
             <label>Titel (optional)</label>
             <input value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="z. B. Operatoren" />
           </div>
-          {rich('Inhalt', b.md, '**aufzeigen, beschreiben** historische Sachverhalte …')}
+          {rich('Inhalt', b.md, '**beschreiben** Sachverhalte mit eigenen Worten wiedergeben …')}
         </>
       )}
+      {b.type === 'glossary' && <GlossaryFields b={b} doc={doc} set={set} onTerm={onTerm} />}
       {b.type === 'lines' && (
         <>
           <div className="field">
@@ -635,33 +878,205 @@ function Inspector({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<
             </div>
           )}
           {b.style !== 'grid' && b.style !== 'empty' && (
-            <>
-              <div className="field">
-                <label>Zeilenabstand</label>
-                <select value={b.spacing ?? 8} onChange={(e) => set({ spacing: Number(e.target.value) })}>
-                  {[6, 7, 8, 9, 10, 12].map((v) => (
-                    <option key={v} value={v}>
-                      {v} mm
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className={st.check}>
-                <input type="checkbox" checked={!!b.rand} onChange={(e) => set({ rand: e.target.checked })} /> mit Korrekturrand
-              </label>
-            </>
+            <div className="field">
+              <label>Zeilenabstand</label>
+              <select value={b.spacing ?? 8} onChange={(e) => set({ spacing: Number(e.target.value) })}>
+                {[6, 7, 8, 9, 10, 12].map((v) => (
+                  <option key={v} value={v}>
+                    {v} mm
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {b.style !== 'empty' && doc.page.korr.side !== 'none' && (
+            <label className={st.check}>
+              <input type="checkbox" checked={!b.korrOff} onChange={(e) => set({ korrOff: !e.target.checked })} /> mit Korrekturrand (Einstellung unter „Blatt“)
+            </label>
           )}
         </>
       )}
       {b.type === 'pagebreak' && <p className={st.hint}>Der nächste Baustein beginnt auf einer neuen Seite.</p>}
+      {b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && <StyleFields b={b} set={set} />}
     </section>
   );
+}
+
+/** Auswahlwerte samt dem aktuellen (Vorlagen dürfen Zwischenwerte haben) */
+const withValue = (list: number[], v?: number) => (v === undefined || list.includes(v) ? list : [...list, v].sort((a, b) => a - b));
+
+/** Gestaltung des ganzen Bausteins: über der Vorlage, „zurücksetzen“ nimmt die eigenen Werte wieder weg */
+function StyleFields({ b, set }: { b: Block; set: (p: Partial<Block>) => void }) {
+  const [open, setOpen] = useState(false);
+  const s = styleOf(b);
+  const own = (['fs', 'lh', 'ta', 'it', 'bd', 'nm', 'ind'] as const).some((k) => b[k] !== undefined) || (b.type === 'material' && b.justify === false);
+  return (
+    <div className={st.styleBox}>
+      <button type="button" className={st.secHead} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        {open ? '▾' : '▸'} Gestaltung{own ? ' (eigene)' : ''}
+      </button>
+      {open && (
+        <>
+          <div className={st.grid2}>
+            <div className="field">
+              <label>Schriftgröße</label>
+              <select value={s.fs ?? 100} onChange={(e) => set({ fs: Number(e.target.value) })}>
+                {withValue([80, 85, 90, 100, 110, 120, 140], s.fs).map((v) => (
+                  <option key={v} value={v}>
+                    {v} %
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Zeilenabstand</label>
+              <select value={s.lh ?? 1.35} onChange={(e) => set({ lh: Number(e.target.value) })}>
+                {withValue([1.15, 1.25, 1.35, 1.45, 1.6, 1.8, 2, 2.4], s.lh ?? 1.35).map((v) => (
+                  <option key={v} value={v}>
+                    {String(v).replace('.', ',')}-fach
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Rand für Notizen</label>
+              <select value={s.nm ?? 0} onChange={(e) => set({ nm: Number(e.target.value) })}>
+                <option value={0}>keiner</option>
+                {withValue([20, 30, 40, 50], s.nm || undefined).map((v) => (
+                  <option key={v} value={v}>
+                    {String(v / 10).replace('.', ',')} cm
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Einzug links</label>
+              <select value={s.ind ?? 0} onChange={(e) => set({ ind: Number(e.target.value) })}>
+                {[0, 5, 10, 15, 20].map((v) => (
+                  <option key={v} value={v}>
+                    {v ? `${v} mm` : 'keiner'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>Ausrichtung</label>
+            <div className="seg" role="group" aria-label="Ausrichtung">
+              {(
+                [
+                  ['left', 'links'],
+                  ['justify', 'Blocksatz'],
+                  ['center', 'Mitte'],
+                  ['right', 'rechts'],
+                ] as const
+              ).map(([v, l]) => (
+                <button key={v} type="button" className={`btn ${(s.ta ?? 'left') === v ? 'on' : ''}`} onClick={() => set({ ta: v })}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={st.grid2}>
+            <label className={st.check}>
+              <input type="checkbox" checked={!!s.it} onChange={(e) => set({ it: e.target.checked })} /> ganz kursiv
+            </label>
+            <label className={st.check}>
+              <input type="checkbox" checked={!!s.bd} onChange={(e) => set({ bd: e.target.checked })} /> ganz fett
+            </label>
+          </div>
+          {own && (
+            <button type="button" className="btn" onClick={() => set({ fs: undefined, lh: undefined, ta: undefined, it: undefined, bd: undefined, nm: undefined, ind: undefined, ...(b.type === 'material' ? { justify: undefined } : {}) })}>
+              Wie in der Vorlage
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Glossar: Wörter entstehen im Text (markieren, „Glossar“); hier stehen alle mit ihrer Erklärung */
+function GlossaryFields({ b, doc, set, onTerm }: { b: Block; doc: BlattDoc; set: (p: Partial<Block>) => void; onTerm: (word: string, explain: string | null) => void }) {
+  const terms = glossaryTerms(doc);
+  return (
+    <>
+      <div className="field">
+        <label>Überschrift</label>
+        <input value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="Glossar" />
+      </div>
+      <div className={st.grid2}>
+        <div className="field">
+          <label>Reihenfolge</label>
+          <select value={b.sort ?? 'alpha'} onChange={(e) => set({ sort: e.target.value as Block['sort'] })}>
+            <option value="alpha">nach dem Alphabet</option>
+            <option value="order">wie im Text</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Im Text markiert mit</label>
+          <select value={b.mark ?? 'star'} onChange={(e) => set({ mark: e.target.value as Block['mark'] })}>
+            <option value="star">Sternchen*</option>
+            <option value="arrow">→ Pfeil</option>
+            <option value="bold">fett</option>
+            <option value="none">nichts</option>
+          </select>
+        </div>
+      </div>
+      {!terms.length && <p className={st.hint}>Noch keine Wörter. Markiere in einem Text ein Wort und wähle in der Leiste „Glossar“.</p>}
+      {terms.map((t) => (
+        <div className="field" key={t.word}>
+          <label className="row">
+            <strong>{t.word}</strong>
+            <span className="grow" />
+            <button type="button" className="btn" style={{ height: 22, fontSize: 11.5 }} onClick={() => onTerm(t.word, null)} title="Aus dem Glossar nehmen (das Wort bleibt im Text)">
+              ✕
+            </button>
+          </label>
+          <TermInput value={t.explain} onChange={(v) => onTerm(t.word, v)} />
+        </div>
+      ))}
+    </>
+  );
+}
+function TermInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return <textarea className={st.term} rows={2} value={value} onChange={(e) => onChange(e.target.value.replace(/[{}\n]/g, ' '))} placeholder="Erklärung" />;
 }
 
 /** Bild: Datei, Einfügen, Ziehen oder aus dem Material von Collegare (Bilder dieses Projekts bzw. der Werkstatt) */
 function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<Block>) => void; projectId: number; onImage: (f: Blob) => void }) {
   const [pick, setPick] = useState<Material[] | null>(null);
   const [err, setErr] = useState('');
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  /** Bild von einer Adresse im Netz: der Server holt es (fremde Seiten geben Bilder dem Browser oft nicht heraus) */
+  async function fromUrl() {
+    const u = url.trim();
+    if (!/^https?:\/\/\S+$/.test(u)) return setErr('Bitte die vollständige Adresse des Bilds eingeben (beginnt mit https://).');
+    setErr('');
+    setLoading(true);
+    try {
+      const res = await fetch(href(`/api/bild-holen?url=${encodeURIComponent(u)}`), { credentials: 'include' });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string; page?: boolean };
+        throw new Error(j.page ? 'Unter dieser Adresse liegt eine Webseite, kein Bild. Rechtsklick auf das Bild, „Bildadresse kopieren“, und hier einsetzen.' : (j.message ?? j.error ?? `Fehler ${res.status}`));
+      }
+      onImage(await res.blob());
+      if (!b.caption) {
+        // Urheber und Lizenz, soweit die Seite sie nennt (z. B. Wikimedia)
+        const info = await fetch(href(`/api/bild-info?url=${encodeURIComponent(u)}`), { credentials: 'include' })
+          .then((r) => (r.ok ? (r.json() as Promise<{ title?: string; credit?: string; license?: string }>) : null))
+          .catch(() => null);
+        const credit = [info?.credit, info?.license].filter(Boolean).join(', ');
+        set({ caption: [info?.title, credit && `(${credit})`].filter(Boolean).join(' ') || `Quelle: ${new URL(u).hostname}` });
+      }
+      setUrl('');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
   async function openPick() {
     setErr('');
     try {
@@ -690,6 +1105,18 @@ function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partia
           Aus dem Material
         </button>
       </div>
+      <form
+        className={st.urlRow}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void fromUrl();
+        }}
+      >
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="oder Adresse: https://…" aria-label="Adresse des Bilds im Netz" />
+        <button type="submit" className="btn" disabled={loading || !url.trim()}>
+          {loading ? 'Lädt …' : 'Laden'}
+        </button>
+      </form>
       {err && <div className="error">{err}</div>}
       {pick && (pick.length ? (
         <div className={st.thumbs}>
@@ -704,7 +1131,7 @@ function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partia
       ))}
       <div className="field">
         <label>Bildunterschrift</label>
-        <input value={b.caption ?? ''} onChange={(e) => set({ caption: e.target.value })} placeholder="z. B. Plakat 135 × 99 cm, Berlin 1934" />
+        <input value={b.caption ?? ''} onChange={(e) => set({ caption: e.target.value })} placeholder="z. B. Abb. 1: Pegel des Rheins bei Köln, 2018" />
       </div>
       <div className="field">
         <label>Breite: {b.width ?? 100} %</label>

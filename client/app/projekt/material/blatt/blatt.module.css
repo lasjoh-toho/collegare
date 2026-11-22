@@ -84,6 +84,7 @@
 .host :global(.bl-note sup) { font-size: 0.8em; }
 .host :global(.bl-foot) { flex: none; text-align: center; font-size: 0.72em; color: #555; padding-top: 2mm; min-height: 1em; }
 .host :global(.bl-block) { margin: 0 0 3.2mm; position: relative; }
+.host :global(.bl-block .bl-ruling) { font-style: normal; max-width: 100%; }
 .host :global(.bl-block p) { margin: 0 0 0.5em; }
 .host :global(.bl-block p:last-child) { margin-bottom: 0; }
 .host :global(.bl-block ul), .host :global(.bl-block ol) { margin: 0 0 0.5em; padding-left: 6mm; }
@@ -94,7 +95,7 @@
 .host :global(.bl-mat-title) { font-weight: 700; margin-bottom: 1.5mm; }
 .host :global(.bl-mat-label) { text-decoration: underline; text-underline-offset: 0.18em; }
 .host :global(.bl-mat-title sup) { font-weight: 400; font-size: 0.7em; }
-.host :global(.bl-mat-body) { position: relative; line-height: 1.45; }
+.host :global(.bl-mat-body) { position: relative; }
 .host :global(.bl-mat-body.bl-numbered) { margin-left: 7mm; }
 .host :global(.bl-mat-body p) { margin: 0; }
 .host :global(.bl-justify) { text-align: justify; hyphens: auto; }
@@ -118,6 +119,35 @@
 .host :global(.bl-box-text p) { margin: 0 0 0.6em; }
 .host :global(.bl-ruling) { display: block; }
 .host :global(.bl-lines) { margin-bottom: 0; }
+/* Auszeichnungen im Text */
+.host :global(.bl-block u) { text-underline-offset: 0.15em; }
+.host :global(.bl-block mark) { background: #fff176; color: inherit; padding: 0 0.1em; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.host :global(sup.bl-fn) { font-size: 0.7em; line-height: 0; font-style: normal; font-weight: 400; }
+.host :global(.bl-gl sup) { font-size: 0.75em; line-height: 0; }
+.host :global(.bl-gl-bold) { font-weight: 700; }
+/* Rand für Notizen: Text schmaler, Randbemerkungen stehen daneben */
+.host :global(.bl-hasnm) { padding-right: calc(var(--nm) + 3mm); }
+.host :global(.bl-mnote) { float: right; clear: right; width: var(--nm, 30mm); margin-right: calc(-1 * (var(--nm, 30mm) + 3mm)); font-size: 0.78em; line-height: 1.25; font-style: italic; font-weight: 400; text-align: left; hyphens: manual; color: #333; }
+.host :global(.bl-block:not(.bl-hasnm) .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
+.host :global(.bl-block:not(.bl-hasnm) .bl-mnote)::before { content: ' ('; }
+.host :global(.bl-block:not(.bl-hasnm) .bl-mnote)::after { content: ')'; }
+/* Vorlagen */
+.host :global(.bl-tpl-hinweis) { background: #eef1f4; padding: 2mm 3mm; border-radius: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.host :global(.bl-tpl-klein) { color: #333; }
+.host :global(.bl-tpl-zeitung) { font-family: 'Linux Libertine', 'Libertinus Serif', Georgia, 'Times New Roman', serif; }
+.host :global(.bl-quote.bl-tpl-eingerueckt .bl-quote-text) { border-left: 0; padding-left: 0; }
+.host :global(.bl-quote.bl-tpl-gross .bl-quote-text) { border-left: 0; padding-left: 0; }
+.host :global(.bl-quote.bl-tpl-gross .bl-quote-text p:first-child)::before { content: '»'; }
+.host :global(.bl-quote.bl-tpl-gross .bl-quote-text p:last-child)::after { content: '«'; }
+.host :global(.bl-quote.bl-tpl-gross .bl-quote-src) { text-align: center; }
+.host :global(.bl-task.bl-tpl-kasten) { border: 0.3mm solid #444; padding: 2mm 3mm; }
+.host :global(.bl-box.bl-tpl-grau) { border: 0; background: #eceff2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.host :global(.bl-box.bl-tpl-merksatz) { border: 0; border-left: 1.4mm solid #444; padding-left: 4mm; }
+.host :global(.bl-box.bl-tpl-gestrichelt) { border-style: dashed; }
+.host :global(.bl-gl-title) { font-weight: 700; font-size: 1.08em; margin-bottom: 1.5mm; }
+.host :global(.bl-gl-item) { margin: 0 0 0.35em !important; break-inside: avoid; }
+.host :global(.bl-glossary.bl-tpl-kasten) { border: 0.3mm solid #444; padding: 2.5mm 3mm; }
+.host :global(.bl-glossary.bl-tpl-zweispaltig .bl-gl-list) { column-count: 2; column-gap: 6mm; }
 .host :global(.bl-overflow) { outline: 0.6mm solid #d92d20; outline-offset: 0.5mm; }
 .host :global(.bl-filler) :global(.bl-body) { opacity: 0.9; }
 /* Auswahl im Editor */
@@ -146,3 +176,12 @@
   .printHost :global(.bl-overflow) { outline: 0; }
   .printHost :global(.bl-ph) { visibility: hidden; }
 }
+/* rechte Spalte: Fußnote/Randbemerkung/Glossar ändern, Gestaltung, Glossar-Erklärungen */
+.atom { display: grid; gap: 6px; margin-top: 6px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--bg-elev); box-shadow: var(--shadow); }
+.atom input, .atom textarea { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; background: var(--bg-elev); color: var(--fg); font: inherit; font-size: 13.5px; }
+.styleBox { display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.styleBox :global(.seg) { flex-wrap: wrap; }
+.term { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--bg-elev); color: var(--fg); font: inherit; font-size: 13.5px; resize: vertical; }
+.richSmall > div > [role='textbox'] { min-height: 40px !important; }
+.urlRow { display: flex; gap: 6px; }
+.urlRow input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--bg-elev); color: var(--fg); }

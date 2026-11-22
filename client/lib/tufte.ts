@@ -3,7 +3,7 @@
  *
  * Schreibweise:
  *   # Abschnitt, ## Unterabschnitt          Überschriften
- *   **fett**, *kursiv*, `Code`, [Text](https://…)
+ *   **fett**, *kursiv*, ++unterstrichen++, `Code`, [Text](https://…)
  *   ==hervorgehoben==                       Hervorhebung (Textmarker)
  *   Text^[nummerierte Randnotiz]            Seitennotiz wie bei Tufte
  *   Text^^[Randbemerkung ohne Nummer]       Marginalie
@@ -134,6 +134,7 @@ function inline(s: string, ctx: Ctx, notes = true): string {
     }
     let matched = false;
     for (const [mark, tag] of [
+      ['++', 'u'],
       ['**', 'strong'],
       ['__', 'strong'],
       ['*', 'em'],

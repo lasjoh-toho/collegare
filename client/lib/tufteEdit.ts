@@ -104,6 +104,7 @@ function inline(s: string, notes = true): string {
     }
     let matched = false;
     for (const [mark, tag] of [
+      ['++', 'u'],
       ['**', 'strong'],
       ['__', 'strong'],
       ['*', 'em'],
@@ -211,6 +212,7 @@ export function editToTufte(root: Node): string {
     if (tag === 'STRONG' || tag === 'B') return mark('**', inner);
     if (tag === 'EM' || tag === 'I') return mark('*', inner);
     if (tag === 'MARK') return mark('==', inner);
+    if (tag === 'U') return mark('++', inner);
     if (tag === 'CODE') return inner ? '`' + (n.textContent ?? '').replace(/`/g, "'") + '`' : '';
     if (tag === 'A') {
       const url = n.getAttribute('href') ?? '';
