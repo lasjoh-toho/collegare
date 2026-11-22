@@ -1,0 +1,33 @@
+/* Seite „Gliederung“ (Konzept 8h.10) */
+/* ‖ steht genau zwischen den beiden Linien darunter (Verschiebung misst die Seite) */
+.switch { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; width: min(460px, 100%); }
+.lineBtn {
+  height: 32px; padding: 0 14px; border-radius: 9px; border: 2px solid var(--t); background: var(--bg-elev); color: var(--t);
+  font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.switch > .lineBtn:first-child { justify-self: end; }
+.switch > .lineBtn:last-child { justify-self: start; }
+.lineBtn.on { background: var(--t); color: #fff; box-shadow: 3px 3px 0 var(--fg); }
+.mid { width: 64px; height: 32px; display: grid; place-items: center; border-radius: 9px; border: 2px solid var(--line); background: var(--bg); color: var(--fg-muted); cursor: pointer; }
+.mid.on { border-color: var(--fg-muted); color: var(--fg); }
+.scope { height: 30px; max-width: 200px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; }
+.notice { margin: 24px auto; max-width: 520px; }
+
+.both { display: flex; height: 100%; min-height: 0; }
+.bothCol { flex: 1; min-width: 0; min-height: 0; animation: gFade 0.35s ease-out; }
+/* eine Linie rutscht aus der Mitte nach links, daneben erscheint die Arbeit */
+.split { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); height: 100%; min-height: 0; }
+.lineCol { min-height: 0; border-right: 1px solid var(--line); background: var(--bg); animation: gSlideLeft 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.work { min-width: 0; min-height: 0; overflow: auto; animation: gFade 0.45s 0.15s ease-out both; }
+/* zarter Farbverlauf: Präsentation oder Ausarbeitung als Text */
+.workAusarb { background: linear-gradient(180deg, color-mix(in srgb, #2b579a 7%, var(--bg)) 0, var(--bg) 220px); }
+.workPraes { background: linear-gradient(180deg, color-mix(in srgb, #c43e1c 7%, var(--bg)) 0, var(--bg) 220px); }
+.slot { padding: 24px; }
+@keyframes gSlideLeft { from { transform: translateX(min(30vw, 420px)); } }
+@keyframes gFade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .lineCol, .work, .bothCol { animation: none; } }
+@media (max-width: 760px) {
+  .split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .lineCol { max-height: 40vh; overflow: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .lineBtn { padding: 0 8px; font-size: 13px; }
+}

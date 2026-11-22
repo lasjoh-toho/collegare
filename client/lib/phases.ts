@@ -127,26 +127,40 @@ export interface TileDef {
   sub: string;
 }
 
+/**
+ * Kacheln in der Reihenfolge der Übersicht (Jo, 22. November 2026): Mindmap, Cluster, Gruppen und Gliederung in einer
+ * Zeile; die Themen-Mindmap ist keine eigene Kachel, „Mindmap“ öffnet sie, solange es noch keine Gruppe gibt.
+ */
 export const TILES: TileDef[] = [
   { key: 'material', phase: null, title: 'Material', icon: 'info', path: '/projekt/material/?id={id}', sub: 'Zum Einarbeiten: Texte, Videos, Webseiten' },
   { key: 'chat', phase: null, title: 'Chat', icon: 'chat', path: '/projekt/chat/?id={id}', sub: 'Mit der Gruppe und mit allen schreiben' },
-  { key: 'topic', phase: 'topic', title: 'Themen-Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}&bereich=p', sub: 'Das Thema gemeinsam umreißen' },
+  { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}&ansicht=aeste', sub: 'Ideen sammeln und ordnen' },
+  { key: 'cluster', phase: 'orientation', title: 'Cluster', icon: 'grid', path: '/projekt/mindmap/?id={id}&ansicht=karten', sub: 'Karten frei auf der Fläche, Zusammengehöriges in Cluster' },
   { key: 'groups', phase: 'groups', title: 'Gruppen', icon: 'users', path: '/projekt/gruppen/?id={id}', sub: 'Board der Gruppenbildung' },
-  { key: 'map', phase: 'orientation', title: 'Mindmap', icon: 'map', path: '/projekt/mindmap/?id={id}', sub: 'Ideen sammeln und ordnen' },
-  { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/mindmap/?id={id}&gliederung=1', sub: 'Abschnitte aus den Clustern' },
+  { key: 'outline', phase: 'orientation', title: 'Gliederung', icon: 'outline', path: '/projekt/gliederung/?id={id}', sub: 'Präsentation und Ausarbeitung nebeneinander' },
   { key: 'notes', phase: 'research', title: 'Notizen und Quellen', icon: 'notes', path: '/projekt/notizen/?id={id}', sub: 'Absprachen, Fragen, Literatur und Fundstellen der Gruppe' },
-  { key: 'pastes', phase: 'research', title: 'Arbeitsprozess', icon: 'clip', path: '/projekt/einfuegen/?id={id}', sub: 'Herkunft von Texten: woher eingesetzte Texte von außen stammen' },
   { key: 'sections', phase: 'drafting', title: 'Textabschnitte', icon: 'doc', office: 'word', docType: 'section', path: '/projekt/ausarbeitung/?id={id}', sub: 'Texteditor je Abschnitt' },
+  { key: 'pastes', phase: 'research', title: 'Arbeitsprozess', icon: 'clip', path: '/projekt/einfuegen/?id={id}', sub: 'Herkunft von Texten: woher eingesetzte Texte von außen stammen' },
+  { key: 'sheet', phase: 'research', title: 'Tabelle', icon: 'grid', office: 'cell', docType: 'sheet', sub: 'Daten auswerten' },
   { key: 'pinnwand', phase: 'presentation', title: 'Pinnwand-Präsentation', icon: 'present', path: '/projekt/pinnwand/?id={id}', sub: 'Bilder, Texte und Roter Faden, gezoomt wie Prezi' },
   { key: 'slides', phase: 'presentation', title: 'Folien-Präsentation', icon: 'slides', office: 'slide', docType: 'slides', path: '/projekt/folien/?id={id}', sub: 'Klassisch Folie für Folie, wie PowerPoint' },
   { key: 'brochure', phase: 'presentation', title: 'Broschüre', icon: 'doc', office: 'word', docType: 'brochure', sub: 'Gemeinsames Heft aller Gruppen' },
   { key: 'handout', phase: 'presentation', title: 'Handout', icon: 'doc', office: 'word', docType: 'handout', sub: 'Zusammenfassung für die Klasse' },
-  { key: 'sheet', phase: 'research', title: 'Tabelle', icon: 'grid', office: 'cell', docType: 'sheet', sub: 'Daten auswerten' },
 ];
+
+/** Abschnitte der Übersicht: die ersten drei Phasen stehen in einer Zeile (Jo, 22. November 2026) */
+export const OVERVIEW_SECTIONS: { no: string; title: string; phases: PhaseKey[] }[] = [
+  { no: '1–3', title: 'Thema, Gruppen und Gliederung', phases: ['topic', 'groups', 'orientation'] },
+  { no: '4', title: 'Recherche und Ausarbeitung', phases: ['research', 'drafting'] },
+  { no: '5', title: 'Präsentation und Publikation', phases: ['presentation'] },
+];
+
+export const TOPIC_MAP_PATH = '/projekt/mindmap/?id={id}&bereich=p';
 
 export const OFFICE_VAR: Record<Office, string> = { word: 'var(--office-word)', slide: 'var(--office-slide)', cell: 'var(--office-cell)' };
 
 /** Hauptoberfläche einer Phase (Link im Seitenmenü). */
 export function phasePath(key: PhaseKey): string | null {
+  if (key === 'topic') return TOPIC_MAP_PATH;
   return TILES.find((t) => t.phase === key && t.path)?.path ?? null;
 }

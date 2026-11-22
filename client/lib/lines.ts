@@ -224,6 +224,50 @@ export function deletePoint(l0: Lines, kind: LineKind, id: string): Lines {
   if (hit) hit.list.splice(hit.list.indexOf(hit.p), 1);
   return l;
 }
+/**
+ * Punkt samt Unterpunkten an eine andere Stelle derselben Linie ziehen (abgelegt auf der Linie, Jo 22. November 2026):
+ * `after` wie bei insertAfterRow. Kommt er aus der anderen Linie, wird er dort kopiert (gleicher Schlüssel) statt verschoben.
+ */
+export function movePointAfter(l0: Lines, kind: LineKind, from: LineKind, id: string, after: string | null): Lines {
+  const l = clone(l0);
+  const hit = findPoint(l[from].points, id);
+  if (!hit) return l;
+  const target = after?.replace(/^\^/, '') ?? null;
+  if (from === kind) {
+    // nicht in sich selbst ablegen
+    if (target && (target === id || allPoints(hit.p.sub).some((x) => x.id === target))) return l0;
+    hit.list.splice(hit.list.indexOf(hit.p), 1);
+    return insertAfterRow(l, kind, after, hit.p);
+  }
+  if (allPoints(l[kind].points).some((p) => p.key === hit.p.key && !p.removed)) return l0;
+  const fresh = (p: LinePoint): LinePoint => ({ ...clone(p), id: rid(), items: clone(p.items).map(reId), sub: p.sub.map(fresh) });
+  return insertAfterRow(l, kind, after, fresh(hit.p));
+}
+
+/**
+ * Vertauschte Punkte wieder gegenüberstellen: den Hauptpunkt `id` der Linie `kind` so verschieben, dass er neben
+ * seinem Gegenstück in der anderen Linie steht. `rows` ist die Ausrichtung der Ansicht „beides“.
+ */
+export function alignPoint(l0: Lines, kind: LineKind, id: string, rows: { left: LinePoint | null; right: LinePoint | null }[]): Lines {
+  const side = kind === 'praes' ? 'left' : 'right';
+  const other = kind === 'praes' ? 'right' : 'left';
+  const me = rows.find((r) => r[side]?.id === id)?.[side];
+  if (!me) return l0;
+  const j = rows.findIndex((r) => r[other]?.key === me.key);
+  if (j < 0) return l0;
+  // hinter den letzten eigenen Punkt, der vor dem Gegenstück steht
+  let after: string | null = null;
+  for (let k = 0; k < j; k++) if (rows[k][side] && rows[k][side]!.id !== id) after = rows[k][side]!.id;
+  const l = clone(l0);
+  const pts = l[kind].points;
+  const i = pts.findIndex((p) => p.id === id);
+  if (i < 0) return l0;
+  const [p] = pts.splice(i, 1);
+  const at = after ? pts.findIndex((x) => x.id === after) + 1 : 0;
+  pts.splice(at, 0, p);
+  return l;
+}
+
 /** Punkt in die andere Linie übernehmen (gleicher Schlüssel: verbindet beide in der Ansicht „beides“) */
 export function copyPoint(l0: Lines, from: LineKind, id: string): Lines {
   const l = clone(l0);
