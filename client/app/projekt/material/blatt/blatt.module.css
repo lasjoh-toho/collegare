@@ -72,6 +72,8 @@
 .host :global(.bl-field) { display: inline-flex; align-items: flex-end; gap: 1.5mm; }
 .host :global(.bl-blank) { display: inline-block; width: 55mm; border-bottom: 0.25mm solid #333; height: 1em; }
 .host :global(.bl-blank.bl-short) { width: 28mm; }
+.host :global(.bl-blank.bl-labelled) { position: relative; margin-bottom: 3mm; }
+.host :global(.bl-under) { position: absolute; left: 0; top: 100%; margin-top: 0.6mm; font-size: 7pt; line-height: 1; color: #555; white-space: nowrap; }
 .host :global(.bl-filled) { font-weight: 600; border-bottom: 0.25mm solid #333; padding: 0 2mm; }
 .host :global(.bl-qr) { flex: none; width: 21mm; text-align: center; }
 .host :global(.bl-qr img) { width: 21mm; height: 21mm; display: block; }

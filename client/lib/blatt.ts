@@ -60,6 +60,11 @@ export interface BlattDoc {
   blocks: Block[];
 }
 
+/** Platzhalter aus „Nummern bestellen“ (z. B. „Abgabe 3“), kein echter Name */
+export function isNumberedSeat(name: string): boolean {
+  return /^Abgabe \d+$/.test(name.trim());
+}
+
 /** Ein persönliches Exemplar (QR-Code aus Autogra.fi) */
 export interface Copy {
   name?: string;
@@ -326,7 +331,17 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy): 
     const left = el('div', 'bl-head-left');
     if (H.text) left.appendChild(el('div', 'bl-head-title', esc(H.text)));
     const fields = el('div', 'bl-head-fields');
-    if (H.nameLine) fields.appendChild(el('span', 'bl-field', 'Name: ' + (copy?.name && copy.printName ? `<span class="bl-filled">${esc(copy.name)}</span>` : '<span class="bl-blank"></span>')));
+    if (H.nameLine) {
+      // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
+      const numbered = !!copy?.name && isNumberedSeat(copy.name);
+      const line =
+        copy?.name && copy.printName && !numbered
+          ? `<span class="bl-filled">${esc(copy.name)}</span>`
+          : numbered
+            ? `<span class="bl-blank bl-labelled"><span class="bl-under">${esc(copy!.name!)}</span></span>`
+            : '<span class="bl-blank"></span>';
+      fields.appendChild(el('span', 'bl-field', 'Name: ' + line));
+    }
     if (H.date) fields.appendChild(el('span', 'bl-field', 'Datum: <span class="bl-blank bl-short"></span>'));
     if (fields.children.length) left.appendChild(fields);
     head.appendChild(left);
