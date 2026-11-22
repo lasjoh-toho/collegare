@@ -80,10 +80,20 @@
 .itemTitle { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bothTag { flex: none; font-size: 10px; padding: 0 5px; border-radius: 6px; border: 1.5px solid var(--fg); background: #fff; color: #111; }
 
-.end { position: relative; margin: 4px 4px 0 30px; padding: 6px 6px; border: 2px dashed var(--line); border-radius: 9px; }
-.end[data-line-over] { border-color: var(--metro); background: color-mix(in srgb, var(--metro) 8%, transparent); }
-.stopEmpty { position: absolute; left: calc(15px - 30px - 2px); top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); box-sizing: border-box; border-radius: 50%; background: #fff; border: 4px dashed var(--metro); opacity: 0.75; z-index: 1; }
-.addBtn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--fg-muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.head[draggable='true'] { cursor: grab; }
+/* Plus im Kreis am Ende der Linie: neuer Punkt (Jo, 22. November 2026) */
+.end { position: relative; display: flex; align-items: center; min-height: 38px; padding-block: 4px; padding-inline: 32px 4px; border-radius: 8px; }
+.end[data-line-over], .end.over { background: color-mix(in srgb, var(--metro) 8%, transparent); outline: 2px dashed var(--metro); outline-offset: -2px; }
+.plusStop {
+  position: absolute; inset-inline-start: var(--cx); top: 50%; width: 26px; height: 26px; padding: 0; box-sizing: border-box; z-index: 1;
+  transform: translate(calc(var(--dir) * 50%), -50%); border-radius: 50%; background: #fff; border: 4px solid var(--metro); color: var(--metro);
+  display: grid; place-items: center; cursor: pointer;
+}
+.plusStop:hover { background: var(--metro); color: #fff; }
+.endLabel { font-size: 12.5px; color: var(--fg-faint); }
+.end:hover .endLabel { color: var(--fg-muted); }
+.endTrack::before { bottom: 50%; }
+.addForm { flex: 1; }
 .addForm input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--metro); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
 .gone { margin: 14px 0 0 32px; font-size: 12.5px; color: var(--fg-muted); }
 .goneRow { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
@@ -100,8 +110,9 @@
 .full { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; background: var(--bg); }
 .fullHead { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
 .fullTitle { font-weight: 750; font-size: 16px; }
-.parallel { flex: 1; overflow: auto; padding: 16px 16px 40px; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1fr); max-width: 1300px; margin: 0 auto; }
+.parallel { position: relative; flex: 1; overflow: auto; padding: 16px 16px 40px; }
+/* die beiden Linien laufen nah beieinander (Jo, 22. November 2026) */
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); max-width: 1100px; margin: 0 auto; }
 .left, .right { min-width: 0; }
 .pTrack { height: 100%; }
 .pTrack::before { border-radius: 0; }
@@ -112,15 +123,29 @@
 .mirror .l3 .stop { transform: translateY(-50%); }
 .bridge { position: relative; }
 /* Querverbindung zwischen gleichen Punkten, von Linienmitte zu Linienmitte */
-.connector { position: absolute; left: -15px; right: -15px; top: 17px; height: 5px; margin-top: -2.5px; background: repeating-linear-gradient(90deg, var(--fg) 0 7px, transparent 7px 12px); }
+.connector { position: absolute; left: -15px; right: -15px; top: 19px; height: 4px; margin-top: -2px; border-radius: 2px; background: color-mix(in srgb, var(--fg) 18%, var(--bg)); }
+/* vertauschte Punkte: graue Linie mit zwei Bögen; Klick stellt sie einander gegenüber */
+.arcs { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 2; }
+.arc { fill: none; stroke: color-mix(in srgb, var(--fg) 35%, var(--bg)); stroke-width: 3.5; stroke-linecap: round; }
+.arcHit { fill: none; stroke: transparent; stroke-width: 16; }
+.arcLive { pointer-events: stroke; cursor: pointer; }
+.arcLive:hover .arc { stroke: var(--fg-muted); stroke-width: 5; }
 .gap { min-height: 18px; }
 .endP { margin: 6px 0; padding: 8px; border: 2px dashed var(--line); border-radius: 9px; color: var(--fg-faint); font-size: 12.5px; text-align: center; }
 .endP[data-line-over] { border-color: var(--fg-muted); }
 @media (max-width: 700px) {
-  .row { grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); }
+  .row { grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); }
 }
 
 /* Vorschau: Ast oder Cluster vorübergehend als Linie */
 .preview { position: absolute; right: 12px; top: 58px; z-index: 12; width: min(320px, 80vw); max-height: calc(100% - 80px); overflow: auto; padding: 8px 10px 10px 6px; border-radius: 12px; background: var(--bg-elev); border: 2px solid var(--metro); box-shadow: 6px 6px 0 var(--fg); }
 .previewHead { display: flex; align-items: center; gap: 6px; padding: 0 0 6px 8px; }
 .previewTitle { font-weight: 700; font-size: 13.5px; color: var(--metro); }
+
+/* Seite „Gliederung“: Fläche mit beiden Linien oder einer Linie links */
+.board { --ink: var(--fg); position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.boardTools { position: absolute; top: 8px; right: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; }
+.boardTools :global(.btn.icon) { width: 28px; height: 28px; }
+.boardSingle .line { padding: 4px 10px 30px 12px; }
+.boardSingle .boardTools { position: static; justify-content: flex-end; padding: 6px 12px 0; }
+.parallel .sharedMark { display: none; }

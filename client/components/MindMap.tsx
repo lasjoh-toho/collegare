@@ -16,6 +16,10 @@
  * dockt an eine Linie oben im Cluster an (`docked`). Die Punkte stehen dort in voller Breite untereinander, sind
  * zugeklappt (nur Titelleiste) und klappen mit einem Klick auf die Titelleiste auf; ein Klick auf den Anschlusspunkt
  * löst sie wieder.
+ *
+ * Jo, 22. November 2026 (Konzept 8h.10): Die Linie läuft am linken Rand des Clusters, die Anschlusspunkte sitzen auf dem
+ * Rand. Oben links in der Ecke steht ein weißer Startkreis: darauf gezogen wird eine Karte der erste Punkt. Auf die
+ * Linie gezogen wird sie an dieser Stelle zwischen die Punkte gesetzt.
  */
 import { cardFromChat, isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -183,10 +187,21 @@ export function MindMap({
     });
   // Höhe der Linie oben im Cluster: die übrigen Karten beginnen darunter
   const [dockH, setDockH] = useState<Record<string, number>>({});
+  const [dockEnd, setDockEnd] = useState<Record<string, number>>({});
+  // Ziel beim Ziehen: Startkreis oder Linie eines Clusters (zum Hervorheben)
+  const [dockOver, setDockOver] = useState<string | null>(null);
   useLayoutEffect(() => {
     const next: Record<string, number> = {};
-    el.current?.querySelectorAll<HTMLElement>('[data-dock]').forEach((n) => (next[n.dataset.dock!] = n.offsetHeight + 10));
+    const ends: Record<string, number> = {};
+    el.current?.querySelectorAll<HTMLElement>('[data-dock]').forEach((n) => {
+      next[n.dataset.dock!] = n.offsetHeight + 10;
+      // die Linie endet am letzten Anschlusspunkt
+      const ports = n.querySelectorAll<HTMLElement>('[data-port]');
+      const last = ports[ports.length - 1];
+      if (last) ends[n.dataset.dock!] = (last.parentElement?.offsetTop ?? 0) + last.offsetTop + last.offsetHeight / 2;
+    });
     if (Object.keys(next).length !== Object.keys(dockH).length || Object.entries(next).some(([k, v]) => dockH[k] !== v)) setDockH(next);
+    if (Object.keys(ends).length !== Object.keys(dockEnd).length || Object.entries(ends).some(([k, v]) => dockEnd[k] !== v)) setDockEnd(ends);
   });
   // Höhe des Texts unter dem Kopf eines Clusters: seine Karten beginnen darunter
   const [ctext, setCtext] = useState<Record<string, number>>({});
@@ -353,6 +368,29 @@ export function MindMap({
     }
     return false;
   };
+  /** Startkreis oder Linie eines Clusters unter dem Zeiger (gezogene Karten lassen den Zeiger durch) */
+  function dockAt(id: string, clientX: number, clientY: number): { cluster: string; start: boolean } | null {
+    if (shown.cards[id]?.kind !== 'card') return null;
+    for (const n of document.elementsFromPoint(clientX, clientY)) {
+      const h = n as HTMLElement;
+      const st = h.closest?.('[data-dock-start]')?.getAttribute('data-dock-start');
+      if (st) return { cluster: st, start: true };
+      const ln = h.closest?.('[data-dock-line]')?.getAttribute('data-dock-line');
+      if (ln) return { cluster: ln, start: false };
+      if (h.closest?.('[data-card]')) return null;
+    }
+    return null;
+  }
+  /** Stelle an der Linie (Index unter den übrigen Punkten) nach der Zeigerhöhe; first: ganz vorn (Startkreis) */
+  function dockOrder(cluster: string, id: string, clientY: number, first = false): number {
+    if (first) return 0;
+    const list = (docks.get(cluster) ?? []).filter((x) => x.id !== id);
+    return list.filter((x) => {
+      const r = el.current?.querySelector<HTMLElement>(`[data-card="${x.id}"]`)?.getBoundingClientRect();
+      return r ? clientY > r.top + r.height / 2 : true;
+    }).length;
+  }
+
   /**
    * Wohin eine gezogene Karte fällt: in eine Karte (dann liegt sie darin), an die obere Kante einer Karte in einer
    * Karte (davor einsortiert), in einen Cluster oder auf die Fläche. Cluster fallen immer auf die Fläche.
@@ -449,7 +487,10 @@ export function MindMap({
     } else if (g.kind === 'move') {
       const dx = e.clientX - g.sx,
         dy = e.clientY - g.sy;
-      setG({ ...g, dx, dy, moved: g.moved || Math.abs(dx) + Math.abs(dy) > 3, over: dropCluster(g.id, e.clientX, e.clientY) });
+      const dk = dockAt(g.id, e.clientX, e.clientY);
+      const dkKey = dk ? (dk.start ? 'start:' : 'line:') + dk.cluster : null;
+      if (dkKey !== dockOver) setDockOver(dkKey);
+      setG({ ...g, dx, dy, moved: g.moved || Math.abs(dx) + Math.abs(dy) > 3, over: dk ? null : dropCluster(g.id, e.clientX, e.clientY) });
       line?.hover(e.clientX, e.clientY);
     } else if (g.kind === 'resize') {
       setG({ ...g, nw: Math.max(100, g.w + (e.clientX - g.sx) / cam.k), nh: Math.max(HEADER + 30, g.h + (e.clientY - g.sy) / cam.k) });
@@ -468,6 +509,7 @@ export function MindMap({
       return;
     }
     setG(null);
+    if (dockOver) setDockOver(null);
     if (g.kind === 'move' && g.moved) {
       line?.hover(null);
       if (line?.drop(g.id, e.clientX, e.clientY)) return;
@@ -485,7 +527,8 @@ export function MindMap({
   /** Verschieben abschließen: in eine Karte legen, davor einsortieren, in einen Cluster oder frei auf die Fläche */
   async function dropMoved(id: string, nx: number, ny: number, cx: number, cy: number) {
     const c = shown.cards[id];
-    const t = dropTarget(id, cx, cy);
+    const dk = dockAt(id, cx, cy);
+    const t = dk ? { cluster: dk.cluster, card: null, before: false } : dropTarget(id, cx, cy);
     // alles, was in der Karte liegt, wandert mit (gleicher Cluster)
     const desc: string[] = [];
     const collect = (k: string) => (nest.get(k) ?? []).forEach((x) => (desc.push(x.id), collect(x.id)));
@@ -493,13 +536,12 @@ export function MindMap({
     const follow = async (parent: string | null) => {
       for (const d of desc) if (shown.cards[d].parent !== parent) await send({ type: 'move', id: d, x: 0, y: 0, parent }, true);
     };
+    if (dk) return dock(id, dk.cluster, dockOrder(dk.cluster, id, cy, dk.start), desc, follow);
     if (t.card && t.before && isDocked(shown.cards[t.card])) {
       // an der Linie vor diesem Punkt einreihen
       const host = shown.cards[t.card];
       const list = (docks.get(host.parent!) ?? []).filter((x) => x.id !== id);
-      const i = list.findIndex((x) => x.id === host.id);
-      const y = i > 0 ? (list[i - 1].y + host.y) / 2 : host.y - 1;
-      return dock(id, host.parent!, y, desc, follow);
+      return dock(id, host.parent!, Math.max(0, list.findIndex((x) => x.id === host.id)), desc, follow);
     }
     if (t.card) {
       const host = shown.cards[t.card];
@@ -519,18 +561,7 @@ export function MindMap({
       const k = shown.cards[t.cluster];
       // direkt unter den Rand gezogen: an die Linie oben im Cluster
       const rel = ny - k.y - dockTop(k.id);
-      if (c.kind === 'card' && rel < (dockH[k.id] ?? 0) + 18) {
-        const list = (docks.get(k.id) ?? []).filter((x) => x.id !== id);
-        // Reihenfolge nach der Lage des Zeigers zwischen den Punkten
-        const after = list.filter((x) => {
-          const r = el.current?.querySelector<HTMLElement>(`[data-card="${x.id}"]`)?.getBoundingClientRect();
-          return r ? cy > r.top + r.height / 2 : true;
-        });
-        const prev = after[after.length - 1];
-        const next = list[after.length];
-        const oy = prev && next ? (prev.y + next.y) / 2 : prev ? prev.y + 1 : next ? next.y - 1 : 0;
-        return dock(id, k.id, oy, desc, follow);
-      }
+      if (c.kind === 'card' && rel < (dockH[k.id] ?? 0) + 18) return dock(id, k.id, dockOrder(k.id, id, cy), desc, follow);
       x = Math.max(0, nx - k.x - PAD);
       y = Math.max(0, ny - k.y - top(k.id));
     }
@@ -542,17 +573,24 @@ export function MindMap({
     await follow(t.cluster);
   }
 
-  /** an die Linie oben im Cluster andocken; y ist nur die Reihenfolge */
-  async function dock(id: string, cluster: string, y: number, desc: string[], follow: (p: string | null) => Promise<void>) {
+  /**
+   * an die Linie im Cluster andocken, an Stelle `index`; y ist an der Linie nur die Reihenfolge (0, 10, 20 …) und wird
+   * für alle Punkte neu vergeben (der Server rückt negative Lagen zurecht, Zwischenwerte gehen also nicht)
+   */
+  async function dock(id: string, cluster: string, index: number, desc: string[], follow: (p: string | null) => Promise<void>) {
     const c = shown.cards[id];
-    y = Math.round(y * 1000) / 1000;
+    const list = (docks.get(cluster) ?? []).filter((x) => x.id !== id);
+    list.splice(Math.min(index, list.length), 0, c);
+    const y = list.indexOf(c) * 10;
     setShown((s) => {
       const n = localMove(s, id, 0, y, cluster);
       n.cards[id] = { ...n.cards[id], docked: true, under: null };
+      list.forEach((x, i) => x.id !== id && (n.cards[x.id] = { ...n.cards[x.id], y: i * 10 }));
       return n;
     });
     if (!(await send({ type: 'move', id, x: 0, y, parent: cluster }))) return;
     await send({ type: 'update', id, patch: { docked: true, ...(c.under ? { under: null } : {}) } }, true);
+    for (let i = 0; i < list.length; i++) if (list[i].id !== id && list[i].y !== i * 10) await send({ type: 'move', id: list[i].id, x: 0, y: i * 10, parent: cluster }, true);
     if (desc.length) await follow(cluster);
   }
 
@@ -795,12 +833,23 @@ export function MindMap({
         </div>
         {textBlock}
         {c.kind === 'card' && kids.length > 0 && <div className={m.nest}>{kids.map((k) => renderCard(k.id, true))}</div>}
+        {c.kind === 'cluster' && (canEdit || docks.get(id)) && (
+          <span
+            className={`${m.dockStart} ${dockOver === 'start:' + id ? m.dockHot : ''}`}
+            data-dock-start={id}
+            title="Startkreis: eine Karte hierher ziehen, dann wird sie der erste Punkt der Linie"
+          />
+        )}
         {c.kind === 'cluster' && docks.get(id) && (
-          <div className={m.dock} data-dock={id} style={{ top: dockTop(id) + 8, left: PAD, right: PAD }}>
+          <span className={`${m.dockLine} ${dockOver === 'line:' + id ? m.dockHot : ''}`} data-dock-line={id} style={{ height: dockTop(id) + 8 + (dockEnd[id] ?? 0) }} title="Linie: eine Karte hierher ziehen, dann steht sie an dieser Stelle zwischen den Punkten" />
+        )}
+        {c.kind === 'cluster' && docks.get(id) && (
+          <div className={m.dock} data-dock={id} style={{ top: dockTop(id) + 8, left: 0, right: PAD }}>
             {docks.get(id)!.map((d) => (
               <div key={d.id} className={m.stop}>
                 <button
                   className={m.port}
+                  data-port
                   data-ui
                   disabled={!canEdit}
                   onClick={() => void undock(d.id)}

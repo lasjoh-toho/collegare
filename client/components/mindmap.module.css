@@ -60,19 +60,26 @@
 @media (max-width: 700px) { .long { display: none; } }
 .body { position: absolute; right: 0; bottom: 0; }
 
-/* Linie oben im Cluster (Konzept 8h.9): angedockte Punkte in voller Breite untereinander, links die Linie in der
-   Farbe des Clusters mit einem Anschlusspunkt je Karte; ein Klick auf den Punkt löst die Karte wieder */
-.dock { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 6px; padding-left: 26px; }
-.dock::before {
-  content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 5px; border-radius: 3px;
+/* Linie im Cluster (Konzept 8h.9/8h.10): läuft am linken Rand, Anschlusspunkte sitzen auf dem Rand, oben links der
+   weiße Startkreis; angedockte Punkte in voller Breite untereinander. Ein Klick auf einen Anschlusspunkt löst die Karte. */
+.dock { position: absolute; display: flex; flex-direction: column; gap: 6px; padding-left: 20px; }
+.dockLine { position: absolute; z-index: 2; left: -11px; top: 0; width: 22px; }
+.dockLine::before {
+  content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 6px; border-radius: 3px;
   background: var(--c); box-shadow: 0 0 0 1.5px var(--ink);
 }
+.dockStart {
+  position: absolute; z-index: 4; left: -13px; top: -13px; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%;
+  background: #fff; border: 3px solid var(--ink); box-shadow: inset 0 0 0 3px var(--c);
+}
+.dockHot.dockStart { transform: scale(1.35); background: var(--c); }
+.dockHot.dockLine::before { width: 10px; left: 5px; outline: 2px dashed var(--accent); outline-offset: 3px; }
 .stop { position: relative; }
 .port {
-  position: absolute; left: -24px; top: 6px; z-index: 2; width: 18px; height: 18px; padding: 0; border-radius: 50%;
-  background: var(--bg-elev); border: 3px solid var(--ink); cursor: pointer;
+  position: absolute; left: -31px; top: 6px; z-index: 3; width: 20px; height: 20px; padding: 0; border-radius: 50%;
+  background: #fff; border: 3px solid var(--ink); cursor: pointer;
 }
-.port::after { content: ''; position: absolute; left: 100%; top: 50%; width: 6px; height: 3px; margin-top: -1.5px; background: var(--ink); }
+.port::after { content: ''; position: absolute; left: 100%; top: 50%; width: 9px; height: 3px; margin-top: -1.5px; background: var(--ink); }
 .port:hover:not(:disabled) { background: var(--c); }
 .port:disabled { cursor: default; }
 .docked { position: relative; left: auto; top: auto; width: auto; }

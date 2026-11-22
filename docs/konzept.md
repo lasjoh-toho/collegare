@@ -1124,6 +1124,30 @@ Die Punkte sind zugeklappt und klappen mit einem Klick auf die Titelleiste auf.
 - Auf- und Zuklappen gilt nur auf dem eigenen Gerät und wird nicht gespeichert.
 - In „Als Gliederung“ und beim Übernehmen eines Clusters kommen angedockte Punkte zuerst, in ihrer Reihenfolge.
 
+### 8h.10 Gliederung als eigener Punkt, Übersicht, Linie am Clusterrand (22. November 2026)
+
+Wünsche von Jo:
+
+- Übersicht: Mindmap, Cluster, Gruppen und Gliederung stehen in einer Zeile („1–3“), danach „4 Recherche und
+  Ausarbeitung“ (Notizen und Quellen, Textabschnitte, Arbeitsprozess) und „5 Präsentation und Publikation“. Die
+  Themen-Mindmap hat keine eigene Kachel: Solange jemand noch keine Gruppe hat, öffnen Mindmap und Cluster die
+  Themen-Mindmap, sobald die Lehrkraft die Phase „Thema“ freigibt. Die Phasen in den Einstellungen bleiben, wie sie sind.
+- Gliederung ist eine eigene Seite (`/projekt/gliederung`), erreichbar über die Kachel und ein Symbol oben rechts neben
+  Notizen und Chat. Ohne Wahl stehen beide Linien nah nebeneinander (synchrone Gliederung). In der Mitte des Kopfs
+  „Präsentation ‖ Ausarbeitung“ genau über den Linien (die Seite misst die Lage); ein Klick lässt die gewählte Linie nach
+  links rutschen, daneben erscheint die Ausarbeitung als Text bzw. als Präsentation (Karten des Schreibeditors, 8i) mit
+  zartem Farbverlauf. „beides“ in der Seitenleiste führt auf diese Seite.
+- Gleiche Hauptpunkte stehen auf einer Höhe, verbunden durch eine hellgraue Linie. Stehen sie vertauscht, verbindet sie
+  eine graue Linie mit zwei Bögen; ein Klick verschiebt den Punkt der Präsentation neben sein Gegenstück (`alignPoint`).
+- Plus im Kreis am Ende jeder Linie für einen neuen Punkt (auch in der Seitenleiste).
+- Punkte lassen sich ziehen: auf die Linie (an dieser Stelle eingesetzt), auf einen Punkt (dahinter), ans Ende. Aus der
+  anderen Linie gezogen entsteht eine Kopie mit gleichem Schlüssel (`movePointAfter`).
+- `map.outline.praes`: Abschnitte der Präsentationslinie im Format von `sections` für die Präsentation im Schreibeditor.
+- Cluster: Die Linie läuft am linken Rand, die Anschlusspunkte sitzen auf dem Rand. Oben links in der Ecke steht ein
+  weißer Startkreis; darauf gezogen wird eine Karte der erste Punkt, auf die Linie gezogen steht sie an dieser Stelle.
+  Die Reihenfolge an der Linie wird bei jedem Andocken neu vergeben (y = 0, 10, 20 …).
+- Offen: Wie zeigt die Präsentationslinie, welche Punkte auf eine Folie kommen (Frage an Jo).
+
 ## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
 
 Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf

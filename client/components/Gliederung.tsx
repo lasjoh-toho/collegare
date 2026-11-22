@@ -12,7 +12,7 @@
  *
  * Gesendet wird die ganze Gliederung als Map-Op `lines`; der Server leitet daraus `pick` und `outline` ab.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import {
   addItem,
@@ -21,6 +21,8 @@ import {
   insertAfterRow,
   MAX_LEVELS,
   alignRows,
+  alignPoint,
+  movePointAfter,
   clone,
   copyPoint,
   deletePoint,
@@ -44,6 +46,8 @@ import { Icon } from './Icon';
 import g from './gliederung.module.css';
 
 const ITEM_MIME = 'application/x-collegare-lineitem';
+/** ein Punkt der Gliederung wird gezogen: {kind, id} */
+const POINT_MIME = 'application/x-collegare-linepoint';
 const TAB_KEY = 'collegare-gliederung-linie';
 const KIND: Record<string, string> = { note: 'Notiz', source: 'Quelle', link: 'Link', image: 'Bild', data: 'Daten', video: 'Video', audio: 'Audio', hand: 'Handschrift', card: 'Karte', cluster: 'Ast', chat: 'Chat' };
 
@@ -62,6 +66,8 @@ export interface GliederungProps {
   onClose?: () => void;
   /** rechts (vor der Gliederung: Mindmap, Cluster, Notizen) oder links (beim Schreiben) */
   side?: 'left' | 'right';
+  /** „beides“ öffnet die Seite Gliederung (sonst ein Vollbild über der Seite) */
+  bothHref?: string;
 }
 
 /** Ziel eines Ablegens aus der Mindmap (Zeiger, kein HTML-Ziehen): steht als data-line-drop an Punkten und am Ende */
@@ -174,7 +180,7 @@ export function Gliederung(props: GliederungProps) {
             <button role="tab" aria-selected={tab === 'praes'} className={`${g.tab} ${tab === 'praes' ? g.on : ''}`} style={{ ['--t' as string]: LINE_COLOR.praes }} onClick={() => onTab('praes')}>
               Präsentation
             </button>
-            <button className={g.both} onClick={() => setBoth(true)} title="Beide Linien nebeneinander (Vollbild)" aria-label="Beide Linien nebeneinander">
+            <button className={g.both} onClick={() => (props.bothHref ? (location.href = props.bothHref) : setBoth(true))} title="Beide Linien nebeneinander (Vollbild)" aria-label="Beide Linien nebeneinander">
               <Icon name="parallel" size={16} />
               <span>beides</span>
             </button>
@@ -243,7 +249,7 @@ interface LineCtx extends GliederungProps {
 function useDrops(ctx: LineCtx, kind: LineKind) {
   const { lines, put, meId, editable } = ctx;
   const [over, setOver] = useState<string | null>(null);
-  const accept = (e: React.DragEvent) => editable && (isChatDrag(e) || e.dataTransfer.types.includes(ITEM_MIME));
+  const accept = (e: React.DragEvent) => editable && (isChatDrag(e) || e.dataTransfer.types.includes(ITEM_MIME) || e.dataTransfer.types.includes(POINT_MIME));
   /**
    * point: Ziel-Punkt (null = neuer Punkt am Ende), into: in dieses Objekt legen, before: vor dieses Objekt,
    * after: abgelegt auf der Linie, neuer Punkt unter dieser Zeile (null = ganz oben)
@@ -259,6 +265,15 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
     e.preventDefault();
     e.stopPropagation();
     setOver(null);
+    const pointRaw = e.dataTransfer.getData(POINT_MIME);
+    if (pointRaw) {
+      // Punkt auf die Linie gezogen: dort einsetzen; auf einen Punkt gezogen: dahinter; ans Ende: ans Ende
+      const pm = JSON.parse(pointRaw) as { kind: LineKind; id: string };
+      const rows = flatPoints(lines[kind].points);
+      const at = after !== undefined ? after : point ? point : rows.length ? '^' + lines[kind].points[lines[kind].points.length - 1].id : null;
+      if (at === pm.id || at === '^' + pm.id) return;
+      return void put(movePointAfter(lines, kind, pm.kind, pm.id, at));
+    }
     const moving = e.dataTransfer.getData(ITEM_MIME);
     if (moving) {
       if (moving === into || moving === before) return;
@@ -292,7 +307,7 @@ function useDrops(ctx: LineCtx, kind: LineKind) {
     if (!accept(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = e.dataTransfer.types.includes(ITEM_MIME) ? 'move' : 'copy';
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes(ITEM_MIME) || e.dataTransfer.types.includes(POINT_MIME) ? 'move' : 'copy';
     if (over !== key) setOver(key);
   };
   return { over, setOver, drop, allow };
@@ -347,9 +362,6 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
   const rows = useMemo(() => flatPoints(pts), [pts]);
   const gone = useMemo(() => allRemoved(pts), [pts]);
   const dz = useDrops(ctx, kind);
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState('');
-  const endTarget = JSON.stringify({ kind, point: null });
 
   return (
     <div className={g.line}>
@@ -359,38 +371,7 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
         {rows.map((r, i) => (
           <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={rows} index={i} dz={dz} />
         ))}
-        {editable && (
-          <li
-            className={`${g.end} ${dz.over === 'end' ? g.over : ''}`}
-            data-line-drop={endTarget}
-            onDragOver={dz.allow('end')}
-            onDragLeave={() => dz.setOver(null)}
-            onDrop={(e) => dz.drop(e, null)}
-          >
-            <span className={g.stopEmpty} aria-hidden />
-            {adding ? (
-              <form
-                className={g.addForm}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (title.trim()) {
-                    const l = clone(lines);
-                    l[kind].points.push(newPoint(title.trim()));
-                    void put(l);
-                  }
-                  setTitle('');
-                  setAdding(false);
-                }}
-              >
-                <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => !title.trim() && setAdding(false)} placeholder="Titel des neuen Punkts" maxLength={200} />
-              </form>
-            ) : (
-              <button className={g.addBtn} onClick={() => setAdding(true)}>
-                <Icon name="plus" size={14} /> Punkt
-              </button>
-            )}
-          </li>
-        )}
+        {editable && <EndPlus ctx={ctx} kind={kind} dz={dz} />}
       </ol>
       {gone.length > 0 && (
         <details className={g.gone}>
@@ -413,6 +394,45 @@ function Line(ctx: LineCtx & { kind: LineKind }) {
         </details>
       )}
     </div>
+  );
+}
+
+/** Plus im Kreis am Ende der Linie (Jo, 22. November 2026): neuer Punkt; auch Ziel zum Ablegen am Ende */
+function EndPlus({ ctx, kind, dz }: { ctx: LineCtx; kind: LineKind; dz: ReturnType<typeof useDrops> }) {
+  const { lines, put } = ctx;
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  return (
+    <li
+      className={`${g.end} ${dz.over === 'end' ? g.over : ''}`}
+      data-line-drop={JSON.stringify({ kind, point: null })}
+      onDragOver={dz.allow('end')}
+      onDragLeave={() => dz.setOver(null)}
+      onDrop={(e) => dz.drop(e, null)}
+    >
+      <button className={g.plusStop} onClick={() => setAdding(true)} title="Neuer Punkt am Ende der Linie" aria-label="Neuer Punkt">
+        <Icon name="plus" size={14} />
+      </button>
+      {adding ? (
+        <form
+          className={g.addForm}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (title.trim()) {
+              const l = clone(lines);
+              l[kind].points.push(newPoint(title.trim()));
+              void put(l);
+            }
+            setTitle('');
+            setAdding(false);
+          }}
+        >
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => !title.trim() && setAdding(false)} onKeyDown={(e) => e.key === 'Escape' && setAdding(false)} placeholder="Titel des neuen Punkts" maxLength={200} />
+        </form>
+      ) : (
+        <span className={g.endLabel}>neuer Punkt</span>
+      )}
+    </li>
   );
 }
 
@@ -458,12 +478,20 @@ function PointView({ ctx, kind, p, level, rows, index, dz }: { ctx: LineCtx; kin
       <div
         className={`${g.head} ${dz.over === key ? g.over : ''}`}
         data-row={p.id}
+        draggable={editable && !edit}
+        onDragStart={(e) => {
+          // Punkt samt Unterpunkten ziehen: auf die Linie (dazwischen einsetzen) oder auf einen anderen Punkt (dahinter)
+          if ((e.target as HTMLElement).closest('button, select, input')) return e.preventDefault();
+          e.dataTransfer.setData(POINT_MIME, JSON.stringify({ kind, id: p.id }));
+          e.dataTransfer.setData('text/plain', titleOf(map, p));
+          e.dataTransfer.effectAllowed = 'move';
+        }}
         data-line-drop={JSON.stringify({ kind, point: p.id })}
         onDragOver={dz.allow(key)}
         onDragLeave={() => dz.setOver(null)}
         onDrop={(e) => dz.drop(e, p.id)}
       >
-        <span className={g.stop} aria-hidden />
+        <span className={g.stop} data-stop aria-hidden />
         {edit ? (
           <input
             className={g.titleInput}
@@ -616,9 +644,13 @@ function Items({ ctx, kind, point, items, dz, depth }: { ctx: LineCtx; kind: Lin
   );
 }
 
-/** Beide Linien nebeneinander, gleiche Punkte in derselben Zeile und durch eine Querverbindung gekoppelt */
+/**
+ * Beide Linien nebeneinander (Jo, 22. November 2026): gleiche Punkte auf einer Höhe, verbunden durch eine hellgraue
+ * Linie. Stehen gleiche Punkte vertauscht, verbindet sie eine graue Linie mit zwei Bögen; ein Klick darauf stellt den
+ * Punkt der Präsentation seinem Gegenstück gegenüber. Am Ende jeder Linie ein Plus für einen neuen Punkt.
+ */
 function Parallel(ctx: LineCtx) {
-  const { lines } = ctx;
+  const { lines, editable, put } = ctx;
   const rows = alignRows(
     lines.praes.points.filter((p) => !p.removed),
     lines.ausarb.points.filter((p) => !p.removed),
@@ -630,11 +662,43 @@ function Parallel(ctx: LineCtx) {
     for (let k = i - 1; k >= 0; k--) if (rows[k][side]) return '^' + rows[k][side]!.id;
     return null;
   };
+  // vertauschte Paare: links nur in Zeile i, rechts nur in Zeile j, gleicher Schlüssel
+  const swaps = rows.flatMap((r, i) => {
+    if (!r.left || r.right) return [];
+    const j = rows.findIndex((x) => !x.left && x.right?.key === r.left!.key);
+    return j >= 0 ? [{ i, j, id: r.left.id }] : [];
+  });
+  const box = useRef<HTMLDivElement>(null);
+  const [arcs, setArcs] = useState<{ id: string; d: string }[]>([]);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const on = () => setTick((t) => t + 1);
+    addEventListener('resize', on);
+    return () => removeEventListener('resize', on);
+  }, []);
+  useLayoutEffect(() => {
+    const b = box.current?.getBoundingClientRect();
+    if (!b || !box.current) return;
+    const stop = (i: number, side: string) => {
+      const el = box.current!.querySelector<HTMLElement>(`[data-prow="${i}"] [data-side="${side}"] [data-stop]`);
+      const r = el?.getBoundingClientRect();
+      return r ? { x: r.left + r.width / 2 - b.left + box.current!.scrollLeft, y: r.top + r.height / 2 - b.top + box.current!.scrollTop } : null;
+    };
+    const next = swaps.flatMap((s) => {
+      const a = stop(s.i, 'left');
+      const z = stop(s.j, 'right');
+      if (!a || !z) return [];
+      const mx = (a.x + z.x) / 2;
+      return [{ id: s.id, d: `M${a.x} ${a.y} C${mx} ${a.y} ${mx} ${z.y} ${z.x} ${z.y}` }];
+    });
+    if (JSON.stringify(next) !== JSON.stringify(arcs)) setArcs(next);
+  });
+  void tick;
   const cell = (kind: LineKind, p: LinePoint | null, dz: ReturnType<typeof useDrops>, i: number) => {
     const flat = p ? flatPoints([p]) : [];
     return (
       <ol className={`${g.track} ${g.pTrack}`} style={{ ['--metro' as string]: LINE_COLOR[kind] }}>
-        {ctx.editable && <Rail kind={kind} dz={dz} fallback={prevOf(kind === 'praes' ? 'left' : 'right', i)} />}
+        {editable && <Rail kind={kind} dz={dz} fallback={prevOf(kind === 'praes' ? 'left' : 'right', i)} />}
         {flat.map((r, i) => (
           <PointView key={r.p.id} ctx={ctx} kind={kind} p={r.p} level={r.level} rows={flat} index={i} dz={dz} />
         ))}
@@ -643,31 +707,79 @@ function Parallel(ctx: LineCtx) {
     );
   };
   return (
-    <div className={g.parallel}>
+    <div className={g.parallel} ref={box}>
+      <svg className={g.arcs} aria-hidden={!arcs.length}>
+        {arcs.map((a) => (
+          <g key={a.id} className={editable ? g.arcLive : ''} onClick={() => editable && void put(alignPoint(lines, 'praes', a.id, rows))}>
+            <title>Vertauscht: klicken, damit beide Punkte einander gegenüberstehen</title>
+            <path className={g.arcHit} d={a.d} />
+            <path className={g.arc} d={a.d} />
+          </g>
+        ))}
+      </svg>
       {rows.map((r, i) => (
-        <div key={(r.left?.id ?? '') + (r.right?.id ?? '')} className={g.row}>
-          <div className={`${g.left} ${g.mirror}`}>{cell('praes', r.left, dzA, i)}</div>
-          <div className={g.bridge} aria-hidden>
+        <div key={(r.left?.id ?? '') + (r.right?.id ?? '')} className={g.row} data-prow={i}>
+          <div className={`${g.left} ${g.mirror}`} data-side="left">
+            {cell('praes', r.left, dzA, i)}
+          </div>
+          <div className={g.bridge} aria-hidden data-bridge>
             {r.left && r.right && <span className={g.connector} />}
           </div>
-          <div className={g.right}>{cell('ausarb', r.right, dzB, i)}</div>
+          <div className={g.right} data-side="right">
+            {cell('ausarb', r.right, dzB, i)}
+          </div>
         </div>
       ))}
-      {ctx.editable && (
+      {editable && (
         <div className={g.row}>
           <div className={`${g.left} ${g.mirror}`}>
-            <div className={`${g.endP} ${dzA.over === 'end' ? g.over : ''}`} onDragOver={dzA.allow('end')} onDragLeave={() => dzA.setOver(null)} onDrop={(e) => dzA.drop(e, null)} data-line-drop={JSON.stringify({ kind: 'praes', point: null })}>
-              neuer Punkt
-            </div>
+            <ol className={`${g.track} ${g.endTrack}`} style={{ ['--metro' as string]: LINE_COLOR.praes }}>
+              <EndPlus ctx={ctx} kind="praes" dz={dzA} />
+            </ol>
           </div>
           <div className={g.bridge} aria-hidden />
           <div className={g.right}>
-            <div className={`${g.endP} ${dzB.over === 'end' ? g.over : ''}`} onDragOver={dzB.allow('end')} onDragLeave={() => dzB.setOver(null)} onDrop={(e) => dzB.drop(e, null)} data-line-drop={JSON.stringify({ kind: 'ausarb', point: null })}>
-              neuer Punkt
-            </div>
+            <ol className={`${g.track} ${g.endTrack}`} style={{ ['--metro' as string]: LINE_COLOR.ausarb }}>
+              <EndPlus ctx={ctx} kind="ausarb" dz={dzB} />
+            </ol>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Seite „Gliederung“ (Jo, 22. November 2026): beide Linien nebeneinander oder eine Linie links (die Seite zeigt daneben
+ * die Ausarbeitung bzw. die Präsentation). Sperre und „nur meine“ stehen oben rechts über der Fläche.
+ */
+export function GliederungBoard(props: GliederungProps & { mode: 'both' | LineKind }) {
+  const { map, send, mode } = props;
+  const lines = linesOf(map);
+  const [mine, setMine] = useState(false);
+  const editable = props.canEdit && !lines.locked;
+  const put = (next: Lines) => send({ type: 'lines', lines: next });
+  const hasItems = (['praes', 'ausarb'] as const).some((k) => flatPoints(lines[k].points).some((r) => r.p.items.length));
+  const ctx: LineCtx = { ...props, lines, editable, put, mine };
+  return (
+    <div className={`${g.board} ${mode === 'both' ? '' : g.boardSingle}`} style={{ ['--metro' as string]: LINE_COLOR[mode === 'both' ? 'ausarb' : mode] }}>
+      <div className={g.boardTools}>
+        {(hasItems || lines.locked) && props.canEdit && (
+          <button
+            className={`btn icon ${lines.locked ? 'on' : ''}`}
+            aria-pressed={lines.locked}
+            onClick={() => void put({ ...clone(lines), locked: !lines.locked })}
+            title={lines.locked ? 'Gesperrt: Die Gliederung ändert sich nicht, auch nicht aus der Mindmap. Klicken zum Öffnen.' : 'Gliederung sperren, damit die Überarbeitung mit Karten erhalten bleibt'}
+            aria-label={lines.locked ? 'Gliederung entsperren' : 'Gliederung sperren'}
+          >
+            <Icon name={lines.locked ? 'lock' : 'unlock'} size={15} />
+          </button>
+        )}
+        <label className={g.mine} title="Nur Objekte zeigen, die du angehängt hast">
+          <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> nur meine
+        </label>
+      </div>
+      {mode === 'both' ? <Parallel {...ctx} /> : <Line {...ctx} kind={mode} />}
     </div>
   );
 }

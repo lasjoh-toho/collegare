@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
+import { href } from '@/lib/api';
 import { visibleKinds, type LineKind } from '@/lib/lines';
 import type { MapOp, MindMap, ProjectView } from '@/lib/types';
 import { Gliederung, useLineTab } from './Gliederung';
@@ -60,5 +61,5 @@ export function GliederungLive({ sock, project, scope, meId, noteInfo, show, onC
   );
 
   if (!map) return <p className="muted" style={{ padding: 12 }}>Gliederung wird geladen …</p>;
-  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} side={side} />;
+  return <Gliederung map={map} send={send} people={people} canEdit={!readOnly} meId={meId} kinds={kinds} tab={tab} onTab={setTab} noteInfo={noteInfo} show={show} onClose={onClose} side={side} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} />;
 }

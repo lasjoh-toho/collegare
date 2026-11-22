@@ -101,11 +101,15 @@ export default function MindmapPage() {
   const [preview, setPreview] = useState<string | null>(null);
   // Ansicht: Äste (wie eine klassische Mindmap) oder Karten-Fläche (brausa); gleiche Daten, Wahl je Gerät
   const [view, setView] = useState<'aeste' | 'karten'>('aeste');
+  // Kacheln „Mindmap“ und „Cluster“ geben die Ansicht in der Adresse vor, sonst gilt die zuletzt gewählte
+  const viewParam = useQuery('ansicht');
   useEffect(() => {
+    if (viewParam === 'karten' || viewParam === 'aeste') return switchView(viewParam);
     try {
       if (localStorage.getItem('collegare-mindmap-ansicht') === 'karten') setView('karten');
     } catch {}
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewParam]);
   const switchView = (v: 'aeste' | 'karten') => {
     setView(v);
     try {
@@ -425,7 +429,7 @@ export default function MindmapPage() {
           </div>
           {map && outlineOpen && !isTopic && (
             <aside className={s.outline} aria-label="Gliederung">
-              <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} />
+              <Gliederung map={map} send={send} people={people} canEdit={canEdit} meId={me.id} kinds={kinds} tab={lineTab} onTab={setLineTab} show={show} onClose={toggleOutline} bothHref={href(`/projekt/gliederung/?id=${project.id}&bereich=${scope}`)} />
             </aside>
           )}
         </div>

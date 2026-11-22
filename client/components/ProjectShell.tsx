@@ -23,6 +23,13 @@ const SIDE_W_KEY = 'collegare-leiste-breite';
 const clampSide = (w: number) => Math.round(Math.max(280, Math.min(w, 900, innerWidth * 0.7)));
 type Side = 'chat' | 'notes' | 'history' | null;
 
+/** Bereich der aktuellen Seite für den Link zur Gliederung (z. B. Testbereich), nicht die Themen-Mindmap */
+function outlineScope(): string {
+  if (typeof window === 'undefined') return '';
+  const b = new URLSearchParams(location.search).get('bereich');
+  return b && b !== 'p' ? `&bereich=${encodeURIComponent(b)}` : '';
+}
+
 /** ein Schritt im Verlauf (Bento, Pinnwand) */
 export interface UndoEntry {
   label: string;
@@ -224,6 +231,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
                 </button>
               )}
             </span>
+          )}
+          {where !== 'Gliederung' && project.settings.phases.orientation?.state !== 'off' && (
+            // synchrone Gliederung: beide Linien nebeneinander (Jo, 22. November 2026)
+            <a className="btn icon" href={href(`/projekt/gliederung/?id=${project.id}${outlineScope()}`)} title="Gliederung: Präsentation und Ausarbeitung nebeneinander" aria-label="Gliederung">
+              <Icon name="outline" size={16} />
+            </a>
           )}
           {where !== 'Notizen und Quellen' && (
             <button className={`btn icon ${showNotes ? 'on' : ''}`} onClick={() => toggleSide(showNotes ? null : 'notes')} title={showNotes ? 'Notizen ausblenden' : 'Notizen zeigen'} aria-pressed={showNotes} aria-label="Notizen und Quellen">
