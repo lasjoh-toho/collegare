@@ -532,3 +532,59 @@ export function toSheets(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement)
     }
   }
 }
+
+/**
+ * Text des Blatts als Markdown für Autogra.fi (Aufgabenstellung als Grundlage für Erwartungshorizont und
+ * KI-Bewertung): Material mit Titel und Quelle, Bilder als Bildunterschrift, Aufgaben nummeriert mit Punkten.
+ * Linien, Umbrüche und Kopfzeile fallen weg.
+ */
+export function toMarkdown(doc: BlattDoc): string {
+  const out: string[] = [];
+  let task = 0;
+  let mat = 0;
+  const para = (md?: string) => (md ?? '').trim();
+  for (const b of doc.blocks) {
+    switch (b.type) {
+      case 'heading':
+        if (b.text?.trim()) out.push(`## ${b.text.trim()}`);
+        break;
+      case 'text':
+        if (para(b.md)) out.push(para(b.md));
+        break;
+      case 'material': {
+        mat++;
+        const label = (b.label ?? '').trim() || `Material ${mat}`;
+        out.push(`### ${label}${b.title?.trim() ? ': ' + b.title.trim() : ''}`);
+        if (para(b.md)) out.push(para(b.md));
+        if (b.source?.trim()) out.push(`Quelle: ${b.source.trim()}`);
+        break;
+      }
+      case 'quote':
+        if (para(b.md)) out.push(para(b.md).split('\n').map((l) => '> ' + l).join('\n') + (b.source?.trim() ? `\n> — ${b.source.trim()}` : ''));
+        break;
+      case 'image':
+        out.push(`[Bild${b.caption?.trim() ? ': ' + b.caption.trim() : ''}]`);
+        break;
+      case 'task':
+        task++;
+        out.push(`${task}. ${para(b.md).replace(/\n+/g, ' ')}${b.points?.trim() ? ` (${b.points.trim()})` : ''}`);
+        break;
+      case 'box':
+        out.push([b.text?.trim() ? `**${b.text.trim()}**` : '', para(b.md)].filter(Boolean).join('\n'));
+        break;
+      default:
+        break;
+    }
+  }
+  return out.filter(Boolean).join('\n\n').trim() + '\n';
+}
+
+/** Aufgaben mit Punktzahl (z. B. „12 P.“) als Teilaufgaben für Autogra.fi; Prozentangaben zählen nicht als Punkte. */
+export function toCriteria(doc: BlattDoc): { key: string; label: string; max_points: number }[] {
+  const tasks = doc.blocks.filter((b) => b.type === 'task');
+  const out = tasks.map((b, i) => {
+    const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:p\.?|pkt\.?|punkte?|be)?\s*$/i.exec(b.points ?? '');
+    return m ? { key: `a${i + 1}`, label: `Aufgabe ${i + 1}`, max_points: Number(m[1].replace(',', '.')) } : null;
+  });
+  return out.every(Boolean) ? (out as { key: string; label: string; max_points: number }[]) : [];
+}

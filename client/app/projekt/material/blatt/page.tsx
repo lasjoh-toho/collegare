@@ -13,7 +13,7 @@ import { Topbar } from '@/components/Topbar';
 import { RichText } from '@/components/RichText';
 import { fileUrl, type Material } from '@/components/Materials';
 import { ApiError, get, href, patch } from '@/lib/api';
-import { BLOCK_LABEL, blockSummary, newBlock, paginate, parseDoc, sheetSize, toSheets, uid, type BlattDoc, type Block, type BlockType, type Copy, type Problem, type Ruling } from '@/lib/blatt';
+import { BLOCK_LABEL, blockSummary, newBlock, paginate, parseDoc, sheetSize, toCriteria, toMarkdown, toSheets, uid, type BlattDoc, type Block, type BlockType, type Copy, type Problem, type Ruling } from '@/lib/blatt';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import st from './blatt.module.css';
@@ -725,9 +725,14 @@ function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partia
 // ---------- Drucken ----------
 interface AgAssessment {
   id: number;
+  context_id: number;
   title: string;
   class: string;
   status: string;
+}
+interface AgClass {
+  id: number;
+  title: string;
 }
 interface AgStudent {
   id: number;
@@ -756,7 +761,24 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
   const [agState, setAgState] = useState<'idle' | 'loading' | 'login' | 'ready' | 'error'>('idle');
   const [agMsg, setAgMsg] = useState('');
   const [tasks, setTasks] = useState<AgAssessment[]>([]);
+  const [classes, setClasses] = useState<AgClass[]>([]);
+  const [parents, setParents] = useState<AgClass[]>([]);
   const [task, setTask] = useState<number | null>(null);
+  // neue Aufgabe in Autogra.fi direkt von hier (Wunsch Jo, 22. November 2026)
+  const [creating, setCreating] = useState(false);
+  const [newClass, setNewClass] = useState<number | 'neu'>('neu');
+  const [newClassName, setNewClassName] = useState('');
+  const [newTitle, setNewTitle] = useState(title);
+  const [newDue, setNewDue] = useState('');
+  const [newMode, setNewMode] = useState<'summative' | 'formative'>('summative');
+  // Personen ergänzen: Namen oder eine Zahl nummerierter Plätze („Abgabe 1“ …)
+  const [addTab, setAddTab] = useState<'names' | 'count'>('names');
+  const [addNames, setAddNames] = useState('');
+  const [addCount, setAddCount] = useState(0);
+  // Aufgabentext nach Autogra.fi (Grundlage für Erwartungshorizont und KI-Bewertung)
+  const [sendText, setSendText] = useState(true);
+  const [taskText, setTaskText] = useState<string | null>(null);
+  const [sent, setSent] = useState('');
   const [students, setStudents] = useState<AgStudent[]>([]);
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [printName, setPrintName] = useState(true);
@@ -782,13 +804,17 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
     setAgState('loading');
     setAgMsg('');
     try {
-      const r = await ag<{ teacher: boolean; assessments: AgAssessment[] }>(base, 'GET', '/api/v1/portal');
+      const r = await ag<{ teacher: boolean; assessments: AgAssessment[]; classes: AgClass[]; parents: AgClass[] }>(base, 'GET', '/api/v1/portal');
       if (!r.teacher) {
         setAgState('login');
         setAgMsg('In Autogra.fi bist du nicht als Lehrkraft angemeldet.');
         return;
       }
       setTasks(r.assessments);
+      setClasses(r.classes ?? []);
+      setParents(r.parents ?? []);
+      setNewClass((r.classes ?? [])[0]?.id ?? 'neu');
+      if (!r.assessments.length) setCreating(true);
       setAgState('ready');
       try {
         localStorage.setItem('collegare-autografi-url', base);
@@ -807,16 +833,107 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
     if (mode === 'ag' && agUrl && agState === 'idle') void loadTasks();
   }, [mode, agUrl, agState, loadTasks]);
 
-  async function pickTask(aid: number) {
+  const base = agUrl.replace(/\/+$/, '');
+  async function pickTask(aid: number, keep?: Set<number>) {
     setTask(aid);
+    setCreating(false);
     setErr('');
     try {
-      const r = await ag<{ assessment: { pseudonymized: boolean }; students: AgStudent[] }>(agUrl.replace(/\/+$/, ''), 'GET', `/api/v1/assessments/${aid}/access-codes`);
+      const r = await ag<{ assessment: { pseudonymized: boolean }; students: AgStudent[] }>(base, 'GET', `/api/v1/assessments/${aid}/access-codes`);
       setStudents(r.students);
-      setPicked(new Set(r.students.map((s) => s.id)));
+      setPicked(keep ?? new Set(r.students.map((s) => s.id)));
       setPrintName(!r.assessment.pseudonymized);
+      if (!keep) {
+        setSent('');
+        // vorhandener Aufgabentext: nur überschreiben, wenn er leer ist oder schon von diesem Blatt stammt
+        const st = await ag<{ assessment: { status: string; items: { body_md: string }[] } }>(base, 'GET', `/api/v1/assessments/${aid}/settings`).catch(() => null);
+        const body = st?.assessment.items[0]?.body_md ?? '';
+        setTaskText(body);
+        setSendText(st?.assessment.status !== 'released' && (!body.trim() || body.trim() === toMarkdown(doc).trim()));
+      }
+      return r.students;
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
+      return [];
+    }
+  }
+
+  /** Neue Aufgabe in Autogra.fi anlegen (bei Bedarf mit neuer Klasse), wie „Neue Aufgabe + QR-Codes“ im Portal. */
+  async function createTask() {
+    setErr('');
+    setBusy(true);
+    try {
+      let ctx = newClass;
+      if (ctx === 'neu') {
+        if (!newClassName.trim()) throw new Error('Bitte einen Namen für die Klasse eingeben.');
+        if (!parents.length) throw new Error('Du darfst in Autogra.fi keine Klassen anlegen. Bitte eine vorhandene Klasse wählen.');
+        const c = await ag<{ id: number }>(base, 'POST', '/api/v1/portal/classes', { parent_id: parents[0].id, title: newClassName.trim() });
+        ctx = c.id;
+      }
+      const t = await ag<{ id: number }>(base, 'POST', '/api/v1/portal/tasks', {
+        context_id: ctx,
+        title: newTitle.trim() || title || 'Klassenarbeit',
+        mode: newMode,
+        due: newDue ? new Date(newDue).toISOString() : '',
+      });
+      await loadTasks();
+      await pickTask(t.id);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Text des Blatts als Aufgabenstellung in die Aufgabe von Autogra.fi schreiben (erste Teilaufgabe). Erwartungshorizont
+   * bleibt; Teilaufgaben mit Punkten kommen nur dazu, wenn dort noch keine stehen.
+   */
+  async function sendToAutografi(aid: number) {
+    const st = await ag<{ assessment: { revision: number; items: { task_id: number; title: string; body_md: string; horizon_md: string; criteria: { key: string; label: string; max_points: number }[]; scored: boolean }[] } }>(
+      base,
+      'GET',
+      `/api/v1/assessments/${aid}/settings`,
+    );
+    const items = st.assessment.items.map((it) => ({ task_id: it.task_id, title: it.title, body_md: it.body_md, horizon_md: it.horizon_md, criteria: it.criteria, scored: it.scored }));
+    if (!items.length) throw new Error('Die Aufgabe in Autogra.fi hat keine Teilaufgabe.');
+    const crit = items[0].criteria.length ? items[0].criteria : toCriteria(doc);
+    items[0] = { ...items[0], title: title.trim() || items[0].title, body_md: toMarkdown(doc), criteria: crit };
+    await ag(base, 'PATCH', `/api/v1/assessments/${aid}`, { revision: st.assessment.revision, items });
+    setTaskText(items[0].body_md);
+    setSent('Der Text des Blatts steht jetzt als Aufgabenstellung in Autogra.fi.');
+  }
+
+  /** Namen oder nummerierte Plätze in die Klasse der Aufgabe eintragen; die neuen werden gleich angehakt. */
+  async function addPeople() {
+    const a = tasks.find((x) => x.id === task);
+    if (!a) return;
+    let names: string[];
+    if (addTab === 'names') names = addNames.split(/\n|;/).map((n) => n.trim()).filter(Boolean);
+    else {
+      let max = 0;
+      for (const s of students) {
+        const m = /^Abgabe (\d+)$/.exec(s.name);
+        if (m) max = Math.max(max, Number(m[1]));
+      }
+      names = Array.from({ length: Math.max(0, Math.min(200, addCount)) }, (_, i) => `Abgabe ${max + i + 1}`);
+    }
+    if (!names.length) return setErr(addTab === 'names' ? 'Bitte mindestens einen Namen eingeben (einer je Zeile).' : 'Bitte eine Anzahl größer als 0 eingeben.');
+    setErr('');
+    setBusy(true);
+    try {
+      const r = await ag<{ added: AgStudent[]; skipped: number }>(base, 'POST', `/api/v1/contexts/${a.context_id}/students`, { names });
+      const fresh = new Set(r.added.map((x) => x.id));
+      const lower = new Set(names.map((n) => n.toLowerCase()));
+      const list = await pickTask(a.id, picked);
+      // schon vorhandene Namen aus der Eingabe ebenfalls anhaken
+      setPicked(new Set([...picked, ...list.filter((s) => fresh.has(s.id) || lower.has(s.name.toLowerCase())).map((s) => s.id)]));
+      setAddNames('');
+      setAddCount(0);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -828,10 +945,11 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
       const d: BlattDoc = structuredClone(doc);
       if (mode === 'ag') {
         if (!task || !picked.size) throw new Error('Bitte eine Aufgabe und mindestens eine Person wählen.');
+        if (sendText) await sendToAutografi(task);
         const body: Record<string, unknown> = { user_ids: [...picked] };
         if (valid === 'freigabe') body.until = 'freigabe';
         else body.hours = Number(valid);
-        const r = await ag<{ items: { user_id: number; name: string; code: string; qr: string }[] }>(agUrl.replace(/\/+$/, ''), 'POST', `/api/v1/assessments/${task}/access-codes`, body);
+        const r = await ag<{ items: { user_id: number; name: string; code: string; qr: string }[] }>(base, 'POST', `/api/v1/assessments/${task}/access-codes`, body);
         const order = new Map(students.map((s, i) => [s.id, i]));
         copies = r.items.sort((a, b) => (order.get(a.user_id) ?? 0) - (order.get(b.user_id) ?? 0)).map((it) => ({ name: it.name, printName, code: it.code, qr: it.qr }));
         if (d.page.header.qr === 'none') d.page.header = { ...d.page.header, show: true, qr: 'first' };
@@ -892,7 +1010,7 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
               <>
                 <div className="field">
                   <label>Aufgabe in Autogra.fi</label>
-                  <select value={task ?? ''} onChange={(e) => void pickTask(Number(e.target.value))}>
+                  <select value={creating ? 'neu' : (task ?? '')} onChange={(e) => (e.target.value === 'neu' ? (setCreating(true), setTask(null)) : void pickTask(Number(e.target.value)))}>
                     <option value="" disabled>
                       bitte wählen
                     </option>
@@ -901,9 +1019,57 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
                         {a.class} · {a.title}
                       </option>
                     ))}
+                    <option value="neu">+ Neue Aufgabe anlegen …</option>
                   </select>
                 </div>
-                {task && (
+                {creating && (
+                  <div className={st.newTask}>
+                    <div className={st.grid2}>
+                      <div className="field">
+                        <label>Klasse</label>
+                        <select value={newClass} onChange={(e) => setNewClass(e.target.value === 'neu' ? 'neu' : Number(e.target.value))}>
+                          {classes.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.title}
+                            </option>
+                          ))}
+                          {parents.length > 0 && <option value="neu">+ Neue Klasse</option>}
+                        </select>
+                      </div>
+                      {newClass === 'neu' ? (
+                        <div className="field">
+                          <label>Name der Klasse</label>
+                          <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="z. B. S4 Geschichte" />
+                        </div>
+                      ) : (
+                        <span />
+                      )}
+                      <div className="field">
+                        <label>Titel der Aufgabe</label>
+                        <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                      </div>
+                      <div className="field">
+                        <label>Art</label>
+                        <select value={newMode} onChange={(e) => setNewMode(e.target.value as 'summative' | 'formative')}>
+                          <option value="summative">Klausur</option>
+                          <option value="formative">Übung</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Abgabe bis (optional)</label>
+                        <input type="datetime-local" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="row">
+                      <span className={st.hint}>Die Aufgabe ist gleich offen; weitere Einstellungen machst du in Autogra.fi.</span>
+                      <span className="grow" />
+                      <button className="btn primary" disabled={busy} onClick={() => void createTask()}>
+                        Aufgabe anlegen
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {task && !creating && (
                   <>
                     <div className="row">
                       <button className="btn" onClick={() => setPicked(new Set(students.map((s) => s.id)))}>
@@ -923,7 +1089,31 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
                           {s.name}
                         </label>
                       ))}
-                      {!students.length && <div className={st.person}>In der Klasse sind noch keine Lernenden eingetragen.</div>}
+                      {!students.length && <div className={st.person}>In der Klasse sind noch keine Lernenden eingetragen. Trag unten Namen ein oder bestell Nummern.</div>}
+                    </div>
+                    <div className={st.addPeople}>
+                      <div className="seg" role="group" aria-label="Personen ergänzen">
+                        <button className={`btn ${addTab === 'names' ? 'on' : ''}`} onClick={() => setAddTab('names')}>
+                          Namen eintragen
+                        </button>
+                        <button className={`btn ${addTab === 'count' ? 'on' : ''}`} onClick={() => setAddTab('count')} title="Codes ohne Namen, z. B. zum Verteilen in der Stunde">
+                          Nummern bestellen
+                        </button>
+                      </div>
+                      {addTab === 'names' ? (
+                        <textarea rows={3} value={addNames} onChange={(e) => setAddNames(e.target.value)} placeholder={'Ein Name je Zeile, z. B.\nLea Brandt\nTom Kühn'} />
+                      ) : (
+                        <div className="row">
+                          <input type="number" min={1} max={200} value={addCount || ''} onChange={(e) => setAddCount(Number(e.target.value) || 0)} placeholder="Anzahl" style={{ width: 90 }} />
+                          <span className={st.hint}>Plätze „Abgabe 1“, „Abgabe 2“ … ohne Namen; wer welchen Zettel bekommt, entscheidest du beim Verteilen.</span>
+                        </div>
+                      )}
+                      <div className="row">
+                        <span className="grow" />
+                        <button className="btn" disabled={busy} onClick={() => void addPeople()}>
+                          In die Klasse übernehmen
+                        </button>
+                      </div>
                     </div>
                     <div className={st.grid2}>
                       <div className="field">
@@ -940,6 +1130,39 @@ function PrintDialog({ doc, title, onClose }: { doc: BlattDoc; title: string; on
                       </label>
                     </div>
                     <p className={st.hint}>Neue Codes ersetzen ältere nicht; schon verteilte Codes gelten weiter.</p>
+                    <div className={st.newTask}>
+                      <label className={st.check}>
+                        <input type="checkbox" checked={sendText} onChange={(e) => setSendText(e.target.checked)} /> Text des Blatts als Aufgabenstellung nach Autogra.fi übernehmen
+                      </label>
+                      <span className={st.hint}>
+                        Grundlage für den Erwartungshorizont und die KI-Bewertung in Autogra.fi: Material, Bildunterschriften und Aufgaben mit Punkten.
+                        {taskText?.trim() && taskText.trim() !== toMarkdown(doc).trim() ? ' Dort steht schon ein anderer Text; er würde ersetzt.' : ''}
+                      </span>
+                      <div className="row">
+                        {sent && <span className={st.hint}>✓ {sent}</span>}
+                        <span className="grow" />
+                        <a className="btn" href={`${base}/korrektur?assessment=${task}&view=einstellungen`} target="_blank" rel="noopener">
+                          Einstellungen in Autogra.fi ↗
+                        </a>
+                        <button
+                          className="btn"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setErr('');
+                            try {
+                              await sendToAutografi(task);
+                            } catch (e) {
+                              setErr(e instanceof Error ? e.message : String(e));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Jetzt übernehmen
+                        </button>
+                      </div>
+                    </div>
                   </>
                 )}
               </>

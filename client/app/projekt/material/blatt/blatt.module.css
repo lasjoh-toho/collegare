@@ -41,6 +41,9 @@
 .preview { max-width: 100%; max-height: 140px; object-fit: contain; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
 
 /* Druckdialog */
+.newTask, .addPeople { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-sunken); }
+.addPeople textarea { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--bg-elev); color: var(--fg); font: inherit; font-size: 13.5px; resize: vertical; }
+.addPeople input { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--bg-elev); color: var(--fg); }
 .dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100vh - 40px); overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .people { display: flex; flex-direction: column; max-height: 36vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .person { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13.5px; }

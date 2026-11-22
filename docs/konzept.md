@@ -1305,13 +1305,26 @@ Kurzcode und auf Wunsch Namen. In Autogra.fi musste dafür nichts geändert werd
 sich aus der angebundenen App (Rücksprung-Adresse der OIDC-Anbindung) oder `AUTOGRAFI_URL`, sonst
 `<Server>/autografi`; sie lässt sich im Druckfenster ändern.
 
+Im Druckfenster lässt sich außerdem (alles mit der Anmeldung in Autogra.fi, ohne Änderung dort):
+
+- eine **neue Aufgabe anlegen** (`POST /api/v1/portal/tasks`, bei Bedarf vorher eine Klasse über
+  `POST /api/v1/portal/classes`);
+- die Klasse füllen: **Namen eintragen** (einer je Zeile) oder **Nummern bestellen** („Abgabe 1“, „Abgabe 2“ … für
+  Codes, die man erst im Raum verteilt), beides über `POST /api/v1/contexts/{ctx}/students`;
+- der **Text des Blatts als Aufgabenstellung** nach Autogra.fi übernehmen: Material, Bildunterschriften und Aufgaben
+  als Markdown in die erste Teilaufgabe (`GET …/settings`, dann `PATCH /api/v1/assessments/{id}` mit `revision` und
+  `items`). Haben alle Aufgaben Punkte („12 P.“), entstehen daraus Teilaufgaben mit Höchstpunkten; vorhandene
+  Teilaufgaben bleiben. Der Text ist dann Grundlage für den Erwartungshorizont und die KI-Bewertung. Nach der
+  Freigabe der Ergebnisse sperrt Autogra.fi den Aufgabentext, dann wird nichts übernommen.
+
 ### 8j.5 Nächste Stufen
 
 1. Spalten und Randspalte (Bild oder Kasten neben dem Text wie im Beispiel), Bild neben Aufgaben.
 2. Word-Datei übernehmen (wie bei Lernseiten), Vorlagen für Klausurkopf und Operatoren je Fach.
 3. QR-Codes über eine Dienstschnittstelle von Autogra.fi, wenn beide auf verschiedenen Servern laufen (heute nur
    gleicher Server), und ohne Collegare: Autogra.fi druckt ein in Collegare gestaltetes Blatt als PDF mit Codes.
-4. Abgabe digital: dasselbe Blatt als Aufgabenstellung in Autogra.fi und in der Ausarbeitung.
+4. Abgabe digital: dasselbe Blatt auch in der Ausarbeitung; Aufgaben einzeln als Teilaufgaben übernehmen, Bilder
+   mitschicken.
 5. Ausarbeitung und Lernseite als Broschüre über denselben Satz (8i.3), Druck über Typst nur „für Fortgeschrittene“.
 
 ## 9. Umsetzungsplan
