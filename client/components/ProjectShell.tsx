@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { watchCopy } from '@/lib/clip';
 import { get, href, post } from '@/lib/api';
 import { groupColor } from '@/lib/colors';
-import { currentPhase, phaseDone, phaseList, phasePath, type DocSummary, type PhaseKey } from '@/lib/phases';
+import { conceptOf, currentPhase, phaseDone, phaseList, phasePath, type DocSummary, type PhaseKey } from '@/lib/phases';
 import type { Me, ProjectView } from '@/lib/types';
 import { ChatPanel } from './ChatPanel';
 import { NotesPanel } from './NotesPanel';
@@ -173,7 +173,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
     // nur beim Öffnen der Leiste (die Seite schickt danach jede Änderung mit)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showHistory]);
-  const phases = phaseList(project.settings, project.mode === 'single').filter((p) => p.state !== 'off');
+  const phases = phaseList(project.settings, project.mode === 'single', Date.now(), conceptOf(project, me.id)).filter((p) => p.state !== 'off');
   const done = phaseDone(project, me.id, docs === undefined ? ownDocs : docs);
   const now = currentPhase(phases, done);
   const myGroup = project.board.groups.find((g) => g.id === project.myGroupId) ?? null;
@@ -199,6 +199,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
           <Icon name="menu" size={18} />
           <span className={sh.whoName}>{me.name}</span>
         </button>
+        {project.werkstatt && (
+          // Werkstatt: der Kopf führt zurück ins Portal (Jo, 22. November 2026), sonst hängt man in den Werkzeugen fest
+          <a className={`btn ${sh.portalBack}`} href={href(where === 'Material' ? '/materialien/' : '/werkzeuge/')} title="Zurück zum Portal">
+            <Icon name="back" size={15} /> <span className={sh.portalBackText}>Portal</span>
+          </a>
+        )}
         <div className={`${sh.whereBox} ${center ? sh.centerBox : ''}`}>
           {center ?? (
             <div className={sh.where}>
@@ -232,7 +238,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
               )}
             </span>
           )}
-          {where !== 'Gliederung' && project.settings.phases.orientation?.state !== 'off' && (
+          {where !== 'Gliederung' && project.settings.phases.orientation?.state !== 'off' && (teacher || project.settings.tools?.outline !== false) && (
             // synchrone Gliederung: beide Linien nebeneinander (Jo, 22. November 2026)
             <a className="btn icon" href={href(`/projekt/gliederung/?id=${project.id}${outlineScope()}`)} title="Gliederung: Präsentation und Ausarbeitung nebeneinander" aria-label="Gliederung">
               <Icon name="outline" size={16} />
@@ -307,7 +313,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
             </a>
           )}
           {phases.map((p, i) => {
-            const path = phasePath(p.key);
+            const path = phasePath(p.key, project.settings);
             const reachable = !!path && (teacher || p.state === 'open' || p.state === 'closed');
             const cls = [sh.phase, p.key === now ? sh.now : '', p.key === phase ? sh.here : '', done[p.key] ? sh.isDone : '', sh[p.state]].join(' ');
             const body = (

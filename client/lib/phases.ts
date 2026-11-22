@@ -61,12 +61,26 @@ function help(key: PhaseKey, s: ProjectSettings, single: boolean): string {
   }
 }
 
-export function phaseList(s: ProjectSettings, single: boolean, now = Date.now()): PhaseInfo[] {
+/**
+ * Zustand aller Phasen. concept: Gruppe (bei Einzelarbeit Person), für die „Start nach Konzept und Freigabe“ gilt;
+ * undefined = Sicht der Lehrkraft (offen, sobald mindestens ein Konzept freigegeben ist).
+ */
+export function phaseList(s: ProjectSettings, single: boolean, now = Date.now(), concept?: number | null): PhaseInfo[] {
+  const released = s.conceptReleased ?? [];
   return PHASE_ORDER.map(({ key, title, icon }) => {
     const ph = s.phases[key] ?? { state: 'on', from: null, to: null };
     let state: PhaseState = 'open';
     let badge = 'offen';
-    if (ph.state === 'off') {
+    if (ph.state === 'release') {
+      const ok = concept === undefined ? released.length > 0 : concept !== null && released.includes(concept);
+      if (ph.to && now > ph.to) {
+        state = 'closed';
+        badge = 'beendet';
+      } else if (!ok) {
+        state = 'upcoming';
+        badge = 'nach Freigabe';
+      } else badge = concept === undefined ? `${released.length} freigegeben` : ph.to ? `bis ${fmtDay(ph.to)}` : 'freigegeben';
+    } else if (ph.state === 'off') {
       state = 'off';
       badge = 'nicht vorgesehen';
     } else if (ph.state === 'closed') {
@@ -160,7 +174,25 @@ export const TOPIC_MAP_PATH = '/projekt/mindmap/?id={id}&bereich=p';
 export const OFFICE_VAR: Record<Office, string> = { word: 'var(--office-word)', slide: 'var(--office-slide)', cell: 'var(--office-cell)' };
 
 /** Hauptoberfläche einer Phase (Link im Seitenmenü). */
-export function phasePath(key: PhaseKey): string | null {
+export function phasePath(key: PhaseKey, s?: ProjectSettings): string | null {
   if (key === 'topic') return TOPIC_MAP_PATH;
-  return TILES.find((t) => t.phase === key && t.path)?.path ?? null;
+  const all = TILES.filter((t) => t.phase === key && t.path);
+  return (s ? all.find((t) => toolOn(s, t)) : undefined)?.path ?? all[0]?.path ?? null;
+}
+
+/** Wessen Konzept für „Start nach Konzept und Freigabe“ zählt: Gruppe, bei Einzelarbeit die Person; Lehrkraft undefined. */
+export function conceptOf(project: Pick<ProjectView, 'role' | 'mode' | 'myGroupId'>, userId: number): number | null | undefined {
+  if (project.role === 'teacher') return undefined;
+  return project.mode === 'single' ? userId : project.myGroupId;
+}
+
+/** Ist die Oberfläche als Alternative ihres Schritts eingeschaltet (Jo, 22. November 2026)? */
+export function toolOn(s: Pick<ProjectSettings, 'docTypes' | 'tools'>, tile: TileDef): boolean {
+  if (tile.docType) return !!s.docTypes?.[tile.docType];
+  return s.tools?.[tile.key] !== false;
+}
+
+/** Oberflächen eines Schritts, zwischen denen die Lehrkraft wählt (nur die gebauten und die mit Dokumentart). */
+export function phaseTools(key: PhaseKey): TileDef[] {
+  return TILES.filter((t) => t.phase === key && (t.path || t.docType));
 }

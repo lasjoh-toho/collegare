@@ -282,6 +282,7 @@ export default function Einstellungen() {
                       ['on', 'an'],
                       ['closed', 'geschlossen'],
                       ['scheduled', 'zeitgesteuert'],
+                      ['release', 'nach Freigabe'],
                       ['off', 'aus'],
                     ] as const
                   ).map(([v, t]) => (

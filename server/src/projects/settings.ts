@@ -28,8 +28,12 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export const PHASES = ['topic', 'groups', 'orientation', 'research', 'drafting', 'presentation'] as const;
 const PhaseSchema = z.object({
-  /** on: offen, closed: von der Lehrkraft geschlossen, scheduled: Zeitraum from–to, off: nicht vorgesehen */
-  state: z.enum(['on', 'closed', 'scheduled', 'off']),
+  /**
+   * on: offen, closed: von der Lehrkraft geschlossen, scheduled: Zeitraum from–to, off: nicht vorgesehen,
+   * release: „Start nach Konzept und Freigabe“ (Jo, 22. November 2026): öffnet für eine Gruppe, sobald die Lehrkraft ihr
+   * Konzept freigegeben hat (conceptReleased); to gilt als Ende wie beim Zeitraum.
+   */
+  state: z.enum(['on', 'closed', 'scheduled', 'off', 'release']),
   from: z.number().int().nullable().default(null),
   to: z.number().int().nullable().default(null),
 });
@@ -44,7 +48,7 @@ export const RELEASE_OPEN_DAYS = 180;
  * Der Beginn zählt nicht: Lernende dürfen sich vorher anmelden, die Phasen zeigen dann „ab …“.
  */
 export function releaseEnd(phases: Record<string, { state: string; to: number | null }>, now: number): number {
-  const live = Object.values(phases).filter((p) => p.state === 'on' || p.state === 'scheduled');
+  const live = Object.values(phases).filter((p) => p.state === 'on' || p.state === 'scheduled' || p.state === 'release');
   if (!live.length) return now;
   if (live.some((p) => p.state === 'on' || p.to == null)) return now + RELEASE_OPEN_DAYS * 86_400_000;
   return Math.max(...live.map((p) => p.to!));
@@ -115,6 +119,14 @@ export const SettingsSchema = z.object({
   /** Folien: Lehrkräfte (ids), deren Präsentation aus „Test / Demo“ die Lernenden lesend sehen */
   folienDemo: z.array(z.number().int()).max(50),
   infos: z.record(z.string().max(40), z.object({ text: z.string().max(2000), start: z.boolean() })),
+  /**
+   * Alternativen je Schritt (Jo, 22. November 2026): Oberflächen (Kachel-Schlüssel wie mindmap, cluster, pinnwand),
+   * die die Lehrkraft für die Lernenden abgeschaltet hat. Fehlt ein Schlüssel, ist die Oberfläche da. Oberflächen mit
+   * eigener Dokumentart (Folien, Handout …) schalten weiter über docTypes.
+   */
+  tools: z.record(z.string().max(40), z.boolean()),
+  /** Gruppen (bei Einzelarbeit Personen), deren Konzept die Lehrkraft freigegeben hat: öffnet Schritte mit state release */
+  conceptReleased: z.array(z.number().int()).max(500),
 });
 export type ProjectSettings = z.infer<typeof SettingsSchema>;
 
@@ -158,6 +170,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   outlineLines: 'both',
   folienDemo: [],
   infos: {},
+  tools: {},
+  conceptReleased: [],
 };
 
 /** Voreinstellungen der Leiste oben auf der Einstellungsseite: setzen nur die genannten Felder. */

@@ -56,8 +56,8 @@ export function PortalShell({ me, active, children }: { me: Me; active: PortalPa
               <Icon name="users" size={15} />
             </span>
             <span>
-              <strong>Projekt-Portal</strong>
-              <small>Collegare · Kooperative Projektarbeit</small>
+              <strong>Portal für Collega.re</strong>
+              <small>Portal für Projekte und Aufgaben</small>
             </span>
           </a>
           <button className={`btn icon ${ps.burger}`} onClick={() => setNavOpen((o) => !o)} aria-label="Menü" aria-expanded={navOpen}>

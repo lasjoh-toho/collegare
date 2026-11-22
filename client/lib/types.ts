@@ -61,7 +61,8 @@ export interface Board {
 export type GroupFormation = 'teacher' | 'choice' | 'open';
 
 export interface PhaseSetting {
-  state: 'on' | 'closed' | 'scheduled' | 'off';
+  /** release: Start nach Konzept und Freigabe (je Gruppe, siehe conceptReleased) */
+  state: 'on' | 'closed' | 'scheduled' | 'off' | 'release';
   from: number | null;
   to: number | null;
 }
@@ -107,6 +108,10 @@ export interface ProjectSettings {
   outlineLines?: 'both' | 'praes' | 'ausarb';
   folienDemo: number[];
   infos: Record<string, { text: string; start: boolean }>;
+  /** abgeschaltete Oberflächen (Kachel-Schlüssel → false), Alternativen je Schritt */
+  tools?: Record<string, boolean>;
+  /** Gruppen bzw. Personen mit freigegebenem Konzept */
+  conceptReleased?: number[];
 }
 
 export interface ProjectView {

@@ -121,3 +121,6 @@ div.phase { opacity: 0.75; }
   margin: 4px 0; padding: 2px 10px; font-size: 12px; font-weight: 600; color: var(--ui-accent);
   border-top: 2px solid var(--ui-accent);
 }
+/* Werkstatt: Weg zurück ins Portal gleich neben dem Namen */
+.portalBack { flex: none; gap: 5px; padding: 5px 10px; border: 1px solid var(--ui-border); }
+@media (max-width: 640px) { .portalBackText { display: none; } }

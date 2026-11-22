@@ -1,12 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { CodesDialog } from '@/components/CodesDialog';
 import { Icon } from '@/components/Icon';
 import { StepIcons } from '@/components/StepIcons';
 import { PortalHead, PortalShell, type PortalPage } from '@/components/PortalShell';
 import { Welcome } from '@/components/Welcome';
 import { BASE_PATH, get, href, post } from '@/lib/api';
 import { currentPhase, phaseList } from '@/lib/phases';
-import type { Course, Me, ProjectListItem, ProjectSettings, ProjectSummary } from '@/lib/types';
+import type { Course, Me, ProjectListItem, ProjectSettings, ProjectSummary, ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import s from './portal-page.module.css';
 
@@ -124,7 +126,8 @@ function Portal({ me }: { me: Me }) {
         </div>
       )}
 
-      <section className={`panel ${s.box}`}>
+      {/* ohne umschließenden Kasten (Jo, 22. November 2026): Kopf, Filter und Karten liegen direkt auf der Seite */}
+      <section className={s.box}>
         <div className={s.boxHead}>
           <h2>
             <Icon name="grid" size={17} /> Bestehende Projekte
@@ -201,44 +204,9 @@ function Portal({ me }: { me: Me }) {
 
         {view === 'cards' && shown.length > 0 && (
           <div className={s.cards}>
-            {shown.map((p) => {
-              const course = courses.find((c) => c.id === p.contextId);
-              return (
-                <div key={p.id} className={`panel ${s.card}`}>
-                  <div className={s.fach}>
-                    <span className={s.fachName}>
-                      <Icon name={course?.moodle ? 'present' : 'doc'} size={13} /> {p.summary?.subject ?? courseTitle(p.contextId)}
-                    </span>
-                    {course?.moodle && <span className={s.lms}>LMS</span>}
-                    {p.summary && <PhaseChip s={p.summary} />}
-                  </div>
-                  <a className={s.ptitle} href={href(`/projekt/?id=${p.id}`)}>
-                    <h3>{p.title}</h3>
-                  </a>
-                  <div className={s.meta}>
-                    <span>
-                      <Icon name="users" size={13} /> {courseTitle(p.contextId)}
-                    </span>
-                    <span>
-                      <Icon name={p.mode === 'single' ? 'doc' : 'grid'} size={13} /> {p.mode === 'single' ? 'Einzelarbeit' : 'Gruppenarbeit'}
-                    </span>
-                    {p.summary && (
-                      <span>
-                        <Icon name="users" size={13} /> {p.summary.students} Lernende{p.summary.groups ? ` · ${p.summary.groups} ${p.summary.groups === 1 ? 'Gruppe' : 'Gruppen'}` : ''}
-                      </span>
-                    )}
-                    {p.summary && p.summary.docs > 0 && (
-                      <span className={s.metaDone}>
-                        <Icon name="check" size={13} /> {p.summary.done} / {p.summary.docs} fertig{p.summary.newDone > 0 ? ` (+${p.summary.newDone} neu)` : ''}
-                      </span>
-                    )}
-                    {p.summary && p.summary.unassigned > 0 && p.summary.groups > 0 && <span className={s.warn}>{p.summary.unassigned} ohne Gruppe</span>}
-                  </div>
-                  {p.summary && <StepIcons projectId={p.id} phases={p.summary.phases} editable={p.role === 'teacher'} onChange={(ph) => setPhases(p.id, ph)} />}
-                  <CardActs p={p} />
-                </div>
-              );
-            })}
+            {shown.map((p) => (
+              <ProjectCard key={p.id} p={p} course={courses.find((c) => c.id === p.contextId)} courseTitle={courseTitle(p.contextId)} onPhases={(ph) => setPhases(p.id, ph)} />
+            ))}
           </div>
         )}
       </section>
@@ -288,26 +256,93 @@ function Docs({ s: sum }: { s: ProjectSummary }) {
   );
 }
 
-/** Knöpfe unten auf der Karte, angeordnet wie in Autogra.fi: Öffnen über die ganze Breite, darunter die Werkzeuge */
-function CardActs({ p }: { p: ProjectListItem }) {
+/**
+ * Projektkarte im Aufbau der Aufgabenkarten von Autogra.fi (task-card-flow, Jo, 22. November 2026): Kurs · Arbeitsform,
+ * Titel in zwei Zeilen, Einstellungen + Zugangscodes, Schritte, Stand, Korrektur + Gruppen. Klick auf eine freie Stelle
+ * öffnet das Projekt.
+ */
+function ProjectCard({ p, course, courseTitle, onPhases }: { p: ProjectListItem; course?: Course; courseTitle: string; onPhases: (ph: ProjectSettings['phases']) => void }) {
+  const [codes, setCodes] = useState<ProjectView | null>(null);
+  const teacher = p.role === 'teacher';
+  const open = href(`/projekt/?id=${p.id}`);
+  async function showCodes() {
+    setCodes(await get<ProjectView>(`/api/projects/${p.id}`));
+  }
   return (
-    <div className={s.cardActs}>
-      <a className="btn" href={href(`/projekt/?id=${p.id}`)}>
-        <Icon name="grid" size={15} /> Projekt öffnen
+    <div
+      className={s.card}
+      title="Klick auf eine freie Stelle öffnet das Projekt"
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('a, button, input, label, select, [role=dialog], .modal-bg')) location.href = open;
+      }}
+    >
+      <div className={s.fach}>
+        <span className={s.fachName} title={courseTitle}>
+          <Icon name={course?.moodle ? 'present' : 'doc'} size={13} />
+          <a className={s.classLink} href={href(`/?klasse=${p.contextId}`)} title={`${courseTitle}: alle Projekte dieser Klasse`}>
+            {p.summary?.subject ? `${p.summary.subject} · ${courseTitle}` : courseTitle}
+          </a>
+        </span>
+        <span className={`${s.modeChip} ${p.mode === 'single' ? s.single : ''}`}>{p.mode === 'single' ? 'Einzeln' : 'Gruppen'}</span>
+      </div>
+      <a className={s.cardTitle} href={open} title={p.title}>
+        {p.title}
       </a>
-      {p.role === 'teacher' && (
+      {teacher && (
         <div className={s.cardRow}>
-          <a className="btn" href={href(`/projekt/korrektur/?id=${p.id}`)}>
-            <Icon name="pen" size={15} /> Korrektur
+          <a className="btn" href={href(`/einstellungen/?id=${p.id}`)}>
+            <Icon name="gear" size={14} /> Einstellungen
           </a>
-          <a className="btn" href={href(`/projekt/gruppen/?id=${p.id}`)}>
-            <Icon name="users" size={15} /> Gruppen
-          </a>
-          <a className={`btn ${s.gear}`} href={href(`/einstellungen/?id=${p.id}`)} title="Einstellungen" aria-label="Einstellungen">
-            <Icon name="gear" size={15} />
-          </a>
+          <button className="btn" onClick={() => void showCodes()} title="Zugangscodes und QR-Codes für die Lernenden">
+            <Icon name="key" size={14} /> Zugangscodes
+          </button>
         </div>
       )}
+      {p.summary && <StepIcons projectId={p.id} phases={p.summary.phases} editable={teacher} wide onChange={onPhases} />}
+      {p.summary && (
+        <div className={s.meta}>
+          <PhaseChip s={p.summary} />
+          <span title={`${p.summary.students} Lernende`}>
+            <Icon name="users" size={13} /> {p.summary.students}
+            {p.summary.groups ? ` · ${p.summary.groups} ${p.summary.groups === 1 ? 'Gruppe' : 'Gruppen'}` : ''}
+          </span>
+          {p.summary.docs > 0 && (
+            <span className={s.metaDone} title="Abschnitte fertig gemeldet">
+              <Icon name="check" size={13} /> {p.summary.done}/{p.summary.docs}
+              {p.summary.newDone > 0 ? ` (+${p.summary.newDone})` : ''}
+            </span>
+          )}
+          {p.summary.unassigned > 0 && p.summary.groups > 0 && <span className={s.warn}>{p.summary.unassigned} ohne Gruppe</span>}
+        </div>
+      )}
+      <div className={s.cardRow}>
+        {teacher ? (
+          <>
+            <a className="btn" href={href(`/projekt/korrektur/?id=${p.id}`)}>
+              <Icon name="pen" size={14} /> Korrektur
+            </a>
+            <a className="btn" href={href(`/projekt/gruppen/?id=${p.id}`)}>
+              <Icon name="users" size={14} /> Gruppen
+            </a>
+          </>
+        ) : (
+          <a className="btn" href={open}>
+            <Icon name="grid" size={14} /> Projekt öffnen
+          </a>
+        )}
+      </div>
+      {codes &&
+        createPortal(
+        <CodesDialog
+          projectId={codes.id}
+          title={codes.title}
+          members={codes.board.members}
+          validUntil={codes.codesValidUntil}
+          followRelease={codes.codesFollowRelease}
+          onClose={() => setCodes(null)}
+        />,
+          document.body,
+        )}
     </div>
   );
 }

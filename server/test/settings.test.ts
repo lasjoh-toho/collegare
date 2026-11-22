@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { buildApp, type App } from '../src/app.js';
 import { createServices, type Services } from '../src/services.js';
-import { DEFAULT_SETTINGS, allowedExtensions, parseSettings } from '../src/projects/settings.js';
+import { DEFAULT_SETTINGS, allowedExtensions, parseSettings, releaseEnd } from '../src/projects/settings.js';
 
 let app: App;
 let s: Services;
@@ -131,5 +131,26 @@ describe('Gruppenbildung durch Lernende', () => {
     const b = (await call('GET', `/api/projects/${project}`, t)).json.board;
     expect(b.groups.find((x: J) => x.id === g).title).toBe('Clara-Thema');
     expect(b.members.find((m: J) => m.userId === ids[2]).groupId).toBe(g);
+  });
+});
+
+describe('Schritte: Alternativen und Start nach Freigabe', () => {
+  it('liest tools, conceptReleased und den Zustand release, alte Einstellungen bekommen leere Standardwerte', () => {
+    const old = parseSettings(JSON.stringify({ brief: 'x' }));
+    expect(old.tools).toEqual({});
+    expect(old.conceptReleased).toEqual([]);
+    const s = parseSettings(
+      JSON.stringify({ tools: { cluster: false }, conceptReleased: [3, 7], phases: { presentation: { state: 'release', from: null, to: 1_000 } } }),
+    );
+    expect(s.tools).toEqual({ cluster: false });
+    expect(s.conceptReleased).toEqual([3, 7]);
+    expect(s.phases.presentation).toEqual({ state: 'release', from: null, to: 1_000 });
+    expect(s.phases.drafting.state).toBe('on');
+  });
+
+  it('Zugangscodes „solange freigegeben“ zählen „nach Freigabe“ wie einen Zeitraum', () => {
+    const off = { state: 'off', from: null, to: null };
+    expect(releaseEnd({ a: { state: 'release', to: 5_000 }, b: off }, 1_000)).toBe(5_000);
+    expect(releaseEnd({ a: { state: 'release', to: null } }, 1_000)).toBeGreaterThan(1_000 + 100 * 86_400_000);
   });
 });

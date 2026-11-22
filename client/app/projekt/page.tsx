@@ -19,7 +19,7 @@ import { Icon } from '@/components/Icon';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { ApiError, get, href } from '@/lib/api';
-import { OFFICE_VAR, OVERVIEW_SECTIONS, TILES, TOPIC_MAP_PATH, currentPhase, phaseDone, phaseList, phasePath, type DocSummary, type TileDef } from '@/lib/phases';
+import { OFFICE_VAR, OVERVIEW_SECTIONS, TILES, TOPIC_MAP_PATH, conceptOf, currentPhase, phaseDone, phaseList, phasePath, toolOn, type DocSummary, type TileDef } from '@/lib/phases';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import { TeacherActions } from './TeacherActions';
@@ -67,7 +67,7 @@ export default function Projekt() {
     );
   if (!project || !me) return null;
   const teacher = project.role === 'teacher';
-  const phases = phaseList(project.settings, project.mode === 'single');
+  const phases = phaseList(project.settings, project.mode === 'single', Date.now(), conceptOf(project, me.id));
   const now = currentPhase(phases, phaseDone(project, me.id, docs));
   const nowInfo = phases.find((x) => x.key === now);
   const myGroup = project.board.groups.find((g) => g.id === project.myGroupId);
@@ -114,7 +114,8 @@ export default function Projekt() {
   const tiles = TILES.filter((tile) => {
     const ph = tile.phase ? phases.find((x) => x.key === tile.phase) : null;
     if (ph?.state === 'off' && !((tile.key === 'map' || tile.key === 'cluster') && onTopic)) return false;
-    if (tile.docType && !project.settings.docTypes[tile.docType]) return false;
+    // Alternativen je Schritt: abgeschaltete Oberflächen sehen die Lernenden nicht (Jo, 22. November 2026)
+    if (!toolOn(project.settings, tile)) return false;
     if (tile.key === 'chat' && project.settings.chatAll === false && (project.settings.chatGroups === false || project.mode !== 'group')) return false;
     return true;
   });
@@ -123,7 +124,7 @@ export default function Projekt() {
     <ProjectShell me={me} project={project} where="Übersicht" docs={docs} actions={teacher && <TeacherActions project={project} onChanged={load} />}>
       <div className={t.wrap}>
         {nowInfo && !teacher && (
-          <a className={`panel ${t.now}`} href={href(phasePath(now!)?.replace('{id}', String(id)) ?? `/projekt/?id=${id}`)}>
+          <a className={`panel ${t.now}`} href={href(phasePath(now!, project.settings)?.replace('{id}', String(id)) ?? `/projekt/?id=${id}`)}>
             <span className={t.nowIcon}>
               <Icon name={nowInfo.icon} size={22} />
             </span>
