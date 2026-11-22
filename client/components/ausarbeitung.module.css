@@ -1,11 +1,15 @@
 /* Karten der Ausarbeitung bzw. Präsentation (AusarbeitungCards) */
 .col { flex: 1; min-width: 0; overflow: auto; counter-reset: ednote; background: var(--bg-sunken); }
-/* zarter Farbverlauf in der Farbe der Linie: blau = Text der Ausarbeitung, orange = Präsentation */
+/* Farbverlauf in der Farbe der Linie (blau = Text der Ausarbeitung, orange = Präsentation), Jo 22.11.: oben 1 mm volle
+   Farbe, dann 50 %, bis 2 cm auf 15 %, unten am Fensterrand 0. Bleibt beim Scrollen am oberen Rand stehen. */
 .ausarb, .praes {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--line-color) 13%, transparent) 0, color-mix(in srgb, var(--line-color) 4%, transparent) 420px, color-mix(in srgb, var(--line-color) 2%, transparent) 100%),
+    linear-gradient(180deg,
+      var(--line-color) 0, var(--line-color) 1mm,
+      color-mix(in srgb, var(--line-color) 50%, transparent) 1mm,
+      color-mix(in srgb, var(--line-color) 15%, transparent) 2cm,
+      transparent 100%),
     var(--bg-sunken);
-  background-attachment: local;
 }
 .praes { --line-color: #d9541a; }
 .cards { max-width: 1180px; margin: 0 auto; padding: 18px 20px 90px; display: flex; flex-direction: column; gap: 6px; }
