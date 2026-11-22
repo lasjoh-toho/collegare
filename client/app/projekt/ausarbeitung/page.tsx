@@ -15,6 +15,7 @@ import { AusarbeitungCards, printArticle, type DocList } from '@/components/Ausa
 import type { InfoSpec } from '@/components/InfoButton';
 import { ApiError, BASE_PATH, get, projectSocket } from '@/lib/api';
 import type { LineKind } from '@/lib/lines';
+import { announceSide, useSideBus } from '@/lib/sides';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import p from '../projekt.module.css';
@@ -46,6 +47,13 @@ export default function Ausarbeitung() {
   const [toast, setToast] = useState('');
   const [sock, setSock] = useState<Socket | null>(null);
   const area = useRef<HTMLDivElement>(null);
+
+  // links wie rechts nur ein Seitenmenü: die Gliederung links schließt das Phasenmenü und umgekehrt
+  useSideBus('left', 'ausarbeitung-gliederung', line, () => setLine(false));
+  const toggleLine = () => {
+    if (!line) announceSide('left', 'ausarbeitung-gliederung');
+    setLine(!line);
+  };
 
   const show = useCallback((msg: string) => {
     setToast(msg);
@@ -101,7 +109,7 @@ export default function Ausarbeitung() {
       actions={
         <>
           {view === 'write' && data?.scope && (
-            <button className={`btn ${s.wide} ${line ? 'on' : ''}`} onClick={() => setLine(!line)} aria-pressed={line} title="Gliederung links ein- oder ausblenden">
+            <button className={`btn ${s.wide} ${line ? 'on' : ''}`} onClick={toggleLine} aria-pressed={line} title="Gliederung links ein- oder ausblenden">
               Gliederung
             </button>
           )}
