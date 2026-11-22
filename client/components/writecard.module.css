@@ -13,6 +13,7 @@
   font-size: 17px;
   line-height: 1.55;
   --text: 60%;
+  --text-wide: 166.67%;
   --paper: #fffff8;
   --ink: #111;
   --rule: #d6d3c8;
@@ -101,7 +102,7 @@
 
 /* Handy: eine Spalte, Randnotizen als eingerückter Kasten direkt im Text */
 @media (max-width: 760px) {
-  .card { padding: 14px 14px 16px; --text: 100%; border-radius: 10px; }
+  .card { padding: 14px 14px 16px; --text: 100%; --text-wide: 100%; border-radius: 10px; }
   .head { flex-wrap: wrap; }
   .meta { margin-left: 0; justify-content: flex-start; }
   .card :global(.ed-body) {
@@ -115,3 +116,16 @@
 }
 /* Werkzeuge über der Markierung in der Schrift der Oberfläche, nicht in der Schrift des Textes */
 .write :global([role='toolbar']) { font-family: var(--font); font-size: 12.5px; }
+
+/* Werkzeuge als mitlaufender Kopf des Eintrags, solange man darin schreibt (über die ganze Breite der Karte) */
+.stickyBar {
+  position: sticky; top: 0; z-index: 25; width: var(--text-wide); margin: 0 0 10px; padding: 4px 6px;
+  border-radius: 9px; background: color-mix(in srgb, var(--bg-elev) 94%, transparent); backdrop-filter: blur(6px);
+  box-shadow: 0 0 0 1px var(--line), 0 4px 14px rgba(0, 0, 0, 0.06); font-family: var(--font); font-size: 12.5px; gap: 2px;
+}
+.stickyBar :global(.btn) { height: 26px; padding: 0 8px; }
+.sep { width: 1px; align-self: stretch; margin: 3px 4px; background: var(--line); }
+.grp { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-faint); padding: 0 4px 0 2px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+/* Ziel beim Hineinziehen einer Notiz: Linie zwischen den Absätzen */
+.dropLine { position: absolute; left: 18px; width: calc((100% - 44px) * 0.6 + 8px); height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+@media (max-width: 760px) { .dropLine { width: calc(100% - 36px); } }

@@ -1,0 +1,41 @@
+/* Karten der Ausarbeitung bzw. Präsentation (AusarbeitungCards) */
+.col { flex: 1; min-width: 0; overflow: auto; counter-reset: ednote; background: var(--bg-sunken); }
+/* zarter Farbverlauf in der Farbe der Linie: blau = Text der Ausarbeitung, orange = Präsentation */
+.ausarb, .praes {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--line-color) 13%, transparent) 0, color-mix(in srgb, var(--line-color) 4%, transparent) 420px, color-mix(in srgb, var(--line-color) 2%, transparent) 100%),
+    var(--bg-sunken);
+  background-attachment: local;
+}
+.praes { --line-color: #d9541a; }
+.cards { max-width: 1180px; margin: 0 auto; padding: 18px 20px 90px; display: flex; flex-direction: column; gap: 6px; }
+.empty { padding: 30px 0; text-align: center; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.secTitle { margin: 12px 0 0 4px; font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.6rem; }
+.outside { opacity: 0.75; }
+.outside .secTitle { font-family: inherit; font-style: normal; font-size: 14px; color: var(--fg-muted); }
+.terms dl { margin: 0; padding: 14px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-elev); display: grid; gap: 6px; font-family: Georgia, serif; }
+.terms dl > div { display: grid; grid-template-columns: minmax(120px, 28%) 1fr; gap: 12px; }
+.terms dt { font-weight: 600; }
+.terms dd { margin: 0; }
+.missing { color: var(--fg-faint); font-style: italic; }
+/* Ablagestelle zwischen den Panels: unsichtbar, beim Ziehen einer Notiz eine gestrichelte Zeile */
+.gap { height: 4px; border-radius: 10px; transition: height 0.12s; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--fg-muted); }
+.gapOn { height: 34px; border: 2px dashed color-mix(in srgb, var(--line-color) 45%, var(--line)); background: color-mix(in srgb, var(--line-color) 5%, transparent); }
+.gapOver { height: 54px; border-style: solid; border-color: var(--line-color); background: color-mix(in srgb, var(--line-color) 12%, transparent); color: var(--fg); }
+.flash > article { animation: flash 2.2s ease-out; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--line-color) 55%, transparent); } 100% { box-shadow: none; } }
+/* „Zurück“ unten, bleibt beim Rollen sichtbar */
+.backBar { position: sticky; bottom: 12px; display: flex; justify-content: flex-start; pointer-events: none; margin-top: 8px; }
+.backBar :global(.btn) { pointer-events: auto; box-shadow: var(--shadow); background: var(--bg-elev); }
+.read { padding: 18px 16px 40px; }
+.officeModal { width: min(1100px, 96vw); height: 88dvh; display: flex; flex-direction: column; gap: 6px; }
+.officeModal h2 { margin: 0; font-size: 16px; }
+.officeModal p { margin: 0; font-size: 12.5px; }
+.stripe { flex: none; height: 6px; background: var(--office-word); }
+.frame { flex: 1; width: 100%; border: 0; background: #fff; }
+@media (max-width: 760px) {
+  .cards { padding: 10px 8px 80px; }
+  .read { padding: 0; }
+  .terms dl > div { grid-template-columns: 1fr; gap: 0; }
+}

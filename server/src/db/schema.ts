@@ -167,6 +167,8 @@ export interface DocumentsTable {
   rev: Generated<number>;
   text_at: Ms | null;
   text_by: number | null;
+  /** Linie der Gliederung, aus der der Abschnitt stammt: ausarb (führende Linie) oder praes */
+  line: Generated<string>;
 }
 
 /** Frühere Fassungen eines Abschnitts (Schnappschüsse beim Schreiben, vor dem Wiederherstellen) */
@@ -178,6 +180,16 @@ export interface DocRevisionsTable {
   at: Ms;
   by: number | null;
   reason: string;
+}
+
+/** Notiz in einen Abschnitt der Ausarbeitung gezogen (Text ausgepackt); snippet = Anfang des eingesetzten Textes */
+export interface NoteUsesTable {
+  id: Generated<number>;
+  doc_id: number;
+  note_id: number;
+  snippet: string;
+  at: Ms;
+  by: number | null;
 }
 
 /** Folien: Freigabe und Sperre je Präsentation (fehlt eine Zeile: nicht freigegeben, nicht gesperrt) */
@@ -395,6 +407,7 @@ export interface Database {
   documents: DocumentsTable;
   doc_changes: DocChangesTable;
   doc_revisions: DocRevisionsTable;
+  note_uses: NoteUsesTable;
   bento_decks: BentoDecksTable;
   deck_access: DeckAccessTable;
   ydocs: YdocsTable;

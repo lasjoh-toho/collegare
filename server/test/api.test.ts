@@ -1,3 +1,4 @@
+import { NoteInput } from '../src/projects/notes.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { io as ioc, type Socket } from 'socket.io-client';
 import type { AddressInfo } from 'node:net';
@@ -1025,6 +1026,20 @@ describe('Ausarbeitung: Dokumente aus der Gliederung', () => {
     const old = after.find((d) => d.id === doc.id)!;
     expect(old.sectionTitle).toBe('Nicht mehr in der Gliederung');
     expect(old.body).toBe('Erste Fassung^[Notiz]');
+
+    // Notiz in den Text gezogen: Marke „verbaut“, solange der Anfang im Text steht
+    const note = await s.notes.add(project, 'g' + g1, ids[0], NoteInput.parse({ kind: 'note', title: 'Brotpreis', body: 'Ein Brot kostete im November 1923 rund 200 Milliarden Mark.' }));
+    const sec = after.find((d) => d.id !== doc.id)!;
+    await call('PUT', `/api/documents/${sec.id}/text`, anna, { body: 'Vorher. Ein Brot kostete im **November** 1923 rund 200 Milliarden Mark. Nachher.', rev: sec.rev });
+    expect((await call('POST', `/api/documents/${sec.id}/notiz`, anna, { noteId: note.id, snippet: 'Ein Brot kostete im November 1923 rund 200 Milliarden Mark.' })).json).toEqual({ ok: true });
+    const uses = (await call('GET', `/api/projects/${project}/notizen-verwendung?bereich=g${g1}`, anna)).json.uses;
+    expect(uses[note.id]).toEqual([{ kind: 'ausarb', where: 'text', label: sec.title, docId: sec.id, point: null }]);
+
+    // Präsentationslinie hat eigene Abschnitte (leer, solange outline.praes fehlt)
+    expect((await call('POST', `/api/projects/${project}/documents/sync`, anna, { scope: 'g' + g1, line: 'praes' })).status).toBe(200);
+    const pr = (await call('GET', `/api/projects/${project}/documents?linie=praes`, anna)).json;
+    expect(pr.line).toBe('praes');
+    expect(pr.docs.every((d: J) => d.line === 'praes')).toBe(true);
   });
 });
 

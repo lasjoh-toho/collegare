@@ -26,7 +26,9 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     return { userId: sess.userId, role: r.role, scopes: r.scopes, scope: sc ?? null };
   }
 
-  app.get<{ Params: { id: string }; Querystring: { bereich?: string } }>('/api/projects/:id/documents', async (req, reply) => {
+  const lineOf = (v: unknown): 'ausarb' | 'praes' => (v === 'praes' ? 'praes' : 'ausarb');
+
+  app.get<{ Params: { id: string }; Querystring: { bereich?: string; linie?: string } }>('/api/projects/:id/documents', async (req, reply) => {
     const projectId = Number(req.params.id);
     const a = await scopeAccess(req, reply, projectId, req.query.bereich);
     if (!a) return;
@@ -34,7 +36,8 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     const base = { role: a.role, scopes: a.scopes.map(({ scope, title, test }) => ({ scope, title, test: !!test })), finishLock: p!.settings.finishLock, reopenBy: p!.settings.reopenBy };
     if (!a.scope) return { ...base, scope: null, people: [], docs: [], outlineAt: null };
     const { map } = await s.maps.get(projectId, a.scope.scope);
-    const docs = (await s.documents.list(projectId, a.scope.scope)).filter((d) => d.kind === 'word');
+    const line = lineOf(req.query.linie);
+    const docs = (await s.documents.list(projectId, a.scope.scope)).filter((d) => d.kind === 'word' && d.line === line);
     const office = await s.documents.hasOfficeText(docs.filter((d) => d.body === null).map((d) => d.id));
     const test = !!a.scope.test;
     return {
@@ -44,6 +47,9 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
       people: a.scope.people,
       docs: docs.map((d) => ({ ...d, office: office.has(d.id) })),
       outlineAt: map.outline?.at ?? null,
+      line,
+      // Präsentationslinie: erst vorhanden, wenn die Gliederung nach dem Update gespeichert wurde
+      hasPraes: !!map.outline?.praes,
       // Zwischenüberschriften der tieferen Gliederungsebenen (falls die Gliederung sie liefert)
       subs: Object.fromEntries((map.outline?.sections ?? []).map((x) => [x.id, (x as { subs?: unknown }).subs ?? []])),
     };
@@ -144,14 +150,14 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
 
   app.post<{ Params: { id: string } }>('/api/projects/:id/documents/sync', async (req, reply) => {
     const projectId = Number(req.params.id);
-    const body = z.object({ scope: z.string() }).safeParse(req.body);
+    const body = z.object({ scope: z.string(), line: z.enum(['ausarb', 'praes']).optional() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Bereich fehlt' });
     const a = await scopeAccess(req, reply, projectId, body.data.scope);
     if (!a) return;
     if (!a.scope) return reply.code(403).send({ error: 'Kein Zugriff auf diese Gruppe' });
     try {
       const { map } = await s.maps.get(projectId, a.scope.scope);
-      const r = await s.documents.syncFromOutline(projectId, a.scope.scope, map);
+      const r = await s.documents.syncFromOutline(projectId, a.scope.scope, map, body.data.line ?? 'ausarb');
       await s.audit.append({ actorId: a.userId, action: 'documents.sync', projectId, data: { scope: a.scope.scope, ...r } });
       ev.changed(projectId, a.scope.scope);
       return r;
@@ -249,17 +255,42 @@ export function documentRoutes(app: FastifyInstance, s: Services, ev: DocEvents)
     const what = req.params.what;
     if (what !== 'merken' && what !== 'zurueck') return reply.code(404).send({ error: 'Unbekannt' });
     const projectId = Number(req.params.id);
-    const body = z.object({ scope: z.string() }).safeParse(req.body);
+    const body = z.object({ scope: z.string(), line: z.enum(['ausarb', 'praes']).optional() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Bereich fehlt' });
     const a = await scopeAccess(req, reply, projectId, body.data.scope);
     if (!a) return;
     if (!a.scope) return reply.code(403).send({ error: 'Kein Zugriff auf diese Gruppe' });
     if (a.role === 'teacher' && !a.scope.test) return reply.code(403).send({ error: 'Lehrkräfte lesen hier nur' });
-    if (what === 'merken') return { saved: await s.documents.snapshotScope(projectId, a.scope.scope, a.userId) };
-    const n = await s.documents.restoreScope(projectId, a.scope.scope, a.userId);
+    const line = body.data.line ?? 'ausarb';
+    if (what === 'merken') return { saved: await s.documents.snapshotScope(projectId, a.scope.scope, a.userId, line) };
+    const n = await s.documents.restoreScope(projectId, a.scope.scope, a.userId, line);
     await s.audit.append({ actorId: a.userId, action: 'documents.restored', projectId, data: { scope: a.scope.scope, count: n } });
     ev.changed(projectId, a.scope.scope);
     return { restored: n };
+  });
+
+  /** Notiz wurde in den Text gezogen (für die Marke „verbaut“ an der Notiz) */
+  app.post<{ Params: { id: string } }>('/api/documents/:id/notiz', async (req, reply) => {
+    const body = z.object({ noteId: z.number().int().positive(), snippet: z.string().min(1).max(2000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Angabe fehlt' });
+    const a = await docAccess(req, reply);
+    if (!a) return;
+    if (!writable(a)) return reply.code(403).send({ error: 'Hier darfst du nicht schreiben' });
+    const note = await s.notes.get(body.data.noteId);
+    if (!note || note.projectId !== a.doc.projectId) return reply.code(404).send({ error: 'Notiz nicht gefunden' });
+    await s.noteUses.add(a.doc.id, body.data.noteId, body.data.snippet, a.userId);
+    return { ok: true };
+  });
+
+  /** Wo stecken die Notizen eines Bereichs schon (Gliederung, Text der Ausarbeitung)? */
+  app.get<{ Params: { id: string }; Querystring: { bereich?: string } }>('/api/projects/:id/notizen-verwendung', async (req, reply) => {
+    const projectId = Number(req.params.id);
+    const a = await scopeAccess(req, reply, projectId, req.query.bereich);
+    if (!a) return;
+    if (!a.scope) return { uses: {} };
+    const { map } = await s.maps.get(projectId, a.scope.scope);
+    const docs = await s.documents.list(projectId, a.scope.scope);
+    return { scope: a.scope.scope, uses: await s.noteUses.forScope(docs, map) };
   });
 
   return { collabId };

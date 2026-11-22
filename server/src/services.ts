@@ -1,3 +1,4 @@
+import { NoteUses } from './projects/noteUses.js';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -75,6 +76,7 @@ export interface Services {
   pinnwandEvents: EventEmitter;
   oidc: OidcProvider;
   documents: Documents;
+  noteUses: NoteUses;
   docStore: DocChangeStore;
   bentoDecks: BentoDecks;
   lti: Lti;
@@ -121,6 +123,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     pinnwandEvents: new EventEmitter(),
     oidc: new OidcProvider(db, toolKey, users, contexts, config.appUrl, now),
     documents: new Documents(db),
+    noteUses: new NoteUses(db),
     docStore: new DocChangeStore(db),
     bentoDecks: new BentoDecks(db, now),
     lti,

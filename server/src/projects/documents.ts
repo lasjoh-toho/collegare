@@ -26,7 +26,9 @@ export interface DocRow {
   rev: number;
   textAt: number | null;
   textBy: number | null;
+  line: 'ausarb' | 'praes';
 }
+export type LineKind = 'ausarb' | 'praes';
 
 /** Höchstlänge eines Abschnitts (Bilder stecken als data:-Adressen im Text) */
 export const MAX_BODY = 4_000_000;
@@ -68,6 +70,7 @@ const toRow = (r: {
   rev?: number;
   text_at?: number | null;
   text_by?: number | null;
+  line?: string;
 }): DocRow => ({
   id: r.id,
   scope: r.scope,
@@ -84,6 +87,7 @@ const toRow = (r: {
   rev: Number(r.rev ?? 0),
   textAt: r.text_at == null ? null : Number(r.text_at),
   textBy: r.text_by ?? null,
+  line: r.line === 'praes' ? 'praes' : 'ausarb',
 });
 
 export class Documents {
@@ -103,14 +107,16 @@ export class Documents {
    * Legt für jede Karte der Gliederung ein Textdokument an, sofern es noch keines gibt. Vorhandene Dokumente
    * übernehmen Abschnitt, Reihenfolge und Titel der Gliederung; Inhalte bleiben unberührt.
    */
-  async syncFromOutline(projectId: number, scope: string, map: MindMap): Promise<{ created: number; total: number }> {
+  async syncFromOutline(projectId: number, scope: string, map: MindMap, line: LineKind = 'ausarb'): Promise<{ created: number; total: number }> {
     if (!map.outline) throw new DocError('Zuerst in der Mindmap „Gliederung übernehmen“');
-    const existing = await this.list(projectId, scope);
+    // ausarb: führende Linie (wie bisher); praes: Abschnitte der Präsentationslinie
+    const outlineSections = line === 'praes' ? (map.outline.praes ?? []) : map.outline.sections;
+    const existing = (await this.list(projectId, scope)).filter((d) => d.kind !== 'word' || d.line === line);
     const byCard = new Map(existing.filter((d) => d.cardId).map((d) => [d.cardId!, d]));
     let position = 0;
     let created = 0;
     const now = Date.now();
-    for (const sec of map.outline.sections) {
+    for (const sec of outlineSections) {
       const sectionTitle = (map.cards[sec.id]?.title || sec.title).slice(0, 255);
       // Punkt der Gliederung ohne Karten (z. B. gestrichelt, nur in der Gliederung entstanden): ein Abschnitt für den Punkt selbst
       const entries = sec.cards.filter((c) => map.cards[c]).map((c) => ({ key: c, title: map.cards[c].title, owner: map.cards[c].owner }));
@@ -129,7 +135,7 @@ export class Documents {
         } else {
           await this.db
             .insertInto('documents')
-            .values({ project_id: projectId, scope, section_id: sec.id, section_title: sectionTitle, card_id: cardId, kind: 'word', title, owner_id: card.owner, position, done_at: null, done_by: null, created_at: now })
+            .values({ project_id: projectId, scope, section_id: sec.id, section_title: sectionTitle, card_id: cardId, kind: 'word', title, owner_id: card.owner, position, done_at: null, done_by: null, created_at: now, line })
             .execute();
           created++;
         }
@@ -137,7 +143,7 @@ export class Documents {
     }
     // Abschnitte, deren Punkt nicht mehr in der Gliederung steht, bleiben mit ihrem Text am Ende stehen
     const seen = new Set<string>();
-    for (const sec of map.outline.sections) {
+    for (const sec of outlineSections) {
       const cards = sec.cards.filter((c) => map.cards[c]);
       for (const c of cards.length ? cards : [sec.id]) seen.add(c);
     }
@@ -219,8 +225,8 @@ export class Documents {
   }
 
   /** Stand aller Texte eines Bereichs sichern, bevor die Gliederung etwas verschiebt („Zurück“ holt ihn wieder) */
-  async snapshotScope(projectId: number, scope: string, by: number): Promise<number> {
-    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && d.body !== null);
+  async snapshotScope(projectId: number, scope: string, by: number, line: LineKind = 'ausarb'): Promise<number> {
+    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && d.line === line && d.body !== null);
     let n = 0;
     for (const d of docs) {
       // nur sichern, was sich seit der letzten Fassung geändert hat (jedes Öffnen merkt sich den Stand)
@@ -240,8 +246,8 @@ export class Documents {
    * Abgleich mit der Gliederung zurück. Der Stand davor bleibt als frühere Fassung erhalten, „Zurück“ lässt sich also
    * selbst zurücknehmen.
    */
-  async restoreScope(projectId: number, scope: string, by: number): Promise<number> {
-    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && !d.doneAt);
+  async restoreScope(projectId: number, scope: string, by: number, line: LineKind = 'ausarb'): Promise<number> {
+    const docs = (await this.list(projectId, scope)).filter((d) => d.kind === 'word' && d.line === line && !d.doneAt);
     let n = 0;
     for (const d of docs) {
       const mark = await this.db.selectFrom('doc_revisions').select(['body']).where('doc_id', '=', d.id).where('reason', '=', 'mark').orderBy('at', 'desc').orderBy('id', 'desc').limit(1).executeTakeFirst();

@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { projectSocket } from '@/lib/api';
+import { get, href, projectSocket } from '@/lib/api';
 import { isChatDrag, setChatDrag } from '@/lib/chatDrag';
 import { imageInfo, imagesFrom, looksLikeImage, mayHoldImages, noteFileUrl, proxied, readPage, setImageDrag, takeImages, uploadImage, type ImageNoteInput } from '@/lib/imageDrop';
 import { post } from '@/lib/api';
@@ -27,6 +27,15 @@ import { ImageImport } from './ImageImport';
 import { NoteSplit, type SplitNoteInput } from './NoteSplit';
 import { PasteNotes } from './PasteNotes';
 import type { Me, ProjectView } from '@/lib/types';
+
+/** Wo eine Notiz schon verbaut ist (GET …/notizen-verwendung) */
+interface NoteUse {
+  kind: 'ausarb' | 'praes';
+  where: 'text' | 'line';
+  label: string;
+  docId: number | null;
+  point: string | null;
+}
 import { GliederungLive } from './GliederungLive';
 import c from './notes.module.css';
 
@@ -603,6 +612,32 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     setTimeout(() => setToast(''), 4000);
   };
 
+  // Wo stecken die Notizen schon (Gliederung, Text der Ausarbeitung)? Marken blau/orange, Klick springt hin
+  const [uses, setUses] = useState<Record<number, NoteUse[]>>({});
+  useEffect(() => {
+    if (!scope || scope === SHARED) return setUses({});
+    let live = true;
+    const load = () =>
+      get<{ uses: Record<number, NoteUse[]> }>(`/api/projects/${id}/notizen-verwendung?bereich=${encodeURIComponent(scope)}`).then(
+        (r) => live && setUses(r.uses),
+        () => {},
+      );
+    void load();
+    const t = setInterval(() => document.visibilityState === 'visible' && void load(), 20_000);
+    addEventListener('collegare:notiz-verbaut', load);
+    addEventListener('focus', load);
+    return () => {
+      live = false;
+      clearInterval(t);
+      removeEventListener('collegare:notiz-verbaut', load);
+      removeEventListener('focus', load);
+    };
+  }, [id, scope]);
+  const goUse = (u: NoteUse) => {
+    const q = `id=${id}${u.kind === 'praes' ? '&linie=praes' : ''}${u.docId ? `&abschnitt=${u.docId}` : ''}`;
+    location.assign(href(u.docId ? `/projekt/ausarbeitung/?${q}` : `/projekt/gliederung/?id=${id}${u.point ? `&punkt=${encodeURIComponent(u.point)}` : ''}`));
+  };
+
   const doJoin = useCallback(
     (sc: string | null) => {
       sock.current?.emit('notes:join', { projectId: id, scope: sc ?? undefined }, (r: JoinAck) => {
@@ -1005,6 +1040,17 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                 >
                   <header className={c.head}>
                     <span className={c.kind}>{KINDS.find((k) => k.kind === n.kind)?.label ?? (n.kind === 'image' ? 'Bild' : n.kind)}</span>
+                    {(uses[n.id] ?? []).map((u, k) => (
+                      <button
+                        key={k}
+                        className={`${c.usePill} ${u.kind === 'praes' ? c.usePraes : c.useAusarb}`}
+                        onClick={(e) => (e.stopPropagation(), goUse(u))}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        title={`${u.kind === 'praes' ? 'In der Präsentation' : 'In der Ausarbeitung'} ${u.where === 'text' ? 'im Text von' : 'am Punkt'} „${u.label}“. Klick springt hin.`}
+                      >
+                        {u.kind === 'praes' ? 'Präsentation' : 'Ausarbeitung'}
+                      </button>
+                    ))}
                     <span className={c.who}>
                       {n.name} · {when(n.updatedAt)}
                       {n.updatedAt > n.at + 1000 ? ' (überarbeitet)' : ''}

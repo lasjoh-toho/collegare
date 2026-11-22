@@ -50,6 +50,8 @@ export function RichText({
   placeholder = 'Schreib hier. Markiere Text, um ihn fett, kursiv oder als Liste zu setzen.',
   className = '',
   tip = true,
+  bar,
+  barClass = '',
 }: {
   value: string;
   onChange: (md: string) => void;
@@ -71,11 +73,16 @@ export function RichText({
   className?: string;
   /** Hinweis unter dem Feld; aus, wo die Erklärung im ⓘ der Kopfzeile steht */
   tip?: boolean;
+  /** Leiste fest vorgeben (Ausarbeitung: mitlaufender Kopf, solange man im Eintrag schreibt); dann kein 📌 und kein schwebendes Menü */
+  bar?: boolean;
+  barClass?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const emitted = useRef<string | null>(null);
   const saved = useRef<Range | null>(null);
-  const [pinned, setPinned] = useState(defaultPinned);
+  const [pinnedState, setPinned] = useState(defaultPinned);
+  const fixed = bar !== undefined;
+  const pinned = fixed ? bar : pinnedState;
   const [float, setFloat] = useState<{ left: number; top: number; below: boolean } | null>(null);
   const [linkAsk, setLinkAsk] = useState<string | null>(null);
   const [active, setActive] = useState<Record<string, boolean>>({});
@@ -282,12 +289,14 @@ export function RichText({
   return (
     <div className={`${r.wrap} ${className}`}>
       {pinned && (
-        <div className={r.bar} role="toolbar" aria-label="Auszeichnen" onMouseDown={keepFocus}>
+        <div className={`${r.bar} ${barClass}`} role="toolbar" aria-label="Auszeichnen" onMouseDown={keepFocus}>
           {buttons}
           <span className="grow" />
-          <button type="button" className="btn on" onClick={togglePin} title="Leiste lösen">
-            📌
-          </button>
+          {!fixed && (
+            <button type="button" className="btn on" onClick={togglePin} title="Leiste lösen">
+              📌
+            </button>
+          )}
         </div>
       )}
       {pinned && linkForm}
@@ -309,7 +318,7 @@ export function RichText({
         }}
       />
       {tooLong && <div className={r.long}>Der Text ist länger als {max} Zeichen; das Ende wird nicht gespeichert.</div>}
-      {!pinned && (float || linkAsk !== null) && (
+      {!pinned && !fixed && (float || linkAsk !== null) && (
         <div className={`${r.float} ${float?.below ? r.below : ''}`} style={float ? { left: float.left, top: float.top } : undefined} role="toolbar" aria-label="Auszeichnen" onMouseDown={keepFocus}>
           {linkAsk !== null ? (
             linkForm
@@ -323,7 +332,7 @@ export function RichText({
           )}
         </div>
       )}
-      {tip && !pinned && !float && linkAsk === null && <div className={r.tip}>Text markieren, dann erscheinen die Werkzeuge darüber. 📌 heftet sie als Leiste an.</div>}
+      {tip && !fixed && !pinned && !float && linkAsk === null && <div className={r.tip}>Text markieren, dann erscheinen die Werkzeuge darüber. 📌 heftet sie als Leiste an.</div>}
     </div>
   );
 }

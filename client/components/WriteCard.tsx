@@ -12,12 +12,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RichText, type EditorApi } from './RichText';
 import { editToTufte, glossHtml, imageHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { API_URL, BASE_PATH, ApiError, get, post } from '@/lib/api';
+import { isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import w from './writecard.module.css';
 
 export interface WriteDoc {
   id: number;
   sectionId: string;
   sectionTitle: string;
+  cardId: string | null;
   title: string;
   ownerId: number | null;
   doneAt: number | null;
@@ -102,6 +104,8 @@ export function WriteCard({
   onBody,
   onOffice,
   show,
+  kind = 'ausarb',
+  onNote,
 }: {
   doc: WriteDoc;
   meId: number;
@@ -118,6 +122,10 @@ export function WriteCard({
   onBody: (id: number, body: string) => void;
   onOffice: () => void;
   show: (msg: string) => void;
+  /** Linie: Text der Ausarbeitung oder Präsentation (Präsentation: Rand = Notizen für den Vortrag) */
+  kind?: 'ausarb' | 'praes';
+  /** Notiz wurde in diesen Text gezogen (für die Marke an der Notiz) */
+  onNote?: (docId: number, noteId: number, text: string) => void;
 }) {
   const [body, setBody] = useState(doc.body ?? '');
   const [state, setState] = useState<'' | 'dirty' | 'saving' | 'saved' | 'error'>('');
@@ -132,6 +140,8 @@ export function WriteCard({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busy = useRef(false);
   const apiRef = useRef<EditorApi | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dropY, setDropY] = useState<number | null>(null);
   const card = useRef<HTMLElement>(null);
   const showRef = useRef(show);
   showRef.current = show;
@@ -307,23 +317,94 @@ export function WriteCard({
     }
   }
 
-  const keep = (ev: React.MouseEvent) => ev.preventDefault();
+  const praes = kind === 'praes';
   const tools = (api: EditorApi) => {
     apiRef.current = api;
     return (
       <>
-        <button type="button" className="btn" onClick={highlight} title="Hervorheben wie mit dem Textmarker">
+        <span className={w.sep} aria-hidden="true" />
+        <span className={w.grp} title="Auszeichnen: gilt für Text und Präsentation">
+          Auszeichnen
+        </span>
+        <button type="button" className="btn" onClick={highlight} title="Hervorheben wie mit dem Textmarker (Text und Folie)">
           <span className={w.markIcon}>Hervorheben</span>
         </button>
-        <button type="button" className="btn" onClick={() => insertNote('note')} title="Nummerierte Randnotiz zur Stelle">
-          Randnotiz
-        </button>
-        <button type="button" className="btn" onClick={term} title="Markiertes Wort in die Begriffe (Glossar) aufnehmen">
+        <button type="button" className="btn" onClick={term} title="Markiertes Wort mit Erklärung in die Begriffe (Glossar am Ende) aufnehmen">
           Begriff
+        </button>
+        <span className={w.sep} aria-hidden="true" />
+        <span className={w.grp} title={praes ? 'Für den Vortrag: steht nicht auf der Folie' : 'Rand: steht rechts neben dem Text'}>
+          <RandIcon /> {praes ? 'Vortrag' : 'Rand'}
+        </span>
+        {!praes && (
+          <button type="button" className="btn" onClick={() => insertNote('note')} title="Nummerierte Randnotiz an der Schreibmarke (nur im Text)">
+            Randnotiz
+          </button>
+        )}
+        <button type="button" className="btn" onClick={() => insertNote('margin')} title={praes ? 'Notiz für den Vortrag: steht nicht auf der Folie' : 'Bemerkung am Rand ohne Nummer'}>
+          {praes ? 'Vortragsnotiz' : 'Bemerkung'}
+        </button>
+        <button type="button" className="btn" onClick={() => fileRef.current?.click()} title={praes ? 'Bild für die Folie' : 'Bild in den Text, Unterschrift steht am Rand'}>
+          Bild
         </button>
       </>
     );
   };
+
+  /** Fokus nur verlieren, wenn er die Karte wirklich verlässt (nicht beim Dateidialog oder Wechsel in den Kasten) */
+  function blurred() {
+    setTimeout(() => {
+      if (!document.hasFocus()) return;
+      setFocused(!!card.current?.contains(document.activeElement));
+    }, 0);
+  }
+
+  /** Markierung beim Ziehen: Linie zwischen den Absätzen, wo die Notiz landet */
+  function dragOverText(e: React.DragEvent) {
+    const box = card.current?.querySelector('[role="textbox"]') as HTMLElement | null;
+    if (!box || !card.current) return;
+    const at = blockAt(box, e.clientY);
+    const top = card.current.getBoundingClientRect().top;
+    const r = at ? at.el.getBoundingClientRect() : box.getBoundingClientRect();
+    setDropY((at ? (at.before ? r.top - 4 : r.bottom + 2) : r.bottom) - top);
+  }
+
+  /** Notiz in den Text gezogen: zwischen den Zeilen als Text ausgepackt */
+  function dropNote(e: React.DragEvent) {
+    const d = readChatDrop(e);
+    const api = apiRef.current;
+    const box = card.current?.querySelector('[role="textbox"]') as HTMLElement | null;
+    if (!d || !api || !box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const text = (d.note ? d.note.text.trim() || d.note.title.trim() : d.body.trim()).slice(0, 20000);
+    if (!text) return;
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = text
+      .split(/\n\s*\n/)
+      .map((para) => `<p>${esc(para.replace(/\s*\n\s*/g, ' ').trim())}</p>`)
+      .join('');
+    // zwischen die Zeilen: vor oder hinter den Absatz, über dem losgelassen wurde
+    const at = blockAt(box, e.clientY);
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const nodes = [...tpl.content.childNodes];
+    if (at) box.insertBefore(tpl.content, at.before ? at.el : at.el.nextSibling);
+    else box.appendChild(tpl.content);
+    const last = nodes[nodes.length - 1];
+    if (last) {
+      box.focus();
+      const r = document.createRange();
+      r.selectNodeContents(last);
+      r.collapse(false);
+      const sel = getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(r);
+    }
+    setDropY(null);
+    api.emit();
+    if (d.note) onNote?.(doc.id, d.note.id, text);
+  }
 
   const when = doc.textAt || state === 'saved' ? new Date(doc.textAt ?? Date.now()) : null;
   const status =
@@ -373,7 +454,20 @@ export function WriteCard({
           </button>
         </p>
       )}
-      <div className={w.write} onFocusCapture={() => setFocused(true)} onBlurCapture={() => setFocused(false)}>
+      <div
+        className={w.write}
+        onFocusCapture={() => setFocused(true)}
+        onBlurCapture={blurred}
+        onDragOver={(e) => {
+          if (!canEdit || !isChatDrag(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'copy';
+          dragOverText(e);
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropY(null)}
+        onDrop={(e) => canEdit && isChatDrag(e) && dropNote(e)}
+      >
         {canEdit ? (
           <RichText
             value={body}
@@ -388,35 +482,26 @@ export function WriteCard({
             pinKey="collegare-editor-leiste-ausarbeitung"
             onAtom={openAtom}
             tip={false}
+            bar={focused && !atom}
+            barClass={w.stickyBar}
             placeholder="Hier schreiben …"
           />
         ) : (
           <div className={w.readonly} dangerouslySetInnerHTML={{ __html: tufteToEdit(body) || '<p class="muted">Noch kein Text.</p>' }} />
         )}
       </div>
-      {canEdit && focused && !atom && (
-        <div className={w.insert} onMouseDown={keep} role="toolbar" aria-label="Am Rand einsetzen">
-          <button type="button" className="btn" onClick={() => insertNote('note')} title="Nummerierte Randnotiz an der Schreibmarke">
-            + Randnotiz
-          </button>
-          <button type="button" className="btn" onClick={() => insertNote('margin')} title="Bemerkung am Rand ohne Nummer">
-            + Bemerkung
-          </button>
-          <label className="btn" title="Bild einsetzen, Unterschrift steht am Rand">
-            + Bild
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f) void image(f);
-              }}
-            />
-          </label>
-        </div>
-      )}
+      {dropY !== null && <div className={w.dropLine} style={{ top: dropY }} aria-hidden="true" />}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (f) void image(f);
+        }}
+      />
       {atom && (
         <form
           className={`panel ${w.atom}`}
@@ -499,5 +584,29 @@ export function WriteCard({
         </div>
       )}
     </article>
+  );
+}
+
+/** Absatz (oberste Ebene im Feld) unter der Höhe y; before = in der oberen Hälfte */
+function blockAt(box: HTMLElement, y: number): { el: Element; before: boolean } | null {
+  const blocks = [...box.children];
+  if (!blocks.length) return null;
+  for (const el of blocks) {
+    const r = el.getBoundingClientRect();
+    if (y < r.top + r.height / 2) return { el, before: true };
+    if (y <= r.bottom) return { el, before: false };
+  }
+  return { el: blocks[blocks.length - 1], before: false };
+}
+
+/** kleines Seitenbild: Text links, Rand rechts (zeigt, dass die Werkzeuge in den Rand schreiben) */
+function RandIcon() {
+  return (
+    <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true" style={{ verticalAlign: '-1px' }}>
+      <rect x="0.5" y="0.5" width="15" height="11" rx="1.5" fill="none" stroke="currentColor" opacity="0.6" />
+      <path d="M2.5 3h6M2.5 5.5h6M2.5 8h5" stroke="currentColor" opacity="0.6" />
+      <rect x="10.5" y="2.3" width="3.2" height="2.6" rx="0.6" fill="currentColor" />
+      <rect x="10.5" y="6.4" width="3.2" height="1.6" rx="0.6" fill="currentColor" opacity="0.6" />
+    </svg>
   );
 }

@@ -6,36 +6,10 @@
 .area { flex: 1; min-height: 0; display: flex; }
 /* Gliederung links, solange geschrieben wird (vor der Gliederung liegende Schritte zeigen sie rechts) */
 .line { width: 300px; flex: none; overflow: auto; border-right: 1px solid var(--line); background: var(--bg-elev); }
-.col { flex: 1; min-width: 0; overflow: auto; background: var(--bg-sunken); counter-reset: ednote; }
-.cards { max-width: 1180px; margin: 0 auto; padding: 18px 20px 90px; display: flex; flex-direction: column; gap: 14px; }
-.empty { padding: 30px 0; text-align: center; }
-.section { display: flex; flex-direction: column; gap: 10px; }
-.secTitle { margin: 12px 0 0 4px; font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.6rem; }
-.outside { opacity: 0.75; }
-.outside .secTitle { font-family: inherit; font-style: normal; font-size: 14px; color: var(--fg-muted); }
-.terms dl { margin: 0; padding: 14px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-elev); display: grid; gap: 6px; font-family: Georgia, serif; }
-.terms dl > div { display: grid; grid-template-columns: minmax(120px, 28%) 1fr; gap: 12px; }
-.terms dt { font-weight: 600; }
-.terms dd { margin: 0; }
-.missing { color: var(--fg-faint); font-style: italic; }
-/* „Zurück“ unten, bleibt beim Rollen sichtbar */
-.backBar { position: sticky; bottom: 12px; display: flex; justify-content: flex-start; pointer-events: none; }
-.backBar :global(.btn) { pointer-events: auto; box-shadow: var(--shadow); background: var(--bg-elev); }
-.read { padding: 18px 16px 40px; }
-.officeModal { width: min(1100px, 96vw); height: 88dvh; display: flex; flex-direction: column; gap: 6px; }
-.officeModal h2 { margin: 0; font-size: 16px; }
-.officeModal p { margin: 0; font-size: 12.5px; }
-.stripe { flex: none; height: 6px; background: var(--office-word); }
-.frame { flex: 1; width: 100%; border: 0; background: #fff; }
-
 @media screen and (max-width: 900px) {
   .line { position: absolute; z-index: 20; left: 0; top: 0; bottom: 0; box-shadow: var(--shadow); }
   .area { position: relative; }
 }
 @media (max-width: 760px) {
   .wide { display: none; }
-  .cards { padding: 10px 8px 80px; }
-  .read { padding: 0; }
-  .terms dl > div { grid-template-columns: 1fr; gap: 0; }
 }
-

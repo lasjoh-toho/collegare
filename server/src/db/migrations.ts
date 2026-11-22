@@ -513,6 +513,25 @@ migrations['0021_doc_text'] = {
   },
 };
 
+// Notizen in der Ausarbeitung (Wunsch Jo, 22. November 2026): wo eine Notiz in einen Text gezogen wurde, damit die
+// Notiz eine Marke „verbaut“ zeigt und man an die Stelle springen kann
+migrations['0022_note_uses'] = {
+  async up(db) {
+    await db.schema
+      .createTable('note_uses')
+      .addColumn('id', 'integer', (c) => (isMysql(db) ? c.autoIncrement().primaryKey() : c.primaryKey().autoIncrement()))
+      .addColumn('doc_id', 'integer', (c) => c.notNull())
+      .addColumn('note_id', 'integer', (c) => c.notNull())
+      .addColumn('snippet', 'varchar(200)', (c) => c.notNull())
+      .addColumn('at', 'bigint', (c) => c.notNull())
+      .addColumn('by', 'integer')
+      .execute();
+    await db.schema.createIndex('note_uses_doc').on('note_uses').column('doc_id').execute();
+    // eigene Abschnitte für die Präsentationslinie (Texte der Präsentation sind kürzer als die der Ausarbeitung)
+    await db.schema.alterTable('documents').addColumn('line', 'varchar(6)', (c) => c.notNull().defaultTo('ausarb')).execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;
