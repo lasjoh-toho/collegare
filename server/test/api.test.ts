@@ -207,6 +207,12 @@ describe('Anmeldung', () => {
     expect((await fetch(`${base}/api/projects/${project}/materials/${((await hf.json()) as J).id}/datei`, { headers: { authorization: 'Bearer ' + anna } })).status).toBe(404);
     expect((await call('PATCH', `/api/projects/${project}/materials/${hid.json.id}`, t, { visible: true })).status).toBe(200);
     expect((await call('GET', `/api/projects/${project}/materials/${hid.json.id}`, anna)).json).toMatchObject({ page: { title: 'Entwurf' } });
+    // Arbeitsblatt bzw. Klassenarbeit (Art „blatt“): JSON im Format ag-blatt/1, gelesen wie eine Lernseite
+    const doc = JSON.stringify({ format: 'ag-blatt/1', page: { size: 'a5', booklet: true }, blocks: [{ id: 'b1', type: 'task', md: 'Geben Sie wieder.', points: '50%' }] });
+    const bl = await call('POST', `/api/projects/${project}/materials/page`, t, { kind: 'blatt', title: '', body: doc });
+    expect(bl.status).toBe(200);
+    expect((await call('GET', `/api/projects/${project}/materials/${bl.json.id}`, anna)).json).toMatchObject({ page: { kind: 'blatt', title: 'Neues Arbeitsblatt', body: doc } });
+    expect((await call('POST', `/api/projects/${project}/materials/page`, t, { kind: 'pdf', body: doc })).status).toBe(400);
     // ohne Anmeldung nichts
     expect((await fetch(`${base}/api/projects/${project}/materials/${fid}/datei`)).status).toBe(401);
   });

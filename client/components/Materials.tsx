@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { API_URL, ApiError, BASE_PATH, get, href, patch, post } from '@/lib/api';
 import m from '@/app/projekt/material/material.module.css';
 import { Icon } from './Icon';
+import { blankDoc } from '@/lib/blatt';
 
 export interface Audience {
   groups: number[];
@@ -17,7 +18,7 @@ export interface Audience {
 
 export interface Material {
   id: number;
-  kind: 'link' | 'video' | 'file' | 'page';
+  kind: 'link' | 'video' | 'file' | 'page' | 'blatt';
   title: string;
   url: string | null;
   note: string;
@@ -56,7 +57,7 @@ export function embedUrl(url: string): string | null {
 export const fileUrl = (projectId: number, id: number, download = false) => `${API_URL}${BASE_PATH}/api/projects/${projectId}/materials/${id}/datei${download ? '?laden=1' : ''}`;
 export const mb = (n: number | null) => (n === null ? '' : n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 export const kindLabel = (x: Material) =>
-  x.kind === 'page' ? 'Lernseite' : x.kind === 'link' ? 'Webseite' : x.kind === 'video' ? 'Video' : x.mime === 'application/pdf' ? 'PDF' : (x.mime ?? '').startsWith('image/') ? 'Bild' : 'Dokument';
+  x.kind === 'page' ? 'Lernseite' : x.kind === 'blatt' ? 'Arbeitsblatt' : x.kind === 'link' ? 'Webseite' : x.kind === 'video' ? 'Video' : x.mime === 'application/pdf' ? 'PDF' : (x.mime ?? '').startsWith('image/') ? 'Bild' : 'Dokument';
 
 /** Kurztext, für wen ein Material freigegeben ist */
 export function audienceText(a: Audience | null, t: Pick<Target, 'groups' | 'members'> | null): string {
@@ -102,6 +103,11 @@ export function OpenButtons({ projectId, x, canEdit, open, onToggle }: { project
             </a>
           )}
         </>
+      )}
+      {x.kind === 'blatt' && (
+        <a className="btn primary" href={href(`/projekt/material/blatt/?id=${projectId}&m=${x.id}`)}>
+          {canEdit ? 'Bearbeiten' : 'Ansehen'}
+        </a>
       )}
       {x.kind === 'link' && x.url && (
         <a className="btn primary" href={x.url} target="_blank" rel="noopener noreferrer">
@@ -324,8 +330,8 @@ export function CopyDialog(props: { werkstatt: number; item?: Material; library?
 export const loadTargets = () => get<{ projects: Target[] }>('/api/werkstatt/ziele').then((r) => r.projects);
 
 /** Formular zum Anlegen: Lernseite, Webseite, Video, Datei */
-export function AddForm({ projectId, maxMb, onAdded, onError, library = false }: { projectId: number; maxMb: number; onAdded: () => void; onError: (e: unknown) => void; library?: boolean }) {
-  const [kind, setKind] = useState<'page' | 'link' | 'video' | 'file'>('page');
+export function AddForm({ projectId, maxMb, onAdded, onError, library = false, initial = 'page' }: { projectId: number; maxMb: number; onAdded: () => void; onError: (e: unknown) => void; library?: boolean; initial?: 'page' | 'blatt' }) {
+  const [kind, setKind] = useState<'page' | 'blatt' | 'link' | 'video' | 'file'>(initial);
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -338,6 +344,11 @@ export function AddForm({ projectId, maxMb, onAdded, onError, library = false }:
   async function add() {
     setBusy(true);
     try {
+      if (kind === 'blatt') {
+        const r = await post<{ id: number }>(`/api/projects/${projectId}/materials/page`, { kind: 'blatt', title, note, visible, body: JSON.stringify(blankDoc(title.trim())) });
+        location.href = href(`/projekt/material/blatt/?id=${projectId}&m=${r.id}`);
+        return;
+      }
       if (kind === 'page') {
         const r = await post<{ id: number }>(`/api/projects/${projectId}/materials/page`, { title, note, visible });
         location.href = href(`/projekt/material/seite/?id=${projectId}&m=${r.id}&bearbeiten=1`);
@@ -367,13 +378,14 @@ export function AddForm({ projectId, maxMb, onAdded, onError, library = false }:
     }
   }
 
-  const ready = kind === 'page' ? true : kind === 'file' ? !!file : kind === 'video' ? !!file || url.trim().startsWith('http') : url.trim().startsWith('http');
+  const ready = kind === 'page' || kind === 'blatt' ? true : kind === 'file' ? !!file : kind === 'video' ? !!file || url.trim().startsWith('http') : url.trim().startsWith('http');
   return (
     <section className={`panel ${m.add}`}>
       <div className="seg" role="group" aria-label="Art">
         {(
           [
             ['page', 'Lernseite schreiben'],
+            ['blatt', 'Arbeitsblatt oder Klassenarbeit'],
             ['link', 'Webseite verlinken'],
             ['video', 'Video'],
             ['file', 'PDF oder Dokument'],
@@ -388,6 +400,11 @@ export function AddForm({ projectId, maxMb, onAdded, onError, library = false }:
         {kind === 'page' && (
           <p className={`muted ${m.span}`}>
             Eine eigene Seite im Tufte-Stil: gut lesbar, mit Randnotizen, Bildern und Videos. Word-Dateien lassen sich im nächsten Schritt übernehmen.
+          </p>
+        )}
+        {kind === 'blatt' && (
+          <p className={`muted ${m.span}`}>
+            Zum Ausdrucken: Material mit Zeilenzählung, Bilder, Aufgaben, Schreiblinien oder Karos, auf Wunsch als Broschüre und mit persönlichem QR-Code aus Autogra.fi.
           </p>
         )}
         {kind === 'file' && (
@@ -414,7 +431,7 @@ export function AddForm({ projectId, maxMb, onAdded, onError, library = false }:
         )}
         <div className="field">
           <label>Titel (optional)</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'page' ? 'z. B. Die Inflation 1923' : kind === 'link' ? 'z. B. Lexikonartikel' : 'z. B. Einführungsvideo'} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'blatt' ? 'z. B. Klausur S 4: Wirtschaft im NS' : kind === 'page' ? 'z. B. Die Inflation 1923' : kind === 'link' ? 'z. B. Lexikonartikel' : 'z. B. Einführungsvideo'} />
         </div>
         <div className="field">
           <label>Hinweis für die Lernenden (optional)</label>
@@ -429,7 +446,7 @@ export function AddForm({ projectId, maxMb, onAdded, onError, library = false }:
         )}
         <span className="grow" />
         <button className="btn primary" disabled={!ready || busy} onClick={add}>
-          {busy ? 'Lädt …' : kind === 'page' ? 'Seite anlegen' : library ? 'Anlegen' : visible ? 'Veröffentlichen' : 'Anlegen (noch unsichtbar)'}
+          {busy ? 'Lädt …' : kind === 'page' ? 'Seite anlegen' : kind === 'blatt' ? 'Blatt anlegen' : library ? 'Anlegen' : visible ? 'Veröffentlichen' : 'Anlegen (noch unsichtbar)'}
         </button>
       </div>
     </section>

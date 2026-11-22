@@ -258,10 +258,10 @@ export interface GradingsTable {
 export interface MaterialsTable {
   id: Generated<number>;
   project_id: number;
-  kind: 'link' | 'video' | 'file' | 'page';
+  kind: 'link' | 'video' | 'file' | 'page' | 'blatt';
   title: string;
   url: string | null;
-  /** Lernseite: Markdown mit Randnotizen (^[…], ^^[…]) */
+  /** Lernseite: Markdown mit Randnotizen (^[…], ^^[…]); Arbeitsblatt: JSON im Format „ag-blatt/1“ */
   body: string | null;
   note: string;
   file_name: string | null;

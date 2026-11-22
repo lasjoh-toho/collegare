@@ -1254,6 +1254,66 @@ Wünsche von Jo vom 22. November 2026:
   als Objekt an einem Punkt der Gliederung), zeigt die Notiz eine blaue bzw. orange Pille. Ein Klick springt dorthin.
 - Die Karten liegen in `components/AusarbeitungCards.tsx` und stehen auch auf der Seite „Gliederung“ neben der Linie.
 
+## 8j. Arbeitsblätter und Klassenarbeiten (22. November 2026)
+
+Wunsch Jo: Lehrkräfte gestalten Klassenarbeiten und Arbeitsblätter zum Ausdrucken. Bilder, Zitate, Erklärtexte und
+Aufgabenstellungen brauchen eigene Formate; freie Seiten füllen sich mit Schreiblinien oder Karos; Doppelseiten lassen
+sich als Broschüre drucken (die erste Seite steht auf dem Bogen neben der letzten); ein QR-Code für Autogra.fi wird
+eingedruckt. Entscheidung Jo: Der Editor entsteht **nur in Collegare**, nicht doppelt in Autogra.fi; die Klausur darf
+dafür zunächst von Collegare abhängen. Autogra.fi liefert Klassenliste und persönliche Codes.
+
+### 8j.1 Wo es liegt
+
+- **Material der Art „blatt“** (`materials.kind`, Text in `body` als JSON im Format `ag-blatt/1`). Damit gilt alles,
+  was Material schon kann: in der Werkstatt vorbereiten, unter „Materialien“ verschlagworten, als Kopie in Projekte
+  übernehmen, für Gruppen oder Einzelne freigeben. Lernende sehen ein freigegebenes Blatt als Seiten und können es
+  drucken.
+- **Einstieg:** Kachel „Arbeitsblatt und Klassenarbeit“ unter Werkzeuge, „Neues Material → Arbeitsblatt oder
+  Klassenarbeit“ in Materialien und im Material eines Projekts. Seite `/projekt/material/blatt/?id=…&m=…`.
+- **Seitensatz** in `client/lib/blatt.ts`, ohne React: Bausteine → Seiten fester Größe in mm, gemessen im Browser.
+  Derselbe Satz soll später die Ausarbeitung als Broschüre setzen (8i.3); dafür ist er unabhängig von der Seite.
+
+### 8j.2 Bausteine (Stufe 1, gebaut)
+
+| Baustein | Inhalt |
+|---|---|
+| Material | Bezeichnung (automatisch „Material 1, 2 …“), Titel, Text mit Blocksatz und Zeilenzählung alle fünf Zeilen (läuft über Seiten weiter), Quelle als Fußnote unten auf der Seite |
+| Bild | verkleinert eingebettet (längste Seite 1600 px), Breite, Ausrichtung, Bildunterschrift; hineinziehen, einfügen oder aus dem Material des Projekts |
+| Aufgabe | von selbst nummeriert, Punkte oder Anteil, auf Wunsch Antwortzeilen oder Karos darunter |
+| Erklärtext, Zitat, Kasten | Text wie auf Karten (fett, kursiv, Listen); Zitat mit Quelle, Kasten z. B. für Operatoren |
+| Überschrift | groß oder unterstrichen („Arbeitsaufträge:“) |
+| Linien | Schreiblinien (6–12 mm, mit Korrekturrand), Karos 5 mm oder Freiraum; Anzahl oder „bis zum Seitenende“ |
+| Seitenumbruch | nächster Baustein auf neuer Seite |
+
+Texte brechen an Absätzen auf die nächste Seite um; was nicht auf eine Seite passt, ist rot umrandet und in der Liste
+markiert. Blatt-Einstellungen: A4 oder A5, Schrift mit/ohne Serifen 10–12 pt, Kopfzeile (Text, Name, Datum),
+QR-Code (keiner, erste Seite, jede Seite), Seitenzahlen. Rückgängig/Wiederholen, Speichern von selbst.
+
+### 8j.3 Broschüre
+
+Auf ein Vielfaches von vier Seiten auffüllen (Schreiblinien, Karos oder leer) und ausschießen (Rückstich): Bogen k
+trägt vorn die Seiten n−2k und 1+2k, hinten 2+2k und n−1−2k. Aus A5 wird A4 quer, aus A4 A3 quer. Die Ansicht
+„Druckbögen“ zeigt die Bögen; gedruckt wird beidseitig, an der kurzen Kante gewendet, ohne Skalierung.
+
+### 8j.4 QR-Codes aus Autogra.fi
+
+Beim Drucken wählt die Lehrkraft eine Aufgabe in Autogra.fi und die Personen der Klasse. Der Browser holt dort mit
+der Anmeldung in Autogra.fi (gleicher Server, Cookie von Autogra.fi, Kopf `X-Autografi-Request`) die Aufgaben
+(`GET /api/v1/portal`), die Klassenliste (`GET …/access-codes`) und neue persönliche Codes (`POST …/access-codes`,
+gültig „solange die Aufgabe freigegeben ist“ oder 1/7/14 Tage). Jede Person bekommt ein eigenes Exemplar mit QR-Code,
+Kurzcode und auf Wunsch Namen. In Autogra.fi musste dafür nichts geändert werden. Die Adresse von Autogra.fi ergibt
+sich aus der angebundenen App (Rücksprung-Adresse der OIDC-Anbindung) oder `AUTOGRAFI_URL`, sonst
+`<Server>/autografi`; sie lässt sich im Druckfenster ändern.
+
+### 8j.5 Nächste Stufen
+
+1. Spalten und Randspalte (Bild oder Kasten neben dem Text wie im Beispiel), Bild neben Aufgaben.
+2. Word-Datei übernehmen (wie bei Lernseiten), Vorlagen für Klausurkopf und Operatoren je Fach.
+3. QR-Codes über eine Dienstschnittstelle von Autogra.fi, wenn beide auf verschiedenen Servern laufen (heute nur
+   gleicher Server), und ohne Collegare: Autogra.fi druckt ein in Collegare gestaltetes Blatt als PDF mit Codes.
+4. Abgabe digital: dasselbe Blatt als Aufgabenstellung in Autogra.fi und in der Ausarbeitung.
+5. Ausarbeitung und Lernseite als Broschüre über denselben Satz (8i.3), Druck über Typst nur „für Fortgeschrittene“.
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |

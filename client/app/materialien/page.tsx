@@ -122,7 +122,7 @@ export default function Materialien() {
             </a>
           </div>
         )}
-        {adding && w !== null && <AddForm projectId={w} maxMb={maxMb} library onAdded={() => (setError(''), setAdding(false), void load())} onError={fail} />}
+        {adding && w !== null && <AddForm projectId={w} maxMb={maxMb} library initial={neu === 'blatt' ? 'blatt' : 'page'} onAdded={() => (setError(''), setAdding(false), void load())} onError={fail} />}
 
         {list && list.length > 0 && (
           <div className={m.toolbar}>

@@ -57,6 +57,24 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
     return { projectId: await s.projects.werkstatt(sess.userId) };
   });
 
+  /**
+   * Adresse von Autogra.fi für den Druck von Arbeitsblättern und Klassenarbeiten mit persönlichen QR-Codes (Jo,
+   * 22. November 2026): abgeleitet aus der Rücksprung-Adresse der angebundenen App („…/auth/oidc/callback“), sonst
+   * aus AUTOGRAFI_URL. Klassenliste und Codes holt der Browser dort selbst mit der Anmeldung in Autogra.fi.
+   */
+  app.get('/api/autografi', async (req, reply) => {
+    const sess = requireSession(req, reply);
+    if (!sess) return;
+    let url: string | null = null;
+    for (const c of await s.oidc.clients()) {
+      for (const u of c.redirectUris) {
+        const m = /^(https?:\/\/.+?)\/(?:auth\/)?oidc\/callback\/?$/.exec(u);
+        if (m && (!url || /autogra/i.test(c.title + u))) url = m[1];
+      }
+    }
+    return { url: url ?? (process.env.AUTOGRAFI_URL?.replace(/\/+$/, '') || null) };
+  });
+
   /** Ziele zum Übernehmen: eigene Projekte als Lehrkraft mit ihren Gruppen und Lernenden */
   app.get('/api/werkstatt/ziele', async (req, reply) => {
     const sess = requireSession(req, reply);
@@ -86,15 +104,15 @@ export function materialRoutes(app: FastifyInstance, s: Services) {
   });
 
   // Lernseite: bis 4 MB Text (eingebettete Bilder als data:-Adressen eingeschlossen)
-  const PageBody = z.object({ visible: z.boolean().default(true), title: z.string().max(200).default(''), body: z.string().max(4_000_000).default(''), note: z.string().max(5000).default('') });
+  const PageBody = z.object({ kind: z.enum(['page', 'blatt']).default('page'), visible: z.boolean().default(true), title: z.string().max(200).default(''), body: z.string().max(4_000_000).default(''), note: z.string().max(5000).default('') });
   app.post<{ Params: { id: string } }>('/api/projects/:id/materials/page', async (req, reply) => {
     const a = await member(req, reply, 'teacher');
     if (!a) return;
     const body = PageBody.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Seite zu groß oder ungültig' });
-    const id = await s.materials.addPage(a.projectId, a.userId, body.data.title, body.data.body, body.data.note);
+    const id = await s.materials.addPage(a.projectId, a.userId, body.data.title, body.data.body, body.data.note, body.data.kind);
     if (!body.data.visible) await s.materials.update(a.projectId, id, { visible: false });
-    await s.audit.append({ actorId: a.userId, action: 'material.added', projectId: a.projectId, data: { id, kind: 'page' } });
+    await s.audit.append({ actorId: a.userId, action: 'material.added', projectId: a.projectId, data: { id, kind: body.data.kind } });
     return { id };
   });
 

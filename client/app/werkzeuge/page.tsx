@@ -55,6 +55,13 @@ export default function Werkzeuge() {
             <span className={t.title}>Lernseite</span>
             <span className={t.line}>Eine gut lesbare Seite mit Randnotizen, Bildern und Videos, z. B. als Einführung</span>
           </a>
+          <a className={`${t.tile} ${t.released}`} href={href('/materialien/?neu=blatt')} style={{ '--tile-color': 'var(--office-word)' } as React.CSSProperties}>
+            <span className={t.icon} style={{ color: 'var(--office-word)' }}>
+              <Icon name="doc" size={26} />
+            </span>
+            <span className={t.title}>Arbeitsblatt und Klassenarbeit</span>
+            <span className={t.line}>Zum Ausdrucken: Material, Bilder, Aufgaben, Schreiblinien, Broschüre, QR-Code für Autogra.fi</span>
+          </a>
           {TOOLS.map(({ key, sub }) => {
             const tile = TILES.find((x) => x.key === key)!;
             const color = tile.office ? OFFICE_VAR[tile.office] : 'var(--ui-muted)';

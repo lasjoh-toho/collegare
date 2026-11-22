@@ -33,7 +33,7 @@ export const MATERIAL_TYPES: Record<string, string> = {
 
 export interface MaterialView {
   id: number;
-  kind: 'link' | 'video' | 'file' | 'page';
+  kind: 'link' | 'video' | 'file' | 'page' | 'blatt';
   title: string;
   url: string | null;
   note: string;
@@ -184,17 +184,20 @@ export class Materials {
     return Number(res.insertId);
   }
 
-  /** Lernseite anlegen (Text als Markdown mit Randnotizen; Bilder als data:-Adressen eingebettet). */
-  async addPage(projectId: number, by: number, title: string, body: string, note = ''): Promise<number> {
+  /**
+   * Lernseite anlegen (Text als Markdown mit Randnotizen; Bilder als data:-Adressen eingebettet) oder Arbeitsblatt
+   * bzw. Klassenarbeit (Art „blatt“, Jo 22. November 2026: JSON „ag-blatt/1“, gesetzt und gedruckt im Browser).
+   */
+  async addPage(projectId: number, by: number, title: string, body: string, note = '', kind: 'page' | 'blatt' = 'page'): Promise<number> {
     const res = await this.db
       .insertInto('materials')
-      .values({ project_id: projectId, kind: 'page', title: title.trim().slice(0, 200) || 'Neue Seite', url: null, body, note, file_name: null, mime: null, size: body.length, data: null, position: await this.nextPosition(projectId), created_by: by, created_at: this.now() })
+      .values({ project_id: projectId, kind, title: title.trim().slice(0, 200) || (kind === 'blatt' ? 'Neues Arbeitsblatt' : 'Neue Seite'), url: null, body, note, file_name: null, mime: null, size: body.length, data: null, position: await this.nextPosition(projectId), created_by: by, created_at: this.now() })
       .executeTakeFirstOrThrow();
     return Number(res.insertId);
   }
 
   async page(projectId: number, id: number): Promise<(MaterialView & { body: string }) | null> {
-    const r = await this.db.selectFrom('materials').selectAll().where('id', '=', id).where('project_id', '=', projectId).where('kind', '=', 'page').executeTakeFirst();
+    const r = await this.db.selectFrom('materials').selectAll().where('id', '=', id).where('project_id', '=', projectId).where('kind', 'in', ['page', 'blatt']).executeTakeFirst();
     if (!r) return null;
     return { ...view(r as unknown as Row), body: r.body ?? '' };
   }
