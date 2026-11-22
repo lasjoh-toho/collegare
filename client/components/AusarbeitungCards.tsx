@@ -139,8 +139,9 @@ export function AusarbeitungCards({
       if (!r || !r.scope || synced.current === sig) return;
       synced.current = sig;
       try {
-        if (writes(r) && (r.outlineAt !== null || sig !== 'start')) {
-          await post(`/api/projects/${id}/documents/merken`, { scope: r.scope, line: kind });
+        if (r.outlineAt !== null || sig !== 'start') {
+          // Stand merken nur, wer schreibt; den Abgleich mit der Gliederung braucht auch die lesende Lehrkraft
+          if (writes(r)) await post(`/api/projects/${id}/documents/merken`, { scope: r.scope, line: kind });
           await post(`/api/projects/${id}/documents/sync`, { scope: r.scope, line: kind }).catch(() => {});
         }
         await load(r.scope);
@@ -374,6 +375,11 @@ export function AusarbeitungCards({
       {data && !data.scope && <p className="muted">{teacher ? 'Noch keine Gruppen.' : 'Du bist noch keiner Gruppe zugeordnet.'}</p>}
       {data?.scope && view === 'write' && (
         <div className={s.cards}>
+          {teacher && !inTest && (
+            <p className={s.readOnly}>
+              Lehrkräfte lesen hier nur mit.{data.scopes.some((x) => x.test) && <> Zum Ausprobieren oben die Gruppe „Test / Demo“ wählen.</>}
+            </p>
+          )}
           {sections.length === 0 && (
             <p className={`muted ${s.empty}`}>
               {kind === 'praes' && !data.hasPraes ? 'Sobald die Gliederung der Präsentation einmal gespeichert ist, erscheinen hier ihre Punkte.' : data.outlineAt ? 'Die Gliederung hat noch keine Punkte.' : 'Sobald eure Gliederung Punkte hat, erscheinen hier die Karten zum Schreiben.'}
