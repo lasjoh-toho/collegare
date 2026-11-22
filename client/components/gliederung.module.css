@@ -110,7 +110,7 @@
 .full { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; background: var(--bg); }
 .fullHead { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg-elev); }
 .fullTitle { font-weight: 750; font-size: 16px; }
-.parallel { position: relative; flex: 1; overflow: auto; padding: 16px 16px 40px; }
+.parallel { position: relative; flex: 1; overflow: auto; padding: 0 16px 40px; }
 /* die beiden Linien laufen nah beieinander (Jo, 22. November 2026) */
 .row { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); max-width: 1100px; margin: 0 auto; }
 .left, .right { min-width: 0; }
@@ -149,3 +149,5 @@
 .boardSingle .line { padding: 4px 10px 30px 12px; }
 .boardSingle .boardTools { position: static; justify-content: flex-end; padding: 6px 12px 0; }
 .parallel .sharedMark { display: none; }
+/* Farbe des Asts bzw. Clusters, mit übernommen: Kreis in dieser Farbe gefüllt */
+.colored.l0 > .head .stop, .colored.l1 > .head .stop { background: var(--pc); }

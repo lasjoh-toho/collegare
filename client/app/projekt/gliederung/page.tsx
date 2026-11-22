@@ -44,23 +44,29 @@ export default function GliederungPage() {
   const [toast, setToast] = useState('');
   const [sock, setSock] = useState<Socket | null>(null);
   const version = useRef(0);
-  // „‖“ im Kopf genau zwischen die beiden Linien darunter schieben (Kopf und Fläche sind verschieden breit belegt)
-  const midRef = useRef<HTMLButtonElement>(null);
-  const [shift, setShift] = useState(0);
+  // Präsentation und Ausarbeitung im Kopf genau über ihren Linien, auch wenn ein Seitenmenü die Fläche verschiebt
+  // (Jo, 22. November 2026): die Linie beginnt direkt unter dem Knopf und berührt ihn
+  const [pos, setPos] = useState<{ red: number; blue: number; w: number } | null>(null);
   const [, setTick] = useState(0);
   useEffect(() => {
     const on = () => setTick((t) => t + 1);
     addEventListener('resize', on);
-    return () => removeEventListener('resize', on);
+    const ro = new ResizeObserver(on);
+    const watch = () => document.querySelectorAll('main, [data-parallel]').forEach((n) => ro.observe(n));
+    watch();
+    const mo = new MutationObserver(watch);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      removeEventListener('resize', on);
+      ro.disconnect();
+      mo.disconnect();
+    };
   }, []);
   useLayoutEffect(() => {
-    const bridge = document.querySelector<HTMLElement>('[data-prow] > [data-bridge]');
-    const mid = midRef.current;
-    if (!bridge || !mid) return;
-    const a = bridge.getBoundingClientRect();
-    const b = mid.getBoundingClientRect();
-    const next = Math.round(shift + (a.left + a.width / 2) - (b.left + b.width / 2));
-    if (Math.abs(next - shift) > 1) setShift(next);
+    const L = document.querySelector<HTMLElement>('[data-parallel] [data-side="left"] ol');
+    const R = document.querySelector<HTMLElement>('[data-parallel] [data-side="right"] ol');
+    const next = L && R ? { red: Math.round(L.getBoundingClientRect().right - 15), blue: Math.round(R.getBoundingClientRect().left + 15), w: document.documentElement.clientWidth } : null;
+    if (JSON.stringify(next) !== JSON.stringify(pos)) setPos(next);
   });
   const scopeRef = useRef<string | null>(null);
   scopeRef.current = scope;
@@ -158,9 +164,9 @@ export default function GliederungPage() {
       info={info}
       center={
         both ? (
-          <div className={s.switch} role="group" aria-label="Welche Gliederung?" style={{ marginLeft: Math.max(0, 2 * shift), marginRight: Math.max(0, -2 * shift) }}>
+          <div className={`${s.switch} ${pos && shown === 'both' ? s.pinned : ''}`} role="group" aria-label="Welche Gliederung?" style={pos && shown === 'both' ? ({ '--red': pos.red + 'px', '--blue': pos.blue + 'px', '--vw': pos.w + 'px' } as React.CSSProperties) : undefined}>
             {lineBtn('praes', 'Präsentation')}
-            <button ref={midRef} className={`${s.mid} ${shown === 'both' ? s.on : ''}`} onClick={() => choose('both')} title="Beide Linien nebeneinander" aria-label="Beide Linien nebeneinander" aria-pressed={shown === 'both'}>
+            <button className={`${s.mid} ${shown === 'both' ? s.on : ''}`} onClick={() => choose('both')} title="Beide Linien nebeneinander" aria-label="Beide Linien nebeneinander" aria-pressed={shown === 'both'}>
               <Icon name="parallel" size={16} />
             </button>
             {lineBtn('ausarb', 'Ausarbeitung')}

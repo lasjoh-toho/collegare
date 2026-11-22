@@ -25,6 +25,10 @@ export interface LinePoint {
   removed: boolean;
   items: LineItem[];
   sub: LinePoint[];
+  /** Farbe des Asts bzw. Clusters, mit übernommen */
+  color?: string | null;
+  /** Personen der Karten nicht übernehmen */
+  noOwners?: boolean;
 }
 export interface Lines {
   praes: { points: LinePoint[] };

@@ -52,6 +52,10 @@ export interface LinePoint {
   removed: boolean;
   items: LineItem[];
   sub: LinePoint[];
+  /** Farbe des Asts bzw. Clusters, mit übernommen (Jo, 22. November 2026) */
+  color?: string | null;
+  /** Personen der Karten nicht übernehmen: zuständig ist nur, wer am Punkt steht */
+  noOwners?: boolean;
 }
 const Point: z.ZodType<LinePoint> = z.lazy(() =>
   z.object({
@@ -64,6 +68,8 @@ const Point: z.ZodType<LinePoint> = z.lazy(() =>
     removed: z.boolean(),
     items: z.array(Item).max(30),
     sub: z.array(Point).max(40),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    noOwners: z.boolean().optional(),
   }),
 );
 
@@ -136,7 +142,7 @@ export function outlineFrom(m: MindMap, l: Lines, points: LinePoint[] = leadingL
       const collect = (list: LinePoint[]) => list.forEach((s) => !s.hidden && !s.removed && (live.push(s), collect(s.sub)));
       collect(p.sub);
       const cards = live.filter((s) => s.card && m.cards[s.card]).map((s) => s.card!);
-      const owners = [...new Set([...cards.map((id) => m.cards[id].owner), ...live.map((s) => s.owner), p.owner].filter((o): o is number => o != null))];
+      const owners = [...new Set([...(p.noOwners ? [] : cards.map((id) => m.cards[id].owner)), ...(p.noOwners || !p.card || !m.cards[p.card] ? [] : [m.cards[p.card].owner]), ...live.map((s) => s.owner), p.owner].filter((o): o is number => o != null))];
       const id = p.card && m.cards[p.card] ? p.card : p.id;
       // tiefere Ebenen (2 bis 4) als Zwischenüberschriften für den Schreibeditor
       const subs: { id: string; title: string; level: number }[] = [];
@@ -146,7 +152,7 @@ export function outlineFrom(m: MindMap, l: Lines, points: LinePoint[] = leadingL
         deep(s.sub, d + 1);
       });
       deep(p.sub, 0);
-      return { id, title: (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel', cards, owners, ...(subs.length ? { subs } : {}) };
+      return { id, title: (p.card && m.cards[p.card]?.title) || p.title || 'Ohne Titel', cards, owners, ...(subs.length ? { subs } : {}), ...(p.color ? { color: p.color } : {}) };
     });
 }
 

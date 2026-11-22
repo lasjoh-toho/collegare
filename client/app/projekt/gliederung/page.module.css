@@ -1,5 +1,4 @@
 /* Seite „Gliederung“ (Konzept 8h.10) */
-/* ‖ steht genau zwischen den beiden Linien darunter (Verschiebung misst die Seite) */
 .switch { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; width: min(460px, 100%); }
 .lineBtn {
   height: 32px; padding: 0 14px; border-radius: 9px; border: 2px solid var(--t); background: var(--bg-elev); color: var(--t);
@@ -10,6 +9,13 @@
 .lineBtn.on { background: var(--t); color: #fff; box-shadow: 3px 3px 0 var(--fg); }
 .mid { width: 64px; height: 32px; display: grid; place-items: center; border-radius: 9px; border: 2px solid var(--line); background: var(--bg); color: var(--fg-muted); cursor: pointer; }
 .mid.on { border-color: var(--fg-muted); color: var(--fg); }
+/* über den Linien: die Seite misst, wo die rote und die blaue Linie verlaufen (--red, --blue); die Knöpfe sitzen unten
+   auf der Kopfzeile, die Linie läuft 14 px innen unter dem Knopf weiter */
+.pinned .lineBtn, .pinned .mid { position: fixed; top: calc(var(--head-h) - 32px); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.pinned .lineBtn:first-child { right: calc(var(--vw) - var(--red) - 18px); }
+.pinned .lineBtn:last-child { left: calc(var(--blue) - 18px); }
+.pinned .mid { left: calc(var(--red) + 24px); width: calc(var(--blue) - var(--red) - 48px); min-width: 28px; }
+.pinned .lineBtn.on { box-shadow: none; }
 .scope { height: 30px; max-width: 200px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 13px; }
 .notice { margin: 24px auto; max-width: 520px; }
 
@@ -18,7 +24,7 @@
 /* eine Linie rutscht aus der Mitte nach links, daneben erscheint die Arbeit */
 .split { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); height: 100%; min-height: 0; }
 .lineCol { min-height: 0; border-right: 1px solid var(--line); background: var(--bg); animation: gSlideLeft 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
-.work { min-width: 0; min-height: 0; overflow: auto; animation: gFade 0.45s 0.15s ease-out both; }
+.work { min-width: 0; min-height: 0; overflow: hidden; display: flex; animation: gFade 0.45s 0.15s ease-out both; }
 /* zarter Farbverlauf: Präsentation oder Ausarbeitung als Text */
 .slot { padding: 24px; }
 @keyframes gSlideLeft { from { transform: translateX(min(30vw, 420px)); } }

@@ -79,6 +79,8 @@ export interface OutlineSection {
   cards: string[];
   owners: number[];
   /** tiefere Punkte der Gliederung (Ebene 2 bis 4), Konzept 8h */
+  /** Farbe des Asts bzw. Clusters, falls in die Gliederung übernommen */
+  color?: string;
   subs?: { id: string; title: string; level: number }[];
 }
 

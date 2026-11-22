@@ -1148,6 +1148,27 @@ Wünsche von Jo:
   Die Reihenfolge an der Linie wird bei jedem Andocken neu vergeben (y = 0, 10, 20 …).
 - Offen: Wie zeigt die Präsentationslinie, welche Punkte auf eine Folie kommen (Frage an Jo).
 
+### 8h.11 Seitenmenüs, Mittelachse, Gruppensäulen, Übernehmen (22. November 2026)
+
+Wünsche von Jo:
+
+- Seite Gliederung: Die Knöpfe „Präsentation“ und „Ausarbeitung“ sitzen unten auf der Kopfzeile genau über ihren Linien,
+  die Linie beginnt direkt unter dem Knopf und berührt ihn. Die Seite misst die Lage der Linien laufend (ResizeObserver),
+  auch wenn das Seitenmenü links oder eine Leiste rechts die Fläche verschiebt.
+- Der i-Knopf steht rechts neben dem Chat-Symbol. Die Symbole oben rechts öffnen Seitenleisten: Notizen, Chat und
+  jetzt auch die Gliederung (`OutlineSide`); „‖“ darin führt zur Parallelansicht. In der Mindmap schaltet das Symbol die
+  Gliederung neben der Mindmap (der Knopf in der Ansichtsleiste entfällt).
+- Links wie rechts ist immer nur ein Seitenmenü offen (`lib/sides.ts`): Wer eines öffnet, meldet `announceSide(edge, id)`,
+  alle anderen auf derselben Seite schließen sich (`useSideBus`). Eingebettete Oberflächen (Pinnwand, Bento) hören im
+  iframe auf `{ type: 'collegare:side-open', edge, id }` und schicken dieselbe Nachricht an `window.parent`, wenn ihre
+  eigenen Seitenmenüs aufgehen. Das Seitenmenü links löst dann auch das Anheften.
+- Gruppensäulen reichen bis zum unteren Fensterrand: hinter den Karten der bisherige Farbton, darunter ein Verlauf bis 0 %,
+  der Rand der Säule bleibt sichtbar.
+- Ast oder Cluster in die Gliederung (Knopf oder Ziehen): Rückfrage „Titel, Personen, Farbe“, alles angehakt. Ohne Titel
+  wird ein eigener Punkt ohne Verbindung zur Karte, ohne Personen setzt der Punkt `noOwners` (Abschnitte übernehmen dann
+  nur die Personen am Punkt), mit Farbe bekommt der Punkt `color` (Kreis gefüllt, in `outline.sections[].color` für den
+  Schreibeditor).
+
 ## 8i. Schreibeditor und Ausarbeitung (21. November 2026)
 
 Wunsch Jo: Die Office-Ansicht der Ausarbeitung weicht einem eigenen, leichten Editor. Geschrieben wird zunächst auf
