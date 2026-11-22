@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
+import { AusarbeitungCards } from '@/components/AusarbeitungCards';
 import { GliederungBoard } from '@/components/Gliederung';
 import { Icon } from '@/components/Icon';
 import { ProjectShell } from '@/components/ProjectShell';
@@ -187,24 +188,13 @@ export default function GliederungPage() {
             <GliederungBoard map={map} send={send} people={join?.people ?? []} canEdit={!join?.readOnly} meId={me.id} kinds={kinds} tab={shown === 'both' ? 'ausarb' : shown} onTab={() => {}} show={show} mode={shown} />
           </div>
           {shown !== 'both' && (
-            <div className={`${s.work} ${shown === 'praes' ? s.workPraes : s.workAusarb}`}>
-              <WorkSlot project={project} scope={scope} kind={shown} />
+            <div className={s.work}>
+              <AusarbeitungCards project={project} scope={scope} me={me} sock={sock} kind={shown} show={show} />
             </div>
           )}
         </div>
       )}
       {toast && <div className={p.toast}>{toast}</div>}
     </ProjectShell>
-  );
-}
-
-/** neben der Linie: die Ausarbeitung als Text bzw. als Präsentation (Karten aus dem Schreibeditor) */
-function WorkSlot({ project, scope, kind }: { project: ProjectView; scope: string; kind: LineKind }) {
-  return (
-    <div className={s.slot}>
-      <a className="btn primary" href={href(`/projekt/ausarbeitung/?id=${project.id}&bereich=${scope}${kind === 'praes' ? '&linie=praes' : ''}`)}>
-        <Icon name="doc" size={15} /> {kind === 'praes' ? 'Präsentation' : 'Ausarbeitung'} öffnen
-      </a>
-    </div>
   );
 }

@@ -20,8 +20,6 @@
 .lineCol { min-height: 0; border-right: 1px solid var(--line); background: var(--bg); animation: gSlideLeft 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
 .work { min-width: 0; min-height: 0; overflow: auto; animation: gFade 0.45s 0.15s ease-out both; }
 /* zarter Farbverlauf: Präsentation oder Ausarbeitung als Text */
-.workAusarb { background: linear-gradient(180deg, color-mix(in srgb, #2b579a 7%, var(--bg)) 0, var(--bg) 220px); }
-.workPraes { background: linear-gradient(180deg, color-mix(in srgb, #c43e1c 7%, var(--bg)) 0, var(--bg) 220px); }
 .slot { padding: 24px; }
 @keyframes gSlideLeft { from { transform: translateX(min(30vw, 420px)); } }
 @keyframes gFade { from { opacity: 0; } }

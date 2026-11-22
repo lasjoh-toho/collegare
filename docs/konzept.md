@@ -1195,6 +1195,24 @@ Randabbildung; Schriften einbinden (OFL, im Paket); eigenständige HTML-Datei zu
 Filter an Bildern der Ausarbeitung: Dithern, Tontrennung, Negativ, Solarisation, Verpixeln, Vektorisieren, Vignette
 (im Browser auf Canvas, Original bleibt erhalten).
 
+### 8i.5 Stufe 1b: Schreiben im Panel, Notizen hineinziehen (22. November 2026, gebaut)
+
+Wünsche von Jo vom 22. November 2026:
+
+- Ein Klick ins Panel, und man schreibt direkt (WYSIWYG). Oben am Eintrag steht dann ein fester Kopf mit den
+  Werkzeugen, in Gruppen: Grundformen (Fett, Kursiv, Überschrift, Liste, Zitat, Link), „Auszeichnen“ (Hervorheben,
+  Begriff) und „Rand“ mit einem Symbol für die Randspalte (Randnotiz nummeriert, Bemerkung ohne Nummer, Bild mit
+  Unterschrift).
+- Text und Präsentation sind eigene Linien (`documents.line`). In der Präsentation heißt die Randgruppe „Vortrag“:
+  Die Randspalte trägt Vortragsnotizen (ohne Nummer), Bilder gehören auf die Folie; nummerierte Randnotizen gibt es nur
+  im Text. Hervorheben und Begriffe gelten für beide.
+- Ein zarter Farbverlauf (blau für den Text, orange für die Präsentation) zeigt, woran man gerade arbeitet.
+- Notizen aus „Notizen und Quellen“ lassen sich in ein Panel ziehen (an der Stelle als Absätze eingesetzt) oder
+  zwischen zwei Panels (neuer Punkt der Gliederung mit der Notiz als Objekt und ihrem Text als Anfang).
+- Wo eine Notiz verbaut ist (Tabelle `note_uses`, gilt nur, solange der Anfang des Textes noch im Abschnitt steht, oder
+  als Objekt an einem Punkt der Gliederung), zeigt die Notiz eine blaue bzw. orange Pille. Ein Klick springt dorthin.
+- Die Karten liegen in `components/AusarbeitungCards.tsx` und stehen auch auf der Seite „Gliederung“ neben der Linie.
+
 ## 9. Umsetzungsplan
 
 | Meilenstein | Inhalt | Ergebnis / Abnahme |
