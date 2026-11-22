@@ -88,7 +88,8 @@ export interface MindMap {
   /** oberste Ebene, hinten nach vorn */
   roots: string[];
   links: MapLink[];
-  outline: { sections: OutlineSection[]; at: number; by: number } | null;
+  /** praes: Abschnitte der Präsentationslinie (sections folgt der führenden Linie) */
+  outline: { sections: OutlineSection[]; praes?: OutlineSection[]; at: number; by: number } | null;
   /** Gliederung als zwei U-Bahn-Linien (Präsentation, Ausarbeitung), Konzept 8h; fehlt bei alten Mindmaps */
   lines?: Lines;
 }

@@ -203,7 +203,8 @@ export interface MindMap {
   cards: Record<string, MapCard>;
   roots: string[];
   links: MapLink[];
-  outline: { sections: OutlineSection[]; at: number; by: number } | null;
+  /** praes: Abschnitte der Präsentationslinie (sections folgt der führenden Linie) */
+  outline: { sections: OutlineSection[]; praes?: OutlineSection[]; at: number; by: number } | null;
   /** Gliederung als zwei U-Bahn-Linien (Konzept 8h), siehe lib/lines.ts */
   lines?: import('./lines').Lines;
 }

@@ -128,8 +128,8 @@ export function leadingLine(l: Lines): LinePoint[] {
   return live(l.ausarb.points).length ? l.ausarb.points : l.praes.points;
 }
 
-export function outlineFrom(m: MindMap, l: Lines): OutlineSection[] {
-  return leadingLine(l)
+export function outlineFrom(m: MindMap, l: Lines, points: LinePoint[] = leadingLine(l)): OutlineSection[] {
+  return points
     .filter((p) => !p.hidden && !p.removed)
     .map((p) => {
       const live: LinePoint[] = [];
@@ -183,7 +183,9 @@ export function applyLines(m: MindMap, next: Lines, actor: number, people: Set<n
   const inLine = cardsInLines(next);
   for (const c of Object.values(m.cards)) c.pick = inLine.has(c.id);
   const sections = outlineFrom(m, next);
-  m.outline = next.at ? { sections, at: next.at, by: m.outline?.by ?? actor } : null;
+  // Abschnitte der Präsentationslinie für die Präsentation im Schreibeditor (Konzept 8h.10)
+  const praes = outlineFrom(m, next, next.praes.points);
+  m.outline = next.at ? { sections, praes, at: next.at, by: m.outline?.by ?? actor } : null;
 }
 
 /** Vor dem Löschen von Karten: Punkte behalten ihren Titel und gelten dann als eigene Punkte der Gliederung */
