@@ -1342,9 +1342,36 @@ Wünsche von Jo nach dem ersten Ausprobieren:
   Lizenz kommen, soweit die Seite sie nennt, in die Bildunterschrift.
 - Überschriften bleiben beim Seitenumbruch beim folgenden Baustein.
 
+### 8j.7 Auf der Seite schreiben, Menüband, Ansichten (Stufe 3, 23. November 2026)
+
+Jo: „Dieser Editor wie alle weiteren sollten WYSIWYG mit Ribbon darüber funktionieren.“ Das gilt für alle eigenen
+Editoren von Collegare.
+
+- **Auf der Seite schreiben:** Ein Klick in einen Text auf der Seite öffnet ihn dort zum Bearbeiten, mit derselben
+  Schrift und demselben Satz. Fußnoten, Randbemerkungen und Glossar-Wörter antippen, um sie zu ändern. Esc beendet.
+  Das Formular im Seitenteil (Inspector) und die eingeklappte „Gestaltung“ entfallen.
+- **Menüband** über der Ansicht wie in Office: Start (Schrift, Absatz, Rand für Notizen, Im Text, Vorlage), Einfügen
+  (alle Bausteine, Teilaufgabe, Spalten), Blatt (Format, Broschüre, Korrekturrand, Kopfzeile, QR-Code, Zählweise) und
+  ein Reiter für den gewählten Baustein (Aufgabe, Bild, Material, Spalten, Linien, Glossar) mit „Anordnen“.
+- **Links** die Ansichten und die Bausteinliste (verschachtelt, zum Ziehen):
+  - *Seiten* untereinander.
+  - *Doppelseiten* wie im aufgeschlagenen Heft (1, dann 2|3, 4|5 …), um den Mittelschnitt zu prüfen; man kann dort
+    schreiben und Bilder verschieben.
+  - *Druckbögen* ausgeschossen für den Broschürendruck (z. B. 8|1, 2|7), nur zum Ansehen. Bei mehrseitigen
+    Broschüren sind Doppelseiten und Druckbögen verschieden.
+- **Rechts** eine Seitenleiste zum Ein- und Ausblenden mit verschiedenen Zwecken: Suchen im Blatt (Text, Bausteinart),
+  Material des Projekts (Bilder und Lernseiten übernehmen), Glossar-Erklärungen.
+- **Aufgaben frei nummerieren:** Teilaufgaben zählen unter der vorigen Aufgabe mit a), b) oder 1.1, 1.2 (Einstellung
+  unter „Blatt“); jede Aufgabe kann eine eigene Nummer bekommen (z. B. „1 b)“), die Zählung läuft danach weiter.
+- **Bilder drehen** in 90°-Schritten und **auf der Seite verschieben** durch Ziehen. Der Platz bleibt frei; „vor dem
+  Text“ legt das Bild über den Text, „An seinen Platz“ setzt es zurück.
+- **Spalten:** Ein Baustein „Spalten“ hält zwei oder drei Spalten mit Bausteinen (Verhältnis 1:1, 2:1, 1:2, 1:1:1),
+  z. B. Grafik neben Erklärtext. „Neben den nächsten“ setzt einen Baustein und den folgenden nebeneinander,
+  „auflösen“ nimmt das zurück.
+
 ### 8j.5 Nächste Stufen
 
-1. Spalten und Randspalte (Bild oder Kasten neben dem Text wie im Beispiel), Bild neben Aufgaben.
+1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).
 2. Word-Datei übernehmen (wie bei Lernseiten), Vorlagen für Klausurkopf und Operatoren je Fach.
 3. QR-Codes über eine Dienstschnittstelle von Autogra.fi, wenn beide auf verschiedenen Servern laufen (heute nur
    gleicher Server), und ohne Collegare: Autogra.fi druckt ein in Collegare gestaltetes Blatt als PDF mit Codes.

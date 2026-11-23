@@ -1,6 +1,49 @@
 /* Arbeitsblatt und Klassenarbeit: Editor (links Blatt und Bausteine, Mitte Seiten, rechts Baustein) und Seitensatz */
-.wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr) 330px; }
-.wrap.read { grid-template-columns: minmax(0, 1fr); }
+.shell { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr) 300px; }
+.wrap.noPanel { grid-template-columns: 250px minmax(0, 1fr); }
+.wrap.read { grid-template-columns: 220px minmax(0, 1fr); }
+
+/* Menüband wie in Office: Reiter, darunter Gruppen mit Beschriftung; Streifen in der Farbe von Word */
+.ribbon { flex: none; border-bottom: 1px solid var(--line); background: linear-gradient(to bottom, color-mix(in srgb, var(--office-word, #2b579a) 7%, var(--bg-elev)), var(--bg-elev)); border-top: 6px solid var(--office-word, #2b579a); }
+.tabs { display: flex; align-items: flex-end; gap: 2px; padding: 4px 10px 0; }
+.tab { border: 0; background: none; padding: 5px 12px 6px; font: inherit; font-size: 13px; color: var(--fg-muted); border-radius: 7px 7px 0 0; cursor: pointer; }
+.tab:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.tabOn { color: var(--fg); background: var(--bg-elev); box-shadow: 0 -1px 0 var(--line), 1px 0 0 var(--line), -1px 0 0 var(--line); font-weight: 600; }
+.tabCtx { color: var(--office-word, #2b579a); font-weight: 600; }
+.groups { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; padding: 6px 8px 4px; background: var(--bg-elev); min-height: 64px; }
+.group { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px; border-right: 1px solid var(--line); }
+.group:last-child { border-right: 0; }
+.groupBody { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 34px; }
+.groupBody select, .rIn { font-size: 12.5px; height: 28px; border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; background: var(--bg-elev); color: var(--fg); }
+.groupBody :global(.btn) { height: 28px; padding: 0 8px; font-size: 12.5px; }
+.groupLabel { font-size: 10.5px; color: var(--fg-faint); text-align: center; padding-top: 3px; white-space: nowrap; }
+.big { flex-direction: column; height: auto !important; padding: 3px 6px !important; font-size: 11px !important; gap: 0; min-width: 58px; }
+.big span { font-size: 16px; line-height: 1.1; }
+.urlRow { display: flex; gap: 4px; }
+.urlRow input { width: 180px; height: 28px; border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; background: var(--bg-elev); color: var(--fg); font-size: 12.5px; }
+
+/* Bearbeiten auf der Seite: der Editor liegt genau über dem Feld */
+.zoomWrap { position: relative; width: max-content; margin: 0 auto; }
+.ov { position: absolute; z-index: 6; background: #fff; outline: 2px solid var(--ui-accent, #2563eb); outline-offset: 1mm; border-radius: 1px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.ovField { outline: 0; cursor: text; caret-color: #111; }
+.ovField:empty::before { content: 'Hier schreiben …'; color: #aaa; font-style: italic; }
+.ov :global(.ed-note) { display: inline-block; font-size: 0.75em; line-height: 1.2; padding: 0 0.35em; margin: 0 0.1em; border-radius: 0.6em; background: #e8f0fe; color: #1e3a8a; cursor: pointer; vertical-align: 0.15em; font-style: normal; font-weight: 400; max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov :global(.ed-note)::before { content: '¹ '; }
+.ov :global(.ed-margin)::before { content: '↦ '; }
+.ov :global(.ed-mark) { display: none; }
+.ov :global(.ed-gloss) { border-bottom: 2px dotted #2563eb; cursor: pointer; }
+.ov :global(mark) { background: #fff176; color: inherit; }
+.ov .atom { position: absolute; left: 0; top: 100%; width: min(360px, 100%); min-width: 260px; margin-top: 10px; z-index: 7; }
+
+/* Seitenleiste rechts */
+.hit { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--bg-elev); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 12.5px; color: var(--fg); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hit:hover { border-color: var(--accent); }
+.matList { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.matImg { border: 1px solid var(--line); border-radius: 8px; padding: 3px; background: var(--bg-elev); cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--fg-muted); text-align: left; }
+.matImg img { width: 100%; height: 70px; object-fit: cover; border-radius: 5px; display: block; }
+.matImg span, .matPage { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matPage { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--bg-elev); cursor: pointer; text-align: left; font: inherit; font-size: 12.5px; color: var(--fg); }
 .side { min-height: 0; overflow: auto; background: var(--bg-elev); border-right: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .side.right { border-right: 0; border-left: 1px solid var(--line); }
 .sec { display: flex; flex-direction: column; gap: 7px; }
@@ -31,7 +74,7 @@
 
 .center { min-height: 0; overflow: auto; background: var(--bg-sunken); display: flex; flex-direction: column; }
 .viewBar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: color-mix(in srgb, var(--bg-sunken) 90%, transparent); backdrop-filter: blur(6px); font-size: 12.5px; color: var(--fg-muted); }
-.pagesOuter { padding: 16px; }
+.pagesOuter { padding: 24px 16px; min-height: 100%; box-sizing: border-box; }
 
 .richBox > div > [role='textbox'] { min-height: 110px; max-height: 340px; font-size: 14px; }
 .imgPick { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -148,6 +191,19 @@
 .host :global(.bl-gl-item) { margin: 0 0 0.35em !important; break-inside: avoid; }
 .host :global(.bl-glossary.bl-tpl-kasten) { border: 0.3mm solid #444; padding: 2.5mm 3mm; }
 .host :global(.bl-glossary.bl-tpl-zweispaltig .bl-gl-list) { column-count: 2; column-gap: 6mm; }
+/* Spalten, Teilaufgaben, gedrehte und frei verschobene Bilder */
+.host :global(.bl-cols) { display: grid; gap: 6mm; align-items: start; }
+.host :global(.bl-col) { min-width: 0; }
+.host :global(.bl-col > .bl-block:last-child) { margin-bottom: 0; }
+.host :global(.bl-col-empty) { min-height: 20mm; border: 0.3mm dashed #bbb; display: grid; place-items: center; text-align: center; color: #999; font-size: 0.8em; }
+.host :global(.bl-subtask) { margin-left: 7mm; }
+.host :global(.bl-task-t p) { margin: 0; display: inline; }
+.host :global(.bl-rot) { position: relative; width: 100%; overflow: visible; }
+.host :global(.bl-rot img) { position: absolute; left: 50%; top: 50%; max-width: none; }
+.host :global(.bl-free) { height: 0; margin: 0 !important; }
+.host :global(.bl-free .bl-fig) { position: absolute; z-index: 3; margin: 0; }
+.host :global(.bl-reading .bl-page + .bl-page) { border-left: 0.4mm solid #888; }
+.host :global(.bl-blank-page) { background: #f4f4f4; box-shadow: none; }
 .host :global(.bl-overflow) { outline: 0.6mm solid #d92d20; outline-offset: 0.5mm; }
 .host :global(.bl-filler) :global(.bl-body) { opacity: 0.9; }
 /* Auswahl im Editor */
@@ -155,6 +211,11 @@
 .host.editing :global(.bl-block:hover) { outline: 1px dashed color-mix(in srgb, var(--ui-accent) 60%, transparent); outline-offset: 1mm; }
 .host.editing :global(.bl-block.bl-sel) { outline: 2px solid var(--ui-accent); outline-offset: 1mm; }
 .host.editing :global(.bl-block.bl-sel.bl-overflow) { outline-color: #d92d20; }
+.host.editing :global([data-field]) { cursor: text; }
+.host.editing :global([data-field]:hover) { background: color-mix(in srgb, var(--ui-accent, #2563eb) 6%, transparent); }
+.host.editing :global(.bl-fig img) { cursor: move; }
+.host.editing :global(.bl-col-empty) { cursor: pointer; }
+.host.editing :global(.bl-col-sel) { outline: 2px dashed var(--ui-accent, #2563eb); outline-offset: 1mm; }
 /* Druckbögen in der Vorschau */
 .host :global(.bl-sheet) { box-sizing: border-box; background: #fff; display: flex; position: relative; flex: none; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 6px 18px rgba(0, 0, 0, 0.08); }
 .host :global(.bl-sheet .bl-page) { box-shadow: none; }
@@ -175,6 +236,7 @@
   .printHost :global(.bl-spread .bl-page + .bl-page) { border-left: 0; }
   .printHost :global(.bl-overflow) { outline: 0; }
   .printHost :global(.bl-ph) { visibility: hidden; }
+  .printHost :global(.bl-col-empty) { border: 0; }
 }
 /* rechte Spalte: Fußnote/Randbemerkung/Glossar ändern, Gestaltung, Glossar-Erklärungen */
 .atom { display: grid; gap: 6px; margin-top: 6px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--bg-elev); box-shadow: var(--shadow); }

@@ -11,7 +11,7 @@
  */
 import { renderMarkdown } from './markdown';
 
-export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'lines' | 'pagebreak';
+export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'cols' | 'lines' | 'pagebreak';
 export type Ruling = 'lines' | 'grid' | 'empty';
 
 export interface Block {
@@ -48,6 +48,20 @@ export interface Block {
   /** Glossar: Reihenfolge und Kennzeichen der Wörter im Text */
   sort?: 'alpha' | 'order';
   mark?: 'star' | 'arrow' | 'bold' | 'none';
+  /** Aufgabe: Teilaufgabe (eingerückt, a) bzw. 1.1) und eigene Nummer statt der automatischen (z. B. „1.2“, „1 b)“) */
+  subtask?: boolean;
+  num?: string;
+  /** Bild: Drehung in Grad (90er-Schritte), Seitenverhältnis Höhe/Breite, frei auf der Seite verschoben (mm) */
+  rot?: number;
+  ar?: number;
+  free?: boolean;
+  /** frei verschobenes Bild liegt vor dem Text und nimmt keinen Platz ein */
+  over?: boolean;
+  dx?: number;
+  dy?: number;
+  /** Spalten: Bausteine je Spalte und Breitenverhältnis */
+  cols?: Block[][];
+  ratio?: number[];
   /** Gestaltung (Wunsch Jo, 22. November 2026): Vorlage und eigene Abweichungen für den ganzen Baustein */
   tpl?: string;
   /** Schriftgröße in Prozent der Blattschrift */
@@ -83,6 +97,8 @@ export interface BlattDoc {
     fill: Ruling;
     header: { show: boolean; text: string; nameLine: boolean; date: boolean; qr: 'first' | 'all' | 'none' };
     korr: Korr;
+    /** Teilaufgaben: a), b) … oder 1.1, 1.2 … */
+    sub?: 'letter' | 'dot';
   };
   blocks: Block[];
 }
@@ -116,6 +132,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   task: 'Aufgabe',
   box: 'Kasten',
   glossary: 'Glossar',
+  cols: 'Spalten',
   lines: 'Linien',
   pagebreak: 'Seitenumbruch',
 };
@@ -156,6 +173,7 @@ export function newBlock(type: BlockType): Block {
   if (type === 'task') Object.assign(b, { md: '', points: '', lines: 0, lineStyle: 'lines' });
   if (type === 'box') Object.assign(b, { text: '', md: '' });
   if (type === 'glossary') Object.assign(b, { text: 'Glossar', sort: 'alpha', mark: 'star' });
+  if (type === 'cols') Object.assign(b, { cols: [[], []], ratio: [1, 1] });
   if (type === 'lines') Object.assign(b, { style: 'lines', count: 8, fill: true, spacing: 8 });
   const t = TEMPLATES[type]?.[0];
   if (t) b.tpl = t.id;
@@ -176,6 +194,8 @@ export function blockSummary(b: Block): string {
       return b.text || plain(b.md);
     case 'glossary':
       return b.text || '';
+    case 'cols':
+      return (b.cols ?? []).map((c) => (c.length ? c.map((x) => BLOCK_LABEL[x.type]).join(', ') : 'leer')).join(' | ');
     case 'lines':
       return `${b.style === 'grid' ? 'Karos' : b.style === 'empty' ? 'Freiraum' : 'Schreiblinien'}${b.fill ? ' bis zum Seitenende' : `, ${b.count ?? 0}`}`;
     case 'pagebreak':
@@ -183,6 +203,77 @@ export function blockSummary(b: Block): string {
     default:
       return plain(b.md);
   }
+}
+
+// ---------- Bausteine in Spalten ----------
+/** Alle Bausteine in Lesereihenfolge, auch die in Spalten */
+export function walk(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  for (const b of blocks) {
+    if (b.type === 'cols') for (const c of b.cols ?? []) out.push(...walk(c));
+    else out.push(b);
+  }
+  return out;
+}
+export function findBlock(blocks: Block[], id: string): Block | null {
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    if (b.type === 'cols') for (const c of b.cols ?? []) {
+      const f = findBlock(c, id);
+      if (f) return f;
+    }
+  }
+  return null;
+}
+/** Liste, in der ein Baustein steht (oberste Ebene oder eine Spalte), mit Stelle */
+export function listOf(blocks: Block[], id: string): { list: Block[]; i: number; parent: Block | null; col: number } | null {
+  const i = blocks.findIndex((b) => b.id === id);
+  if (i >= 0) return { list: blocks, i, parent: null, col: -1 };
+  for (const b of blocks) {
+    if (b.type !== 'cols') continue;
+    for (const [k, c] of (b.cols ?? []).entries()) {
+      const r = listOf(c, id);
+      if (r) return r.parent ? r : { ...r, parent: b, col: k };
+    }
+  }
+  return null;
+}
+/** Bausteine umbauen: fn bekommt jede Liste (oberste Ebene und jede Spalte) und gibt sie geändert zurück */
+export function mapLists(blocks: Block[], fn: (list: Block[]) => Block[]): Block[] {
+  return fn(blocks).map((b) => (b.type === 'cols' ? { ...b, cols: (b.cols ?? []).map((c) => mapLists(c, fn)) } : b));
+}
+export const updateBlock = (blocks: Block[], id: string, p: Partial<Block>) => mapLists(blocks, (l) => l.map((b) => (b.id === id ? { ...b, ...p } : b)));
+export const removeBlock = (blocks: Block[], id: string) => mapLists(blocks, (l) => l.filter((b) => b.id !== id));
+/** nach dem Baustein after einfügen (in dieselbe Spalte), ohne after am Ende */
+export function insertAfter(blocks: Block[], after: string | null, nb: Block): Block[] {
+  if (!after || !findBlock(blocks, after)) return [...blocks, nb];
+  return mapLists(blocks, (l) => {
+    const i = l.findIndex((b) => b.id === after);
+    return i < 0 ? l : [...l.slice(0, i + 1), nb, ...l.slice(i + 1)];
+  });
+}
+/** in eine (leere) Spalte setzen */
+export const insertIntoCol = (blocks: Block[], colsId: string, k: number, nb: Block) =>
+  mapLists(blocks, (l) => l.map((b) => (b.id === colsId ? { ...b, cols: (b.cols ?? []).map((c, j) => (j === k ? [...c, nb] : c)) } : b)));
+
+/** Nummern der Aufgaben: 1., 2. … und Teilaufgaben a), b) bzw. 1.1, 1.2; eigene Nummern gehen vor */
+export function taskLabels(doc: BlattDoc): Map<string, string> {
+  const out = new Map<string, string>();
+  let m = 0;
+  let s = 0;
+  for (const b of walk(doc.blocks)) {
+    if (b.type !== 'task') continue;
+    if (b.subtask) {
+      s++;
+      if (!m) m = 1;
+      out.set(b.id, b.num?.trim() || (doc.page.sub === 'dot' ? `${m}.${s}` : `${String.fromCharCode(96 + Math.min(26, s))})`));
+    } else {
+      m++;
+      s = 0;
+      out.set(b.id, b.num?.trim() || `${m}.`);
+    }
+  }
+  return out;
 }
 
 // ---------- DOM-Helfer ----------
@@ -385,7 +476,7 @@ export function plainMd(md: string, notes: 'drop' | 'paren' = 'drop'): string {
 /** Alle Glossar-Wörter des Blatts in der Reihenfolge des Auftretens (ein Eintrag je Wort) */
 export function glossaryTerms(doc: BlattDoc): { word: string; explain: string }[] {
   const seen = new Map<string, { word: string; explain: string }>();
-  for (const b of doc.blocks) {
+  for (const b of walk(doc.blocks)) {
     for (const md of [b.md, b.title]) {
       if (!md) continue;
       for (let i = 0; i < md.length; i++) {
@@ -437,7 +528,7 @@ export function setTerm(doc: BlattDoc, word: string, explain: string | null): Bl
     }
     return out;
   };
-  return { ...doc, blocks: doc.blocks.map((b) => ({ ...b, md: fix(b.md), title: fix(b.title) })) };
+  return { ...doc, blocks: mapLists(doc.blocks, (l) => l.map((b) => (b.type === 'cols' ? b : { ...b, md: fix(b.md), title: fix(b.title) }))) };
 }
 
 /**
@@ -552,17 +643,24 @@ function ruling(style: Ruling, widthMm: number, heightMm: number, spacing: numbe
 interface Ctx {
   widthMm: number;
   number?: number;
+  label?: string;
   korr: Korr | null;
   text: TextCtx;
   terms: { word: string; explain: string }[];
+  /** im Editor: leere Felder als Platzhalter zeigen, damit man sie anklicken kann */
+  editing?: boolean;
 }
 interface Part {
   /** vorbereitete Absätze (einmal gesetzt, damit Fußnoten beim Umbrechen ihre Nummer behalten) */
   paras?: string[];
   title?: string;
+  /** Fußnotenzeichen hinter dem Titel (Quelle des Materials) */
+  mark?: string;
   first?: boolean;
   last?: boolean;
   heightMm?: number;
+  /** Spalten: vorbereitete Bausteine je Spalte */
+  kids?: { b: Block; ctx: Ctx; part: Part }[][];
 }
 
 /** Vorlage und eigene Gestaltung auf den Baustein anwenden */
@@ -586,6 +684,13 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
   }
 }
 
+/** Feld, das man auf der Seite anklicken und dort bearbeiten kann */
+function field(tag: string, cls: string, name: string, html: string): HTMLElement {
+  const e = el(tag, cls, html);
+  e.dataset.field = name;
+  return e;
+}
+
 function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
   const box = el('div', 'bl-block bl-' + b.type);
   box.dataset.bid = b.id;
@@ -594,63 +699,111 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
   const first = part.first !== false;
   switch (b.type) {
     case 'heading':
-      box.appendChild(el(b.level === 1 ? 'h2' : 'h3', '', part.title || esc(b.text)));
+      box.appendChild(field(b.level === 1 ? 'h2' : 'h3', '', 'text', part.title || esc(b.text) || '<span class="bl-ph">Überschrift</span>'));
       break;
     case 'text':
-      box.appendChild(el('div', 'bl-text', html || '<p class="bl-ph">Erklärtext …</p>'));
+      box.appendChild(field('div', 'bl-text', 'md', html || '<p class="bl-ph">Erklärtext …</p>'));
       break;
     case 'material': {
       if (first) {
         const label = (b.label ?? '').trim() || `Material ${ctx.number}`;
         const title = part.title ?? '';
-        box.appendChild(el('div', 'bl-mat-title', `<span class="bl-mat-label">${esc(label)}${title.replace(/<sup[^>]*>.*?<\/sup>/g, '') ? ':' : ''}</span>${title ? ' ' + title : ''}`));
+        const t = el('div', 'bl-mat-title', `<span class="bl-mat-label">${esc(label)}:</span> `);
+        t.appendChild(field('span', 'bl-mat-t', 'title', title || '<span class="bl-ph">Titel</span>'));
+        if (part.mark) t.insertAdjacentHTML('beforeend', part.mark);
+        box.appendChild(t);
       }
-      box.appendChild(el('div', 'bl-mat-body' + (b.lineNumbers !== false ? ' bl-numbered' : ''), html || '<p class="bl-ph">Text des Materials …</p>'));
+      box.appendChild(field('div', 'bl-mat-body' + (b.lineNumbers !== false ? ' bl-numbered' : ''), 'md', html || '<p class="bl-ph">Text des Materials …</p>'));
       break;
     }
     case 'quote':
-      box.appendChild(el('div', 'bl-quote-text', html || '<p class="bl-ph">Zitat …</p>'));
-      if (b.source && part.last !== false) box.appendChild(el('div', 'bl-quote-src', esc(b.source)));
+      box.appendChild(field('div', 'bl-quote-text', 'md', html || '<p class="bl-ph">Zitat …</p>'));
+      if (part.last !== false) box.appendChild(field('div', 'bl-quote-src', 'source', esc(b.source) || (ctx.editing ? '<span class="bl-ph">Quelle</span>' : '')));
       break;
     case 'image': {
       const fig = el('figure', 'bl-fig bl-align-' + (b.align ?? 'center'));
-      fig.style.width = Math.max(15, Math.min(100, Number(b.width) || 100)) + '%';
+      const pct = Math.max(15, Math.min(100, Number(b.width) || 100));
+      const wMm = (pct / 100) * ctx.widthMm;
+      fig.style.width = pct + '%';
+      const rot = (((Number(b.rot) || 0) % 360) + 360) % 360;
       if (b.src) {
         const img = el('img') as HTMLImageElement;
         img.src = b.src;
         img.alt = b.caption ?? '';
-        fig.appendChild(img);
-      } else fig.appendChild(el('div', 'bl-img-empty', '<span>Bild hierher ziehen<br>oder rechts auswählen</span>'));
-      if (b.caption) fig.appendChild(el('figcaption', '', esc(b.caption)));
+        img.draggable = false;
+        if (rot % 180 && b.ar) {
+          // gedreht um 90°: sichtbare Breite = Höhe des Bilds; der Rahmen bekommt die neue Höhe
+          const wrap = el('div', 'bl-rot');
+          const h = wMm / b.ar;
+          wrap.style.height = h + 'mm';
+          img.style.width = h + 'mm';
+          img.style.height = wMm + 'mm';
+          img.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+          wrap.appendChild(img);
+          fig.appendChild(wrap);
+        } else {
+          if (rot) img.style.transform = `rotate(${rot}deg)`;
+          fig.appendChild(img);
+        }
+      } else fig.appendChild(el('div', 'bl-img-empty', '<span>Bild hierher ziehen<br>oder im Menüband auswählen</span>'));
+      if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
+      if (b.free) {
+        // verschoben um dx/dy gegenüber seiner Stelle; sein Platz im Text bleibt frei, außer es liegt „vor dem Text“
+        const dx = Number(b.dx) || 0;
+        const dy = Number(b.dy) || 0;
+        if (b.over) {
+          box.classList.add('bl-free');
+          fig.style.width = wMm + 'mm';
+          const base = b.align === 'left' ? '0mm' : b.align === 'right' ? `(100% - ${wMm}mm)` : `((100% - ${wMm}mm) / 2)`;
+          fig.style.left = `calc(${base} + ${dx}mm)`;
+        } else {
+          fig.style.position = 'relative';
+          fig.style.left = dx + 'mm';
+        }
+        fig.style.top = dy + 'mm';
+        fig.style.zIndex = '3';
+      }
       box.appendChild(fig);
       break;
     }
     case 'task': {
+      if (b.subtask) box.classList.add('bl-subtask');
       const row = el('div', 'bl-task-row');
-      row.appendChild(el('span', 'bl-task-no', `${ctx.number}.`));
-      const pts = b.points ? ` <span class="bl-pts">${esc(b.points)}</span>` : '';
-      row.appendChild(el('div', 'bl-task-text', (part.title || '<span class="bl-ph">Aufgabenstellung …</span>') + pts));
+      row.appendChild(el('span', 'bl-task-no', esc(ctx.label ?? `${ctx.number}.`)));
+      const text = el('div', 'bl-task-text');
+      text.appendChild(field('span', 'bl-task-t', 'md', part.title || '<span class="bl-ph">Aufgabenstellung …</span>'));
+      if (b.points) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
+      row.appendChild(text);
       box.appendChild(row);
       const n = Math.max(0, Math.min(40, Number(b.lines) || 0));
       if (n) {
         const style = b.lineStyle ?? 'lines';
         const sp = style === 'grid' ? 5 : Number(b.spacing) || 8;
         const lines = style === 'grid' ? Math.ceil((n * 8) / 5) : n;
-        const r = ruling(style, ctx.widthMm, lines * sp + (style === 'grid' ? 0 : 1), sp, ctx.korr);
-        // Linien gehen über die ganze Breite, auch wenn der Text eingerückt ist
-        (r as SVGElement).style.fontStyle = 'normal';
-        box.appendChild(r);
+        box.appendChild(ruling(style, ctx.widthMm, lines * sp + (style === 'grid' ? 0 : 1), sp, ctx.korr));
       }
       break;
     }
     case 'box':
-      if (b.text && first) box.appendChild(el('div', 'bl-box-title', esc(b.text)));
-      box.appendChild(el('div', 'bl-box-text', html || '<p class="bl-ph">Inhalt des Kastens …</p>'));
+      if (first && (b.text || ctx.editing)) box.appendChild(field('div', 'bl-box-title', 'text', esc(b.text) || '<span class="bl-ph">Titel (optional)</span>'));
+      box.appendChild(field('div', 'bl-box-text', 'md', html || '<p class="bl-ph">Inhalt des Kastens …</p>'));
       break;
     case 'glossary':
-      if (first && b.text) box.appendChild(el('div', 'bl-gl-title', esc(b.text)));
+      if (first) box.appendChild(field('div', 'bl-gl-title', 'text', esc(b.text) || (ctx.editing ? '<span class="bl-ph">Überschrift</span>' : '')));
       box.appendChild(el('div', 'bl-gl-list', html || '<p class="bl-ph">Noch keine Wörter. Markiere im Text ein Wort und wähle „Glossar“.</p>'));
       break;
+    case 'cols': {
+      const ratio = (b.ratio ?? []).length === (b.cols ?? []).length ? b.ratio! : (b.cols ?? []).map(() => 1);
+      box.style.gridTemplateColumns = ratio.map((r) => `minmax(0, ${r}fr)`).join(' ');
+      for (const [k, col] of (part.kids ?? []).entries()) {
+        const c = el('div', 'bl-col');
+        c.dataset.col = `${b.id}:${k}`;
+        for (const kid of col) c.appendChild(render(kid.b, kid.ctx, kid.part));
+        if (!col.length) c.appendChild(el('div', 'bl-col-empty', ctx.editing ? '<span>leere Spalte<br>hier klicken, dann einfügen</span>' : ''));
+        box.appendChild(c);
+      }
+      break;
+    }
     case 'lines': {
       const style = b.style ?? 'lines';
       const sp = style === 'grid' ? 5 : Number(b.spacing) || 8;
@@ -665,7 +818,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     default:
       break;
   }
-  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image') applyStyle(box, b, /bl-mnote/.test(html));
+  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols') applyStyle(box, b, /bl-mnote/.test(html));
   return box;
 }
 
@@ -674,13 +827,14 @@ function prepare(b: Block, ctx: Ctx): Part {
   const t = ctx.text;
   switch (b.type) {
     case 'material': {
-      let title = inlineMd(b.title, t);
+      const title = inlineMd(b.title, t);
+      let mark = '';
       if (b.source?.trim()) {
         const n = ++t.fn;
         t.notes.set(n, esc(b.source));
-        title += `<sup class="bl-fn" data-fn="${n}">${n}</sup>`;
+        mark = `<sup class="bl-fn" data-fn="${n}">${n}</sup>`;
       }
-      return { title, paras: paragraphs(b.md, t) };
+      return { title, mark, paras: paragraphs(b.md, t) };
     }
     case 'text':
     case 'quote':
@@ -799,7 +953,7 @@ export interface Problem {
  * Bausteine auf Seiten setzen. host muss sichtbar im Dokument hängen, denn gemessen wird in px.
  * Liefert die Seiten in Lesereihenfolge und Hinweise auf Bausteine, die nicht auf eine Seite passen.
  */
-export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy): { pages: HTMLElement[]; problems: Problem[] } {
+export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { editing?: boolean } = {}): { pages: HTMLElement[]; problems: Problem[] } {
   host.replaceChildren();
   const pages: Pg[] = [];
   const problems: Problem[] = [];
@@ -816,13 +970,18 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy): { pages
     next();
     if (keep) pg.body.appendChild(keep);
   };
-  let taskNo = 0;
   let matNo = 0;
-  const gloss = doc.blocks.find((b) => b.type === 'glossary');
+  const labels = taskLabels(doc);
+  const gloss = walk(doc.blocks).find((b) => b.type === 'glossary');
   const text = newTextCtx(gloss?.mark ?? 'star');
   const terms = glossaryTerms(doc);
   const korr = doc.page.korr?.side && doc.page.korr.side !== 'none' ? doc.page.korr : null;
-  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, ...extra });
+  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, ...extra });
+  /** Nummer bzw. Bezeichnung eines Bausteins (in Lesereihenfolge, auch in Spalten) */
+  const number = (b: Block, ctx: Ctx) => {
+    if (b.type === 'task') ctx.label = labels.get(b.id);
+    if (b.type === 'material') ctx.number = ++matNo;
+  };
 
   const place = (b: Block, ctx: Ctx, part?: Part) => {
     const e = render(b, ctx, part);
@@ -851,8 +1010,33 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy): { pages
       continue;
     }
     const ctx = mkCtx();
-    if (b.type === 'task') ctx.number = ++taskNo;
-    if (b.type === 'material') ctx.number = ++matNo;
+    number(b, ctx);
+    if (b.type === 'cols') {
+      // Spalten: Bausteine nebeneinander, als Ganzes auf eine Seite
+      const n = Math.max(1, (b.cols ?? []).length);
+      const ratio = (b.ratio ?? []).length === n ? b.ratio! : Array(n).fill(1);
+      const sum = ratio.reduce((x, y) => x + y, 0);
+      const gap = 6;
+      const kids = (b.cols ?? []).map((col, k) =>
+        col.map((kb) => {
+          const kc = mkCtx({ widthMm: ((pg.widthMm - gap * (n - 1)) * ratio[k]) / sum });
+          number(kb, kc);
+          return { b: kb, ctx: kc, part: prepare(kb, kc) };
+        }),
+      );
+      let p = place(b, ctx, { kids });
+      if (over(pg) && pg.body.children.length > 1) {
+        p.remove();
+        nextKeep();
+        p = place(b, ctx, { kids });
+      }
+      for (const m of p.e.querySelectorAll<HTMLElement>('.bl-material')) numberLines(m, 0);
+      if (over(pg)) {
+        p.e.classList.add('bl-overflow');
+        problems.push({ bid: b.id, msg: 'Die Spalten passen nicht auf eine Seite' });
+      }
+      continue;
+    }
 
     if (b.type === 'lines' && b.fill) {
       // bis zum Seitenende: Rest messen; ist kaum noch Platz, eine neue Seite füllen
@@ -979,16 +1163,49 @@ export function toSheets(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement)
 }
 
 /**
+ * Doppelseiten wie im aufgeschlagenen Heft (Wunsch Jo, 23. November 2026): Seite 1 allein rechts, dann 2|3, 4|5 …
+ * So lässt sich prüfen, was am Mittelschnitt (Falz) steht.
+ */
+export function toSpreads(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement) {
+  const size = doc.page.size === 'a5' ? 'a5' : 'a4';
+  const [w, h] = SIZES[size];
+  const mk = (label: string) => {
+    const sh = el('div', 'bl-sheet bl-spread bl-reading');
+    sh.style.width = 2 * w + 'mm';
+    sh.style.height = h + 'mm';
+    sh.dataset.label = label;
+    host.appendChild(sh);
+    return sh;
+  };
+  const blank = () => {
+    const e = el('div', 'bl-page bl-blank-page');
+    e.style.width = w + 'mm';
+    e.style.height = h + 'mm';
+    return e;
+  };
+  for (let i = 0; i < pages.length; i += i === 0 ? 1 : 2) {
+    if (i === 0) {
+      const sh = mk('Seite 1 (Titelseite)');
+      sh.append(blank(), pages[0]);
+      continue;
+    }
+    const right = pages[i + 1];
+    const sh = mk(right ? `Seiten ${i + 1} und ${i + 2}` : `Seite ${i + 1}`);
+    sh.append(pages[i], right ?? blank());
+  }
+}
+
+/**
  * Text des Blatts als Markdown für Autogra.fi (Aufgabenstellung als Grundlage für Erwartungshorizont und
  * KI-Bewertung): Material mit Titel und Quelle, Bilder als Bildunterschrift, Aufgaben nummeriert mit Punkten.
  * Linien, Umbrüche und Kopfzeile fallen weg.
  */
 export function toMarkdown(doc: BlattDoc): string {
   const out: string[] = [];
-  let task = 0;
+  const labels = taskLabels(doc);
   let mat = 0;
   const para = (md?: string) => plainMd(md ?? '', 'paren').trim();
-  for (const b of doc.blocks) {
+  for (const b of walk(doc.blocks)) {
     switch (b.type) {
       case 'heading':
         if (b.text?.trim()) out.push(`## ${b.text.trim()}`);
@@ -1011,8 +1228,7 @@ export function toMarkdown(doc: BlattDoc): string {
         out.push(`[Bild${b.caption?.trim() ? ': ' + b.caption.trim() : ''}]`);
         break;
       case 'task':
-        task++;
-        out.push(`${task}. ${para(b.md).replace(/\n+/g, ' ')}${b.points?.trim() ? ` (${b.points.trim()})` : ''}`);
+        out.push(`${labels.get(b.id) ?? ''} ${para(b.md).replace(/\n+/g, ' ')}${b.points?.trim() ? ` (${b.points.trim()})` : ''}`);
         break;
       case 'box':
         out.push([b.text?.trim() ? `**${b.text.trim()}**` : '', para(b.md)].filter(Boolean).join('\n'));
@@ -1031,10 +1247,11 @@ export function toMarkdown(doc: BlattDoc): string {
 
 /** Aufgaben mit Punktzahl (z. B. „12 P.“) als Teilaufgaben für Autogra.fi; Prozentangaben zählen nicht als Punkte. */
 export function toCriteria(doc: BlattDoc): { key: string; label: string; max_points: number }[] {
-  const tasks = doc.blocks.filter((b) => b.type === 'task');
+  const tasks = walk(doc.blocks).filter((b) => b.type === 'task');
+  const labels = taskLabels(doc);
   const out = tasks.map((b, i) => {
     const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:p\.?|pkt\.?|punkte?|be)?\s*$/i.exec(b.points ?? '');
-    return m ? { key: `a${i + 1}`, label: `Aufgabe ${i + 1}`, max_points: Number(m[1].replace(',', '.')) } : null;
+    return m ? { key: `a${i + 1}`, label: `Aufgabe ${(labels.get(b.id) ?? String(i + 1)).replace(/[.)]$/, '')}`, max_points: Number(m[1].replace(',', '.')) } : null;
   });
   return out.every(Boolean) ? (out as { key: string; label: string; max_points: number }[]) : [];
 }

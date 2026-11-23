@@ -10,27 +10,37 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
-import { RichText, type EditorApi } from '@/components/RichText';
 import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { fileUrl, type Material } from '@/components/Materials';
 import { ApiError, get, href, patch } from '@/lib/api';
 import {
   BLOCK_LABEL,
   blockSummary,
+  findBlock,
   fromEditMd,
   glossaryTerms,
+  insertAfter,
+  insertIntoCol,
+  listOf,
+  mapLists,
   newBlock,
   paginate,
   parseDoc,
+  plainMd,
+  removeBlock,
   setTerm,
   sheetSize,
   styleOf,
+  taskLabels,
   TEMPLATES,
   toCriteria,
   toEditMd,
   toMarkdown,
   toSheets,
+  toSpreads,
   uid,
+  updateBlock,
+  walk,
   type BlattDoc,
   type Block,
   type BlockType,
@@ -51,32 +61,32 @@ interface Page {
   body: string;
 }
 
-const ICON: Record<BlockType, string> = { heading: 'H', text: '¶', material: '❝', quote: '“', image: '▣', task: '✎', box: '▢', glossary: 'Aa', lines: '≡', pagebreak: '⤓' };
+const ICON: Record<BlockType, string> = { heading: 'H', text: '¶', material: '❝', quote: '“', image: '▣', task: '✎', box: '▢', glossary: 'Aa', cols: '▥', lines: '≡', pagebreak: '⤓' };
 const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'glossary', 'lines', 'pagebreak'];
 const MAX = 4_000_000;
 
-const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken.
+const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken. Du schreibst direkt auf der Seite: Klick in einen Text, eine Überschrift, eine Bildunterschrift oder eine Quelle, und tipp los. Esc beendet das Schreiben.
 
-Links legst du das Format fest und fügst Bausteine hinzu: Material (mit Zeilenzählung alle fünf Zeilen und Quelle als Fußnote), Bild, Aufgabe (wird von selbst nummeriert, mit Punkten und Antwortlinien), Erklärtext, Zitat, Kasten (z. B. Operatoren), Überschrift, Linien und Seitenumbruch. Die Reihenfolge änderst du mit den Pfeilen oder durch Ziehen.
+Das Menüband oben: „Start“ formatiert (fett, kursiv, unterstrichen, Textmarker, Listen, Ausrichtung, Einzug, Zeilenabstand, Schriftgröße, Rand für Notizen) und setzt Fußnote, Randbemerkung oder Glossar-Wort in den Text. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. Jeder Textbaustein hat Vorlagen; „Wie Vorlage“ nimmt eigene Änderungen wieder weg. „Einfügen“ fügt Bausteine nach dem gewählten ein, auch Teilaufgaben und Spalten. „Blatt“ stellt Format, Broschüre, Korrekturrand, Kopfzeile, QR-Code und die Nummern der Teilaufgaben ein. Der Reiter mit dem Namen des gewählten Bausteins (z. B. „Aufgabe“ oder „Bild“) hat dessen Einstellungen.
 
-In der Mitte siehst du die Seiten so, wie sie gedruckt werden. Ein Klick auf einen Baustein wählt ihn aus; rechts bearbeitest du ihn. Bilder ziehst du einfach auf die Seite. Rot umrandet ist, was nicht auf eine Seite passt.
+Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (unter „Blatt“). Eine eigene Nummer wie „1 b)“ trägst du im Reiter „Aufgabe“ ein.
 
-„Linien bis zum Seitenende“ füllt den Rest einer Seite mit Schreiblinien, Karos (Mathe) oder Freiraum. Den Korrekturrand stellst du links unter „Blatt“ ein: eine dünne, mittlere oder dicke Randlinie, oder die Zeilen enden einfach vor dem Rand. Er gilt für alle Schreiblinien und Karos, auch unter den Aufgaben.
+Spalten: unter „Einfügen“ zwei oder drei Spalten anlegen, in eine leere Spalte klicken und dann einen Baustein einfügen. Oder einen Baustein wählen und „neben den nächsten“: Er steht dann neben dem folgenden, z. B. ein Erklärtext neben einer Grafik.
 
-Text auszeichnen: Markiere Text, dann setzt die Leiste fett, kursiv, unterstrichen oder den Textmarker. „Fußnote“ setzt eine nummerierte Fußnote unten auf die Seite, „Randbemerkung“ schreibt etwas in den Rand neben die Zeile. Fußnoten und Randbemerkungen tippst du an, um sie zu ändern.
+Bilder: hineinziehen, einfügen, im Reiter „Bild“ auswählen, aus dem Material oder über ihre Adresse im Netz laden. Ein Bild lässt sich drehen und mit der Maus frei auf der Seite verschieben; Sein Platz im Text bleibt frei, außer du wählst „vor dem Text“; „An seinen Platz“ setzt es zurück.
 
-Glossar: Markiere ein Wort und wähle „Glossar“. Das Wort kommt ins Glossar am Ende des Blatts (es wird beim ersten Wort von selbst angelegt), die Erklärung schreibst du dort oder nach Antippen des Worts. Im Text ist das Wort mit einem Sternchen, einem Pfeil oder fett gekennzeichnet.
+Links wählst du die Ansicht: Seiten (zum Schreiben), Doppelseiten (zwei Seiten nebeneinander wie im aufgeschlagenen Heft, um den Mittelschnitt zu prüfen; auch hier schreibst du) und Druckbögen (so liegen die Seiten auf dem Papier). Darunter stehen alle Bausteine; ziehen ändert die Reihenfolge.
 
-Gestaltung: Jeder Textbaustein hat Vorlagen (z. B. Material mit Rand für Notizen, Kasten grau hinterlegt, Zitat groß in der Mitte). Unter „Gestaltung“ änderst du für den ganzen Baustein Schriftgröße, Zeilenabstand, Ausrichtung, Einzug, kursiv oder fett und die Breite des Rands für Notizen.
+Rechts lässt sich eine Seitenleiste zuschalten: Suchen (im Blatt, nach Bausteinen und im Material), Material (Bilder und Lernseiten einsetzen) und Glossar (Erklärungen schreiben).
 
-Bilder: hineinziehen, einfügen, aus dem Material wählen oder über ihre Adresse im Netz laden.
+Korrekturrand: dünne, mittlere oder dicke Randlinie, oder die Zeilen enden vor dem Rand; er gilt für alle Schreiblinien und Karos.
 
-Broschüre: Die Seiten werden auf ein Vielfaches von vier aufgefüllt (mit Linien, Karos oder leer) und so auf die Bögen verteilt, dass nach dem Falten alles in der richtigen Reihenfolge liegt; die erste Seite steht also neben der letzten. Aus A5-Seiten werden A4-Bögen (quer), aus A4-Seiten A3-Bögen. Beidseitig drucken und an der kurzen Kante wenden.
+Broschüre: Die Seiten werden auf ein Vielfaches von vier aufgefüllt und so auf die Bögen verteilt, dass die erste Seite neben der letzten steht. Beidseitig drucken und an der kurzen Kante wenden.
 
-QR-Code: Beim Drucken wählst du eine Aufgabe in Autogra.fi. Dann bekommt jede Person ein eigenes Exemplar mit ihrem QR-Code und Kurzcode, auf Wunsch mit Namen. Dafür musst du im selben Browser in Autogra.fi angemeldet sein.`;
+QR-Code: Beim Drucken wählst du eine Aufgabe in Autogra.fi; jede Person bekommt ein eigenes Exemplar mit ihrem Code. Dafür musst du im selben Browser in Autogra.fi angemeldet sein.`;
 
 /** Bild verkleinern (längste Seite 1600 px) und als data:-Adresse zurückgeben (wie bei Lernseiten). */
-async function shrink(file: Blob): Promise<string> {
+async function shrink(file: Blob): Promise<{ src: string; ar: number }> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -93,7 +103,7 @@ async function shrink(file: Blob): Promise<string> {
     g.fillStyle = '#fff';
     g.fillRect(0, 0, c.width, c.height);
     g.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.82);
+    return { src: c.toDataURL('image/jpeg', 0.82), ar: c.height / Math.max(1, c.width) };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -111,18 +121,26 @@ export default function BlattPage() {
   const [doc, setDoc] = useState<BlattDoc | null>(null);
   const [title, setTitle] = useState('');
   const [sel, setSel] = useState<string | null>(null);
+  /** leere Spalte, in die „Einfügen“ setzt */
+  const [selCol, setSelCol] = useState<{ id: string; k: number } | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<'ok' | 'dirty' | 'saving'>('ok');
-  const [view, setView] = useState<'pages' | 'sheets'>('pages');
+  const [view, setView] = useState<'pages' | 'spreads' | 'sheets'>('pages');
   const [problems, setProblems] = useState<Problem[]>([]);
   const [pageCount, setPageCount] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [printing, setPrinting] = useState(false);
-  const [showPage, setShowPage] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('start');
+  const [panel, setPanel] = useState<Panel | null>(null);
+  /** Feld, das gerade auf der Seite bearbeitet wird */
+  const [edit, setEdit] = useState<EditTarget | null>(null);
+  const [ov, setOv] = useState<Overlay | null>(null);
   const host = useRef<HTMLDivElement>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   const center = useRef<HTMLDivElement>(null);
+  const inline = useRef<InlineApi | null>(null);
   const history = useRef<{ undo: BlattDoc[]; redo: BlattDoc[]; last: number }>({ undo: [], redo: [], last: 0 });
 
   useEffect(() => {
@@ -173,7 +191,7 @@ export default function BlattPage() {
     setDoc(nx);
     setSaved('dirty');
   };
-  const setBlock = (bid: string, patchB: Partial<Block>) => change((d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === bid ? { ...b, ...patchB } : b)) }));
+  const setBlock = useCallback((bid: string, p: Partial<Block>) => change((d) => ({ ...d, blocks: updateBlock(d.blocks, bid, p) })), [change]);
   const setPageOpt = (p: Partial<BlattDoc['page']>) => change((d) => ({ ...d, page: { ...d.page, ...p } }));
   const setHeader = (p: Partial<BlattDoc['page']['header']>) => change((d) => ({ ...d, page: { ...d.page, header: { ...d.page.header, ...p } } }));
 
@@ -208,7 +226,7 @@ export default function BlattPage() {
   }, [saved]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      const inField = (e.target as HTMLElement)?.closest?.('input, textarea, [contenteditable="true"]');
+      const inField = (e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable="true"]');
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         void save();
@@ -216,6 +234,9 @@ export default function BlattPage() {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      } else if (!inField && sel && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        remove(sel);
       }
     };
     addEventListener('keydown', key);
@@ -226,27 +247,29 @@ export default function BlattPage() {
   useLayoutEffect(() => {
     const h = host.current;
     if (!h || !doc) return;
-    const r = paginate(doc, h);
+    const r = paginate(doc, h, undefined, { editing: canEdit });
     setProblems(r.problems);
     setPageCount(r.pages.length);
-    if (view === 'sheets') {
+    if (view !== 'pages') {
       const tmp = document.createElement('div');
-      toSheets(doc, r.pages, tmp);
+      if (view === 'sheets') toSheets(doc, r.pages, tmp);
+      else toSpreads(doc, r.pages, tmp);
       h.replaceChildren(...tmp.children);
     }
-  }, [doc, view, canEdit]);
-  useLayoutEffect(() => {
-    host.current?.querySelectorAll('.bl-sel').forEach((e) => e.classList.remove('bl-sel'));
-    if (sel) host.current?.querySelectorAll(`[data-bid="${sel}"]`).forEach((e) => e.classList.add('bl-sel'));
-  });
+    // Auswahl markieren und das bearbeitete Feld wiederfinden (es kann durch den Umbruch gewandert sein)
+    h.querySelectorAll(`[data-bid="${sel}"]`).forEach((e) => e.classList.add('bl-sel'));
+    if (selCol) h.querySelector(`[data-col="${selCol.id}:${selCol.k}"]`)?.classList.add('bl-col-sel');
+    setOv(edit ? overlayFor(h, wrap.current, edit, zoom) : null);
+  }, [doc, view, canEdit, sel, selCol, edit, zoom]);
   // auf die Breite der Mitte einpassen
   useEffect(() => {
     const c = center.current;
     if (!c || !doc) return;
     const fit = () => {
-      const sz = view === 'sheets' ? sheetSize(doc) : { w: doc.page.size === 'a5' ? 148 : 210 };
-      const px = sz.w * 3.7795 + 40;
-      setZoom(Math.min(1, Math.max(0.35, (c.clientWidth - 8) / px)));
+      const pw = doc.page.size === 'a5' ? 148 : 210;
+      const sz = view === 'sheets' ? sheetSize(doc).w : view === 'spreads' ? 2 * pw : pw;
+      const px = sz * 3.7795 + 40;
+      setZoom(Math.min(1, Math.max(0.3, (c.clientWidth - 8) / px)));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -255,67 +278,116 @@ export default function BlattPage() {
   }, [doc?.page.size, doc?.page.booklet, view, doc]);
 
   // ---------- Bausteine ----------
-  const selBlock = doc?.blocks.find((b) => b.id === sel) ?? null;
+  const selBlock = doc && sel ? findBlock(doc.blocks, sel) : null;
   function add(type: BlockType, extra: Partial<Block> = {}) {
     const b = { ...newBlock(type), ...extra };
-    change((d) => {
-      const i = sel ? d.blocks.findIndex((x) => x.id === sel) : -1;
-      const blocks = [...d.blocks];
-      blocks.splice(i < 0 ? blocks.length : i + 1, 0, b);
-      return { ...d, blocks };
-    });
+    change((d) => ({ ...d, blocks: selCol ? insertIntoCol(d.blocks, selCol.id, selCol.k, b) : insertAfter(d.blocks, sel, b) }));
+    setSelCol(null);
     setSel(b.id);
+    setEdit(null);
+    if (type === 'image' || type === 'cols' || type === 'lines' || type === 'glossary') setTab('block');
   }
   function move(bid: string, dir: -1 | 1) {
-    change((d) => {
-      const i = d.blocks.findIndex((b) => b.id === bid);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= d.blocks.length) return d;
-      const blocks = [...d.blocks];
-      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
-      return { ...d, blocks };
-    });
+    change((d) => ({
+      ...d,
+      blocks: mapLists(d.blocks, (l) => {
+        const i = l.findIndex((b) => b.id === bid);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= l.length) return l;
+        const out = [...l];
+        [out[i], out[j]] = [out[j], out[i]];
+        return out;
+      }),
+    }));
   }
   function moveTo(bid: string, beforeId: string | null) {
     if (bid === beforeId) return;
     change((d) => {
-      const b = d.blocks.find((x) => x.id === bid);
+      const b = findBlock(d.blocks, bid);
       if (!b) return d;
-      const rest = d.blocks.filter((x) => x.id !== bid);
-      const at = beforeId ? rest.findIndex((x) => x.id === beforeId) : rest.length;
-      rest.splice(at < 0 ? rest.length : at, 0, b);
-      return { ...d, blocks: rest };
+      const rest = removeBlock(d.blocks, bid);
+      if (!beforeId) return { ...d, blocks: [...rest, b] };
+      return {
+        ...d,
+        blocks: mapLists(rest, (l) => {
+          const i = l.findIndex((x) => x.id === beforeId);
+          return i < 0 ? l : [...l.slice(0, i), b, ...l.slice(i)];
+        }),
+      };
     });
   }
   function remove(bid: string) {
-    change((d) => ({ ...d, blocks: d.blocks.filter((b) => b.id !== bid) }));
+    change((d) => ({ ...d, blocks: removeBlock(d.blocks, bid) }));
     if (sel === bid) setSel(null);
+    setEdit(null);
   }
   function duplicate(bid: string) {
     const nid = uid();
     change((d) => {
-      const i = d.blocks.findIndex((b) => b.id === bid);
-      const blocks = [...d.blocks];
-      blocks.splice(i + 1, 0, { ...d.blocks[i], id: nid });
-      return { ...d, blocks };
+      const b = findBlock(d.blocks, bid);
+      return b ? { ...d, blocks: insertAfter(d.blocks, bid, JSON.parse(JSON.stringify({ ...b, id: nid }), (k, v) => (k === 'id' && v !== nid ? uid() : v))) } : d;
     });
     setSel(nid);
   }
+  /** gewählten Baustein und den folgenden nebeneinander setzen (z. B. Erklärtext neben eine Grafik) */
+  function toColumns(bid: string) {
+    change((d) => ({
+      ...d,
+      blocks: mapLists(d.blocks, (l) => {
+        const i = l.findIndex((b) => b.id === bid);
+        if (i < 0) return l;
+        const next = l[i + 1];
+        const c: Block = { ...newBlock('cols'), cols: next ? [[l[i]], [next]] : [[l[i]], []] };
+        return [...l.slice(0, i), c, ...l.slice(i + (next ? 2 : 1))];
+      }),
+    }));
+  }
+  function unColumns(cid: string) {
+    change((d) => ({ ...d, blocks: mapLists(d.blocks, (l) => l.flatMap((b) => (b.id === cid ? (b.cols ?? []).flat() : [b]))) }));
+    setSel(null);
+  }
   async function imageInto(file: Blob, bid: string | null) {
     try {
-      const src = await shrink(file);
-      if (bid && doc?.blocks.find((b) => b.id === bid)?.type === 'image') setBlock(bid, { src });
-      else add('image', { src });
+      const { src, ar } = await shrink(file);
+      if (bid && findBlock(doc?.blocks ?? [], bid)?.type === 'image') setBlock(bid, { src, ar });
+      else add('image', { src, ar });
     } catch {
       setError('Das Bild ließ sich nicht lesen.');
     }
+  }
+  function select(bid: string | null) {
+    setSel(bid);
+    setSelCol(null);
+    const b = bid && doc ? findBlock(doc.blocks, bid) : null;
+    if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary')) setTab('block');
   }
 
   // Klick, Ziehen und Einsetzen auf den Seiten
   function onPagesClick(e: React.MouseEvent) {
     if (!canEdit) return;
-    const t = (e.target as HTMLElement).closest<HTMLElement>('[data-bid]');
-    if (t?.dataset.bid) setSel(t.dataset.bid);
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-ov]')) return;
+    const col = t.closest<HTMLElement>('.bl-col-empty')?.parentElement;
+    if (col?.dataset.col) {
+      const [cid, k] = col.dataset.col.split(':');
+      setSel(cid);
+      setSelCol({ id: cid, k: Number(k) });
+      setEdit(null);
+      setTab('insert');
+      return;
+    }
+    const blockEl = t.closest<HTMLElement>('[data-bid]');
+    if (!blockEl?.dataset.bid) {
+      setEdit(null);
+      return;
+    }
+    select(blockEl.dataset.bid);
+    // geschrieben wird in den Seiten und in den Doppelseiten; die Druckbögen sind nur zum Ansehen
+    const f = view !== 'sheets' ? t.closest<HTMLElement>('[data-field]') : null;
+    if (f && f.closest('[data-bid]') === blockEl) {
+      const all = [...(host.current?.querySelectorAll<HTMLElement>(`[data-bid="${blockEl.dataset.bid}"] [data-field="${f.dataset.field}"]`) ?? [])].filter((x) => x.closest('[data-bid]') === x.closest(`[data-bid="${blockEl.dataset.bid}"]`));
+      setEdit({ bid: blockEl.dataset.bid, field: f.dataset.field as EditTarget['field'], idx: Math.max(0, all.indexOf(f)), at: { x: e.clientX, y: e.clientY } });
+    } else setEdit(null);
   }
   function onPagesDrop(e: React.DragEvent) {
     if (!canEdit) return;
@@ -324,6 +396,43 @@ export default function BlattPage() {
     e.preventDefault();
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-bid]');
     void imageInto(f, t?.dataset.bid ?? null);
+  }
+  // Bilder auf der Seite verschieben: ziehen; ein Bild im Text wird dabei frei
+  function onPointerDown(e: React.PointerEvent) {
+    if (!canEdit || view === 'sheets' || e.button !== 0) return;
+    const fig = (e.target as HTMLElement).closest<HTMLElement>('.bl-fig');
+    const box = fig?.closest<HTMLElement>('.bl-image');
+    const bid = box?.dataset.bid;
+    if (!fig || !bid || (e.target as HTMLElement).closest('[data-field]')) return;
+    const b = doc ? findBlock(doc.blocks, bid) : null;
+    if (!b?.src) return;
+    e.preventDefault();
+    select(bid);
+    setEdit(null);
+    const pxmm = 3.7795 * zoom;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const left0 = Number(b.dx) || 0;
+    const top0 = Number(b.dy) || 0;
+    let moved = false;
+    const mv = (ev: PointerEvent) => {
+      const dx = (ev.clientX - sx) / pxmm;
+      const dy = (ev.clientY - sy) / pxmm;
+      if (!moved && Math.hypot(dx, dy) < 1.5) return;
+      moved = true;
+      fig.style.transform = `translate(${dx}mm, ${dy}mm)`;
+      fig.style.opacity = '0.85';
+    };
+    const up = (ev: PointerEvent) => {
+      removeEventListener('pointermove', mv);
+      removeEventListener('pointerup', up);
+      if (!moved) return;
+      const dx = Math.round((left0 + (ev.clientX - sx) / pxmm) * 2) / 2;
+      const dy = Math.round((top0 + (ev.clientY - sy) / pxmm) * 2) / 2;
+      setBlock(bid, { free: true, dx, dy });
+    };
+    addEventListener('pointermove', mv);
+    addEventListener('pointerup', up);
   }
   useEffect(() => {
     if (!canEdit) return;
@@ -342,6 +451,8 @@ export default function BlattPage() {
   if (!me || !project) return <Topbar me={me ?? null} />;
   const bad = new Set(problems.map((p) => p.bid));
   const editing = canEdit;
+  const editValue = edit && doc ? fieldValue(findBlock(doc.blocks, edit.bid), edit.field) : '';
+  const outline = doc ? flatOutline(doc.blocks) : [];
   return (
     <ProjectShell
       me={me}
@@ -376,108 +487,62 @@ export default function BlattPage() {
     >
       {error && <div className="error">{error}</div>}
       {doc && (
-        <div className={`${st.wrap} ${editing ? '' : st.read}`}>
+        <div className={st.shell}>
           {editing && (
+            <Ribbon
+              tab={tab}
+              setTab={setTab}
+              doc={doc}
+              b={selBlock}
+              selCol={selCol}
+              inline={inline}
+              editingText={!!edit}
+              panel={panel}
+              setPanel={setPanel}
+              set={(p) => selBlock && setBlock(selBlock.id, p)}
+              setPageOpt={setPageOpt}
+              setHeader={setHeader}
+              add={add}
+              move={move}
+              remove={remove}
+              duplicate={duplicate}
+              toColumns={toColumns}
+              unColumns={unColumns}
+              onImage={(f) => void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null)}
+              ensureGlossary={() => change((d) => (walk(d.blocks).some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))}
+              onError={setError}
+            />
+          )}
+          <div className={`${st.wrap} ${editing ? '' : st.read} ${panel ? '' : st.noPanel}`}>
             <aside className={st.side}>
-              <input className={st.titleIn} value={title} onChange={(e) => (setTitle(e.target.value), setSaved('dirty'))} placeholder="Name des Blatts" aria-label="Name des Blatts" />
-              <section className={st.sec}>
-                <button className={st.secHead} onClick={() => setShowPage((v) => !v)} aria-expanded={showPage}>
-                  {showPage ? '▾' : '▸'} Blatt
+              <div className="seg" role="group" aria-label="Ansicht">
+                <button className={`btn ${view === 'pages' ? 'on' : ''}`} onClick={() => setView('pages')} title="Seiten untereinander; hier schreibst du">
+                  Seiten
                 </button>
-                {showPage && (
-                  <>
-                    <div className={st.grid2}>
-                      <div className="field">
-                        <label>Seitengröße</label>
-                        <select value={doc.page.size} onChange={(e) => setPageOpt({ size: e.target.value as 'a4' | 'a5' })}>
-                          <option value="a4">A4</option>
-                          <option value="a5">A5</option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Schrift</label>
-                        <select value={`${doc.page.font}-${doc.page.fontSize}`} onChange={(e) => {
-                          const [font, size] = e.target.value.split('-');
-                          setPageOpt({ font: font as 'sans' | 'serif', fontSize: Number(size) });
-                        }}>
-                          {(['sans', 'serif'] as const).flatMap((f) =>
-                            [10, 11, 12].map((s) => (
-                              <option key={f + s} value={`${f}-${s}`}>
-                                {f === 'sans' ? 'Ohne Serifen' : 'Mit Serifen'} {s} pt
-                              </option>
-                            )),
-                          )}
-                        </select>
-                      </div>
-                    </div>
-                    <label className={st.check}>
-                      <input type="checkbox" checked={doc.page.booklet} onChange={(e) => setPageOpt({ booklet: e.target.checked })} /> Als Broschüre drucken ({doc.page.size === 'a5' ? 'auf A4 quer' : 'auf A3 quer'})
-                    </label>
-                    {doc.page.booklet && (
-                      <div className="field">
-                        <label>Leere Seiten am Ende füllen mit</label>
-                        <select value={doc.page.fill} onChange={(e) => setPageOpt({ fill: e.target.value as Ruling })}>
-                          <option value="lines">Schreiblinien</option>
-                          <option value="grid">Karos (Mathe)</option>
-                          <option value="empty">nichts</option>
-                        </select>
-                      </div>
-                    )}
-                    <KorrFields korr={doc.page.korr} set={(k) => setPageOpt({ korr: { ...doc.page.korr, ...k } })} />
-                    <label className={st.check}>
-                      <input type="checkbox" checked={doc.page.header.show} onChange={(e) => setHeader({ show: e.target.checked })} /> Kopfzeile auf der ersten Seite
-                    </label>
-                    {doc.page.header.show && (
-                      <>
-                        <div className="field">
-                          <label>Text der Kopfzeile</label>
-                          <input value={doc.page.header.text} onChange={(e) => setHeader({ text: e.target.value })} placeholder="z. B. Klausur S 4" />
-                        </div>
-                        <div className={st.grid2}>
-                          <label className={st.check}>
-                            <input type="checkbox" checked={doc.page.header.nameLine} onChange={(e) => setHeader({ nameLine: e.target.checked })} /> Name
-                          </label>
-                          <label className={st.check}>
-                            <input type="checkbox" checked={doc.page.header.date} onChange={(e) => setHeader({ date: e.target.checked })} /> Datum
-                          </label>
-                        </div>
-                      </>
-                    )}
-                    <div className="field">
-                      <label>QR-Code für Autogra.fi</label>
-                      <select value={doc.page.header.qr} onChange={(e) => setHeader({ qr: e.target.value as 'first' | 'all' | 'none', show: e.target.value !== 'none' || doc.page.header.show })}>
-                        <option value="none">keiner</option>
-                        <option value="first">auf der ersten Seite</option>
-                        <option value="all">auf jeder Seite</option>
-                      </select>
-                    </div>
-                    <label className={st.check}>
-                      <input type="checkbox" checked={doc.page.pageNumbers} onChange={(e) => setPageOpt({ pageNumbers: e.target.checked })} /> Seitenzahlen
-                    </label>
-                  </>
-                )}
-              </section>
-              <section className={st.sec}>
-                <div className={st.secHead}>Baustein hinzufügen</div>
-                <div className={st.add}>
-                  {ADD.map((t) => (
-                    <button key={t} className="btn" onClick={() => add(t)} title={`${BLOCK_LABEL[t]} ${sel ? 'nach dem gewählten Baustein' : 'am Ende'} einfügen`}>
-                      <span>{ICON[t]}</span>
-                      {BLOCK_LABEL[t]}
-                    </button>
-                  ))}
-                </div>
-              </section>
+                <button className={`btn ${view === 'spreads' ? 'on' : ''}`} onClick={() => (setView('spreads'), setEdit(null))} title="Zwei Seiten nebeneinander wie im aufgeschlagenen Heft; auch hier schreiben und Bilder verschieben">
+                  Doppelseiten
+                </button>
+                <button className={`btn ${view === 'sheets' ? 'on' : ''}`} onClick={() => (setView('sheets'), setEdit(null))} title="So liegen die Seiten auf dem Papier">
+                  Druckbögen
+                </button>
+              </div>
+              <div className={st.hint}>
+                {pageCount} {pageCount === 1 ? 'Seite' : 'Seiten'} {doc.page.size.toUpperCase()}
+                {doc.page.booklet ? `, ${pageCount / 4} ${pageCount / 4 === 1 ? 'Bogen' : 'Bögen'} ${sheetSize(doc).name}` : ''}
+              </div>
+              {problems.length > 0 && <div className={st.warn}>{problems.length === 1 ? 'Ein Baustein passt' : `${problems.length} Bausteine passen`} nicht auf eine Seite</div>}
+              {editing && <input className={st.titleIn} value={title} onChange={(e) => (setTitle(e.target.value), setSaved('dirty'))} placeholder="Name des Blatts" aria-label="Name des Blatts" />}
               <section className={st.sec}>
                 <div className={st.secHead}>Bausteine</div>
-                {!doc.blocks.length && <div className={st.empty}>Noch leer. Füg oben Material, Bilder und Aufgaben hinzu.</div>}
+                {!doc.blocks.length && <div className={st.empty}>Noch leer. Im Menüband unter „Einfügen“ kommen Material, Bilder und Aufgaben dazu.</div>}
                 <div className={st.list} onDragOver={(e) => dragId && e.preventDefault()} onDrop={() => dragId && (moveTo(dragId, dropAt), setDragId(null), setDropAt(null))}>
-                  {doc.blocks.map((b, i) => (
+                  {outline.map(({ b, depth }) => (
                     <div
                       key={b.id}
                       className={`${st.item} ${sel === b.id ? st.sel : ''} ${bad.has(b.id) ? st.bad : ''} ${dragId === b.id ? st.drag : ''} ${dropAt === b.id && dragId !== b.id ? st.dropAbove : ''}`}
-                      onClick={() => setSel(b.id)}
-                      draggable
+                      style={{ marginLeft: depth * 14 }}
+                      onClick={() => (select(b.id), setEdit(null), host.current?.querySelector(`[data-bid="${b.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
+                      draggable={editing}
                       onDragStart={(e) => (setDragId(b.id), e.dataTransfer.setData('text/plain', b.id))}
                       onDragOver={() => dragId && setDropAt(b.id)}
                       onDragEnd={() => (setDragId(null), setDropAt(null))}
@@ -488,69 +553,57 @@ export default function BlattPage() {
                         {BLOCK_LABEL[b.type]}
                         <small>{blockSummary(b)}</small>
                       </span>
-                      <span className={st.itemBtns}>
-                        <button className="btn" onClick={(e) => (e.stopPropagation(), move(b.id, -1))} disabled={i === 0} title="nach oben">
-                          ↑
-                        </button>
-                        <button className="btn" onClick={(e) => (e.stopPropagation(), move(b.id, 1))} disabled={i === doc.blocks.length - 1} title="nach unten">
-                          ↓
-                        </button>
-                        <button className="btn" onClick={(e) => (e.stopPropagation(), duplicate(b.id))} title="verdoppeln">
-                          ⧉
-                        </button>
-                        <button className="btn danger" onClick={(e) => (e.stopPropagation(), remove(b.id))} title="entfernen">
-                          ✕
-                        </button>
-                      </span>
                     </div>
                   ))}
-                  {dragId && <div className={`${st.empty} ${dropAt === null ? '' : ''}`} onDragOver={() => setDropAt(null)}>ans Ende</div>}
+                  {dragId && (
+                    <div className={st.empty} onDragOver={() => setDropAt(null)}>
+                      ans Ende
+                    </div>
+                  )}
                 </div>
               </section>
             </aside>
-          )}
 
-          <div className={st.center} ref={center}>
-            <div className={st.viewBar}>
-              <div className="seg" role="group" aria-label="Ansicht">
-                <button className={`btn ${view === 'pages' ? 'on' : ''}`} onClick={() => setView('pages')}>
-                  Seiten
-                </button>
-                <button className={`btn ${view === 'sheets' ? 'on' : ''}`} onClick={() => setView('sheets')} title="So liegen die Seiten auf dem Papier">
-                  Druckbögen
-                </button>
+            <div className={st.center} ref={center}>
+              <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragOver={(e) => canEdit && e.preventDefault()} onDrop={onPagesDrop}>
+                <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
+                  <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''}`} />
+                  {edit && ov && (
+                    <InlineEditor
+                      key={`${edit.bid}:${edit.field}`}
+                      ov={ov}
+                      field={edit.field}
+                      at={edit.at}
+                      value={editValue}
+                      api={inline}
+                      doc={doc}
+                      onChange={(v) => setBlock(edit.bid, { [edit.field]: v })}
+                      onClose={() => setEdit(null)}
+                      ensureGlossary={() => change((d) => (walk(d.blocks).some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))}
+                    />
+                  )}
+                </div>
               </div>
-              <span>
-                {pageCount} {pageCount === 1 ? 'Seite' : 'Seiten'} {doc.page.size.toUpperCase()}
-                {doc.page.booklet ? `, ${pageCount / 4} ${pageCount / 4 === 1 ? 'Bogen' : 'Bögen'} ${sheetSize(doc).name}` : ''}
-              </span>
-              {problems.length > 0 && <span className={st.warn}>{problems.length === 1 ? 'Ein Baustein passt' : `${problems.length} Bausteine passen`} nicht auf eine Seite</span>}
             </div>
-            <div className={st.pagesOuter} onClick={onPagesClick} onDragOver={(e) => canEdit && e.preventDefault()} onDrop={onPagesDrop}>
-              <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view === 'sheets' ? st.sheets : ''}`} style={{ zoom } as React.CSSProperties} />
-            </div>
-          </div>
 
-          {editing && (
-            <aside className={`${st.side} ${st.right}`}>
-              {selBlock ? (
-                <Inspector
-                  key={selBlock.id}
-                  b={selBlock}
+            {panel && (
+              <aside className={`${st.side} ${st.right}`}>
+                <SidePanel
+                  panel={panel}
+                  setPanel={setPanel}
                   doc={doc}
-                  set={(p) => setBlock(selBlock.id, p)}
                   projectId={id}
-                  onImage={(f) => void imageInto(f, selBlock.id)}
+                  onPick={(bid) => (select(bid), setEdit(null), host.current?.querySelector(`[data-bid="${bid}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
+                  add={add}
+                  onImage={(f, caption) => {
+                    void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null);
+                    if (caption && selBlock?.type === 'image' && !selBlock.caption) setBlock(selBlock.id, { caption });
+                  }}
                   onTerm={(w, e) => change((d) => setTerm(d, w, e))}
-                  ensureGlossary={() =>
-                    change((d) => (d.blocks.some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))
-                  }
                 />
-              ) : (
-                <p className={st.hint}>Klick auf einen Baustein in der Liste oder auf der Seite, um ihn hier zu bearbeiten. Bilder kannst du direkt auf die Seite ziehen oder einfügen (Strg+V).</p>
-              )}
-            </aside>
-          )}
+              </aside>
+            )}
+          </div>
         </div>
       )}
       {printing && doc && <PrintDialog doc={doc} title={title} onClose={() => setPrinting(false)} />}
@@ -558,90 +611,161 @@ export default function BlattPage() {
   );
 }
 
-// ---------- Korrekturrand (links unter „Blatt“) ----------
-function KorrFields({ korr, set }: { korr: Korr; set: (k: Partial<Korr>) => void }) {
-  return (
-    <>
-      <div className={st.grid2}>
-        <div className="field">
-          <label>Korrekturrand</label>
-          <select value={korr.side} onChange={(e) => set({ side: e.target.value as Korr['side'] })}>
-            <option value="none">keiner</option>
-            <option value="right">rechts</option>
-            <option value="left">links</option>
-          </select>
-        </div>
-        {korr.side !== 'none' && (
-          <div className="field">
-            <label>Breite</label>
-            <select value={korr.width} onChange={(e) => set({ width: Number(e.target.value) })}>
-              {[20, 25, 30, 40, 50].map((v) => (
-                <option key={v} value={v}>
-                  {v / 10} cm
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-      {korr.side !== 'none' && (
-        <div className="field">
-          <label>Am Rand</label>
-          <div className="seg" role="group" aria-label="Randlinie">
-            {(
-              [
-                ['thin', 'dünne Linie'],
-                ['medium', 'mittel'],
-                ['thick', 'dick'],
-                ['end', 'Zeilen enden'],
-              ] as const
-            ).map(([v, l]) => (
-              <button key={v} type="button" className={`btn ${korr.style === v ? 'on' : ''}`} onClick={() => set({ style: v })} title={v === 'end' ? 'Keine Randlinie: die Zeilen hören vor dem Rand auf' : `Randlinie ${l}`}>
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  );
+// ---------- Bearbeiten direkt auf der Seite ----------
+type Tab = 'start' | 'insert' | 'sheet' | 'block';
+type Panel = 'search' | 'material' | 'glossary';
+type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption';
+interface EditTarget {
+  bid: string;
+  field: FieldName;
+  /** welches Stück, wenn der Baustein über mehrere Seiten läuft */
+  idx: number;
+  at?: { x: number; y: number };
 }
-
-// ---------- rechte Spalte: gewählter Baustein ----------
-interface Atom {
+/** Lage und Aussehen des Felds auf der Seite, damit der Editor genau darüber liegt */
+interface Overlay {
+  left: number;
+  top: number;
+  width: number;
+  minHeight: number;
+  tag: string;
+  pageStyle: string;
+  blockClass: string;
+  blockStyle: string;
+  fieldClass: string;
+  fieldStyle: string;
+}
+interface InlineApi {
   el: HTMLElement;
-  api: EditorApi;
-  text: string;
-  extra: string;
+  emit: () => void;
+  restore: () => void;
+  rich: boolean;
 }
 
-function Inspector({
-  b,
+function overlayFor(host: HTMLElement, wrapEl: HTMLElement | null, t: EditTarget, zoom: number): Overlay | null {
+  if (!wrapEl) return null;
+  const all = [...host.querySelectorAll<HTMLElement>(`[data-bid="${t.bid}"] [data-field="${t.field}"]`)].filter((x) => x.closest('[data-bid]')?.getAttribute('data-bid') === t.bid);
+  const f = all[Math.min(t.idx, all.length - 1)];
+  if (!f) return null;
+  const block = f.closest<HTMLElement>('.bl-block')!;
+  const pg = f.closest<HTMLElement>('.bl-page');
+  const w = wrapEl.getBoundingClientRect();
+  const inlineEl = getComputedStyle(f).display === 'inline';
+  const r = inlineEl ? (f.getClientRects()[0] ?? f.getBoundingClientRect()) : f.getBoundingClientRect();
+  const parent = (inlineEl ? f.parentElement : f)!.getBoundingClientRect();
+  const left = (r.left - w.left) / zoom;
+  const top = (r.top - w.top) / zoom;
+  const width = inlineEl ? (parent.right - r.left) / zoom : f.offsetWidth;
+  return {
+    left,
+    top,
+    width: Math.max(40, width),
+    minHeight: inlineEl ? r.height / zoom : f.offsetHeight,
+    tag: inlineEl ? 'div' : f.tagName.toLowerCase() === 'figcaption' ? 'div' : f.tagName.toLowerCase(),
+    pageStyle: `font-family:${pg?.style.fontFamily ?? ''};font-size:${pg?.style.fontSize ?? ''};line-height:1.35;color:#111`,
+    blockClass: block.className.replace(/\bbl-sel\b|\bbl-overflow\b/g, ''),
+    blockStyle: block.style.cssText,
+    fieldClass: f.className,
+    fieldStyle: f.style.cssText,
+  };
+}
+
+function fieldValue(b: Block | null, f: FieldName): string {
+  if (!b) return '';
+  return String((b as unknown as Record<string, unknown>)[f] ?? '');
+}
+const RICH: FieldName[] = ['md', 'title', 'text'];
+const MULTI: FieldName[] = ['md'];
+
+function InlineEditor({
+  ov,
+  field,
+  at,
+  value,
+  api,
   doc,
-  set,
-  projectId,
-  onImage,
-  onTerm,
+  onChange,
+  onClose,
   ensureGlossary,
 }: {
-  b: Block;
+  ov: Overlay;
+  field: FieldName;
+  at?: { x: number; y: number };
+  value: string;
+  api: React.MutableRefObject<InlineApi | null>;
   doc: BlattDoc;
-  set: (p: Partial<Block>) => void;
-  projectId: number;
-  onImage: (f: Blob) => void;
-  onTerm: (word: string, explain: string | null) => void;
+  onChange: (v: string) => void;
+  onClose: () => void;
   ensureGlossary: () => void;
 }) {
-  const [atom, setAtom] = useState<Atom | null>(null);
-  function openAtom(el: HTMLElement, api: EditorApi) {
-    if (el.classList.contains('ed-note')) setAtom({ el, api, text: el.dataset.text ?? '', extra: '' });
-    else if (el.classList.contains('ed-gloss')) setAtom({ el, api, text: el.textContent ?? '', extra: el.dataset.explain ?? '' });
+  const box = useRef<HTMLElement | null>(null);
+  const emitted = useRef<string | null>(null);
+  const saved = useRef<Range | null>(null);
+  const [atom, setAtom] = useState<{ el: HTMLElement; text: string; extra: string } | null>(null);
+  const rich = RICH.includes(field);
+  const multi = MULTI.includes(field);
+
+  function emit() {
+    const el = box.current;
+    if (!el) return;
+    let v = rich ? fromEditMd(editToTufte(el)) : (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!multi) v = v.replace(/\n+/g, ' ');
+    emitted.current = v;
+    onChange(v);
   }
-  function saveAtom(remove = false) {
+  function restore() {
+    const el = box.current;
+    if (!el) return;
+    if (document.activeElement !== el) el.focus();
+    const s = getSelection();
+    if (saved.current && el.contains(saved.current.startContainer)) {
+      s?.removeAllRanges();
+      s?.addRange(saved.current);
+    }
+  }
+  // Inhalt nur setzen, wenn er von außen kommt (Rückgängig, Glossar …), sonst springt die Schreibmarke
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || value === emitted.current) return;
+    const first = emitted.current === null;
+    if (rich) el.innerHTML = tufteToEdit(toEditMd(value));
+    else el.textContent = value;
+    emitted.current = value;
+    if (first) {
+      el.focus();
+      // Schreibmarke dorthin, wo geklickt wurde
+      const pos = at && (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(at.x, at.y);
+      const s = getSelection();
+      if (pos && el.contains(pos.startContainer)) {
+        s?.removeAllRanges();
+        s?.addRange(pos);
+      } else {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        r.collapse(false);
+        s?.removeAllRanges();
+        s?.addRange(r);
+      }
+    }
+  }, [value, rich, at]);
+  useEffect(() => {
+    api.current = box.current ? { el: box.current, emit, restore, rich } : null;
+    return () => {
+      api.current = null;
+    };
+  });
+  useEffect(() => {
+    const onSel = () => {
+      const s = getSelection();
+      if (box.current && s?.rangeCount && box.current.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange();
+    };
+    document.addEventListener('selectionchange', onSel);
+    return () => document.removeEventListener('selectionchange', onSel);
+  }, []);
+  function saveAtom(removeIt = false) {
     if (!atom) return;
-    const { el, api, text, extra } = atom;
-    if (remove) {
-      // Glossar-Wort: nur die Kennzeichnung entfernen, das Wort bleibt im Text
+    const { el, text, extra } = atom;
+    if (removeIt) {
       if (el.classList.contains('ed-gloss')) el.replaceWith(document.createTextNode(el.textContent ?? ''));
       else el.remove();
     } else {
@@ -649,78 +773,50 @@ function Inspector({
       tpl.innerHTML = el.classList.contains('ed-gloss') ? glossHtml(text.trim(), extra.trim()) : noteHtml(el.dataset.kind === 'margin' ? 'margin' : 'note', text.trim());
       if (tpl.content.firstChild) el.replaceWith(tpl.content.firstChild);
     }
-    api.emit();
+    emit();
     setAtom(null);
   }
-  const tools = (api: EditorApi) => (
-    <>
-      <button type="button" className="btn" onClick={() => (document.execCommand('underline'), api.emit())} title="Unterstrichen (Strg+U)">
-        <u>U</u>
-      </button>
-      <button
-        type="button"
-        className="btn"
-        title="Textmarker"
-        onClick={() => {
-          const t = api.selectedText();
-          if (!t) return;
-          const sel = getSelection();
-          const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
-          const m = r?.startContainer.parentElement?.closest('mark');
-          if (m) m.replaceWith(...m.childNodes);
-          else if (r) {
-            const mk = document.createElement('mark');
-            mk.appendChild(r.extractContents());
-            r.insertNode(mk);
-          }
-          api.emit();
-        }}
-      >
-        <mark style={{ background: '#fff176', padding: '0 2px' }}>M</mark>
-      </button>
-      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('note', 'Fußnote'))} title="Nummerierte Fußnote unten auf der Seite; antippen zum Ändern">
-        Fußnote
-      </button>
-      <button type="button" className="btn" onClick={() => api.insertHtml(noteHtml('margin', 'Bemerkung'))} title="Bemerkung im Rand neben der Zeile; antippen zum Ändern">
-        Randbemerkung
-      </button>
-      <button
-        type="button"
-        className="btn"
-        title="Markiertes Wort ins Glossar"
-        onClick={() => {
-          const w = api.selectedText().trim();
-          if (!w) return;
-          const known = glossaryTerms(doc).find((t) => t.word.toLowerCase() === w.toLowerCase());
-          const sel = getSelection();
-          if (sel?.rangeCount) sel.getRangeAt(0).deleteContents();
-          api.insertHtml(glossHtml(w, known?.explain ?? ''));
-          ensureGlossary();
-        }}
-      >
-        Glossar
-      </button>
-    </>
-  );
-  const rich = (label: string, value: string | undefined, placeholder: string, key: 'md' | 'title' = 'md', minimal = false) => (
-    <div className="field">
-      <label>{label}</label>
-      <div className={`${st.richBox} ${minimal ? st.richSmall : ''}`}>
-        <RichText
-          value={toEditMd(value ?? '')}
-          onChange={(md) => set({ [key]: fromEditMd(md) })}
-          max={200_000}
-          label={label}
-          render={tufteToEdit}
-          serialize={editToTufte}
-          tools={minimal ? ['bold', 'italic'] : ['bold', 'italic', 'ul', 'ol']}
-          extraTools={tools}
-          onAtom={openAtom}
-          placeholder={placeholder}
-          tip={false}
-          pinKey="collegare-editor-leiste-blatt"
-          defaultPinned
-        />
+  void doc;
+  void ensureGlossary;
+  const Tag = ov.tag as 'div';
+  return (
+    <div className={`${st.host} ${st.ov}`} data-ov style={{ left: ov.left, top: ov.top, width: ov.width }} onClick={(e) => e.stopPropagation()}>
+      <div style={cssObj(ov.pageStyle)}>
+        <div className={ov.blockClass} style={{ ...cssObj(ov.blockStyle), padding: 0, margin: 0, border: 0, background: 'none', boxShadow: 'none', outline: 0, minHeight: 0, height: 'auto' }}>
+          <Tag
+            ref={(e: HTMLElement | null) => {
+              box.current = e;
+            }}
+            className={`${ov.fieldClass} ${st.ovField}`}
+            style={{ ...cssObj(ov.fieldStyle), margin: 0, minHeight: ov.minHeight, width: '100%' }}
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-multiline={multi}
+            aria-label="Text auf der Seite"
+            onInput={emit}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose();
+              if (e.key === 'Enter' && !multi) e.preventDefault();
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u' && rich) {
+                e.preventDefault();
+                document.execCommand('underline');
+                emit();
+              }
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const t = e.clipboardData.getData('text/plain');
+              if (t) document.execCommand('insertText', false, multi ? t : t.replace(/\s*\n\s*/g, ' '));
+              emit();
+            }}
+            onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'p')}
+            onClick={(e) => {
+              const a = (e.target as HTMLElement).closest('.ed-note, .ed-gloss') as HTMLElement | null;
+              if (a) setAtom(a.classList.contains('ed-gloss') ? { el: a, text: a.textContent ?? '', extra: a.dataset.explain ?? '' } : { el: a, text: a.dataset.text ?? '', extra: '' });
+            }}
+          />
+        </div>
       </div>
       {atom && atom.el.isConnected && (
         <form
@@ -756,314 +852,415 @@ function Inspector({
       )}
     </div>
   );
-  const ruling = (value: Ruling | undefined, onChange: (r: Ruling) => void, withEmpty = true) => (
-    <select value={value ?? 'lines'} onChange={(e) => onChange(e.target.value as Ruling)}>
-      <option value="lines">Schreiblinien</option>
-      <option value="grid">Karos (Mathe)</option>
-      {withEmpty && <option value="empty">Freiraum</option>}
-    </select>
-  );
-  return (
-    <section className={st.sec}>
-      <div className={st.secHead}>
-        {ICON[b.type]} {BLOCK_LABEL[b.type]}
-      </div>
-      {TEMPLATES[b.type] && (
-        <div className="field">
-          <label>Vorlage</label>
-          <select
-            value={b.tpl ?? TEMPLATES[b.type]![0].id}
-            onChange={(e) => set({ tpl: e.target.value, fs: undefined, lh: undefined, ta: undefined, it: undefined, bd: undefined, nm: undefined, ind: undefined, ...(b.type === 'material' ? { justify: undefined } : {}) })}
-          >
-            {TEMPLATES[b.type]!.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {b.type === 'heading' && (
-        <>
-          <div className="field">
-            <label>Text</label>
-            <input value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} autoFocus />
-          </div>
-          <div className="field">
-            <label>Art</label>
-            <select value={b.level ?? 2} onChange={(e) => set({ level: Number(e.target.value) as 1 | 2 })}>
-              <option value={1}>groß</option>
-              <option value={2}>unterstrichen (z. B. „Arbeitsaufträge:“)</option>
-            </select>
-          </div>
-        </>
-      )}
-      {b.type === 'material' && (
-        <>
-          <div className={st.grid2}>
-            <div className="field">
-              <label>Bezeichnung</label>
-              <input value={b.label ?? ''} onChange={(e) => set({ label: e.target.value })} placeholder="automatisch: Material 1" />
-            </div>
-            <div className="field">
-              <label>&nbsp;</label>
-              <label className={st.check}>
-                <input type="checkbox" checked={b.lineNumbers !== false} onChange={(e) => set({ lineNumbers: e.target.checked })} /> Zeilen zählen
-              </label>
-            </div>
-          </div>
-          {rich('Titel', b.title, 'z. B. Der Wasserkreislauf der Erde', 'title', true)}
-          {rich('Text', b.md, 'Text des Materials. Jede Zeile ist ein Absatz.')}
-          <div className="field">
-            <label>Quelle (steht als Fußnote unten auf der Seite)</label>
-            <input value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="zitiert nach …" />
-          </div>
-        </>
-      )}
-      {b.type === 'text' && rich('Text', b.md, 'Erklärtext, Hinweise, Einleitung …')}
-      {b.type === 'quote' && (
-        <>
-          {rich('Zitat', b.md, 'Zitierter Text')}
-          <div className="field">
-            <label>Quelle</label>
-            <input value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="z. B. Marie Curie, 1921" />
-          </div>
-        </>
-      )}
-      {b.type === 'image' && <ImageFields b={b} set={set} projectId={projectId} onImage={onImage} />}
-      {b.type === 'task' && (
-        <>
-          {rich('Aufgabenstellung', b.md, 'z. B. Beschreiben Sie die Grafik …')}
-          <div className={st.grid2}>
-            <div className="field">
-              <label>Punkte oder Anteil</label>
-              <input value={b.points ?? ''} onChange={(e) => set({ points: e.target.value })} placeholder="z. B. 50% oder 12 P." />
-            </div>
-            <div className="field">
-              <label>Antwortzeilen darunter</label>
-              <input type="number" min={0} max={40} value={b.lines ?? 0} onChange={(e) => set({ lines: Math.max(0, Math.min(40, Number(e.target.value) || 0)) })} />
-            </div>
-          </div>
-          {(b.lines ?? 0) > 0 && (
-            <div className="field">
-              <label>Art der Zeilen</label>
-              {ruling(b.lineStyle, (r) => set({ lineStyle: r }), false)}
-            </div>
-          )}
-        </>
-      )}
-      {b.type === 'box' && (
-        <>
-          <div className="field">
-            <label>Titel (optional)</label>
-            <input value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="z. B. Operatoren" />
-          </div>
-          {rich('Inhalt', b.md, '**beschreiben** Sachverhalte mit eigenen Worten wiedergeben …')}
-        </>
-      )}
-      {b.type === 'glossary' && <GlossaryFields b={b} doc={doc} set={set} onTerm={onTerm} />}
-      {b.type === 'lines' && (
-        <>
-          <div className="field">
-            <label>Art</label>
-            {ruling(b.style, (r) => set({ style: r }))}
-          </div>
-          <label className={st.check}>
-            <input type="checkbox" checked={!!b.fill} onChange={(e) => set({ fill: e.target.checked })} /> bis zum Seitenende
-          </label>
-          {!b.fill && (
-            <div className="field">
-              <label>{b.style === 'grid' ? 'Kästchenreihen' : 'Anzahl Zeilen'}</label>
-              <input type="number" min={1} max={60} value={b.count ?? 8} onChange={(e) => set({ count: Math.max(1, Math.min(60, Number(e.target.value) || 1)) })} />
-            </div>
-          )}
-          {b.style !== 'grid' && b.style !== 'empty' && (
-            <div className="field">
-              <label>Zeilenabstand</label>
-              <select value={b.spacing ?? 8} onChange={(e) => set({ spacing: Number(e.target.value) })}>
-                {[6, 7, 8, 9, 10, 12].map((v) => (
-                  <option key={v} value={v}>
-                    {v} mm
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {b.style !== 'empty' && doc.page.korr.side !== 'none' && (
-            <label className={st.check}>
-              <input type="checkbox" checked={!b.korrOff} onChange={(e) => set({ korrOff: !e.target.checked })} /> mit Korrekturrand (Einstellung unter „Blatt“)
-            </label>
-          )}
-        </>
-      )}
-      {b.type === 'pagebreak' && <p className={st.hint}>Der nächste Baustein beginnt auf einer neuen Seite.</p>}
-      {b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && <StyleFields b={b} set={set} />}
-    </section>
-  );
 }
 
-/** Auswahlwerte samt dem aktuellen (Vorlagen dürfen Zwischenwerte haben) */
-const withValue = (list: number[], v?: number) => (v === undefined || list.includes(v) ? list : [...list, v].sort((a, b) => a - b));
+/** style.cssText → Objekt für React */
+function cssObj(css: string): React.CSSProperties {
+  const o: Record<string, string> = {};
+  for (const part of css.split(';')) {
+    const i = part.indexOf(':');
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (!k || !v) continue;
+    o[k.startsWith('--') ? k : k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())] = v;
+  }
+  return o as React.CSSProperties;
+}
 
-/** Gestaltung des ganzen Bausteins: über der Vorlage, „zurücksetzen“ nimmt die eigenen Werte wieder weg */
-function StyleFields({ b, set }: { b: Block; set: (p: Partial<Block>) => void }) {
-  const [open, setOpen] = useState(false);
-  const s = styleOf(b);
-  const own = (['fs', 'lh', 'ta', 'it', 'bd', 'nm', 'ind'] as const).some((k) => b[k] !== undefined) || (b.type === 'material' && b.justify === false);
+/** Bausteine für die Liste links, mit Einrückung für Spalten */
+function flatOutline(blocks: Block[], depth = 0): { b: Block; depth: number }[] {
+  const out: { b: Block; depth: number }[] = [];
+  for (const b of blocks) {
+    out.push({ b, depth });
+    if (b.type === 'cols') for (const c of b.cols ?? []) out.push(...flatOutline(c, depth + 1));
+  }
+  return out;
+}
+
+// ---------- Menüband ----------
+const withValue = (list: number[], v?: number) => (v === undefined || list.includes(v) ? list : [...list, v].sort((a, b) => a - b));
+const STYLE_RESET: Partial<Block> = { fs: undefined, lh: undefined, ta: undefined, it: undefined, bd: undefined, nm: undefined, ind: undefined };
+const TEXT_TYPES: BlockType[] = ['heading', 'text', 'material', 'quote', 'task', 'box', 'glossary'];
+
+function Ribbon(props: {
+  tab: Tab;
+  setTab: (t: Tab) => void;
+  doc: BlattDoc;
+  b: Block | null;
+  selCol: { id: string; k: number } | null;
+  inline: React.MutableRefObject<InlineApi | null>;
+  editingText: boolean;
+  panel: Panel | null;
+  setPanel: (p: Panel | null) => void;
+  set: (p: Partial<Block>) => void;
+  setPageOpt: (p: Partial<BlattDoc['page']>) => void;
+  setHeader: (p: Partial<BlattDoc['page']['header']>) => void;
+  add: (t: BlockType, extra?: Partial<Block>) => void;
+  move: (id: string, dir: -1 | 1) => void;
+  remove: (id: string) => void;
+  duplicate: (id: string) => void;
+  toColumns: (id: string) => void;
+  unColumns: (id: string) => void;
+  onImage: (f: Blob) => void;
+  ensureGlossary: () => void;
+  onError: (m: string) => void;
+}) {
+  const { tab, setTab, doc, b, inline, set } = props;
+  const textBlock = !!b && TEXT_TYPES.includes(b.type);
+  const s = b ? styleOf(b) : {};
+  // Befehl im Text auf der Seite (Markierung bleibt, weil die Knöpfe den Fokus nicht nehmen)
+  const cmd = (fn: (api: InlineApi) => void) => {
+    const api = inline.current;
+    if (!api) return false;
+    api.restore();
+    fn(api);
+    api.emit();
+    return true;
+  };
+  const exec = (c: string, v?: string) => cmd(() => document.execCommand(c, false, v));
+  const selectedText = () => {
+    const sel = getSelection();
+    return inline.current && sel?.rangeCount && inline.current.el.contains(sel.anchorNode) ? sel.toString() : '';
+  };
+  const keep = (e: React.MouseEvent) => (e.target as Element).closest('button') && e.preventDefault();
+  const blockTab = b ? (b.type === 'cols' ? 'Spalten' : BLOCK_LABEL[b.type]) : null;
+  const P = doc.page;
   return (
-    <div className={st.styleBox}>
-      <button type="button" className={st.secHead} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        {open ? '▾' : '▸'} Gestaltung{own ? ' (eigene)' : ''}
-      </button>
-      {open && (
-        <>
-          <div className={st.grid2}>
-            <div className="field">
-              <label>Schriftgröße</label>
-              <select value={s.fs ?? 100} onChange={(e) => set({ fs: Number(e.target.value) })}>
+    <div className={st.ribbon} onMouseDown={keep}>
+      <div className={st.tabs} role="tablist">
+        {(
+          [
+            ['start', 'Start'],
+            ['insert', 'Einfügen'],
+            ['sheet', 'Blatt'],
+          ] as const
+        ).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={`${st.tab} ${tab === k ? st.tabOn : ''}`} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+        {blockTab && (
+          <button role="tab" aria-selected={tab === 'block'} className={`${st.tab} ${st.tabCtx} ${tab === 'block' ? st.tabOn : ''}`} onClick={() => setTab('block')}>
+            {blockTab}
+          </button>
+        )}
+        <span className="grow" />
+        {(
+          [
+            ['search', '🔍 Suchen'],
+            ['material', 'Material'],
+            ['glossary', 'Glossar'],
+          ] as const
+        ).map(([k, l]) => (
+          <button key={k} className={`${st.tab} ${props.panel === k ? st.tabOn : ''}`} onClick={() => props.setPanel(props.panel === k ? null : k)} title="Seitenleiste rechts ein- und ausblenden">
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className={st.groups}>
+        {tab === 'start' && (
+          <>
+            <Group label="Schrift">
+              <button className={`btn ${s.bd ? 'on' : ''}`} disabled={!textBlock} onClick={() => exec('bold') || set({ bd: !s.bd })} title="Fett (Strg+B); ohne Markierung der ganze Baustein">
+                <b>F</b>
+              </button>
+              <button className={`btn ${s.it ? 'on' : ''}`} disabled={!textBlock} onClick={() => exec('italic') || set({ it: !s.it })} title="Kursiv (Strg+I); ohne Markierung der ganze Baustein">
+                <i>K</i>
+              </button>
+              <button className="btn" disabled={!props.editingText} onClick={() => exec('underline')} title="Unterstrichen (Strg+U)">
+                <u>U</u>
+              </button>
+              <button
+                className="btn"
+                disabled={!props.editingText}
+                title="Textmarker"
+                onClick={() =>
+                  cmd(() => {
+                    const sel = getSelection();
+                    const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
+                    if (!r || r.collapsed) return;
+                    const m = r.startContainer.parentElement?.closest('mark');
+                    if (m) m.replaceWith(...m.childNodes);
+                    else {
+                      const mk = document.createElement('mark');
+                      mk.appendChild(r.extractContents());
+                      r.insertNode(mk);
+                    }
+                  })
+                }
+              >
+                <mark style={{ background: '#fff176', padding: '0 3px' }}>M</mark>
+              </button>
+              <select value={s.fs ?? 100} disabled={!textBlock} onChange={(e) => set({ fs: Number(e.target.value) })} title="Schriftgröße des Bausteins" aria-label="Schriftgröße">
                 {withValue([80, 85, 90, 100, 110, 120, 140], s.fs).map((v) => (
                   <option key={v} value={v}>
                     {v} %
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="field">
-              <label>Zeilenabstand</label>
-              <select value={s.lh ?? 1.35} onChange={(e) => set({ lh: Number(e.target.value) })}>
+            </Group>
+            <Group label="Absatz">
+              <button className="btn" disabled={!props.editingText} onClick={() => exec('insertUnorderedList')} title="Liste mit Punkten">
+                • Liste
+              </button>
+              <button className="btn" disabled={!props.editingText} onClick={() => exec('insertOrderedList')} title="Nummerierte Liste">
+                1. Liste
+              </button>
+              <span className="seg">
+                {(
+                  [
+                    ['left', '⯇', 'linksbündig'],
+                    ['justify', '☰', 'Blocksatz'],
+                    ['center', '≡', 'zentriert'],
+                    ['right', '⯈', 'rechtsbündig'],
+                  ] as const
+                ).map(([v, l, t]) => (
+                  <button key={v} className={`btn ${(s.ta ?? 'left') === v && textBlock ? 'on' : ''}`} disabled={!textBlock} onClick={() => set({ ta: v })} title={t}>
+                    {l}
+                  </button>
+                ))}
+              </span>
+              <button className="btn" disabled={!textBlock || !(s.ind ?? 0)} onClick={() => set({ ind: Math.max(0, (s.ind ?? 0) - 5) })} title="Einzug verkleinern">
+                ⇤
+              </button>
+              <button className="btn" disabled={!textBlock} onClick={() => set({ ind: Math.min(40, (s.ind ?? 0) + 5) })} title="Einzug vergrößern (5 mm)">
+                ⇥
+              </button>
+              <select value={s.lh ?? 1.35} disabled={!textBlock} onChange={(e) => set({ lh: Number(e.target.value) })} title="Zeilenabstand" aria-label="Zeilenabstand">
                 {withValue([1.15, 1.25, 1.35, 1.45, 1.6, 1.8, 2, 2.4], s.lh ?? 1.35).map((v) => (
                   <option key={v} value={v}>
-                    {String(v).replace('.', ',')}-fach
+                    Zeilen {String(v).replace('.', ',')}
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="field">
-              <label>Rand für Notizen</label>
-              <select value={s.nm ?? 0} onChange={(e) => set({ nm: Number(e.target.value) })}>
-                <option value={0}>keiner</option>
+            </Group>
+            <Group label="Rand">
+              <select value={s.nm ?? 0} disabled={!textBlock} onChange={(e) => set({ nm: Number(e.target.value) })} title="Freier Rand rechts für Notizen; Randbemerkungen stehen dort" aria-label="Rand für Notizen">
+                <option value={0}>kein Rand für Notizen</option>
                 {withValue([20, 30, 40, 50], s.nm || undefined).map((v) => (
                   <option key={v} value={v}>
-                    {String(v / 10).replace('.', ',')} cm
+                    Rand für Notizen {String(v / 10).replace('.', ',')} cm
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="field">
-              <label>Einzug links</label>
-              <select value={s.ind ?? 0} onChange={(e) => set({ ind: Number(e.target.value) })}>
-                {[0, 5, 10, 15, 20].map((v) => (
-                  <option key={v} value={v}>
-                    {v ? `${v} mm` : 'keiner'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="field">
-            <label>Ausrichtung</label>
-            <div className="seg" role="group" aria-label="Ausrichtung">
+            </Group>
+            <Group label="Im Text">
+              <button className="btn" disabled={!props.editingText || !inline.current?.rich} onClick={() => exec('insertHTML', noteHtml('note', 'Fußnote'))} title="Nummerierte Fußnote unten auf der Seite; antippen zum Ändern">
+                Fußnote
+              </button>
+              <button className="btn" disabled={!props.editingText || !inline.current?.rich} onClick={() => exec('insertHTML', noteHtml('margin', 'Bemerkung'))} title="Bemerkung im Rand neben der Zeile">
+                Randbemerkung
+              </button>
+              <button
+                className="btn"
+                disabled={!props.editingText || !inline.current?.rich}
+                title="Markiertes Wort ins Glossar"
+                onClick={() => {
+                  const w = selectedText().trim();
+                  if (!w) return props.onError('Erst im Text ein Wort markieren, dann „Glossar“.');
+                  props.onError('');
+                  const known = glossaryTerms(doc).find((t) => t.word.toLowerCase() === w.toLowerCase());
+                  exec('insertHTML', glossHtml(w, known?.explain ?? ''));
+                  props.ensureGlossary();
+                }}
+              >
+                Glossar
+              </button>
+            </Group>
+            <Group label="Vorlage">
+              {b && TEMPLATES[b.type] ? (
+                <select value={b.tpl ?? TEMPLATES[b.type]![0].id} onChange={(e) => set({ tpl: e.target.value, ...STYLE_RESET, ...(b.type === 'material' ? { justify: undefined } : {}) })} aria-label="Vorlage">
+                  {TEMPLATES[b.type]!.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className={st.hint}>{b ? 'keine Vorlagen' : 'Baustein anklicken'}</span>
+              )}
+              <button className="btn" disabled={!textBlock} onClick={() => set({ ...STYLE_RESET, ...(b?.type === 'material' ? { justify: undefined } : {}) })} title="Eigene Gestaltung entfernen">
+                Wie Vorlage
+              </button>
+            </Group>
+          </>
+        )}
+        {tab === 'insert' && (
+          <>
+            <Group label={props.selCol ? 'In die gewählte Spalte' : b ? 'Nach dem gewählten Baustein' : 'Am Ende'}>
+              {ADD.map((t) => (
+                <button key={t} className={`btn ${st.big}`} onClick={() => props.add(t)} title={BLOCK_LABEL[t]}>
+                  <span>{ICON[t]}</span>
+                  {BLOCK_LABEL[t]}
+                </button>
+              ))}
+              <button className={`btn ${st.big}`} onClick={() => props.add('task', { subtask: true })} title="Teilaufgabe: a), b) … oder 1.1, 1.2 …">
+                <span>✎ₐ</span>
+                Teilaufgabe
+              </button>
+            </Group>
+            <Group label="Spalten">
               {(
                 [
-                  ['left', 'links'],
-                  ['justify', 'Blocksatz'],
-                  ['center', 'Mitte'],
-                  ['right', 'rechts'],
+                  [[1, 1], '▥ zwei gleich'],
+                  [[2, 1], '▥ breit | schmal'],
+                  [[1, 2], '▥ schmal | breit'],
+                  [[1, 1, 1], '▦ drei'],
                 ] as const
-              ).map(([v, l]) => (
-                <button key={v} type="button" className={`btn ${(s.ta ?? 'left') === v ? 'on' : ''}`} onClick={() => set({ ta: v })}>
+              ).map(([r, l]) => (
+                <button key={l} className="btn" onClick={() => props.add('cols', { ratio: [...r], cols: r.map(() => []) })} title="Spalten einfügen; in eine leere Spalte klicken, dann Baustein einfügen">
                   {l}
                 </button>
               ))}
-            </div>
-          </div>
-          <div className={st.grid2}>
-            <label className={st.check}>
-              <input type="checkbox" checked={!!s.it} onChange={(e) => set({ it: e.target.checked })} /> ganz kursiv
-            </label>
-            <label className={st.check}>
-              <input type="checkbox" checked={!!s.bd} onChange={(e) => set({ bd: e.target.checked })} /> ganz fett
-            </label>
-          </div>
-          {own && (
-            <button type="button" className="btn" onClick={() => set({ fs: undefined, lh: undefined, ta: undefined, it: undefined, bd: undefined, nm: undefined, ind: undefined, ...(b.type === 'material' ? { justify: undefined } : {}) })}>
-              Wie in der Vorlage
-            </button>
-          )}
-        </>
-      )}
+            </Group>
+          </>
+        )}
+        {tab === 'sheet' && (
+          <>
+            <Group label="Format">
+              <select value={P.size} onChange={(e) => props.setPageOpt({ size: e.target.value as 'a4' | 'a5' })} aria-label="Seitengröße">
+                <option value="a4">A4</option>
+                <option value="a5">A5</option>
+              </select>
+              <select
+                value={`${P.font}-${P.fontSize}`}
+                onChange={(e) => {
+                  const [font, size] = e.target.value.split('-');
+                  props.setPageOpt({ font: font as 'sans' | 'serif', fontSize: Number(size) });
+                }}
+                aria-label="Schrift"
+              >
+                {(['sans', 'serif'] as const).flatMap((f) =>
+                  [10, 11, 12].map((z) => (
+                    <option key={f + z} value={`${f}-${z}`}>
+                      {f === 'sans' ? 'Ohne Serifen' : 'Mit Serifen'} {z} pt
+                    </option>
+                  )),
+                )}
+              </select>
+              <label className={st.check}>
+                <input type="checkbox" checked={P.pageNumbers} onChange={(e) => props.setPageOpt({ pageNumbers: e.target.checked })} /> Seitenzahlen
+              </label>
+            </Group>
+            <Group label="Broschüre">
+              <label className={st.check}>
+                <input type="checkbox" checked={P.booklet} onChange={(e) => props.setPageOpt({ booklet: e.target.checked })} /> als Broschüre ({P.size === 'a5' ? 'A4 quer' : 'A3 quer'})
+              </label>
+              {P.booklet && (
+                <select value={P.fill} onChange={(e) => props.setPageOpt({ fill: e.target.value as Ruling })} aria-label="Leere Seiten füllen mit">
+                  <option value="lines">leere Seiten: Schreiblinien</option>
+                  <option value="grid">leere Seiten: Karos</option>
+                  <option value="empty">leere Seiten: nichts</option>
+                </select>
+              )}
+            </Group>
+            <Group label="Korrekturrand">
+              <select value={P.korr.side} onChange={(e) => props.setPageOpt({ korr: { ...P.korr, side: e.target.value as Korr['side'] } })} aria-label="Korrekturrand">
+                <option value="none">kein Korrekturrand</option>
+                <option value="right">rechts</option>
+                <option value="left">links</option>
+              </select>
+              {P.korr.side !== 'none' && (
+                <>
+                  <select value={P.korr.width} onChange={(e) => props.setPageOpt({ korr: { ...P.korr, width: Number(e.target.value) } })} aria-label="Breite">
+                    {[20, 25, 30, 40, 50].map((v) => (
+                      <option key={v} value={v}>
+                        {String(v / 10).replace('.', ',')} cm
+                      </option>
+                    ))}
+                  </select>
+                  <span className="seg">
+                    {(
+                      [
+                        ['thin', 'dünn'],
+                        ['medium', 'mittel'],
+                        ['thick', 'dick'],
+                        ['end', 'Zeilen enden'],
+                      ] as const
+                    ).map(([v, l]) => (
+                      <button key={v} className={`btn ${P.korr.style === v ? 'on' : ''}`} onClick={() => props.setPageOpt({ korr: { ...P.korr, style: v } })}>
+                        {l}
+                      </button>
+                    ))}
+                  </span>
+                </>
+              )}
+            </Group>
+            <Group label="Kopfzeile">
+              <label className={st.check}>
+                <input type="checkbox" checked={P.header.show} onChange={(e) => props.setHeader({ show: e.target.checked })} /> Kopfzeile
+              </label>
+              {P.header.show && (
+                <>
+                  <input className={st.rIn} value={P.header.text} onChange={(e) => props.setHeader({ text: e.target.value })} placeholder="z. B. Klausur S 4" aria-label="Text der Kopfzeile" />
+                  <label className={st.check}>
+                    <input type="checkbox" checked={P.header.nameLine} onChange={(e) => props.setHeader({ nameLine: e.target.checked })} /> Name
+                  </label>
+                  <label className={st.check}>
+                    <input type="checkbox" checked={P.header.date} onChange={(e) => props.setHeader({ date: e.target.checked })} /> Datum
+                  </label>
+                </>
+              )}
+              <select value={P.header.qr} onChange={(e) => props.setHeader({ qr: e.target.value as 'first' | 'all' | 'none', show: e.target.value !== 'none' || P.header.show })} aria-label="QR-Code für Autogra.fi">
+                <option value="none">kein QR-Code</option>
+                <option value="first">QR-Code auf Seite 1</option>
+                <option value="all">QR-Code auf jeder Seite</option>
+              </select>
+            </Group>
+            <Group label="Teilaufgaben">
+              <select value={P.sub ?? 'letter'} onChange={(e) => props.setPageOpt({ sub: e.target.value as 'letter' | 'dot' })} aria-label="Nummern der Teilaufgaben">
+                <option value="letter">a), b), c) …</option>
+                <option value="dot">1.1, 1.2, 1.3 …</option>
+              </select>
+            </Group>
+          </>
+        )}
+        {tab === 'block' && b && <BlockTab {...props} b={b} />}
+        {tab === 'block' && !b && <span className={st.hint}>Klick auf einen Baustein auf der Seite.</span>}
+      </div>
     </div>
   );
 }
 
-/** Glossar: Wörter entstehen im Text (markieren, „Glossar“); hier stehen alle mit ihrer Erklärung */
-function GlossaryFields({ b, doc, set, onTerm }: { b: Block; doc: BlattDoc; set: (p: Partial<Block>) => void; onTerm: (word: string, explain: string | null) => void }) {
-  const terms = glossaryTerms(doc);
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <>
-      <div className="field">
-        <label>Überschrift</label>
-        <input value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="Glossar" />
-      </div>
-      <div className={st.grid2}>
-        <div className="field">
-          <label>Reihenfolge</label>
-          <select value={b.sort ?? 'alpha'} onChange={(e) => set({ sort: e.target.value as Block['sort'] })}>
-            <option value="alpha">nach dem Alphabet</option>
-            <option value="order">wie im Text</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Im Text markiert mit</label>
-          <select value={b.mark ?? 'star'} onChange={(e) => set({ mark: e.target.value as Block['mark'] })}>
-            <option value="star">Sternchen*</option>
-            <option value="arrow">→ Pfeil</option>
-            <option value="bold">fett</option>
-            <option value="none">nichts</option>
-          </select>
-        </div>
-      </div>
-      {!terms.length && <p className={st.hint}>Noch keine Wörter. Markiere in einem Text ein Wort und wähle in der Leiste „Glossar“.</p>}
-      {terms.map((t) => (
-        <div className="field" key={t.word}>
-          <label className="row">
-            <strong>{t.word}</strong>
-            <span className="grow" />
-            <button type="button" className="btn" style={{ height: 22, fontSize: 11.5 }} onClick={() => onTerm(t.word, null)} title="Aus dem Glossar nehmen (das Wort bleibt im Text)">
-              ✕
-            </button>
-          </label>
-          <TermInput value={t.explain} onChange={(v) => onTerm(t.word, v)} />
-        </div>
-      ))}
-    </>
+    <div className={st.group}>
+      <div className={st.groupBody}>{children}</div>
+      <div className={st.groupLabel}>{label}</div>
+    </div>
   );
 }
-function TermInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return <textarea className={st.term} rows={2} value={value} onChange={(e) => onChange(e.target.value.replace(/[{}\n]/g, ' '))} placeholder="Erklärung" />;
-}
 
-/** Bild: Datei, Einfügen, Ziehen oder aus dem Material von Collegare (Bilder dieses Projekts bzw. der Werkstatt) */
-function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partial<Block>) => void; projectId: number; onImage: (f: Blob) => void }) {
-  const [pick, setPick] = useState<Material[] | null>(null);
-  const [err, setErr] = useState('');
+function BlockTab(props: Parameters<typeof Ribbon>[0] & { b: Block }) {
+  const { b, set, doc } = props;
+  const labels = taskLabels(doc);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  async function rotate(dir: 1 | -1) {
+    let ar = b.ar;
+    if (!ar && b.src) ar = await new Promise<number>((res) => {
+      const i = new Image();
+      i.onload = () => res(i.naturalHeight / Math.max(1, i.naturalWidth));
+      i.onerror = () => res(1);
+      i.src = b.src!;
+    });
+    set({ rot: ((((Number(b.rot) || 0) + dir * 90) % 360) + 360) % 360, ar });
+  }
   /** Bild von einer Adresse im Netz: der Server holt es (fremde Seiten geben Bilder dem Browser oft nicht heraus) */
   async function fromUrl() {
     const u = url.trim();
-    if (!/^https?:\/\/\S+$/.test(u)) return setErr('Bitte die vollständige Adresse des Bilds eingeben (beginnt mit https://).');
-    setErr('');
+    if (!/^https?:\/\/\S+$/.test(u)) return props.onError('Bitte die vollständige Adresse des Bilds eingeben (beginnt mit https://).');
+    props.onError('');
     setLoading(true);
     try {
       const res = await fetch(href(`/api/bild-holen?url=${encodeURIComponent(u)}`), { credentials: 'include' });
       if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string; page?: boolean };
-        throw new Error(j.page ? 'Unter dieser Adresse liegt eine Webseite, kein Bild. Rechtsklick auf das Bild, „Bildadresse kopieren“, und hier einsetzen.' : (j.message ?? j.error ?? `Fehler ${res.status}`));
+        const j = (await res.json().catch(() => ({}))) as { error?: string; page?: boolean };
+        throw new Error(j.page ? 'Unter dieser Adresse liegt eine Webseite, kein Bild. Rechtsklick auf das Bild, „Bildadresse kopieren“, und hier einsetzen.' : (j.error ?? `Fehler ${res.status}`));
       }
-      onImage(await res.blob());
+      props.onImage(await res.blob());
       if (!b.caption) {
-        // Urheber und Lizenz, soweit die Seite sie nennt (z. B. Wikimedia)
         const info = await fetch(href(`/api/bild-info?url=${encodeURIComponent(u)}`), { credentials: 'include' })
           .then((r) => (r.ok ? (r.json() as Promise<{ title?: string; credit?: string; license?: string }>) : null))
           .catch(() => null);
@@ -1072,80 +1269,350 @@ function ImageFields({ b, set, projectId, onImage }: { b: Block; set: (p: Partia
       }
       setUrl('');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      props.onError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }
-  async function openPick() {
-    setErr('');
+  const ruling = (value: Ruling | undefined, onChange: (r: Ruling) => void, withEmpty = true) => (
+    <select value={value ?? 'lines'} onChange={(e) => onChange(e.target.value as Ruling)} aria-label="Art der Linien">
+      <option value="lines">Schreiblinien</option>
+      <option value="grid">Karos (Mathe)</option>
+      {withEmpty && <option value="empty">Freiraum</option>}
+    </select>
+  );
+  const inCols = !!listOf(doc.blocks, b.id)?.parent;
+  return (
+    <>
+      {b.type === 'heading' && (
+        <Group label="Überschrift">
+          <select value={b.level ?? 2} onChange={(e) => set({ level: Number(e.target.value) as 1 | 2 })} aria-label="Art">
+            <option value={1}>groß</option>
+            <option value={2}>unterstrichen</option>
+          </select>
+        </Group>
+      )}
+      {b.type === 'material' && (
+        <Group label="Material">
+          <input className={st.rIn} value={b.label ?? ''} onChange={(e) => set({ label: e.target.value })} placeholder="Material 1 (automatisch)" aria-label="Bezeichnung" style={{ width: 150 }} />
+          <label className={st.check}>
+            <input type="checkbox" checked={b.lineNumbers !== false} onChange={(e) => set({ lineNumbers: e.target.checked })} /> Zeilen zählen
+          </label>
+          <input className={st.rIn} value={b.source ?? ''} onChange={(e) => set({ source: e.target.value })} placeholder="Quelle (Fußnote)" aria-label="Quelle" style={{ width: 220 }} />
+        </Group>
+      )}
+      {b.type === 'task' && (
+        <>
+          <Group label="Nummer">
+            <label className={st.check}>
+              <input type="checkbox" checked={!!b.subtask} onChange={(e) => set({ subtask: e.target.checked })} /> Teilaufgabe
+            </label>
+            <input className={st.rIn} value={b.num ?? ''} onChange={(e) => set({ num: e.target.value })} placeholder={`automatisch: ${labels.get(b.id) ?? ''}`} aria-label="Eigene Nummer" title="Eigene Nummer, z. B. 1.2 oder 1 b); leer = automatisch" style={{ width: 130 }} />
+          </Group>
+          <Group label="Bewertung">
+            <input className={st.rIn} value={b.points ?? ''} onChange={(e) => set({ points: e.target.value })} placeholder="z. B. 12 P. oder 50%" aria-label="Punkte oder Anteil" style={{ width: 130 }} />
+          </Group>
+          <Group label="Antwortzeilen">
+            <input className={st.rIn} type="number" min={0} max={40} value={b.lines ?? 0} onChange={(e) => set({ lines: Math.max(0, Math.min(40, Number(e.target.value) || 0)) })} aria-label="Antwortzeilen" style={{ width: 64 }} />
+            {(b.lines ?? 0) > 0 && ruling(b.lineStyle, (r) => set({ lineStyle: r }), false)}
+          </Group>
+        </>
+      )}
+      {b.type === 'image' && (
+        <>
+          <Group label="Bild">
+            <label className="btn">
+              {b.src ? 'Anderes Bild …' : 'Bild auswählen …'}
+              <input type="file" accept="image/*" hidden onChange={(e) => (e.target.files?.[0] && props.onImage(e.target.files[0]), (e.target.value = ''))} />
+            </label>
+            <button className="btn" onClick={() => props.setPanel('material')}>
+              Aus dem Material
+            </button>
+            <form
+              className={st.urlRow}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void fromUrl();
+              }}
+            >
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Adresse: https://…" aria-label="Adresse des Bilds im Netz" />
+              <button type="submit" className="btn" disabled={loading || !url.trim()}>
+                {loading ? 'Lädt …' : 'Laden'}
+              </button>
+            </form>
+          </Group>
+          <Group label="Größe und Lage">
+            <input type="range" min={20} max={100} step={5} value={b.width ?? 100} onChange={(e) => set({ width: Number(e.target.value) })} aria-label="Breite" title={`Breite ${b.width ?? 100} %`} />
+            <span className={st.hint}>{b.width ?? 100} %</span>
+            {!b.free && (
+              <span className="seg">
+                {(
+                  [
+                    ['left', 'links'],
+                    ['center', 'Mitte'],
+                    ['right', 'rechts'],
+                  ] as const
+                ).map(([v, l]) => (
+                  <button key={v} className={`btn ${(b.align ?? 'center') === v ? 'on' : ''}`} onClick={() => set({ align: v })}>
+                    {l}
+                  </button>
+                ))}
+              </span>
+            )}
+            <button className="btn" disabled={!b.src} onClick={() => void rotate(-1)} title="Um 90° nach links drehen">
+              ⟲
+            </button>
+            <button className="btn" disabled={!b.src} onClick={() => void rotate(1)} title="Um 90° nach rechts drehen">
+              ⟳
+            </button>
+            {b.free ? (
+              <>
+                <label className={st.check} title="Das Bild liegt über dem Text; der Text rückt an seinen Platz nach">
+                  <input type="checkbox" checked={!!b.over} onChange={(e) => set({ over: e.target.checked })} /> vor dem Text
+                </label>
+                <button className="btn" onClick={() => set({ free: false, over: false, dx: undefined, dy: undefined })} title="Bild wieder an seinen Platz im Text setzen">
+                  An seinen Platz
+                </button>
+              </>
+            ) : (
+              <span className={st.hint}>Ziehen verschiebt das Bild.</span>
+            )}
+          </Group>
+        </>
+      )}
+      {b.type === 'glossary' && (
+        <Group label="Glossar">
+          <select value={b.sort ?? 'alpha'} onChange={(e) => set({ sort: e.target.value as Block['sort'] })} aria-label="Reihenfolge">
+            <option value="alpha">nach dem Alphabet</option>
+            <option value="order">wie im Text</option>
+          </select>
+          <select value={b.mark ?? 'star'} onChange={(e) => set({ mark: e.target.value as Block['mark'] })} aria-label="Markierung im Text">
+            <option value="star">im Text: Sternchen*</option>
+            <option value="arrow">im Text: → Pfeil</option>
+            <option value="bold">im Text: fett</option>
+            <option value="none">im Text: nichts</option>
+          </select>
+          <button className="btn" onClick={() => props.setPanel('glossary')}>
+            Erklärungen bearbeiten
+          </button>
+        </Group>
+      )}
+      {b.type === 'cols' && (
+        <Group label="Spalten">
+          <select
+            value={(b.ratio ?? [1, 1]).join(':')}
+            onChange={(e) => {
+              const r = e.target.value.split(':').map(Number);
+              const cols = [...(b.cols ?? [])];
+              while (cols.length < r.length) cols.push([]);
+              // überzählige Spalten: Inhalt in die letzte übrige
+              while (cols.length > r.length) cols[r.length - 1] = [...cols[r.length - 1], ...cols.pop()!];
+              set({ ratio: r, cols });
+            }}
+            aria-label="Aufteilung"
+          >
+            <option value="1:1">zwei gleich breit</option>
+            <option value="2:1">breit | schmal</option>
+            <option value="1:2">schmal | breit</option>
+            <option value="3:2">3 : 2</option>
+            <option value="1:1:1">drei gleich breit</option>
+          </select>
+          <button className="btn" onClick={() => props.unColumns(b.id)} title="Bausteine wieder untereinander setzen">
+            Spalten auflösen
+          </button>
+        </Group>
+      )}
+      {b.type === 'lines' && (
+        <Group label="Linien">
+          {ruling(b.style, (r) => set({ style: r }))}
+          <label className={st.check}>
+            <input type="checkbox" checked={!!b.fill} onChange={(e) => set({ fill: e.target.checked })} /> bis Seitenende
+          </label>
+          {!b.fill && <input className={st.rIn} type="number" min={1} max={60} value={b.count ?? 8} onChange={(e) => set({ count: Math.max(1, Math.min(60, Number(e.target.value) || 1)) })} aria-label="Anzahl Zeilen" style={{ width: 64 }} />}
+          {b.style !== 'grid' && b.style !== 'empty' && (
+            <select value={b.spacing ?? 8} onChange={(e) => set({ spacing: Number(e.target.value) })} aria-label="Zeilenabstand">
+              {[6, 7, 8, 9, 10, 12].map((v) => (
+                <option key={v} value={v}>
+                  Abstand {v} mm
+                </option>
+              ))}
+            </select>
+          )}
+          {b.style !== 'empty' && doc.page.korr.side !== 'none' && (
+            <label className={st.check}>
+              <input type="checkbox" checked={!b.korrOff} onChange={(e) => set({ korrOff: !e.target.checked })} /> Korrekturrand
+            </label>
+          )}
+        </Group>
+      )}
+      {b.type === 'pagebreak' && (
+        <Group label="Seitenumbruch">
+          <span className={st.hint}>Der nächste Baustein beginnt auf einer neuen Seite.</span>
+        </Group>
+      )}
+      <Group label="Anordnen">
+        <button className="btn" onClick={() => props.move(b.id, -1)} title="nach oben">
+          ↑
+        </button>
+        <button className="btn" onClick={() => props.move(b.id, 1)} title="nach unten">
+          ↓
+        </button>
+        <button className="btn" onClick={() => props.duplicate(b.id)} title="verdoppeln">
+          ⧉
+        </button>
+        {b.type !== 'cols' && !inCols && (
+          <button className="btn" onClick={() => props.toColumns(b.id)} title="Diesen und den nächsten Baustein nebeneinander setzen">
+            ▥ neben den nächsten
+          </button>
+        )}
+        <button className="btn danger" onClick={() => props.remove(b.id)} title="entfernen (Entf)">
+          ✕ Entfernen
+        </button>
+      </Group>
+    </>
+  );
+}
+
+// ---------- Seitenleiste rechts: suchen, Material, Glossar ----------
+function SidePanel({
+  panel,
+  setPanel,
+  doc,
+  projectId,
+  onPick,
+  add,
+  onImage,
+  onTerm,
+}: {
+  panel: Panel;
+  setPanel: (p: Panel | null) => void;
+  doc: BlattDoc;
+  projectId: number;
+  onPick: (bid: string) => void;
+  add: (t: BlockType, extra?: Partial<Block>) => void;
+  onImage: (f: Blob, caption?: string) => void;
+  onTerm: (word: string, explain: string | null) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [mats, setMats] = useState<Material[] | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if ((panel === 'material' || panel === 'search') && mats === null)
+      get<{ materials: Material[] }>(`/api/projects/${projectId}/materials`).then(
+        (r) => setMats(r.materials),
+        (e) => setErr(e instanceof ApiError ? e.message : String(e)),
+      );
+  }, [panel, mats, projectId]);
+  const needle = q.trim().toLowerCase();
+  const hits = needle ? walk(doc.blocks).filter((b) => [BLOCK_LABEL[b.type], blockSummary(b), plainMd(b.md ?? ''), b.caption ?? '', b.source ?? '', b.text ?? ''].join(' ').toLowerCase().includes(needle)) : [];
+  const types = needle ? ADD.filter((t) => BLOCK_LABEL[t].toLowerCase().includes(needle)) : [];
+  const matHits = (mats ?? []).filter((m) => (m.kind === 'page' || (m.mime ?? '').startsWith('image/')) && (!needle || m.title.toLowerCase().includes(needle)));
+  async function takeImage(m: Material) {
+    const res = await fetch(fileUrl(projectId, m.id), { credentials: 'include' });
+    if (!res.ok) return setErr('Bild nicht erreichbar');
+    onImage(await res.blob(), m.title);
+  }
+  async function takePage(m: Material) {
     try {
-      const r = await get<{ materials: Material[] }>(`/api/projects/${projectId}/materials`);
-      setPick(r.materials.filter((m) => (m.mime ?? '').startsWith('image/')));
+      const r = await get<{ page: { body: string; title: string } }>(`/api/projects/${projectId}/materials/${m.id}`);
+      // Lernseite: Absätze (Leerzeile) werden Zeilen, Bilder und Videos bleiben draußen
+      const md = r.page.body
+        .split(/\n{2,}/)
+        .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+        .filter((p) => p && !/^!\[|^https?:\/\/\S+$/.test(p))
+        .join('\n');
+      add('material', { title: r.page.title, md, source: '' });
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
     }
   }
-  async function take(m: Material) {
-    const res = await fetch(fileUrl(projectId, m.id), { credentials: 'include' });
-    if (!res.ok) return setErr('Bild nicht erreichbar');
-    onImage(await res.blob());
-    if (!b.caption) set({ caption: m.title });
-    setPick(null);
-  }
+  const terms = glossaryTerms(doc);
+  const matList = (list: Material[]) => (
+    <div className={st.matList}>
+      {list.map((m) =>
+        (m.mime ?? '').startsWith('image/') ? (
+          <button key={m.id} className={st.matImg} onClick={() => void takeImage(m)} title={`Bild einsetzen: ${m.title}`}>
+            <img src={fileUrl(projectId, m.id)} alt={m.title} />
+            <span>{m.title}</span>
+          </button>
+        ) : (
+          <button key={m.id} className={st.matPage} onClick={() => void takePage(m)} title="Als Material-Baustein übernehmen">
+            ❝ {m.title}
+          </button>
+        ),
+      )}
+    </div>
+  );
   return (
-    <>
-      {b.src && <img className={st.preview} src={b.src} alt="" />}
-      <div className={st.imgPick}>
-        <label className="btn">
-          {b.src ? 'Anderes Bild …' : 'Bild auswählen …'}
-          <input type="file" accept="image/*" hidden onChange={(e) => (e.target.files?.[0] && onImage(e.target.files[0]), (e.target.value = ''))} />
-        </label>
-        <button className="btn" onClick={() => (pick ? setPick(null) : void openPick())}>
-          Aus dem Material
-        </button>
-      </div>
-      <form
-        className={st.urlRow}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void fromUrl();
-        }}
-      >
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="oder Adresse: https://…" aria-label="Adresse des Bilds im Netz" />
-        <button type="submit" className="btn" disabled={loading || !url.trim()}>
-          {loading ? 'Lädt …' : 'Laden'}
-        </button>
-      </form>
-      {err && <div className="error">{err}</div>}
-      {pick && (pick.length ? (
-        <div className={st.thumbs}>
-          {pick.map((m) => (
-            <button key={m.id} onClick={() => void take(m)} title={m.title}>
-              <img src={fileUrl(projectId, m.id)} alt={m.title} />
+    <section className={st.sec}>
+      <div className="row">
+        <div className="seg" role="group" aria-label="Seitenleiste">
+          {(
+            [
+              ['search', 'Suchen'],
+              ['material', 'Material'],
+              ['glossary', 'Glossar'],
+            ] as const
+          ).map(([k, l]) => (
+            <button key={k} className={`btn ${panel === k ? 'on' : ''}`} onClick={() => setPanel(k)}>
+              {l}
             </button>
           ))}
         </div>
-      ) : (
-        <p className={st.hint}>Hier gibt es noch keine Bilder im Material. Bilder lädst du unter „Materialien“ hoch, oder du ziehst sie direkt auf die Seite.</p>
-      ))}
-      <div className="field">
-        <label>Bildunterschrift</label>
-        <input value={b.caption ?? ''} onChange={(e) => set({ caption: e.target.value })} placeholder="z. B. Abb. 1: Pegel des Rheins bei Köln, 2018" />
+        <span className="grow" />
+        <button className="btn" onClick={() => setPanel(null)} title="Seitenleiste schließen">
+          ✕
+        </button>
       </div>
-      <div className="field">
-        <label>Breite: {b.width ?? 100} %</label>
-        <input type="range" min={20} max={100} step={5} value={b.width ?? 100} onChange={(e) => set({ width: Number(e.target.value) })} />
-      </div>
-      <div className="field">
-        <label>Ausrichtung</label>
-        <select value={b.align ?? 'center'} onChange={(e) => set({ align: e.target.value as Block['align'] })}>
-          <option value="left">links</option>
-          <option value="center">Mitte</option>
-          <option value="right">rechts</option>
-        </select>
-      </div>
-    </>
+      {err && <div className="error">{err}</div>}
+      {panel !== 'glossary' && <input className={st.titleIn} style={{ fontSize: 14, fontWeight: 400 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder={panel === 'search' ? 'Suchen: Text, Baustein, Material …' : 'Material filtern …'} autoFocus />}
+      {panel === 'search' && (
+        <>
+          {!needle && <p className={st.hint}>Sucht im Blatt, unter den Bausteinen und im Material dieses Projekts.</p>}
+          {needle && (
+            <>
+              <div className={st.secHead}>Auf diesem Blatt ({hits.length})</div>
+              {hits.map((b) => (
+                <button key={b.id} className={st.hit} onClick={() => onPick(b.id)}>
+                  <b>{ICON[b.type]} {BLOCK_LABEL[b.type]}</b> {blockSummary(b).slice(0, 90)}
+                </button>
+              ))}
+              {types.length > 0 && <div className={st.secHead}>Einfügen</div>}
+              {types.map((t) => (
+                <button key={t} className={st.hit} onClick={() => add(t)}>
+                  + {ICON[t]} {BLOCK_LABEL[t]}
+                </button>
+              ))}
+              <div className={st.secHead}>Material ({matHits.length})</div>
+              {matList(matHits)}
+            </>
+          )}
+        </>
+      )}
+      {panel === 'material' && (
+        <>
+          <p className={st.hint}>Bilder und Lernseiten aus dem Material dieses Projekts. Ein Klick setzt sie ein (ein Bild in den gewählten Bild-Baustein).</p>
+          {mats === null ? <p className={st.hint}>Lädt …</p> : matHits.length ? matList(matHits) : <p className={st.hint}>Kein passendes Material. Bilder lädst du unter „Materialien“ hoch oder ziehst sie direkt auf die Seite.</p>}
+        </>
+      )}
+      {panel === 'glossary' && (
+        <>
+          {!terms.length && <p className={st.hint}>Noch keine Wörter. Markiere auf der Seite ein Wort und wähle im Menüband „Glossar“.</p>}
+          {terms.map((t) => (
+            <div className="field" key={t.word}>
+              <label className="row">
+                <strong>{t.word}</strong>
+                <span className="grow" />
+                <button type="button" className="btn" style={{ height: 22, fontSize: 11.5 }} onClick={() => onTerm(t.word, null)} title="Aus dem Glossar nehmen (das Wort bleibt im Text)">
+                  ✕
+                </button>
+              </label>
+              <textarea className={st.term} rows={2} value={t.explain} onChange={(e) => onTerm(t.word, e.target.value.replace(/[{}\n]/g, ' '))} placeholder="Erklärung" />
+            </div>
+          ))}
+        </>
+      )}
+    </section>
   );
 }
 
