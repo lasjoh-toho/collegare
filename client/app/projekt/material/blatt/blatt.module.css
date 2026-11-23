@@ -247,3 +247,65 @@
 .richSmall > div > [role='textbox'] { min-height: 40px !important; }
 .urlRow { display: flex; gap: 6px; }
 .urlRow input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--bg-elev); color: var(--fg); }
+
+/* Runde 4 (23. November 2026): Rahmendaten, Tabelle, Diagramm, Mittelstege */
+.host :global(.bl-blank.bl-tiny) { width: 14mm; }
+.host :global(.bl-cols) { position: relative; }
+.host :global(.bl-gutter) { position: absolute; top: 0; bottom: 0; width: 4mm; margin-left: -2mm; cursor: col-resize; z-index: 4; }
+.host :global(.bl-gutter)::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 0.3mm dashed transparent; }
+.host.editing :global(.bl-cols:hover .bl-gutter)::after,
+.host.editing :global(.bl-sel .bl-gutter)::after { border-left-color: var(--ui-accent, #2563eb); }
+.host :global(.bl-table) { border-collapse: collapse; width: 100%; font-size: 0.95em; }
+.host :global(.bl-table td), .host :global(.bl-table th) { padding: 1.2mm 2mm; vertical-align: top; text-align: left; }
+.host :global(.bl-table th) { font-weight: 700; background: #f0f0f0; }
+.host :global(.bl-grid-all td), .host :global(.bl-grid-all th) { border: 0.25mm solid #555; }
+.host :global(.bl-grid-rows td), .host :global(.bl-grid-rows th) { border-bottom: 0.25mm solid #777; }
+.host :global(.bl-grid-rows tr:first-child > *) { border-top: 0.35mm solid #222; }
+.host :global(.bl-grid-rows tr:last-child > *) { border-bottom: 0.35mm solid #222; }
+.host :global(.bl-grid-none th) { background: none; border-bottom: 0.3mm solid #222; }
+.host :global(.bl-cap) { font-size: 0.85em; margin-top: 1mm; }
+.host :global(.bl-chart-svg) { display: block; max-width: 100%; height: auto; }
+.host :global(.bl-chart-svg text) { font-family: inherit; }
+.host.editing :global(.bl-head) { cursor: pointer; }
+.host.editing :global(.bl-head:hover) { outline: 1px dashed var(--ui-accent, #2563eb); outline-offset: 1mm; }
+.host.editing :global(.bl-page) { cursor: text; }
+.ov :global(td), .ov :global(th) { padding: 0; }
+
+/* Menüband mit Colibre-Icons (Runde 4) */
+.ico { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.ico :global(svg.cb) { width: 100%; height: 100%; display: block; }
+:root[data-theme='dark'] .ico :global(svg.cb) { filter: invert(0.9) hue-rotate(180deg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .ico :global(svg.cb) { filter: invert(0.9) hue-rotate(180deg); } }
+.rb { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--fg); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.rb:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 7%, transparent); border-color: var(--line); }
+.rb:disabled { opacity: 0.4; cursor: default; }
+.rbOn { background: color-mix(in srgb, var(--office-word, #2b579a) 14%, transparent) !important; border-color: color-mix(in srgb, var(--office-word, #2b579a) 35%, transparent) !important; }
+.rbBig { flex-direction: column; justify-content: flex-start; height: auto; min-height: 58px; min-width: 52px; max-width: 84px; padding: 4px 5px 3px; gap: 3px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; }
+.rows { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.row { display: flex; align-items: center; gap: 2px; }
+.icoSel { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+.tabSide { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Linke Leiste: Seiten, Gliederung, Elemente */
+.leftTabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.leftTab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 0; background: none; padding: 6px 2px; font: inherit; font-size: 12px; color: var(--fg-muted); border-bottom: 2px solid transparent; cursor: pointer; }
+.leftTabOn { color: var(--fg); border-bottom-color: var(--office-word, #2b579a); font-weight: 600; }
+.pThumbs { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0; }
+.pThumb { position: relative; border: 2px solid transparent; border-radius: 4px; padding: 0; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; color: var(--fg-muted); }
+.pThumb:hover { border-color: var(--accent); }
+.pThumbInner { zoom: 0.2; pointer-events: none; display: block !important; }
+.pThumbInner :global(.bl-page) { box-shadow: 0 0 0 4px #ccc !important; }
+.oItem { display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; background: none; padding: 4px 6px; font: inherit; font-size: 12.5px; color: var(--fg); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oItem:hover { background: var(--bg-sunken); }
+.oItem.sel { background: var(--accent-soft); }
+
+/* Rahmendaten */
+.headDlg { position: absolute; z-index: 8; top: 8px; left: 50%; transform: translateX(-50%); width: min(640px, 92vw); background: var(--bg-elev); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; zoom: 1; }
+.headTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.headTable th { font-size: 11px; font-weight: 500; color: var(--fg-muted); text-align: left; padding: 2px 4px; }
+.headTable td { padding: 3px 4px; border-top: 1px solid var(--line); }
+.headTable td:first-child, .headTable td:nth-child(3) { width: 1%; text-align: center; }
+.headTable td:nth-child(2) { width: 1%; white-space: nowrap; font-weight: 600; }
+.headTable tr.off td { color: var(--fg-faint); }
+.host :global(.bl-wm) { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 64pt; font-weight: 800; letter-spacing: 0.08em; color: rgba(0, 0, 0, 0.07); white-space: nowrap; pointer-events: none; z-index: 0; }
+.headAnchor { position: relative; height: 0; z-index: 9; }

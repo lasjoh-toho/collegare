@@ -11,7 +11,7 @@
  */
 import { renderMarkdown } from './markdown';
 
-export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'cols' | 'lines' | 'pagebreak';
+export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak';
 export type Ruling = 'lines' | 'grid' | 'empty';
 
 export interface Block {
@@ -59,9 +59,19 @@ export interface Block {
   over?: boolean;
   dx?: number;
   dy?: number;
-  /** Spalten: Bausteine je Spalte und Breitenverhältnis */
+  /** Spalten: Bausteine je Spalte und Breitenverhältnis (Mittelstege auf der Seite ziehbar) */
   cols?: Block[][];
   ratio?: number[];
+  /** Tabelle (Wunsch Jo, 23. November 2026): Zellen als kleines Markdown, erste Zeile als Kopf, Linien */
+  rows?: string[][];
+  headRow?: boolean;
+  grid?: 'all' | 'rows' | 'none';
+  /** Diagramm aus einer Tabelle des Blatts: erste Zeile Reihen, erste Spalte Kategorien */
+  ref?: string;
+  kind?: 'col' | 'bar' | 'line' | 'pie';
+  gray?: boolean;
+  /** Höhe des Diagramms in mm */
+  hMm?: number;
   /** Gestaltung (Wunsch Jo, 22. November 2026): Vorlage und eigene Abweichungen für den ganzen Baustein */
   tpl?: string;
   /** Schriftgröße in Prozent der Blattschrift */
@@ -95,12 +105,60 @@ export interface BlattDoc {
     pageNumbers: boolean;
     /** Leere Seiten der Broschüre */
     fill: Ruling;
-    header: { show: boolean; text: string; nameLine: boolean; date: boolean; qr: 'first' | 'all' | 'none' };
+    header: { show: boolean; text: string; nameLine: boolean; date: boolean; qr: 'first' | 'all' | 'none'; fields?: HeadFields };
     korr: Korr;
     /** Teilaufgaben: a), b) … oder 1.1, 1.2 … */
     sub?: 'letter' | 'dot';
+    /** Wasserzeichen quer über jeder Seite (z. B. ENTWURF) */
+    watermark?: string;
   };
   blocks: Block[];
+}
+
+/**
+ * Rahmendaten im Kopf der ersten Seite (Wunsch Jo, 23. November 2026): jedes Feld an oder aus; „automatisch“ füllt es
+ * aus dem Blatt bzw. beim Druck aus Autogra.fi, sonst steht der eigene Text da oder eine Linie zum Ausfüllen.
+ */
+export type HeadKey = 'title' | 'subject' | 'klasse' | 'teacher' | 'date' | 'name' | 'points' | 'grade';
+export interface HeadField {
+  on: boolean;
+  auto?: boolean;
+  value?: string;
+}
+export type HeadFields = Partial<Record<HeadKey, HeadField>>;
+export const HEAD_KEYS: { key: HeadKey; label: string; auto?: string }[] = [
+  { key: 'title', label: 'Titel', auto: 'Name des Blatts' },
+  { key: 'subject', label: 'Fach' },
+  { key: 'klasse', label: 'Klasse', auto: 'Kurs, beim Druck die Klasse aus Autogra.fi' },
+  { key: 'teacher', label: 'Lehrkraft', auto: 'dein Name' },
+  { key: 'date', label: 'Datum', auto: 'Tag des Drucks' },
+  { key: 'name', label: 'Name', auto: 'beim Druck aus der Klassenliste' },
+  { key: 'points', label: 'Punkte', auto: 'Summe der Aufgaben' },
+  { key: 'grade', label: 'Note' },
+];
+/** Rahmendaten lesen; ältere Blätter (Kopfzeile mit Text, Name, Datum) werden übernommen */
+export function headFields(doc: BlattDoc): Record<HeadKey, HeadField> {
+  const H = doc.page.header;
+  const f = H.fields ?? {};
+  const old: Record<HeadKey, HeadField> = {
+    title: { on: !!H.text?.trim(), auto: false, value: H.text ?? '' },
+    subject: { on: false },
+    klasse: { on: false, auto: true },
+    teacher: { on: false, auto: true },
+    date: { on: !!H.date, auto: false },
+    name: { on: H.nameLine !== false, auto: true },
+    points: { on: false, auto: true },
+    grade: { on: false },
+  };
+  const out = {} as Record<HeadKey, HeadField>;
+  for (const { key } of HEAD_KEYS) out[key] = { ...old[key], ...(f[key] ?? {}) };
+  return out;
+}
+/** Werte, die der Kopf automatisch einsetzt */
+export interface HeadCtx {
+  title?: string;
+  course?: string;
+  teacher?: string;
 }
 
 /** Platzhalter aus „Nummern bestellen“ (z. B. „Abgabe 3“), kein echter Name */
@@ -111,6 +169,8 @@ export function isNumberedSeat(name: string): boolean {
 /** Ein persönliches Exemplar (QR-Code aus Autogra.fi) */
 export interface Copy {
   name?: string;
+  /** Klasse aus Autogra.fi (Rahmendaten „Klasse“ automatisch) */
+  klasse?: string;
   printName?: boolean;
   code?: string;
   qr?: string;
@@ -132,6 +192,8 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   task: 'Aufgabe',
   box: 'Kasten',
   glossary: 'Glossar',
+  table: 'Tabelle',
+  chart: 'Diagramm',
   cols: 'Spalten',
   lines: 'Linien',
   pagebreak: 'Seitenumbruch',
@@ -140,7 +202,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
 export function blankDoc(title = ''): BlattDoc {
   return {
     format: 'ag-blatt/1',
-    page: { size: 'a4', booklet: false, font: 'sans', fontSize: 11, pageNumbers: true, fill: 'lines', header: { show: true, text: title, nameLine: true, date: false, qr: 'none' }, korr: { side: 'none', width: 30, style: 'thin' } },
+    page: { size: 'a4', booklet: false, font: 'sans', fontSize: 11, pageNumbers: true, fill: 'lines', header: { show: true, text: '', nameLine: true, date: false, qr: 'none', fields: { title: { on: true, auto: true }, name: { on: true, auto: true }, date: { on: false, auto: false } } }, korr: { side: 'none', width: 30, style: 'thin' } },
     blocks: [],
   };
 }
@@ -154,7 +216,7 @@ export function parseDoc(body: string, title = ''): BlattDoc {
     // ältere Blätter: Korrekturrand hing am einzelnen Linien-Baustein (rechts, etwa 4 cm)
     const korr = j.page?.korr ?? (blocks.some((b) => b.type === 'lines' && b.rand) ? { side: 'right' as const, width: 40, style: 'thin' as const } : d.page.korr);
     if (!j.page?.korr) for (const b of blocks) if (b.type === 'lines' && !b.rand && korr.side !== 'none') b.korrOff = true;
-    return { ...d, ...j, format: 'ag-blatt/1', page: { ...d.page, ...(j.page ?? {}), header: { ...d.page.header, ...(j.page?.header ?? {}) }, korr: { ...d.page.korr, ...korr } }, blocks };
+    return { ...d, ...j, format: 'ag-blatt/1', page: { ...d.page, ...(j.page ?? {}), header: { ...d.page.header, ...(j.page?.header ? { fields: undefined, ...j.page.header } : {}) }, korr: { ...d.page.korr, ...korr } }, blocks };
   } catch {
     return d;
   }
@@ -174,6 +236,8 @@ export function newBlock(type: BlockType): Block {
   if (type === 'box') Object.assign(b, { text: '', md: '' });
   if (type === 'glossary') Object.assign(b, { text: 'Glossar', sort: 'alpha', mark: 'star' });
   if (type === 'cols') Object.assign(b, { cols: [[], []], ratio: [1, 1] });
+  if (type === 'table') Object.assign(b, { rows: [['', '', ''], ['', '', ''], ['', '', '']], headRow: true, grid: 'all' });
+  if (type === 'chart') Object.assign(b, { kind: 'col', width: 90, hMm: 60, caption: '' });
   if (type === 'lines') Object.assign(b, { style: 'lines', count: 8, fill: true, spacing: 8 });
   const t = TEMPLATES[type]?.[0];
   if (t) b.tpl = t.id;
@@ -194,6 +258,10 @@ export function blockSummary(b: Block): string {
       return b.text || plain(b.md);
     case 'glossary':
       return b.text || '';
+    case 'table':
+      return `${(b.rows ?? []).length} × ${(b.rows ?? [])[0]?.length ?? 0}: ` + (b.rows ?? []).flat().map((c) => plain(c)).filter(Boolean).slice(0, 4).join(', ');
+    case 'chart':
+      return b.caption || ({ col: 'Säulen', bar: 'Balken', line: 'Linie', pie: 'Kreis' } as const)[b.kind ?? 'col'];
     case 'cols':
       return (b.cols ?? []).map((c) => (c.length ? c.map((x) => BLOCK_LABEL[x.type]).join(', ') : 'leer')).join(' | ');
     case 'lines':
@@ -640,6 +708,143 @@ function ruling(style: Ruling, widthMm: number, heightMm: number, spacing: numbe
   return svg;
 }
 
+// ---------- Diagramm aus einer Tabelle ----------
+const PALETTE = ['#2f6db5', '#e07b39', '#3f9d5a', '#c8414b', '#7e5bb5', '#9a7b4f'];
+const GRAYS = ['#333', '#999', '#ccc', '#666', '#e2e2e2', '#b0b0b0'];
+/** Zahl aus einer Zelle („1.234,5“, „12 %“, „3,5 m“) */
+export function cellNumber(s: string): number | null {
+  const t = plainMd(s ?? '')
+    .replace(/\s/g, '')
+    .replace(/\.(?=\d{3}(\D|$))/g, '')
+    .replace(',', '.');
+  const m = /-?\d+(\.\d+)?/.exec(t);
+  return m ? Number(m[0]) : null;
+}
+/** Erste Zeile: Namen der Reihen; erste Spalte: Kategorien */
+export function chartData(rows: string[][]): { cats: string[]; series: { name: string; vals: (number | null)[] }[] } {
+  const head = rows[0] ?? [];
+  const body = rows.slice(1).filter((r) => r.some((c) => (c ?? '').trim()));
+  const cats = body.map((r) => plainMd(r[0] ?? '').trim());
+  const series = head
+    .slice(1)
+    .map((h, j) => ({ name: plainMd(h ?? '').trim() || `Reihe ${j + 1}`, vals: body.map((r) => cellNumber(r[j + 1] ?? '')) }))
+    .filter((x) => x.vals.some((v) => v !== null));
+  return { cats, series };
+}
+function niceStep(range: number): number {
+  const raw = range / 5;
+  const p = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * p) return m * p;
+  return 10 * p;
+}
+const fmtNum = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString('de-DE');
+/** Säulen, Balken, Linie oder Kreis als SVG in mm */
+export function chartSvg(rows: string[][], kind: 'col' | 'bar' | 'line' | 'pie', w: number, h: number, gray: boolean): string {
+  const { cats, series } = chartData(rows);
+  const col = gray ? GRAYS : PALETTE;
+  const fs = 3;
+  const t = (x: number, y: number, s: string, anchor = 'middle', extra = '') => `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" text-anchor="${anchor}" font-size="${fs}" ${extra}>${esc(s)}</text>`;
+  const open = `<svg class="bl-chart-svg" viewBox="0 0 ${w.toFixed(2)} ${h}" style="width:${w.toFixed(2)}mm;height:${h}mm" font-family="inherit" fill="#111">`;
+  if (!series.length || !cats.length) return open + t(w / 2, h / 2, 'In der Tabelle stehen noch keine Zahlen.') + '</svg>';
+  let out = open;
+  // Legende oben, wenn mehrere Reihen (beim Kreis: Kategorien rechts)
+  let top = 2;
+  if (kind !== 'pie' && series.length > 1) {
+    let x = 0;
+    for (const [k, s] of series.entries()) {
+      out += `<rect x="${x}" y="1" width="3" height="3" fill="${col[k % col.length]}" stroke="#111" stroke-width="${gray ? 0.15 : 0}"/>` + t(x + 4, 3.8, s.name, 'start');
+      x += 8 + s.name.length * 1.6;
+    }
+    top = 7;
+  }
+  if (kind === 'pie') {
+    const s = series[0];
+    const vals = s.vals.map((v) => Math.max(0, v ?? 0));
+    const sum = vals.reduce((x, y) => x + y, 0) || 1;
+    const r = Math.min(h / 2 - 2, w * 0.3);
+    const cx = r + 2;
+    const cy = h / 2;
+    let a = -Math.PI / 2;
+    for (const [k, v] of vals.entries()) {
+      const b = a + (v / sum) * 2 * Math.PI;
+      const large = b - a > Math.PI ? 1 : 0;
+      const p = (ang: number) => `${(cx + r * Math.cos(ang)).toFixed(2)} ${(cy + r * Math.sin(ang)).toFixed(2)}`;
+      out += v >= sum ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${col[k % col.length]}" stroke="#fff" stroke-width="0.3"/>` : `<path d="M${cx} ${cy} L${p(a)} A${r} ${r} 0 ${large} 1 ${p(b)} Z" fill="${col[k % col.length]}" stroke="#fff" stroke-width="0.3"/>`;
+      a = b;
+    }
+    const lx = 2 * r + 7;
+    const step = Math.min(5, (h - 4) / Math.max(1, cats.length));
+    for (const [k, c] of cats.entries()) {
+      const y = cy - (cats.length * step) / 2 + k * step + 3;
+      out += `<rect x="${lx}" y="${(y - 2.6).toFixed(2)}" width="3" height="3" fill="${col[k % col.length]}"/>` + t(lx + 4.5, y, `${c} (${fmtNum(Math.round((vals[k] / sum) * 1000) / 10)} %)`, 'start');
+    }
+    return out + '</svg>';
+  }
+  const all = series.flatMap((s) => s.vals.filter((v): v is number => v !== null));
+  const lo = Math.min(0, ...all);
+  const hi = Math.max(0, ...all);
+  const step = niceStep(hi - lo || 1);
+  const vmin = Math.floor(lo / step) * step;
+  const vmax = Math.ceil(hi / step) * step || step;
+  const ticks: number[] = [];
+  for (let v = vmin; v <= vmax + step / 2; v += step) ticks.push(v);
+  const labW = Math.max(...ticks.map((v) => fmtNum(v).length)) * 1.7 + 2;
+  if (kind === 'bar') {
+    // Balken waagerecht: Kategorien links, Werte unten
+    const catW = Math.min(w * 0.35, Math.max(...cats.map((c) => c.length)) * 1.6 + 2);
+    const x0 = catW;
+    const x1 = w - 2;
+    const y0 = top;
+    const y1 = h - 6;
+    const X = (v: number) => x0 + ((v - vmin) / (vmax - vmin)) * (x1 - x0);
+    for (const v of ticks) out += `<line x1="${X(v).toFixed(2)}" x2="${X(v).toFixed(2)}" y1="${y0}" y2="${y1}" stroke="#ccc" stroke-width="0.2"/>` + t(X(v), y1 + 4, fmtNum(v));
+    const band = (y1 - y0) / cats.length;
+    const bh = (band * 0.7) / series.length;
+    for (const [i, c] of cats.entries()) {
+      out += t(x0 - 1.5, y0 + band * (i + 0.5) + 1, c, 'end');
+      for (const [k, s] of series.entries()) {
+        const v = s.vals[i];
+        if (v === null) continue;
+        const a = X(Math.min(0, v));
+        const b = X(Math.max(0, v));
+        out += `<rect x="${a.toFixed(2)}" y="${(y0 + band * i + band * 0.15 + k * bh).toFixed(2)}" width="${Math.max(0.1, b - a).toFixed(2)}" height="${bh.toFixed(2)}" fill="${col[k % col.length]}" stroke="#111" stroke-width="${gray ? 0.15 : 0}"/>`;
+      }
+    }
+    out += `<line x1="${X(0)}" x2="${X(0)}" y1="${y0}" y2="${y1}" stroke="#111" stroke-width="0.3"/>`;
+    return out + '</svg>';
+  }
+  const x0 = labW;
+  const x1 = w - 1;
+  const y0 = top + 1;
+  const y1 = h - 6;
+  const Y = (v: number) => y1 - ((v - vmin) / (vmax - vmin)) * (y1 - y0);
+  for (const v of ticks) out += `<line x1="${x0}" x2="${x1}" y1="${Y(v).toFixed(2)}" y2="${Y(v).toFixed(2)}" stroke="#ccc" stroke-width="0.2"/>` + t(x0 - 1.2, Y(v) + 1, fmtNum(v), 'end');
+  const band = (x1 - x0) / cats.length;
+  const every = Math.max(1, Math.ceil((cats.reduce((m, c) => Math.max(m, c.length), 0) * 1.6 + 1) / band));
+  cats.forEach((c, i) => {
+    if (i % every === 0) out += t(x0 + band * (i + 0.5), y1 + 4, c);
+  });
+  if (kind === 'line') {
+    for (const [k, s] of series.entries()) {
+      const pts = s.vals.map((v, i) => (v === null ? null : [x0 + band * (i + 0.5), Y(v)] as const)).filter((p): p is readonly [number, number] => !!p);
+      out += `<polyline points="${pts.map((p) => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ')}" fill="none" stroke="${col[k % col.length]}" stroke-width="0.6"${gray && k % 2 ? ' stroke-dasharray="1.5 1"' : ''}/>`;
+      out += pts.map((p) => `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="0.8" fill="${col[k % col.length]}"/>`).join('');
+    }
+  } else {
+    const bw = (band * 0.7) / series.length;
+    for (const [i] of cats.entries())
+      for (const [k, s] of series.entries()) {
+        const v = s.vals[i];
+        if (v === null) continue;
+        const a = Y(Math.max(0, v));
+        const b = Y(Math.min(0, v));
+        out += `<rect x="${(x0 + band * i + band * 0.15 + k * bw).toFixed(2)}" y="${a.toFixed(2)}" width="${bw.toFixed(2)}" height="${Math.max(0.1, b - a).toFixed(2)}" fill="${col[k % col.length]}" stroke="#111" stroke-width="${gray ? 0.15 : 0}"/>`;
+      }
+  }
+  out += `<line x1="${x0}" x2="${x1}" y1="${Y(0).toFixed(2)}" y2="${Y(0).toFixed(2)}" stroke="#111" stroke-width="0.3"/><line x1="${x0}" x2="${x0}" y1="${y0}" y2="${y1}" stroke="#111" stroke-width="0.3"/>`;
+  return out + '</svg>';
+}
+
 interface Ctx {
   widthMm: number;
   number?: number;
@@ -649,6 +854,8 @@ interface Ctx {
   terms: { word: string; explain: string }[];
   /** im Editor: leere Felder als Platzhalter zeigen, damit man sie anklicken kann */
   editing?: boolean;
+  /** Tabellen des Blatts (für Diagramme) */
+  tables?: Map<string, string[][]>;
 }
 interface Part {
   /** vorbereitete Absätze (einmal gesetzt, damit Fußnoten beim Umbrechen ihre Nummer behalten) */
@@ -661,6 +868,8 @@ interface Part {
   heightMm?: number;
   /** Spalten: vorbereitete Bausteine je Spalte */
   kids?: { b: Block; ctx: Ctx; part: Part }[][];
+  /** Tabelle: Zellen als HTML */
+  cells?: string[][];
 }
 
 /** Vorlage und eigene Gestaltung auf den Baustein anwenden */
@@ -802,6 +1011,44 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
         if (!col.length) c.appendChild(el('div', 'bl-col-empty', ctx.editing ? '<span>leere Spalte<br>hier klicken, dann einfügen</span>' : ''));
         box.appendChild(c);
       }
+      // Mittelstege zum Ziehen (nur im Editor)
+      if (ctx.editing) {
+        const sum = ratio.reduce((x, y) => x + y, 0);
+        let acc = 0;
+        for (let k = 0; k < ratio.length - 1; k++) {
+          acc += ratio[k];
+          const g = el('div', 'bl-gutter');
+          g.dataset.gutter = `${b.id}:${k}`;
+          g.title = 'Mittelsteg ziehen';
+          // Lage: Anteil der Spaltenbreiten plus die Stege davor (6 mm je Steg)
+          g.style.left = `calc((100% - ${6 * (ratio.length - 1)}mm) * ${acc / sum} + ${6 * k + 3}mm)`;
+          box.appendChild(g);
+        }
+      }
+      break;
+    }
+    case 'table': {
+      const tb = el('table', 'bl-table bl-grid-' + (b.grid ?? 'all'));
+      const body = el('tbody');
+      for (const [i, r] of (part.cells ?? []).entries()) {
+        const tr = el('tr');
+        for (const [j, c] of r.entries()) tr.appendChild(field(b.headRow !== false && i === 0 ? 'th' : 'td', '', `cell:${i}:${j}`, c || (ctx.editing ? '<span class="bl-ph">&nbsp;</span>' : '')));
+        body.appendChild(tr);
+      }
+      tb.appendChild(body);
+      box.appendChild(tb);
+      if (b.caption || ctx.editing) box.appendChild(field('div', 'bl-cap', 'caption', esc(b.caption) || '<span class="bl-ph">Beschriftung (optional)</span>'));
+      break;
+    }
+    case 'chart': {
+      const pct = Math.max(20, Math.min(100, Number(b.width) || 90));
+      const wMm = (pct / 100) * ctx.widthMm;
+      const fig = el('figure', 'bl-fig bl-chart bl-align-' + (b.align ?? 'center'));
+      fig.style.width = pct + '%';
+      const rows = b.ref ? ctx.tables?.get(b.ref) : undefined;
+      fig.innerHTML = rows ? chartSvg(rows, b.kind ?? 'col', wMm, Math.max(25, Math.min(200, Number(b.hMm) || 60)), !!b.gray) : `<div class="bl-img-empty" style="height:${Number(b.hMm) || 60}mm"><span>${b.ref ? 'Die Tabelle fehlt.' : 'Noch keine Tabelle gewählt.'}<br>Im Reiter „Diagramm“ eine Tabelle wählen.</span></div>`;
+      if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
+      box.appendChild(fig);
       break;
     }
     case 'lines': {
@@ -818,7 +1065,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     default:
       break;
   }
-  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols') applyStyle(box, b, /bl-mnote/.test(html));
+  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart') applyStyle(box, b, /bl-mnote/.test(html));
   return box;
 }
 
@@ -842,6 +1089,8 @@ function prepare(b: Block, ctx: Ctx): Part {
       return { paras: paragraphs(b.md, t) };
     case 'task':
       return { title: inlineMd(b.md, t) };
+    case 'table':
+      return { cells: (b.rows ?? []).map((r) => r.map((c) => inlineMd(c, t))) };
     case 'heading':
       return { title: inlineMd(b.text, t) };
     case 'glossary': {
@@ -883,7 +1132,20 @@ interface Pg {
   widthMm: number;
 }
 
-function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy): Pg {
+/** Summe der Punkte aller Aufgaben („6 P.“), oder null, wenn eine Aufgabe keine Punktzahl hat */
+export function totalPoints(doc: BlattDoc): number | null {
+  const tasks = walk(doc.blocks).filter((b) => b.type === 'task');
+  if (!tasks.length) return null;
+  let sum = 0;
+  for (const b of tasks) {
+    const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:p\.?|pkt\.?|punkte?|be)?\s*$/i.exec(b.points ?? '');
+    if (!m) return null;
+    sum += Number(m[1].replace(',', '.'));
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, headCtx?: HeadCtx, editing?: boolean): Pg {
   const P = doc.page;
   const size = P.size === 'a5' ? 'a5' : 'a4';
   const [w, h] = SIZES[size];
@@ -896,23 +1158,42 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy): 
   page.style.fontSize = (Number(P.fontSize) || 11) + 'pt';
   const H = P.header;
   const qrHere = H.qr === 'all' || (H.qr === 'first' && index === 0);
-  if (H.show && (index === 0 || qrHere)) {
+  const F = headFields(doc);
+  if (H.show !== false && (index === 0 || qrHere)) {
     const head = el('div', 'bl-head');
+    head.dataset.head = '1';
     const left = el('div', 'bl-head-left');
-    if (H.text) left.appendChild(el('div', 'bl-head-title', esc(H.text)));
+    const blank = (cls = 'bl-short') => `<span class="bl-blank ${cls}"></span>`;
+    const val = (k: HeadKey, auto?: string) => {
+      const f = F[k];
+      const v = f.auto && auto !== undefined ? auto : f.value;
+      return v?.trim() ? esc(v.trim()) : '';
+    };
+    const title = F.title.on ? val('title', headCtx?.title ?? '') : '';
+    if (title) left.appendChild(el('div', 'bl-head-title', title));
+    else if (F.title.on && editing) left.appendChild(el('div', 'bl-head-title', '<span class="bl-ph">Titel</span>'));
     const fields = el('div', 'bl-head-fields');
-    if (H.nameLine) {
+    const add = (label: string, inner: string, cls = '') => fields.appendChild(el('span', 'bl-field ' + cls, `${label}: ${inner}`));
+    if (F.name.on) {
       // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
       const numbered = !!copy?.name && isNumberedSeat(copy.name);
       const line =
-        copy?.name && copy.printName && !numbered
+        F.name.auto !== false && copy?.name && copy.printName && !numbered
           ? `<span class="bl-filled">${esc(copy.name)}</span>`
           : numbered
             ? `<span class="bl-blank bl-labelled"><span class="bl-under">${esc(copy!.name!)}</span></span>`
-            : '<span class="bl-blank"></span>';
-      fields.appendChild(el('span', 'bl-field', 'Name: ' + line));
+            : blank('');
+      add('Name', line, 'bl-f-name');
     }
-    if (H.date) fields.appendChild(el('span', 'bl-field', 'Datum: <span class="bl-blank bl-short"></span>'));
+    if (F.klasse.on) add('Klasse', val('klasse', copy?.klasse ?? headCtx?.course ?? '') || blank());
+    if (F.subject.on) add('Fach', val('subject') || blank());
+    if (F.teacher.on) add('Lehrkraft', val('teacher', headCtx?.teacher ?? '') || blank());
+    if (F.date.on) add('Datum', val('date', new Date().toLocaleDateString('de-DE')) || blank());
+    if (F.points.on) {
+      const sum = F.points.auto !== false ? totalPoints(doc) : null;
+      add('Punkte', sum !== null ? `${blank('bl-tiny')} / ${String(sum).replace('.', ',')}` : val('points') || blank());
+    }
+    if (F.grade.on) add('Note', blank('bl-tiny'));
     if (fields.children.length) left.appendChild(fields);
     head.appendChild(left);
     if (qrHere) {
@@ -926,8 +1207,9 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy): 
       } else q.appendChild(el('div', 'bl-qr-ph', '<span>QR-Code<br>Autogra.fi</span>'));
       head.appendChild(q);
     }
-    page.appendChild(head);
+    if (left.children.length || qrHere) page.appendChild(head);
   }
+  if (P.watermark?.trim()) page.appendChild(el('div', 'bl-wm', esc(P.watermark.trim())));
   const body = el('div', 'bl-body');
   const notes = el('div', 'bl-notes');
   const foot = el('div', 'bl-foot');
@@ -953,13 +1235,13 @@ export interface Problem {
  * Bausteine auf Seiten setzen. host muss sichtbar im Dokument hängen, denn gemessen wird in px.
  * Liefert die Seiten in Lesereihenfolge und Hinweise auf Bausteine, die nicht auf eine Seite passen.
  */
-export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { editing?: boolean } = {}): { pages: HTMLElement[]; problems: Problem[] } {
+export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { editing?: boolean; head?: HeadCtx } = {}): { pages: HTMLElement[]; problems: Problem[] } {
   host.replaceChildren();
   const pages: Pg[] = [];
   const problems: Problem[] = [];
   let pg!: Pg;
   const next = () => {
-    pg = newPage(doc, host, pages.length, copy);
+    pg = newPage(doc, host, pages.length, copy, opts.head, opts.editing);
     pages.push(pg);
   };
   next();
@@ -976,7 +1258,8 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   const text = newTextCtx(gloss?.mark ?? 'star');
   const terms = glossaryTerms(doc);
   const korr = doc.page.korr?.side && doc.page.korr.side !== 'none' ? doc.page.korr : null;
-  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, ...extra });
+  const tables = new Map(walk(doc.blocks).filter((b) => b.type === 'table').map((b) => [b.id, b.rows ?? []] as const));
+  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, ...extra });
   /** Nummer bzw. Bezeichnung eines Bausteins (in Lesereihenfolge, auch in Spalten) */
   const number = (b: Block, ctx: Ctx) => {
     if (b.type === 'task') ctx.label = labels.get(b.id);
@@ -1227,6 +1510,15 @@ export function toMarkdown(doc: BlattDoc): string {
       case 'image':
         out.push(`[Bild${b.caption?.trim() ? ': ' + b.caption.trim() : ''}]`);
         break;
+      case 'chart':
+        out.push(`[Diagramm${b.caption?.trim() ? ': ' + b.caption.trim() : ''}]`);
+        break;
+      case 'table': {
+        const rows = (b.rows ?? []).map((r) => '| ' + r.map((c) => plainMd(c ?? '').replace(/\|/g, '/').replace(/\n+/g, ' ').trim()).join(' | ') + ' |');
+        if (rows.length) rows.splice(1, 0, '|' + (b.rows![0] ?? []).map(() => ' --- |').join(''));
+        out.push([rows.join('\n'), b.caption?.trim() ?? ''].filter(Boolean).join('\n\n'));
+        break;
+      }
       case 'task':
         out.push(`${labels.get(b.id) ?? ''} ${para(b.md).replace(/\n+/g, ' ')}${b.points?.trim() ? ` (${b.points.trim()})` : ''}`);
         break;

@@ -27,6 +27,9 @@ Der Kern enthält keinen Code aus OnlyOffice oder office-website. Er bindet die 
 
 Änderungen an `web/` (z. B. die Weiterleitung des Protokolls in `web/utils/editor/server.ts`) bleiben AGPL und werden mit veröffentlicht. Kein Code aus `web/` wird in `client/` oder `server/` kopiert oder importiert; umgekehrt ebenso.
 
+Die Menüband-Icons in `client/lib/colibre.ts` sind das Colibre-Icon-Thema von LibreOffice (Andreas Kainz) unter CC0;
+sie stehen frei und behalten den Hinweis auf ihre Herkunft im Dateikopf.
+
 ## Beiträge
 
 Wer zum Kern beiträgt, erklärt sich damit einverstanden, dass der Beitrag unter der Lizenz in `LICENSE` steht und dass der Rechteinhaber (`lasjoh-toho`) ihn auch unter anderen Bedingungen lizenzieren darf (z. B. später eine freie Lizenz oder eine Genehmigung für kommerzielle Nutzung). Beiträge zu `web/` stehen unter AGPL-3.0.

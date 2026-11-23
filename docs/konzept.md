@@ -1369,6 +1369,32 @@ Editoren von Collegare.
   z. B. Grafik neben Erklärtext. „Neben den nächsten“ setzt einen Baustein und den folgenden nebeneinander,
   „auflösen“ nimmt das zurück.
 
+### 8j.8 Menüband wie in Word, Rahmendaten, Tabelle und Diagramm (Stufe 4, 23. November 2026)
+
+Wünsche von Jo nach dem Ausprobieren von 0.7.18:
+
+- **Schreiben auf der Seite** auch ohne genaues Zielen: Ein Klick irgendwo in einen Textbaustein öffnet seinen Text,
+  ein Klick ins Leere unter dem letzten Baustein schreibt dort weiter (wie in Word), ein neu eingefügter Textbaustein
+  öffnet sich gleich. Die Rücktaste löscht keinen gewählten Baustein mehr (nur noch Entf).
+- **Menüband wie in Word:** Start, Einfügen, Entwurf, Layout und ein Reiter für den gewählten Baustein; große und
+  kleine Knöpfe mit den Colibre-Icons aus LibreOffice (CC0, `client/lib/colibre.ts`, dieselben wie im Menüband der
+  Folien). „Blatt“ ist in Entwurf (Schrift, Rahmendaten, QR-Code, Wasserzeichen, Korrekturrand) und Layout (Format,
+  Seitenzahlen, Broschüre, Spalten, Zählweise) aufgeteilt.
+- **Links** unter den Ansichten umschaltbar: Seitenminiaturen (Klick springt zur Seite), Gliederung (Überschriften,
+  Materialien, Aufgaben, beschriftete Tabellen und Bilder) und alle Elemente.
+- **Rahmendaten** (Klick in den Kopf oder „Rahmendaten“): Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note
+  und QR-Code, jedes Feld an oder aus, „automatisch“ (Name des Blatts, Kurs bzw. Klasse aus Autogra.fi, eigener Name,
+  Tag des Drucks, Name aus der Klassenliste, Summe der Punkte) oder frei (eigener Text, leer = Linie zum Ausfüllen).
+  Ältere Blätter (Kopfzeile mit Text, Name, Datum) werden übernommen.
+- **Spalten:** Im Baustein steht nur die Zahl der Spalten (eine bis vier); die Mittelstege werden auf der Seite
+  gezogen, „Gleichmäßig“ setzt sie zurück.
+- **Tabelle** als Baustein: Zellen auf der Seite beschreiben, Tab springt weiter, aus einer Tabellenkalkulation
+  Eingefügtes verteilt sich auf die Zellen; Zeilen und Spalten einfügen und löschen, Kopfzeile, Linien.
+- **Diagramm aus einer Tabelle** des Blatts: Säulen, Balken, Linie oder Kreis als SVG im Seitensatz (druckt scharf),
+  farbig oder in Graustufen; erste Zeile = Reihen, erste Spalte = Kategorien. Ändert sich die Tabelle, ändert sich das
+  Diagramm mit.
+- **Wasserzeichen** (ENTWURF, MUSTER, LÖSUNG oder eigener Text).
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).
