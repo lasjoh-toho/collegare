@@ -510,5 +510,5 @@
 /* Definitionen (z. B. Operatoren): Begriff links, Erklärung rechts */
 .host :global(.bl-def) { display: grid; grid-template-columns: var(--dt, 30mm) minmax(0, 1fr); column-gap: 4mm; }
 .host :global(.bl-def + .bl-def) { border-top: 0.15mm solid #ddd; padding-top: 1mm; }
-.host :global(.bl-dt) { font-weight: 700; }
+.host :global(.bl-dt) { font-weight: 700; text-align: right; }
 .host :global(.bl-tpl-definitionen .bl-def > .bl-dt::after) { content: ''; }
