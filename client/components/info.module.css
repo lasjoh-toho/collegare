@@ -12,3 +12,7 @@
 .area { width: 100%; resize: vertical; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--ui-border); background: var(--ui-bg); color: var(--ui-text); font: inherit; font-size: 13px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .err { margin: 0; color: var(--danger); font-size: 12.5px; }
+.side { display: flex; flex-direction: column; gap: 8px; padding: 12px; height: 100%; overflow: hidden; }
+.sideBar { display: flex; align-items: center; gap: 8px; color: var(--ui-text); }
+.sideText { flex: 1; overflow: auto; padding-right: 4px; }
+.sideText .text { font-size: 13.5px; line-height: 1.55; margin: 0 0 10px; }

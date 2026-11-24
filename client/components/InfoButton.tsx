@@ -4,7 +4,7 @@
  * Erklärung; Lehrkräfte passen Text und „beim ersten Öffnen zeigen“ in einem Fenster an (Einstellung infos),
  * nicht auf der Einstellungsseite. Lernende sehen eine Erklärung mit „start“ einmal von selbst, je Text gemerkt.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { patch } from '@/lib/api';
 import type { ProjectView } from '@/lib/types';
 import { Icon } from './Icon';
@@ -28,64 +28,89 @@ function hash(s: string) {
   return String(h);
 }
 
-export function InfoButton({ project, spec }: { project: ProjectView; spec: InfoSpec }) {
+/** Text der Erklärung, ob sie von selbst aufgehen soll, und „gesehen“ merken */
+function useInfo(project: ProjectView, spec: InfoSpec) {
   const [own, setOwn] = useState(project.settings.infos?.[spec.key]);
   useEffect(() => setOwn(project.settings.infos?.[spec.key]), [project.settings.infos, spec.key]);
   const text = own?.text.trim() || spec.text;
   // gemerkt wird nur der eigene Text der Lehrkraft: ein Standardtext, der je nach Ansicht wechselt, geht nicht erneut auf
   const mark = hash(own?.text.trim() || '');
   const start = own ? own.start : !!spec.start;
-  const teacher = project.role === 'teacher';
-  const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState(false);
-  const box = useRef<HTMLSpanElement>(null);
-
-  // einmal von selbst zeigen, wieder erst, wenn die Lehrkraft den Text ändert
-  useEffect(() => {
-    if (!start) return;
+  const unseen = () => {
     try {
-      if (localStorage.getItem(seenKey(project.id, spec.key)) !== mark) setOpen(true);
-    } catch {}
-  }, [start, mark, project.id, spec.key]);
-  const close = () => {
-    setOpen(false);
+      return localStorage.getItem(seenKey(project.id, spec.key)) !== mark;
+    } catch {
+      return false;
+    }
+  };
+  const seen = () => {
     try {
       localStorage.setItem(seenKey(project.id, spec.key), mark);
     } catch {}
   };
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => !box.current?.contains(e.target as Node) && close();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    addEventListener('pointerdown', onDown);
-    addEventListener('keydown', onKey);
-    return () => {
-      removeEventListener('pointerdown', onDown);
-      removeEventListener('keydown', onKey);
-    };
-  });
+  return { own, setOwn, text, mark, start, unseen, seen };
+}
 
+/**
+ * i-Knopf in der Kopfzeile. Die Erklärung steht in der rechten Leiste, die sie sich mit Chat, Notizen, Verlauf und
+ * Gliederung teilt (Wunsch Jo, 24. November 2026: die Blase ging über den rechten Rand hinaus).
+ */
+export function InfoButton({ project, spec, open, onOpen, onClose }: { project: ProjectView; spec: InfoSpec; open: boolean; onOpen: () => void; onClose: () => void }) {
+  const { start, mark, unseen, seen } = useInfo(project, spec);
+  // einmal von selbst zeigen, wieder erst, wenn die Lehrkraft den Text ändert
+  useEffect(() => {
+    if (start && unseen()) onOpen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, mark, project.id, spec.key]);
   return (
-    <span className={st.wrap} ref={box}>
-      <button className={`btn icon ${st.btn} ${open ? 'on' : ''}`} onClick={() => (open ? close() : setOpen(true))} title="Erklärung" aria-label="Erklärung" aria-expanded={open}>
-        <Icon name="info" size={15} />
-      </button>
-      {open && (
-        <div className={`panel ${st.pop}`} role="note">
-          <p className={st.text}>{text}</p>
-          <div className={st.foot}>
-            {teacher && (
-              <button className="btn" onClick={() => setEdit(true)}>
-                <Icon name="pen" size={13} /> Anpassen
-              </button>
-            )}
-            <span className="grow" />
-            <button className="btn" onClick={close}>
-              Verstanden
-            </button>
-          </div>
-        </div>
-      )}
+    <button
+      className={`btn icon ${st.btn} ${open ? 'on' : ''}`}
+      onClick={() => (open ? (seen(), onClose()) : onOpen())}
+      title={open ? 'Erklärung ausblenden' : 'Erklärung'}
+      aria-label="Erklärung"
+      aria-pressed={open}
+    >
+      <Icon name="info" size={15} />
+    </button>
+  );
+}
+
+/** Erklärung als Leiste am rechten Rand */
+export function InfoPanel({ project, spec, onClose }: { project: ProjectView; spec: InfoSpec; onClose: () => void }) {
+  const { own, setOwn, text, seen } = useInfo(project, spec);
+  const [edit, setEdit] = useState(false);
+  const teacher = project.role === 'teacher';
+  const close = () => {
+    seen();
+    onClose();
+  };
+  return (
+    <div className={st.side} role="note">
+      <div className={st.sideBar}>
+        <Icon name="info" size={16} />
+        <strong className="grow">Erklärung</strong>
+        <button className="btn icon" onClick={close} title="Schließen" aria-label="Erklärung schließen">
+          <Icon name="close" size={15} />
+        </button>
+      </div>
+      <div className={st.sideText}>
+        {text.split(/\n{2,}/).map((p, i) => (
+          <p key={i} className={st.text}>
+            {p}
+          </p>
+        ))}
+      </div>
+      <div className={st.foot}>
+        {teacher && (
+          <button className="btn" onClick={() => setEdit(true)}>
+            <Icon name="pen" size={13} /> Anpassen
+          </button>
+        )}
+        <span className="grow" />
+        <button className="btn" onClick={close}>
+          Verstanden
+        </button>
+      </div>
       {edit && (
         <InfoDialog
           project={project}
@@ -98,7 +123,7 @@ export function InfoButton({ project, spec }: { project: ProjectView; spec: Info
           }}
         />
       )}
-    </span>
+    </div>
   );
 }
 

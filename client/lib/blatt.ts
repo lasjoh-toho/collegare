@@ -312,6 +312,53 @@ export function newBlock(type: BlockType): Block {
   return b;
 }
 
+/** Textbausteine, die sich ineinander umwandeln lassen (Wunsch Jo, 24. November 2026) */
+export const CONVERTIBLE: BlockType[] = ['heading', 'text', 'material', 'quote', 'box', 'task'];
+
+/**
+ * Baustein in eine andere Art umwandeln, ohne Text zu verlieren: Titel (Überschrift, Materialtitel, Kastentitel) und
+ * Text (eine Zeile je Absatz) wandern mit. Wird aus mehrzeiligem Text eine Überschrift, folgt der Rest als Erklärtext.
+ * Gemeinsame Einstellungen (Umbrüche, Zusammenhalten) bleiben, die Vorlage beginnt neu.
+ */
+export function convertBlock(b: Block, to: BlockType): Block[] {
+  if (b.type === to || !CONVERTIBLE.includes(b.type) || !CONVERTIBLE.includes(to)) return [b];
+  const title = (b.type === 'heading' ? b.text : b.type === 'material' ? b.title : b.type === 'box' ? b.text : '')?.trim() ?? '';
+  const body = b.type === 'heading' ? '' : (b.md ?? '').replace(/\s+$/, '');
+  const n = newBlock(to);
+  n.id = b.id;
+  for (const k of ['breakBefore', 'keep', 'keepNext'] as const) if (b[k]) n[k] = b[k];
+  const both = [title, body].filter(Boolean).join('\n');
+  switch (to) {
+    case 'heading': {
+      const lines = body.split('\n');
+      n.text = title || plainMd(lines.shift() ?? '').trim();
+      n.level = 2;
+      const rest = (title ? body : lines.join('\n')).trim();
+      if (!rest) return [n];
+      const t = newBlock('text');
+      t.md = rest;
+      return [n, t];
+    }
+    case 'material':
+      n.title = title;
+      n.md = body;
+      if (b.type === 'quote' && b.source) n.source = b.source;
+      break;
+    case 'box':
+      n.text = title;
+      n.md = body;
+      break;
+    case 'quote':
+      n.md = both;
+      if (b.type === 'material' && b.source) n.source = b.source;
+      break;
+    default:
+      // Aufgabe, Erklärtext: Titel als erste Zeile
+      n.md = both;
+  }
+  return [n];
+}
+
 /** Kurztext eines Bausteins für die Liste */
 export function blockSummary(b: Block): string {
   const plain = (s?: string) => plainMd(s ?? '').replace(/[#>-]+/g, ' ').replace(/\s+/g, ' ').trim();

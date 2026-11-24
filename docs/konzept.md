@@ -1451,6 +1451,11 @@ zu komplex“):
   Notenkasten) haben eine wählbare Linienstärke (`line`: Haarlinie, dünn = Standard, mittel, kräftig; Start →
   Formatvorlagen → „Linie“), insgesamt leichtere Striche. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im
   Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (`qrHint`, abschaltbar).
+- **Umwandeln und Erklärung** (Jo, 24. November 2026): Einträge der linken Leiste (Gliederung, Elemente) lassen sich
+  per Rechtsklick (in den Elementen auch per Knopf) in eine andere Bausteinart umwandeln (`convertBlock`: Überschrift,
+  Erklärtext, Material, Zitat, Kasten, Aufgabe; Titel und Text wandern mit, aus mehrzeiligem Text wird Überschrift +
+  Erklärtext). Die Erklärung hinter dem ⓘ ist in allen Projektseiten keine Blase mehr, sondern eine Leiste am rechten
+  Rand, die sie sich mit Chat, Notizen, Verlauf und Gliederung teilt (immer nur eine offen).
 
 ### 8j.5 Nächste Stufen
 

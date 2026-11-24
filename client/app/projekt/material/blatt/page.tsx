@@ -30,6 +30,8 @@ import {
   insertIntoCol,
   listOf,
   mapLists,
+  CONVERTIBLE,
+  convertBlock,
   newBlock,
   pageGeom,
   paginate,
@@ -105,7 +107,7 @@ Tabelle: in die Zellen schreiben, Tab springt in die nächste Zelle (am Ende kom
 
 Bilder: hineinziehen, einfügen, im Reiter „Bild“ auswählen, aus dem Material oder über ihre Adresse im Netz laden. Ein Bild lässt sich drehen und mit der Maus frei auf der Seite verschieben; sein Platz im Text bleibt frei, außer du wählst „vor dem Text“.
 
-Links wählst du die Ansicht: Seiten (zum Schreiben), Doppelseiten (wie im aufgeschlagenen Heft, um den Mittelschnitt zu prüfen; auch hier schreibst du) und Druckbögen (so liegen die Seiten auf dem Papier). Darunter wechselst du zwischen Seitenminiaturen, Gliederung und allen Elementen (ziehen ändert die Reihenfolge).
+Links wählst du die Ansicht: Seiten (zum Schreiben), Doppelseiten (wie im aufgeschlagenen Heft, um den Mittelschnitt zu prüfen; auch hier schreibst du) und Druckbögen (so liegen die Seiten auf dem Papier). Darunter wechselst du zwischen Seitenminiaturen, Gliederung und allen Elementen (ziehen ändert die Reihenfolge). Ein Rechtsklick auf einen Eintrag der Gliederung oder der Elemente wandelt ihn um: Überschrift, Erklärtext, Material, Zitat, Kasten oder Aufgabe; der Text bleibt erhalten. In den Elementen geht das auch mit dem kleinen Knopf am gewählten Eintrag.
 
 Rechts lässt sich eine Seitenleiste zuschalten: Suchen (im Blatt, nach Bausteinen und im Material), Material (Bilder und Lernseiten einsetzen) und Glossar (Erklärungen schreiben).
 
@@ -161,6 +163,8 @@ export default function BlattPage() {
   const [zoom, setZoom] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  /** Kontextmenü „Umwandeln in“ für einen Baustein der linken Leiste */
+  const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
   const [dropAt, setDropAt] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('insert');
   /** Format übertragen: Gestaltung, die beim nächsten Klick auf einen Baustein übernommen wird */
@@ -585,6 +589,24 @@ export default function BlattPage() {
     });
     setSel(nid);
   }
+  /** Baustein in eine andere Art umwandeln (Überschrift, Erklärtext, Material, Zitat, Kasten, Aufgabe) */
+  function transform(bid: string, to: BlockType) {
+    change((d) => ({
+      ...d,
+      blocks: mapLists(d.blocks, (l) => {
+        const i = l.findIndex((b) => b.id === bid);
+        return i < 0 ? l : [...l.slice(0, i), ...convertBlock(l[i], to), ...l.slice(i + 1)];
+      }),
+    }));
+    setSel(bid);
+    setEdit(null);
+  }
+  const openConv = (e: React.MouseEvent, b: Block) => {
+    if (!editing || !CONVERTIBLE.includes(b.type)) return;
+    e.preventDefault();
+    select(b.id);
+    setConv({ bid: b.id, x: e.clientX, y: e.clientY });
+  };
   /** gewählten Baustein und den folgenden nebeneinander setzen (z. B. Erklärtext neben eine Grafik) */
   function toColumns(bid: string) {
     change((d) => ({
@@ -1043,11 +1065,19 @@ export default function BlattPage() {
                 <div className={st.list}>
                   {!outlineItems.length && <div className={st.empty}>Noch keine Überschriften, Materialien oder Aufgaben.</div>}
                   {outlineItems.map(({ b, depth, label }) => (
-                    <button key={b.id} className={`${st.oItem} ${sel === b.id ? st.sel : ''}`} style={{ paddingLeft: 6 + depth * 14 }} onClick={() => (select(b.id), setEdit(null), host.current?.querySelector(`[data-bid="${b.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}>
+                    <button key={b.id} className={`${st.oItem} ${sel === b.id ? st.sel : ''}`} style={{ paddingLeft: 6 + depth * 14 }} onContextMenu={(e) => openConv(e, b)} onClick={() => (select(b.id), setEdit(null), host.current?.querySelector(`[data-bid="${b.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}>
                       {label}
                     </button>
                   ))}
                 </div>
+              )}
+              {conv && (
+                <ConvMenu
+                  conv={conv}
+                  b={doc ? findBlock(doc.blocks, conv.bid) : null}
+                  onPick={(to) => (transform(conv.bid, to), setConv(null))}
+                  onClose={() => setConv(null)}
+                />
               )}
               {leftTab === 'blocks' && (
                 <section className={st.sec}>
@@ -1063,6 +1093,7 @@ export default function BlattPage() {
                         onDragStart={(e) => (setDragId(b.id), e.dataTransfer.setData('text/plain', b.id))}
                         onDragOver={() => dragId && setDropAt(b.id)}
                         onDragEnd={() => (setDragId(null), setDropAt(null))}
+                        onContextMenu={(e) => openConv(e, b)}
                         title={bad.has(b.id) ? problems.find((p) => p.bid === b.id)?.msg : undefined}
                       >
                         <span className={st.itemIcon}>
@@ -1072,6 +1103,21 @@ export default function BlattPage() {
                           {BLOCK_LABEL[b.type]}
                           <small>{blockSummary(b)}</small>
                         </span>
+                        {editing && sel === b.id && CONVERTIBLE.includes(b.type) && (
+                          <button
+                            type="button"
+                            className={st.convBtn}
+                            title="Umwandeln in … (auch mit Rechtsklick)"
+                            aria-label="Umwandeln"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setConv({ bid: b.id, x: r.left, y: r.bottom + 2 });
+                            }}
+                          >
+                            <Ico n="editstyle" size={14} />
+                          </button>
+                        )}
                       </div>
                     ))}
                     {dragId && (
@@ -1277,6 +1323,32 @@ function cssObj(css: string): React.CSSProperties {
     o[k.startsWith('--') ? k : k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())] = v;
   }
   return o as React.CSSProperties;
+}
+
+/** Kontextmenü der linken Leiste: Baustein umwandeln */
+function ConvMenu({ conv, b, onPick, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; onPick: (to: BlockType) => void; onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    addEventListener('pointerdown', down);
+    addEventListener('keydown', key);
+    return () => {
+      removeEventListener('pointerdown', down);
+      removeEventListener('keydown', key);
+    };
+  }, [onClose]);
+  if (!b) return null;
+  const left = Math.min(conv.x, innerWidth - 240);
+  const top = Math.min(conv.y, innerHeight - 300);
+  return (
+    <div ref={box} className={`${st.menu} ${st.convMenu}`} style={{ left, top }} role="menu">
+      <div className={st.mh}>Umwandeln in</div>
+      {CONVERTIBLE.map((t) => (
+        <MI key={t} icon={BICON[t]} label={BLOCK_LABEL[t]} on={b.type === t} disabled={b.type === t} onClick={() => onPick(t)} />
+      ))}
+    </div>
+  );
 }
 
 /** Gliederung: Überschriften, Materialien, Aufgaben, Tabellen, Diagramme und Bilder mit Unterschrift */

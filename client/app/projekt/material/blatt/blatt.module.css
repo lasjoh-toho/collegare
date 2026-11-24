@@ -409,3 +409,8 @@
 .host :global(.bl-grade-table) { table-layout: fixed; }
 .host :global(.bl-grade-table th) { width: 32mm; }
 .host :global(.bl-grade-qr) { margin: 3mm 0 0; font-size: 0.85em; font-style: italic; color: #444; }
+
+/* Baustein umwandeln (linke Leiste) */
+.convMenu { position: fixed; top: auto; z-index: 60; min-width: 210px; }
+.convBtn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-elev); cursor: pointer; padding: 0; }
+.convBtn:hover { background: var(--accent-soft); }

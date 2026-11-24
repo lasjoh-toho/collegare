@@ -13,7 +13,7 @@ import type { Me, ProjectView } from '@/lib/types';
 import { ChatPanel } from './ChatPanel';
 import { NotesPanel } from './NotesPanel';
 import { Icon } from './Icon';
-import { InfoButton, type InfoSpec } from './InfoButton';
+import { InfoButton, InfoPanel, type InfoSpec } from './InfoButton';
 import { OutlineSide } from './OutlineSide';
 import { announceSide, useSideBus } from '@/lib/sides';
 import { ThemeSwitch } from './ThemeSwitch';
@@ -23,7 +23,7 @@ const PIN_KEY = 'collegare-menu-pinned';
 const SIDE_KEY = 'collegare-leiste';
 const SIDE_W_KEY = 'collegare-leiste-breite';
 const clampSide = (w: number) => Math.round(Math.max(280, Math.min(w, 900, innerWidth * 0.7)));
-type Side = 'chat' | 'notes' | 'history' | 'outline' | null;
+type Side = 'chat' | 'notes' | 'history' | 'outline' | 'info' | null;
 
 /** ein Schritt im Verlauf (Bento, Pinnwand) */
 export interface UndoEntry {
@@ -168,7 +168,8 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   const showHistory = side === 'history' && !!undo?.onGo;
   const outlineOn = project.settings.phases.orientation?.state !== 'off' && where !== 'Gliederung' && (teacher || project.settings.tools?.outline !== false);
   const showOutline = side === 'outline' && outlineOn && !outline;
-  useSideBus('right', 'shell', showChat || showNotes || showHistory || showOutline, () => toggleSide(null));
+  const showInfo = side === 'info' && !!info;
+  useSideBus('right', 'shell', showChat || showNotes || showHistory || showOutline || showInfo, () => toggleSide(null));
   useSideBus('left', 'menu', open || pinned, () => {
     setOpen(false);
     if (pinned) pin(false);
@@ -199,7 +200,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
   }
 
   return (
-    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes || showHistory ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
+    <div className={`${sh.shell} ${pinned ? sh.pinned : ''} ${pushed ? sh.pushed : ''} ${fill ? sh.fill : ''} ${showChat || showNotes || showHistory || showInfo ? sh.chatOpen : ''}`} style={{ '--side-w': `${sideW}px` } as React.CSSProperties}>
       <header className={sh.head}>
         <button className={sh.who} onClick={() => (pinned ? pin(false) : (open || announceSide('left', 'menu'), setOpen((o) => !o)))} aria-expanded={open || pinned} aria-controls="seitenmenue" title="Seitenmenü">
           <Icon name="menu" size={18} />
@@ -265,7 +266,7 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
               <Icon name="chat" size={16} />
             </button>
           )}
-          {info && <InfoButton project={project} spec={info} />}
+          {info && <InfoButton project={project} spec={info} open={showInfo} onOpen={() => toggleSide('info')} onClose={() => toggleSide(null)} />}
         </div>
       </header>
 
@@ -407,6 +408,12 @@ export function ProjectShell({ me, project, where, phase = null, actions, docs, 
         <aside className={sh.chat} aria-label="Gliederung">
           <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
           <OutlineSide me={me} project={project} onClose={() => toggleSide(null)} />
+        </aside>
+      )}
+      {showInfo && info && (
+        <aside className={sh.chat} aria-label="Erklärung">
+          <div className={sh.sideGrip} onPointerDown={dragSide} title="Breite ziehen" aria-hidden="true" />
+          <InfoPanel project={project} spec={info} onClose={() => toggleSide(null)} />
         </aside>
       )}
       {showNotes && (
