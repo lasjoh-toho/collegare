@@ -42,6 +42,10 @@ import {
   STYLE_KEYS,
   taskLabels,
   TEMPLATES,
+  LINE_MM,
+  LINE_LABEL,
+  hasFrame,
+  type LineWeight,
   toCriteria,
   toEditMd,
   toMarkdown,
@@ -91,7 +95,7 @@ Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht d
 
 Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
 
-Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte (z. B. [   ] / 6 P.). „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift.
+Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte. Mit „Sollpunktzahl zeigen“ steht die mögliche Punktzahl gleich im Feld (z. B. [    / 6 P.]), sonst bleibt sie im Text der Aufgabe. „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (abschaltbar). Die Stärke der Rahmenlinien wählst du bei Kästen unter „Start“ → Formatvorlagen → „Linie“ (Haarlinie bis kräftig), beim Notenkasten auch in seinem Reiter.
 
 Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (Reiter „Aufgabe“ → Nummern). Eine eigene Nummer wie „1 b)“ trägst du dort ein, wenn die Aufgabe gewählt ist.
 
@@ -1436,6 +1440,19 @@ function MI({ label, on, onClick, icon, hint, disabled, stay }: { label: string;
     </button>
   );
 }
+/** Linienstärke für Kästen (Kasten, Aufgabe oder Glossar im Kasten, Bewertung) */
+function LineDrop({ b, set }: { b: Block | null | undefined; set: (p: Partial<Block>) => void }) {
+  const ok = hasFrame(b);
+  const cur: LineWeight = b?.line ?? 'thin';
+  return (
+    <Drop icon="formatline" label="Linie" value={ok ? LINE_LABEL[cur] : '–'} disabled={!ok} title={ok ? 'Stärke der Rahmenlinien' : 'Nur bei Kästen: Kasten, Aufgabe oder Glossar „im Kasten“, Notenkasten'}>
+      <MH>Rahmenlinie</MH>
+      {(Object.keys(LINE_MM) as LineWeight[]).map((k) => (
+        <MI key={k} label={LINE_LABEL[k] + (k === 'thin' ? ' (Standard)' : '')} hint={`${de(LINE_MM[k])} mm`} on={cur === k} onClick={() => set({ line: k === 'thin' ? undefined : k })} />
+      ))}
+    </Drop>
+  );
+}
 /** Überschrift im Klappmenü */
 const MH = ({ children }: { children: React.ReactNode }) => <div className={st.mh}>{children}</div>;
 
@@ -1683,6 +1700,7 @@ function Ribbon(props: RibbonProps) {
                   <RB icon="resetattributes" label="Wie Vorlage" hideLabel disabled={!textBlock} onClick={() => set({ ...STYLE_RESET, ...(b?.type === 'material' ? { justify: undefined } : {}) })} title="Eigene Gestaltung entfernen (wie Vorlage)" />
                 </div>
                 <div className={st.row}>
+                  <LineDrop b={b} set={set} />
                   <Drop icon="pagemargin" label="Rand für Notizen" value={s.nm ? cm(s.nm) : 'kein'} disabled={!textBlock} title="Freier Rand rechts für Notizen; Randbemerkungen stehen dort">
                     <MI label="kein Rand" on={!s.nm} onClick={() => set({ nm: 0 })} />
                     {withValue([20, 30, 40, 50], s.nm || undefined).map((v) => (
@@ -1799,11 +1817,13 @@ function Ribbon(props: RibbonProps) {
               </Drop>
             </Group>
             <Group label="Bewertung">
-              <Drop icon="checkbox" label="Punktefelder" value={P.earned === 'box' ? 'Kästchen' : P.earned === 'line' ? 'Linie' : 'aus'} big title="Feld für die erreichten Punkte hinter jeder Aufgabe">
+              <Drop icon="checkbox" label="Punktefelder" value={P.earned === 'box' || P.earned === 'line' ? (P.earned === 'box' ? 'Kästchen' : 'Linie') + (P.earnedMax === false ? '' : ' / Soll') : 'aus'} big title="Feld für die erreichten Punkte hinter jeder Aufgabe">
                 <MH>Hinter jeder Aufgabe</MH>
                 <MI label="kein Feld" hint="Punkte stehen im Text der Aufgabe" on={!P.earned || P.earned === 'none'} onClick={() => props.setPageOpt({ earned: 'none' })} />
-                <MI label="Kästchen" hint="[   ] / 6 P. rechts neben der Aufgabe" on={P.earned === 'box'} onClick={() => props.setPageOpt({ earned: 'box' })} />
-                <MI label="Linie" hint="___ / 6 P. rechts neben der Aufgabe" on={P.earned === 'line'} onClick={() => props.setPageOpt({ earned: 'line' })} />
+                <MI label="Kästchen" hint={P.earnedMax === false ? '[   ] rechts neben der Aufgabe' : '[    / 6 P.] rechts, die Sollpunktzahl steht im Kästchen'} on={P.earned === 'box'} onClick={() => props.setPageOpt({ earned: 'box' })} />
+                <MI label="Linie" hint={P.earnedMax === false ? '___ rechts neben der Aufgabe' : '___ / 6 P. rechts neben der Aufgabe'} on={P.earned === 'line'} onClick={() => props.setPageOpt({ earned: 'line' })} />
+                <MH>Im Feld</MH>
+                <MI label="Sollpunktzahl zeigen" stay hint="„/ 6 P.“; aus: die Punkte stehen im Text der Aufgabe" on={P.earnedMax !== false} disabled={!P.earned || P.earned === 'none'} onClick={() => props.setPageOpt({ earnedMax: P.earnedMax === false ? undefined : false })} />
               </Drop>
               <RB
                 icon="tabledialog"
@@ -2452,7 +2472,11 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           <RB icon="tabledialog" label="Punkte je Aufgabe" big on={b.scoreTable !== false} onClick={() => set({ scoreTable: b.scoreTable === false })} title="Tabelle: Aufgaben, mögliche und erreichte Punkte, Summe" />
           <RB icon="insertannotation" label="Bemerkung" big on={!!b.remark} onClick={() => set({ remark: !b.remark })} title="Linie für eine Bemerkung" />
           <RB icon="edit" label="Unterschrift" big on={!!b.sign} onClick={() => set({ sign: !b.sign })} title="Linie für die Unterschrift" />
+          <RB icon="qr" label="QR-Hinweis" big on={b.qrHint !== false} onClick={() => set({ qrHint: b.qrHint === false ? undefined : false })} title="Unten im Kasten: „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ Erscheint nur, wenn das Blatt einen QR-Code hat." />
           <div className={st.rows}>
+            <div className={st.row}>
+              <LineDrop b={b} set={set} />
+            </div>
             <label className={st.mini}>
               Feld heißt
               <input className={st.rIn} value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="Note" style={{ width: 110 }} title="z. B. Note, Notenpunkte, Bewertung" />

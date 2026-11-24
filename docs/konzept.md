@@ -1446,6 +1446,11 @@ zu komplex“):
   rechts hinter jeder Aufgabe, „[ ] / 6 P.“) und „Notenkasten“ (Baustein `grade`: Tabelle Aufgabe / mögliche /
   erreichte Punkte mit Summe, Feld für die Note mit eigener Beschriftung, wahlweise Bemerkung und Unterschrift).
   Aufgaben mit Prozentangaben zählen dort nicht mit. Auch in Word und Typst.
+  Nachtrag (Jo, 24. November 2026): Die Sollpunktzahl steht wahlweise im Punktefeld („[    / 6 P.]“, ein Kästchen
+  statt zwei; `page.earnedMax`, Standard an; aus: Punkte im Aufgabentext). Kästen (Kasten, Aufgabe/Glossar im Kasten,
+  Notenkasten) haben eine wählbare Linienstärke (`line`: Haarlinie, dünn = Standard, mittel, kräftig; Start →
+  Formatvorlagen → „Linie“), insgesamt leichtere Striche. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im
+  Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (`qrHint`, abschaltbar).
 
 ### 8j.5 Nächste Stufen
 

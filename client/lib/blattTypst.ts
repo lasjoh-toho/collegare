@@ -457,13 +457,14 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['justify', 'blocksatz', 'bool'],
   ],
   quote: [['source', 'quelle', 'content']],
-  box: [['text', 'titel', 'content']],
+  box: [['text', 'titel', 'content'], ['line', 'linie', 'str']],
   task: [
     ['subtask', 'teilaufgabe', 'bool'],
     ['num', 'nummer', 'str'],
     ['points', 'punkte', 'str'],
     ['lines', 'zeilen', 'num'],
     ['lineStyle', 'linien', 'str'],
+    ['line', 'linie', 'str'],
   ],
   image: [...PLACE, ['rot', 'drehung', 'num'], ['ar', 'seitenverhaeltnis', 'num']],
   chart: [['ref', 'tabelle', 'str'], ['kind', 'art', 'str'], ['gray', 'grau', 'bool'], ['hMm', 'hoehe', 'mm'], ...PLACE],
@@ -476,6 +477,7 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['text', 'titel', 'str'],
     ['sort', 'ordnung', 'str'],
     ['mark', 'kennzeichen', 'str'],
+    ['line', 'linie', 'str'],
   ],
   lines: [
     ['style', 'art', 'str'],
@@ -490,6 +492,8 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['scoreTable', 'punktetabelle', 'bool'],
     ['remark', 'bemerkung', 'bool'],
     ['sign', 'unterschrift', 'bool'],
+    ['qrHint', 'qr-hinweis', 'bool'],
+    ['line', 'linie', 'str'],
   ],
 };
 const NAME: Record<BlockType, string> = {
@@ -603,7 +607,7 @@ export function toTypst(doc: BlattDoc): string {
   const out: string[] = [];
   out.push('// Arbeitsblatt als Typst-Code. Ändern und „Übernehmen“; Bilder verweisen auf ihre Nummer im Blatt.');
   out.push(
-    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
+    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n${P.earnedMax === false ? '  sollpunktzahl: false,\n' : ''}  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
   );
   const fieldCode = (k: HeadKey) => {
     const f = F[k];
@@ -764,6 +768,8 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
       if (g('schriftgroesse') !== undefined) page.fontSize = read(g('schriftgroesse')!, 'num', 'schriftgroesse', c.line) as number;
       const pf = str('punktefelder', ['none', 'box', 'line']);
       if (pf) page.earned = pf as 'box';
+      const sp = bool('sollpunktzahl');
+      page.earnedMax = sp === false ? false : undefined;
       const pn = bool('seitenzahlen');
       if (pn !== undefined) page.pageNumbers = pn;
       const o = str('seitenfolge', ['einzeln', 'zwei-je-blatt', 'broschuere']);

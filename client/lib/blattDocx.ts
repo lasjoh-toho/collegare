@@ -6,7 +6,7 @@
  * (als PNG), Glossar. Fußnoten sind echte Word-Fußnoten; Randbemerkungen stehen kursiv in Klammern im Text.
  * Der Seitensatz (Umbruch, Spalten, Broschüre) bleibt Sache von Word. Ohne Abhängigkeiten außer dem kleinen ZIP.
  */
-import { type BlattDoc, type Block, type HeadCtx, chartSvg, glossaryTerms, headFields, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
+import { type BlattDoc, type Block, type HeadCtx, chartSvg, glossaryTerms, headFields, LINE_MM, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
 
 const xe = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -241,7 +241,11 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
       const label = st.labels.get(b.id) ?? '';
       const lines = (b.md ?? '').split('\n').filter((x) => x.trim());
       const earned = doc.page.earned && doc.page.earned !== 'none';
-      const pts = earned ? [{ t: `\t${doc.page.earned === 'box' ? '[      ]' : '______'}${b.points?.trim() ? ` / ${b.points.trim()}` : ''}`, b: true }] : b.points?.trim() ? [{ t: `\t${b.points.trim()}`, b: true }] : [];
+      const showMax = doc.page.earnedMax !== false && !!b.points?.trim();
+      const maxT = showMax ? ` / ${b.points!.trim()}` : '';
+      const field = doc.page.earned === 'box' ? (showMax ? `[      ${maxT.trim()} ]` : '[      ]') : `______${maxT}`;
+      const inline = b.points?.trim() && (!earned || !showMax) ? [{ t: ` ${b.points.trim()}`, b: true }] : [];
+      const pts = earned ? [...inline, { t: `\t${field}`, b: true }] : b.points?.trim() ? [{ t: `\t${b.points.trim()}`, b: true }] : [];
       const ind = b.subtask ? 16 : 8;
       const tabs = `<w:tabs><w:tab w:val="right" w:pos="${Math.round(ctx.width * TW)}"/></w:tabs>`;
       const first = para([{ t: `${label}\t`, b: base.b }, ...runs(lines[0] ?? '', base), ...pts], ctx, { ind, hanging: 8, tabs });
@@ -301,8 +305,10 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
         const max = scores.map((x) => x.points!.trim().replace(/\s*(p\.?|pkt\.?|punkte?|be)\s*$/i, ''));
         const sum = max.reduce((a, x) => a + (Number(x.replace(',', '.').match(/\d+(?:\.\d+)?/)?.[0]) || 0), 0);
         const row = (cells: string[], bold = false) => `<w:tr><w:trPr><w:trHeight w:val="${Math.round(8 * TW)}"/></w:trPr>${cells.map((c, i) => cell(c, bold || i === 0)).join('')}</w:tr>`;
+        const sz = Math.max(2, Math.round(LINE_MM[b.line ?? 'thin'] * 2.835 * 8));
+        const bd = (k: string) => `<w:${k} w:val="single" w:sz="${sz}" w:color="777777"/>`;
         out.push(
-          `<w:tbl><w:tblPr><w:tblW w:w="${colW * n}" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr><w:tblGrid>${Array(n).fill(`<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>` +
+          `<w:tbl><w:tblPr><w:tblW w:w="${colW * n}" w:type="dxa"/><w:tblBorders>${['top', 'bottom', 'left', 'right', 'insideH', 'insideV'].map(bd).join('')}</w:tblBorders></w:tblPr><w:tblGrid>${Array(n).fill(`<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>` +
             row(['Aufgabe', ...scores.map((x) => (st.labels.get(x.id) ?? '').replace(/[.)]$/, '')), 'Summe'], true) +
             row(['mögliche Punkte', ...max, sum ? String(sum).replace('.', ',') : '']) +
             row(['erreichte Punkte', ...max.map(() => ''), '']) +
@@ -312,6 +318,7 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
       out.push(para([{ t: `${b.text?.trim() || 'Note'}: `, b: true }, { t: '[            ]' }], ctx, { after: 120 }));
       if (b.remark) out.push(para([{ t: 'Bemerkung: ' }, { t: '_'.repeat(60) }], ctx));
       if (b.sign) out.push(para([{ t: 'Unterschrift: ' }, { t: '_'.repeat(30) }], ctx));
+      if (b.qrHint !== false && doc.page.header.show !== false && doc.page.header.qr !== 'none') out.push(para([{ t: 'Scannen Sie für ein genaues Feedback erneut den QR-Code.', i: true }], ctx));
       return out.join('');
     }
     case 'cols': {

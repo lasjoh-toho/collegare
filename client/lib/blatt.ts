@@ -103,6 +103,23 @@ export interface Block {
   scoreTable?: boolean;
   sign?: boolean;
   remark?: boolean;
+  /** Bewertung: Hinweis „Scannen Sie für ein genaues Feedback erneut den QR-Code“, wenn das Blatt einen QR-Code hat (Standard an) */
+  qrHint?: boolean;
+  /** Kästen (Kasten, Aufgabe im Kasten, Glossar im Kasten, Bewertung): Linienstärke (Wunsch Jo, 24. November 2026) */
+  line?: LineWeight;
+}
+
+/** Linienstärken für Kästen; Standard „dünn“ */
+export type LineWeight = 'hair' | 'thin' | 'medium' | 'thick';
+export const LINE_MM: Record<LineWeight, number> = { hair: 0.12, thin: 0.2, medium: 0.35, thick: 0.6 };
+export const LINE_LABEL: Record<LineWeight, string> = { hair: 'Haarlinie', thin: 'dünn', medium: 'mittel', thick: 'kräftig' };
+/** Bausteine mit Rahmen, bei denen man die Linienstärke wählen kann */
+export function hasFrame(b: Block | undefined | null): boolean {
+  if (!b) return false;
+  if (b.type === 'grade') return true;
+  if (b.type === 'box') return (b.tpl ?? 'rahmen') === 'rahmen' || b.tpl === 'gestrichelt';
+  if (b.type === 'task' || b.type === 'glossary') return b.tpl === 'kasten';
+  return false;
 }
 
 /** Korrekturrand auf Schreiblinien und Karos (Wunsch Jo, 22. November 2026) */
@@ -146,6 +163,8 @@ export interface BlattDoc {
     nup?: boolean;
     /** Feld für die erreichten Punkte hinter jeder Aufgabe: Kästchen oder Linie */
     earned?: 'none' | 'box' | 'line';
+    /** Sollpunktzahl „/ 6 P.“ im Punktefeld zeigen (Standard an); beim Kästchen steht sie im Kästchen */
+    earnedMax?: boolean;
   };
   blocks: Block[];
 }
@@ -942,7 +961,10 @@ interface Ctx {
   tables?: Map<string, string[][]>;
   /** Feld für erreichte Punkte hinter den Aufgaben; Aufgaben mit Punkten für die Bewertung */
   earned?: 'box' | 'line';
+  earnedMax?: boolean;
   scores?: { label: string; max: string }[];
+  /** Blatt hat einen QR-Code aus Autogra.fi */
+  qr?: boolean;
 }
 interface Part {
   /** vorbereitete Absätze (einmal gesetzt, damit Fußnoten beim Umbrechen ihre Nummer behalten) */
@@ -966,6 +988,7 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
   const st = styleOf(b);
   const tpl = TEMPLATES[b.type]?.find((x) => x.id === b.tpl)?.id ?? TEMPLATES[b.type]?.[0]?.id;
   if (tpl) box.classList.add('bl-tpl-' + tpl);
+  if (b.line && LINE_MM[b.line]) box.style.setProperty('--bw', LINE_MM[b.line] + 'mm');
   if (st.fs && st.fs !== 100) box.style.fontSize = Math.max(60, Math.min(200, st.fs)) / 100 + 'em';
   if (st.lh) box.style.lineHeight = String(Math.max(1, Math.min(3, st.lh)));
   if (st.ta) {
@@ -1087,13 +1110,21 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       row.appendChild(el('span', 'bl-task-no', esc(ctx.label ?? `${ctx.number}.`)));
       const text = el('div', 'bl-task-text');
       text.appendChild(field('span', 'bl-task-t', 'md', part.title || '<span class="bl-ph">Aufgabenstellung …</span>'));
-      if (b.points && !ctx.earned) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
+      const showMax = ctx.earned && ctx.earnedMax !== false && !!b.points?.trim();
+      if (b.points && (!ctx.earned || (ctx.earnedMax === false))) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
       row.appendChild(text);
       if (ctx.earned) {
-        // Feld für die erreichten Punkte rechts: [   ] / 6 P.
+        // Feld für die erreichten Punkte rechts: [     / 6 P.] bzw. ____ / 6 P.
         const sc = el('span', 'bl-score');
-        sc.appendChild(el('span', ctx.earned === 'box' ? 'bl-ebox' : 'bl-eline'));
-        if (b.points?.trim()) sc.appendChild(el('span', 'bl-emax', '/ ' + esc(b.points.trim())));
+        const max = showMax ? el('span', 'bl-emax', '/ ' + esc(b.points!.trim())) : null;
+        if (ctx.earned === 'box') {
+          const bx = el('span', 'bl-ebox' + (max ? ' bl-ebox-max' : ''));
+          if (max) bx.appendChild(max);
+          sc.appendChild(bx);
+        } else {
+          sc.appendChild(el('span', 'bl-eline'));
+          if (max) sc.appendChild(max);
+        }
         row.appendChild(sc);
       }
       box.appendChild(row);
@@ -1205,6 +1236,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       if (b.remark) foot.appendChild(el('span', 'bl-grade-line bl-grade-remark', 'Bemerkung: <span class="bl-blank"></span>'));
       if (b.sign) foot.appendChild(el('span', 'bl-grade-line', 'Unterschrift: <span class="bl-blank"></span>'));
       box.appendChild(foot);
+      if (ctx.qr && b.qrHint !== false) box.appendChild(el('p', 'bl-grade-qr', 'Scannen Sie für ein genaues Feedback erneut den QR-Code.'));
       break;
     }
     default:
@@ -1413,10 +1445,11 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   const korr = doc.page.korr?.side && doc.page.korr.side !== 'none' ? doc.page.korr : null;
   const tables = new Map(walk(doc.blocks).filter((b) => b.type === 'table').map((b) => [b.id, b.rows ?? []] as const));
   const earned = doc.page.earned && doc.page.earned !== 'none' ? doc.page.earned : undefined;
+  const qr = doc.page.header.show !== false && doc.page.header.qr !== 'none';
   const scores = walk(doc.blocks)
     .filter((b) => b.type === 'task' && b.points?.trim() && !/%/.test(b.points))
     .map((b) => ({ label: labels.get(b.id) ?? '', max: b.points!.trim() }));
-  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, earned, scores, ...extra });
+  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, earned, earnedMax: doc.page.earnedMax, scores, qr, ...extra });
   /** Nummer bzw. Bezeichnung eines Bausteins (in Lesereihenfolge, auch in Spalten) */
   const number = (b: Block, ctx: Ctx) => {
     if (b.type === 'task') ctx.label = labels.get(b.id);
