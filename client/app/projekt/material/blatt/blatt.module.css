@@ -20,12 +20,12 @@
   transform: translateY(-2px); animation: ctxIn 0.22s ease-out;
 }
 .ctxWrap .tabCtx:hover { background: color-mix(in srgb, var(--office-word, #2b579a) 18%, var(--bg-elev)); }
-/* offen: wie die übrigen offenen Reiter hell und mit dem Menüband verbunden (dunkelblau ist nur „Datei“), oben ein blauer Strich */
+/* offen: Hintergrund in der Farbe der Trennlinie, unten ein Mini-Schatten (Jo, 24. November 2026) */
 .ctxWrap .tabCtx.tabOn {
-  color: var(--office-word, #2b579a); background: var(--bg-elev); transform: none; margin-bottom: 0; border-radius: 8px 8px 0 0; padding: 5px 14px 6px;
-  border: 1px solid var(--line); border-bottom-color: var(--bg-elev); border-top: 3px solid var(--office-word, #2b579a); box-shadow: 0 -3px 10px color-mix(in srgb, var(--office-word, #2b579a) 18%, transparent);
+  color: var(--fg); background: color-mix(in srgb, var(--office-word, #2b579a) 45%, var(--bg-elev)); border-color: transparent;
+  transform: translateY(-2px); box-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.22);
 }
-.ctxOn .groups { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--office-word, #2b579a) 55%, transparent); background: color-mix(in srgb, var(--office-word, #2b579a) 4%, var(--bg-elev)); }
+.ctxOn .groups { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--office-word, #2b579a) 45%, var(--bg-elev)); background: color-mix(in srgb, var(--office-word, #2b579a) 4%, var(--bg-elev)); }
 @keyframes ctxIn { from { opacity: 0; transform: translate(-8px, -2px); } to { opacity: 1; transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .ctxWrap .tabCtx { animation: none; } }
 .groups { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; padding: 6px 8px 4px; background: var(--bg-elev); min-height: 64px; }
@@ -400,10 +400,8 @@
 .host :global(.bl-flow .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
 .host :global(.bl-flow .bl-mnote)::before { content: ' ('; }
 .host :global(.bl-flow .bl-mnote)::after { content: ')'; }
-/* „Datei“ im Hintergrund nur zart getönt (Jo, 24. November 2026), damit der offene Reiter das stärkste Element bleibt */
-.tabFile { color: var(--office-word, #2b579a); background: color-mix(in srgb, var(--office-word, #2b579a) 13%, transparent); margin-right: 4px; font-weight: 600; }
-.tabFile:hover { color: #fff; background: var(--office-word, #2b579a); }
-.tabFile.tabOn { color: var(--office-word, #2b579a); background: var(--bg-elev); }
+/* „Datei“ ist ein ganz normaler Reiter (Jo, 24. November 2026) */
+.tabFile { margin-right: 4px; }
 /* Bewertung: Felder für erreichte Punkte und Notenkasten */
 .host :global(.bl-score) { flex: none; display: inline-flex; align-items: flex-end; gap: 1.2mm; margin-left: 3mm; white-space: nowrap; font-size: 0.95em; }
 .host :global(.bl-ebox) { display: inline-flex; align-items: flex-end; justify-content: flex-end; box-sizing: border-box; width: 11mm; height: 6.5mm; border: 0.2mm solid #555; border-radius: 0.6mm; }
