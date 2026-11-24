@@ -240,7 +240,8 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
     case 'task': {
       const label = st.labels.get(b.id) ?? '';
       const lines = (b.md ?? '').split('\n').filter((x) => x.trim());
-      const pts = b.points?.trim() ? [{ t: `\t${b.points.trim()}`, b: true }] : [];
+      const earned = doc.page.earned && doc.page.earned !== 'none';
+      const pts = earned ? [{ t: `\t${doc.page.earned === 'box' ? '[      ]' : '______'}${b.points?.trim() ? ` / ${b.points.trim()}` : ''}`, b: true }] : b.points?.trim() ? [{ t: `\t${b.points.trim()}`, b: true }] : [];
       const ind = b.subtask ? 16 : 8;
       const tabs = `<w:tabs><w:tab w:val="right" w:pos="${Math.round(ctx.width * TW)}"/></w:tabs>`;
       const first = para([{ t: `${label}\t`, b: base.b }, ...runs(lines[0] ?? '', base), ...pts], ctx, { ind, hanging: 8, tabs });
@@ -290,6 +291,29 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
       return b.style === 'empty' ? '' : answerLines(b.fill ? 12 : (b.count ?? 8), ctx, b.spacing ?? 8);
     case 'pagebreak':
       return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+    case 'grade': {
+      const scores = walk(doc.blocks).filter((x) => x.type === 'task' && x.points?.trim() && !/%/.test(x.points));
+      const out: string[] = [];
+      if (b.scoreTable !== false && scores.length) {
+        const n = scores.length + 2;
+        const colW = Math.round((ctx.width * TW) / n);
+        const cell = (t: string, bold = false) => `<w:tc><w:tcPr><w:tcW w:w="${colW}" w:type="dxa"/></w:tcPr>${para(t ? [{ t, b: bold }] : [], ctx, { align: 'center', after: 0 })}</w:tc>`;
+        const max = scores.map((x) => x.points!.trim().replace(/\s*(p\.?|pkt\.?|punkte?|be)\s*$/i, ''));
+        const sum = max.reduce((a, x) => a + (Number(x.replace(',', '.').match(/\d+(?:\.\d+)?/)?.[0]) || 0), 0);
+        const row = (cells: string[], bold = false) => `<w:tr><w:trPr><w:trHeight w:val="${Math.round(8 * TW)}"/></w:trPr>${cells.map((c, i) => cell(c, bold || i === 0)).join('')}</w:tr>`;
+        out.push(
+          `<w:tbl><w:tblPr><w:tblW w:w="${colW * n}" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr><w:tblGrid>${Array(n).fill(`<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>` +
+            row(['Aufgabe', ...scores.map((x) => (st.labels.get(x.id) ?? '').replace(/[.)]$/, '')), 'Summe'], true) +
+            row(['mögliche Punkte', ...max, sum ? String(sum).replace('.', ',') : '']) +
+            row(['erreichte Punkte', ...max.map(() => ''), '']) +
+            '</w:tbl>',
+        );
+      }
+      out.push(para([{ t: `${b.text?.trim() || 'Note'}: `, b: true }, { t: '[            ]' }], ctx, { after: 120 }));
+      if (b.remark) out.push(para([{ t: 'Bemerkung: ' }, { t: '_'.repeat(60) }], ctx));
+      if (b.sign) out.push(para([{ t: 'Unterschrift: ' }, { t: '_'.repeat(30) }], ctx));
+      return out.join('');
+    }
     case 'cols': {
       // Spalten nacheinander (Word-Abschnitte mit Spalten würden den Satz verschieben)
       const parts: string[] = [];

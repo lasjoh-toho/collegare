@@ -74,7 +74,7 @@ interface Page {
   body: string;
 }
 
-const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'table', 'chart', 'glossary', 'lines', 'pagebreak'];
+const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'table', 'chart', 'glossary', 'lines', 'pagebreak', 'grade'];
 /** Textbausteine und ihr Hauptfeld: ein Klick in den Baustein oder ein neuer Baustein öffnet es zum Schreiben */
 const MAIN_FIELD: Partial<Record<BlockType, FieldName>> = { text: 'md', material: 'md', quote: 'md', box: 'md', task: 'md', heading: 'text', glossary: 'text' };
 const MAX = 4_000_000;
@@ -90,6 +90,8 @@ Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden
 Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
 
 Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+
+Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte (z. B. [   ] / 6 P.). „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift.
 
 Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (Reiter „Aufgabe“ → Nummern). Eine eigene Nummer wie „1 b)“ trägst du dort ein, wenn die Aufgabe gewählt ist.
 
@@ -525,7 +527,7 @@ export default function BlattPage() {
     // neuer Textbaustein: gleich darin schreiben
     const f = MAIN_FIELD[type];
     setEdit(f && type !== 'glossary' ? { bid: b.id, field: f, idx: 0 } : type === 'table' ? { bid: b.id, field: 'cell:0:0', idx: 0 } : null);
-    if (type === 'image' || type === 'cols' || type === 'lines' || type === 'glossary' || type === 'table' || type === 'chart') setTab('block');
+    if (type === 'image' || type === 'cols' || type === 'lines' || type === 'glossary' || type === 'table' || type === 'chart' || type === 'grade') setTab('block');
   }
   /** Zahl der Spalten ändern; überzählige Spalten wandern in die letzte, „1“ löst die Spalten auf */
   function setColCount(cid: string, n: number) {
@@ -609,7 +611,7 @@ export default function BlattPage() {
     setSel(bid);
     setSelCol(null);
     const b = bid && doc ? findBlock(doc.blocks, bid) : null;
-    if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart')) setTab('block');
+    if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart' || b.type === 'grade')) setTab('block');
     else if (b?.type === 'task' && tab === 'block') setTab('task');
     else if (b && tab === 'block' && !CTX_TYPES.includes(b.type)) setTab('start');
   }
@@ -981,6 +983,7 @@ export default function BlattPage() {
               setFlowView={setFlowView}
               pro={pro || panel === 'typst'}
               file={(a) => void fileAction(a)}
+              select={(bid) => (select(bid), setEdit(null), setTab('block'), host.current?.querySelector(`[data-bid="${bid}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
               busy={busy}
             />
           )}
@@ -1130,7 +1133,7 @@ export default function BlattPage() {
 type Tab = 'file' | 'start' | 'insert' | 'task' | 'design' | 'layout' | 'block';
 type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' | 'json' | 'open';
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
-const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak'];
+const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade'];
 type Panel = 'search' | 'material' | 'glossary' | 'typst';
 type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | `cell:${number}:${number}`;
 interface EditTarget {
@@ -1338,6 +1341,7 @@ const BICON: Record<BlockType, string> = {
   cols: 'formatcolumns',
   lines: 'togglegridhorizontal',
   pagebreak: 'insertpagebreak',
+  grade: 'checkbox',
 };
 
 type RibbonProps = {
@@ -1373,6 +1377,7 @@ type RibbonProps = {
   setFlowView: (v: boolean) => void;
   /** Typst-Code anbieten (für Fortgeschrittene) */
   pro: boolean;
+  select: (bid: string) => void;
   file: (a: FileAction) => void;
   busy: string;
 };
@@ -1792,6 +1797,26 @@ function Ribbon(props: RibbonProps) {
                 <MI label="auf Seite 1" on={H.qr === 'first'} onClick={() => props.setHeader({ qr: 'first', show: true })} />
                 <MI label="auf jeder Seite" on={H.qr === 'all'} onClick={() => props.setHeader({ qr: 'all', show: true })} hint="hilft, wenn Seiten getrennt gescannt werden" />
               </Drop>
+            </Group>
+            <Group label="Bewertung">
+              <Drop icon="checkbox" label="Punktefelder" value={P.earned === 'box' ? 'Kästchen' : P.earned === 'line' ? 'Linie' : 'aus'} big title="Feld für die erreichten Punkte hinter jeder Aufgabe">
+                <MH>Hinter jeder Aufgabe</MH>
+                <MI label="kein Feld" hint="Punkte stehen im Text der Aufgabe" on={!P.earned || P.earned === 'none'} onClick={() => props.setPageOpt({ earned: 'none' })} />
+                <MI label="Kästchen" hint="[   ] / 6 P. rechts neben der Aufgabe" on={P.earned === 'box'} onClick={() => props.setPageOpt({ earned: 'box' })} />
+                <MI label="Linie" hint="___ / 6 P. rechts neben der Aufgabe" on={P.earned === 'line'} onClick={() => props.setPageOpt({ earned: 'line' })} />
+              </Drop>
+              <RB
+                icon="tabledialog"
+                label="Notenkasten"
+                big
+                on={walk(doc.blocks).some((x) => x.type === 'grade')}
+                onClick={() => {
+                  const g = walk(doc.blocks).find((x) => x.type === 'grade');
+                  if (g) props.select(g.id);
+                  else props.add('grade');
+                }}
+                title="Kasten für die Bewertung: Punkte je Aufgabe, Summe und ein Feld für die Note (meist am Ende)"
+              />
             </Group>
             <Group label="Korrektur">
               <Drop icon="pagemargin" label="Korrekturrand" value={P.korr.side === 'none' ? 'aus' : `${P.korr.side === 'right' ? 'rechts' : 'links'} ${cm(P.korr.width)}`} big title="Freier Rand für die Korrektur neben Linien und Antworten">
@@ -2419,6 +2444,19 @@ function BlockTab(props: RibbonProps & { b: Block }) {
                 </label>
               )}
             </div>
+          </div>
+        </Group>
+      )}
+      {b.type === 'grade' && (
+        <Group label="Bewertung">
+          <RB icon="tabledialog" label="Punkte je Aufgabe" big on={b.scoreTable !== false} onClick={() => set({ scoreTable: b.scoreTable === false })} title="Tabelle: Aufgaben, mögliche und erreichte Punkte, Summe" />
+          <RB icon="insertannotation" label="Bemerkung" big on={!!b.remark} onClick={() => set({ remark: !b.remark })} title="Linie für eine Bemerkung" />
+          <RB icon="edit" label="Unterschrift" big on={!!b.sign} onClick={() => set({ sign: !b.sign })} title="Linie für die Unterschrift" />
+          <div className={st.rows}>
+            <label className={st.mini}>
+              Feld heißt
+              <input className={st.rIn} value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="Note" style={{ width: 110 }} title="z. B. Note, Notenpunkte, Bewertung" />
+            </label>
           </div>
         </Group>
       )}

@@ -1442,6 +1442,11 @@ zu komplex“):
   Webseite (alle Seiten als eine HTML-Datei), Text (Markdown), für Fortgeschrittene Typst (.typ), Blatt-Datei
   (.blatt.json mit Bildern) weitergeben und öffnen.
 
+- **Bewertung** (Jo, 24. November 2026): Reiter „Aufgabe“ → „Punktefelder“ (`page.earned`: Kästchen oder Linie
+  rechts hinter jeder Aufgabe, „[ ] / 6 P.“) und „Notenkasten“ (Baustein `grade`: Tabelle Aufgabe / mögliche /
+  erreichte Punkte mit Summe, Feld für die Note mit eigener Beschriftung, wahlweise Bemerkung und Unterschrift).
+  Aufgaben mit Prozentangaben zählen dort nicht mit. Auch in Word und Typst.
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).

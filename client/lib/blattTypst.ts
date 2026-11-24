@@ -485,6 +485,12 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['korrOff', 'ohne-korrekturrand', 'bool'],
   ],
   cols: [['ratio', 'verhaeltnis', 'nums']],
+  grade: [
+    ['text', 'beschriftung', 'str'],
+    ['scoreTable', 'punktetabelle', 'bool'],
+    ['remark', 'bemerkung', 'bool'],
+    ['sign', 'unterschrift', 'bool'],
+  ],
 };
 const NAME: Record<BlockType, string> = {
   heading: 'ueberschrift',
@@ -500,6 +506,7 @@ const NAME: Record<BlockType, string> = {
   cols: 'spalten',
   lines: 'linien',
   pagebreak: 'pagebreak',
+  grade: 'bewertung',
 };
 const TYPE_OF = Object.fromEntries(Object.entries(NAME).map(([k, v]) => [v, k])) as Record<string, BlockType>;
 /** Bausteine, deren Haupttext im Inhalt [ … ] steht */
@@ -564,7 +571,7 @@ function blockCode(b: Block, ind: string): string {
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) continue;
     if (b.type === 'cols' && k === 'ratio' && (v as number[]).every((x) => x === 1)) continue;
     // Schalter, die von sich aus aus sind, nur zeigen, wenn sie an sind (fett/kursiv nicht: „aus“ kann die Vorlage ändern)
-    if (v === false && ['free', 'over', 'subtask', 'gray', 'breakBefore', 'keep', 'keepNext', 'korrOff'].includes(k)) continue;
+    if (v === false && ['free', 'over', 'subtask', 'gray', 'breakBefore', 'keep', 'keepNext', 'korrOff', 'sign', 'remark'].includes(k)) continue;
     args.push(`${n}: ${emit(v, kind)}`);
   }
   if (b.type === 'cols' && b.gap) args.push(`steg: ${num(b.gap)}mm`);
@@ -596,7 +603,7 @@ export function toTypst(doc: BlattDoc): string {
   const out: string[] = [];
   out.push('// Arbeitsblatt als Typst-Code. Ändern und „Übernehmen“; Bilder verweisen auf ihre Nummer im Blatt.');
   out.push(
-    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
+    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
   );
   const fieldCode = (k: HeadKey) => {
     const f = F[k];
@@ -755,6 +762,8 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
       const f = str('schrift', ['sans', 'serif']);
       if (f) page.font = f as 'sans';
       if (g('schriftgroesse') !== undefined) page.fontSize = read(g('schriftgroesse')!, 'num', 'schriftgroesse', c.line) as number;
+      const pf = str('punktefelder', ['none', 'box', 'line']);
+      if (pf) page.earned = pf as 'box';
       const pn = bool('seitenzahlen');
       if (pn !== undefined) page.pageNumbers = pn;
       const o = str('seitenfolge', ['einzeln', 'zwei-je-blatt', 'broschuere']);

@@ -11,7 +11,7 @@
  */
 import { renderMarkdown } from './markdown';
 
-export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak';
+export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak' | 'grade';
 export type Ruling = 'lines' | 'grid' | 'empty';
 
 export interface Block {
@@ -99,6 +99,10 @@ export interface Block {
   breakBefore?: boolean;
   keep?: boolean;
   keepNext?: boolean;
+  /** Bewertung (Wunsch Jo, 24. November 2026): Tabelle der Punkte je Aufgabe, Unterschrift, Bemerkung */
+  scoreTable?: boolean;
+  sign?: boolean;
+  remark?: boolean;
 }
 
 /** Korrekturrand auf Schreiblinien und Karos (Wunsch Jo, 22. November 2026) */
@@ -140,6 +144,8 @@ export interface BlattDoc {
     margin?: 'normal' | 'narrow' | 'wide';
     landscape?: boolean;
     nup?: boolean;
+    /** Feld für die erreichten Punkte hinter jeder Aufgabe: Kästchen oder Linie */
+    earned?: 'none' | 'box' | 'line';
   };
   blocks: Block[];
 }
@@ -238,6 +244,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   cols: 'Spalten',
   lines: 'Linien',
   pagebreak: 'Seitenumbruch',
+  grade: 'Bewertung',
 };
 
 export function blankDoc(title = ''): BlattDoc {
@@ -280,6 +287,7 @@ export function newBlock(type: BlockType): Block {
   if (type === 'table') Object.assign(b, { rows: [['', '', ''], ['', '', ''], ['', '', '']], headRow: true, grid: 'all' });
   if (type === 'chart') Object.assign(b, { kind: 'col', width: 90, hMm: 60, caption: '' });
   if (type === 'lines') Object.assign(b, { style: 'lines', count: 8, fill: true, spacing: 8 });
+  if (type === 'grade') Object.assign(b, { text: 'Note', scoreTable: true, sign: false, remark: false });
   const t = TEMPLATES[type]?.[0];
   if (t) b.tpl = t.id;
   return b;
@@ -309,6 +317,8 @@ export function blockSummary(b: Block): string {
       return `${b.style === 'grid' ? 'Karos' : b.style === 'empty' ? 'Freiraum' : 'Schreiblinien'}${b.fill ? ' bis zum Seitenende' : `, ${b.count ?? 0}`}`;
     case 'pagebreak':
       return '';
+    case 'grade':
+      return [b.scoreTable !== false && 'Punkte je Aufgabe', b.text || 'Note', b.remark && 'Bemerkung', b.sign && 'Unterschrift'].filter(Boolean).join(', ');
     default:
       return plain(b.md);
   }
@@ -930,6 +940,9 @@ interface Ctx {
   editing?: boolean;
   /** Tabellen des Blatts (für Diagramme) */
   tables?: Map<string, string[][]>;
+  /** Feld für erreichte Punkte hinter den Aufgaben; Aufgaben mit Punkten für die Bewertung */
+  earned?: 'box' | 'line';
+  scores?: { label: string; max: string }[];
 }
 interface Part {
   /** vorbereitete Absätze (einmal gesetzt, damit Fußnoten beim Umbrechen ihre Nummer behalten) */
@@ -1074,8 +1087,15 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       row.appendChild(el('span', 'bl-task-no', esc(ctx.label ?? `${ctx.number}.`)));
       const text = el('div', 'bl-task-text');
       text.appendChild(field('span', 'bl-task-t', 'md', part.title || '<span class="bl-ph">Aufgabenstellung …</span>'));
-      if (b.points) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
+      if (b.points && !ctx.earned) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
       row.appendChild(text);
+      if (ctx.earned) {
+        // Feld für die erreichten Punkte rechts: [   ] / 6 P.
+        const sc = el('span', 'bl-score');
+        sc.appendChild(el('span', ctx.earned === 'box' ? 'bl-ebox' : 'bl-eline'));
+        if (b.points?.trim()) sc.appendChild(el('span', 'bl-emax', '/ ' + esc(b.points.trim())));
+        row.appendChild(sc);
+      }
       box.appendChild(row);
       const n = Math.max(0, Math.min(40, Number(b.lines) || 0));
       if (n) {
@@ -1160,6 +1180,31 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
         d.style.height = h + 'mm';
         box.appendChild(d);
       } else box.appendChild(ruling(style, ctx.widthMm, h, sp, b.korrOff ? null : ctx.korr));
+      break;
+    }
+    case 'grade': {
+      // Bewertung: Punkte je Aufgabe, Summe, Note, Bemerkung, Unterschrift
+      const scores = ctx.scores ?? [];
+      if (b.scoreTable !== false && scores.length) {
+        const sum = scores.reduce((a, x) => a + (Number(x.max.replace(',', '.').match(/\d+(?:\.\d+)?/)?.[0]) || 0), 0);
+        const t = el('table', 'bl-grade-table');
+        const tr = (cls: string, head: string, cells: string[], last: string) => {
+          const r = el('tr', cls);
+          r.appendChild(el('th', '', head));
+          for (const c of cells) r.appendChild(el('td', '', c));
+          r.appendChild(el('td', 'bl-grade-sum', last));
+          t.appendChild(r);
+        };
+        tr('bl-grade-h', 'Aufgabe', scores.map((x) => esc(x.label.replace(/[.)]$/, ''))), 'Summe');
+        tr('', 'mögliche Punkte', scores.map((x) => esc(x.max.replace(/\s*(p\.?|pkt\.?|punkte?|be)\s*$/i, ''))), sum ? String(Math.round(sum * 10) / 10).replace('.', ',') : '');
+        tr('bl-grade-e', 'erreichte Punkte', scores.map(() => ''), '');
+        box.appendChild(t);
+      } else if (b.scoreTable !== false && ctx.editing) box.appendChild(el('p', 'bl-ph', 'Hier erscheinen die Aufgaben mit ihren Punkten.'));
+      const foot = el('div', 'bl-grade-foot');
+      foot.appendChild(el('span', 'bl-grade-note', `${esc(b.text?.trim() || 'Note')}: <span class="bl-gbox"></span>`));
+      if (b.remark) foot.appendChild(el('span', 'bl-grade-line bl-grade-remark', 'Bemerkung: <span class="bl-blank"></span>'));
+      if (b.sign) foot.appendChild(el('span', 'bl-grade-line', 'Unterschrift: <span class="bl-blank"></span>'));
+      box.appendChild(foot);
       break;
     }
     default:
@@ -1367,7 +1412,11 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   const terms = glossaryTerms(doc);
   const korr = doc.page.korr?.side && doc.page.korr.side !== 'none' ? doc.page.korr : null;
   const tables = new Map(walk(doc.blocks).filter((b) => b.type === 'table').map((b) => [b.id, b.rows ?? []] as const));
-  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, ...extra });
+  const earned = doc.page.earned && doc.page.earned !== 'none' ? doc.page.earned : undefined;
+  const scores = walk(doc.blocks)
+    .filter((b) => b.type === 'task' && b.points?.trim() && !/%/.test(b.points))
+    .map((b) => ({ label: labels.get(b.id) ?? '', max: b.points!.trim() }));
+  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, earned, scores, ...extra });
   /** Nummer bzw. Bezeichnung eines Bausteins (in Lesereihenfolge, auch in Spalten) */
   const number = (b: Block, ctx: Ctx) => {
     if (b.type === 'task') ctx.label = labels.get(b.id);
