@@ -8,6 +8,7 @@ import { Server, type Socket } from 'socket.io';
 import { CoServer, type CoServerOptions } from './collab/coServer.js';
 import { COOKIE, sessionHook } from './http/auth.js';
 import { adminRoutes } from './routes/admin.js';
+import { aiRoutes } from './routes/ai.js';
 import { authRoutes } from './routes/auth.js';
 import { BoardBroadcaster, projectRoutes } from './routes/projects.js';
 import { gradingRoutes } from './routes/gradings.js';
@@ -15,7 +16,7 @@ import { materialRoutes } from './routes/materials.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
-import { chatSocket } from './routes/chat.js';
+import { chatRoutes, chatSocket } from './routes/chat.js';
 import { notesSocket } from './routes/notes.js';
 import { pinnwandRoutes, pinnwandSocket } from './routes/pinnwand.js';
 import { bentoRoutes } from './routes/bento.js';
@@ -141,6 +142,8 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     bentoRoutes(http, s, opts.clientDir);
     pasteRoutes(http, s);
     webImageRoutes(http, s, opts.webAllowed);
+    aiRoutes(http, s);
+    chatRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 

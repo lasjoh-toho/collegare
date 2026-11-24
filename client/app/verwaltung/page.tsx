@@ -8,6 +8,7 @@ import s from '../start.module.css';
 const PAGES = [
   { path: '/verwaltung/lehrkraefte/', title: 'Lehrkräfte', text: 'Konten anlegen, Passwort setzen, als Lehrkraft ansehen.' },
   { path: '/verwaltung/rahmen/', title: 'Rahmen für Projekte', text: 'Erlaubte Dokument- und Dateitypen, KI, Tippfluss-Hinweise, offenes Office.' },
+  { path: '/verwaltung/ki/', title: 'KI-Konfiguration', text: 'Modellkarten für die Texterkennung, Import aus Autogra.fi.' },
   { path: '/verwaltung/moodle/', title: 'Moodle-Verbindung', text: 'Collegare als externes Tool (LTI 1.3) in Moodle eintragen.' },
 ];
 

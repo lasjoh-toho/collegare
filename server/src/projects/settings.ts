@@ -99,6 +99,8 @@ export const SettingsSchema = z.object({
   notesAudio: z.boolean(),
   notesVideo: z.boolean(),
   notesMediaMb: z.number().min(1).max(200),
+  /** Texterkennung für aufgenommene Bilder in den Notizen (Wunsch Jo, 24. November 2026), braucht eine KI-Modellkarte */
+  notesOcr: z.boolean(),
   logbookRequired: z.boolean(),
   aiFeedback: z.boolean(),
   aiDailyLimit: z.number().int().min(0).max(100),
@@ -162,6 +164,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   notesAudio: true,
   notesVideo: true,
   notesMediaMb: 25,
+  notesOcr: true,
   logbookRequired: true,
   aiFeedback: false,
   aiDailyLimit: 5,
@@ -208,6 +211,8 @@ export const FrameSchema = z.object({
   notesAudio: z.boolean(),
   notesVideo: z.boolean(),
   notesMediaMb: z.number().min(1).max(200),
+  /** Texterkennung (Bild aufnehmen in den Notizen) überhaupt erlauben */
+  ocr: z.boolean(),
 });
 export type Frame = z.infer<typeof FrameSchema>;
 
@@ -222,6 +227,7 @@ export const DEFAULT_FRAME: Frame = {
   notesAudio: true,
   notesVideo: true,
   notesMediaMb: 100,
+  ocr: true,
 };
 
 /** Liest gespeichertes JSON robust ein: Standardwerte für Fehlendes, Ungültiges fällt auf den Standard zurück. */
@@ -261,6 +267,7 @@ export function clampToFrame(s: ProjectSettings, f: Frame): ProjectSettings {
     notesAudio: s.notesAudio && f.notesAudio,
     notesVideo: s.notesVideo && f.notesVideo,
     notesMediaMb: Math.min(s.notesMediaMb, f.notesMediaMb),
+    notesOcr: s.notesOcr && f.ocr,
   };
 }
 

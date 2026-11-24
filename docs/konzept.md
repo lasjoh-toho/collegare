@@ -720,6 +720,15 @@ Ist Autogra.fi verbunden (8c), bietet der Thread „Notiz scannen“: Scanner un
 über den Dienst (Abschnitt 8), Überarbeiten des erkannten Texts neben dem Seitenbild. Zurück kommt eine Karte mit
 Bild und Text (8a.6, erstes Modul). Voraussetzung ist die Anmeldung über Collegare in Autogra.fi (8c.5, offen).
 
+**Stand 24. November 2026 (Wunsch Jo, „überschaubar“):** Statt auf den Dienst aus Autogra.fi zu warten, bringt Collegare
+eine kleine eigene Fassung mit. „Bild aufnehmen“ im Notiz-Editor öffnet den Scanner aus Autogra.fi als Kopie
+(`client/public/scanner/`, ein Bild je Notiz, Farben bleiben). „Text erkennen“ bereitet erst dann eine Kopie auf
+(Graustufen, Kontrast, verkleinert, `client/lib/ocr.ts`) und schickt sie mit der Anweisung aus Autogra.fi an die
+KI-Modellkarte „Texterkennung“ (Verwaltung → KI-Konfiguration, Import der Karten aus Autogra.fi). Bild und erkannter
+Text stehen danach nebeneinander zum Überarbeiten; der erkannte Text kommt mit Herkunft `hand` ins Einfüge-Protokoll.
+Schalter: Rahmen `ocr`, Projekt `notesOcr`. Nicht dabei: kraken-Zeilen, Lesefehler, Training, QR-Kopplung zum Handy.
+Der Dienst aus Abschnitt 8 bleibt das Ziel, sobald 8c.5 steht.
+
 ### 8d.5 mod_pinnwand als Modul für die Präsentation
 
 **Ja, das geht.** mod_pinnwand steht unter derselben nicht-kommerziellen Lizenz wie der Kern (Entscheidung 9) und

@@ -22,7 +22,7 @@ export default function ChatPage() {
   }, [id]);
   if (!me || !project) return <Topbar me={me ?? null} />;
   return (
-    <ProjectShell me={me} project={project} info={{ key: 'chat', title: 'Chat', text: 'Hier sprecht ihr euch ab. Beiträge lassen sich in die Mindmap ziehen.' }} where="Chat" fill>
+    <ProjectShell me={me} project={project} info={{ key: 'chat', title: 'Chat', text: 'Hier sprecht ihr euch ab. Beiträge lassen sich in die Mindmap ziehen. Mit der Kamera neben dem Eingabefeld nehmt ihr ein Bild auf (Ecken werden erkannt und gerade gezogen); es geht mit der nächsten Nachricht mit. „Text erkennen“ an einem Bild legt den gelesenen Text ins Eingabefeld, sofern die Texterkennung eingerichtet ist.' }} where="Chat" fill>
       <ChatPanel me={me} project={project} wanted={wanted} />
     </ProjectShell>
   );

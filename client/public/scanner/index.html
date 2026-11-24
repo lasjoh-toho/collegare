@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Bild aufnehmen</title>
+    <!-- Dokumentenscanner aus Autogra.fi (Stand v0.9.10), Dateien unverändert bis auf options.js (Schalter
+         dokumentfilter). collegare.js ersetzt device.js: das Bild geht per postMessage an „Notizen und Quellen“. -->
+    <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="options.css">
+    <link rel="stylesheet" href="device.css">
+    <style>
+        /* Farben von Collegare statt des Autogra.fi-Blaus */
+        :root { --ag-grad: linear-gradient(135deg, #8a1c0c 0%, #d9541a 100%); --ag-primary: #8a1c0c; }
+        .cg-close { margin-left: auto; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.12); color: inherit; border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+    </style>
+    <script src="vendor/Sortable.min.js"></script>
+</head>
+<body>
+    <div id="targetBar" class="ag-topbar">
+        <div class="ag-topbar-text">
+            <strong>Bild aufnehmen</strong>
+            <span id="targetHint">Für Notizen und Quellen</span>
+        </div>
+        <button type="button" class="cg-close" id="closeBtn">Schließen</button>
+    </div>
+    <div id="doneOverlay" class="ag-done" hidden>
+        <div class="ag-done-card">
+            <h2 id="doneTitle">Übernommen</h2>
+            <p id="doneText">Das Bild ist in der Notiz.</p>
+            <a id="doneBackBtn" class="ag-btn" href="#" hidden></a>
+            <button type="button" id="doneMoreBtn" class="ag-btn ag-btn-secondary">Weiteres Bild</button>
+        </div>
+    </div>
+    <div class="container">
+        <!-- Empty state: shown when no images have been taken yet -->
+        <div id="emptyState" class="empty-state">
+            <button type="button" id="emptyStateCameraBtn" class="empty-state-icon-btn" title="Kamera öffnen">
+                <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+            </button>
+            <h2>Anleitung</h2>
+            <ol>
+                <li>
+                    <strong>Aufnahme</strong><br>
+                    Blatt, Buchseite oder Tafelbild aufnehmen. Ein helles Papier wird auf einer einheitlichen dunklen Fläche am besten erkannt – sonst Punkte auf die Ecken ziehen.<br><br>
+                    Danach lassen sich die Ränder abschneiden. Mit dem Haken übernehmen.
+                </li>
+                <li>
+                    <strong>Optionen</strong><br>
+                    Das Bild bleibt in seinen Farben. Für die Texterkennung wird es später von selbst aufbereitet. Unter <em>„Farbe“</em> lässt sich Helligkeit und Kontrast trotzdem anpassen.<br><br>
+                    Die Seitenränder können mit einem Griff ins Bild gezogen werden, um Teile abzuschneiden.
+                </li>
+            </ol>
+        </div>
+
+        <div class="thumbnail-grid" id="thumbnailGrid">
+            <div class="add-buttons-container" id="galleryContainer"<?= $cfg['galerie'] ? '' : ' hidden' ?>>
+                <div class="add-button gallery-add">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <span>Galerie</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fixed footer: camera always visible, upload appears when images exist -->
+    <div id="fixedFooter" class="fixed-footer">
+        <input type="hidden" id="pdfName" value="">
+        <button id="uploadBtn" class="footer-upload-btn" style="display:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 16 12 12 8 16"></polyline>
+                <line x1="12" y1="12" x2="12" y2="21"></line>
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+            </svg>
+            Übernehmen
+        </button>
+        <button id="cameraFooterBtn" class="footer-camera-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Camera Overlay -->
+    <div id="cameraOverlay" class="overlay" style="display: none;">
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <div class="camera-controls" style="position:fixed">
+                <button id="cancelBtn" class="control-btn cancel-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                
+                <button id="captureBtn" class="control-btn capture-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                </button>
+<button id="torchBtn" class="control-btn torch-btn" style="display: none;">
+<svg xmlns="http://www.w3.org/2000/svg" fill="#000000" width="800" height="800" viewBox="0 0 47 47.001"><path d="M23.5 0C15.06 0 8.213 6.556 8.213 14.644c0 9.604 6.671 12.051 6.671 17.642 0 1.382 1.056 2.666 2.643 3.61-.333.275-.517.578-.517.896 0 .426.335.824.909 1.165-.54.334-.852.72-.852 1.132s.32.805.872 1.141c-.563.34-.892.732-.892 1.153 0 .511.484.983 1.293 1.365-.314.285-.493.599-.493.931 0 .978 1.525 1.81 3.668 2.141.375.697 1.14 1.181 2.032 1.181s1.652-.479 2.029-1.176c2.162-.327 3.703-1.163 3.703-2.146 0-.328-.172-.638-.479-.919.825-.384 1.32-.86 1.32-1.377 0-.417-.321-.806-.874-1.143.563-.339.892-.731.892-1.151 0-.426-.336-.822-.91-1.165.541-.334.853-.72.853-1.132 0-.329-.201-.641-.556-.923 1.562-.943 2.599-2.214 2.599-3.583 0-5.59 6.663-8.038 6.663-17.642C38.788 6.556 31.942 0 23.5 0zm7.983 23.707c-1.525 2.236-3.248 4.763-3.354 8.238-.521.585-2.389 1.533-4.625 1.533s-4.104-.948-4.626-1.533c-.106-3.478-1.831-6.002-3.357-8.24-1.701-2.493-3.308-4.848-3.308-9.061C12.213 8.775 17.276 4 23.5 4s11.287 4.775 11.287 10.644c.001 4.214-1.605 6.569-3.304 9.063z"/></svg>
+</button>
+
+                <button id="autoBtn" class="control-btn auto-btn" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+    </div>
+    <div id="correctionOverlay" class="overlay" style="display: none;">
+<div class="correction-container">
+    <canvas id="imageCanvas"></canvas>
+    <div id="cornerHandles"> </div>
+    
+    <div class="correction-controls">
+        <button id="cancelCorrectionBtn" class="control-btn cancel-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        
+        <button id="resetBtn" class="control-btn reset-btn">
+<svg xmlns="http://www.w3.org/2000/svg" fill="#2222FF" width="24" height="24" viewBox="0 0 256 256"><path d="M216 48v40a8 8 0 0 1-13.657 5.657l-40-40A8 8 0 0 1 168 40h40a8 8 0 0 1 8 8zM53.657 162.343A8 8 0 0 0 40 168v40a8 8 0 0 0 8 8h40a8 8 0 0 0 5.657-13.657zm157.404-1.734a8 8 0 0 0-8.719 1.734l-40 40A8 8 0 0 0 168 216h40a8 8 0 0 0 8-8v-40a8.001 8.001 0 0 0-4.938-7.391zM88 40H48a8 8 0 0 0-8 8v40a8 8 0 0 0 13.657 5.657l40-40A8 8 0 0 0 88 40z"/></svg>
+        </button>
+        
+        <button id="confirmBtn" class="control-btn confirm-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </button>
+        <button id="formatToggleBtn" class="control-btn format-toggle-btn">&#9647;</button>
+    </div>
+</div>
+    </div>    
+    <div id="optionsOverlay" class="overlay" style="display: none;">
+<div class="options-container">
+
+    <!-- Image preview with crop-handles overlay -->
+    <div class="image-container" id="optionsImageContainer">
+        <img id="optionsImage" src="" alt="Bildvorschau">
+        <div id="cropHandlesOverlay">
+            <!-- Shaded areas outside the crop region -->
+            <div class="crop-shade crop-shade-top"></div>
+            <div class="crop-shade crop-shade-bottom"></div>
+            <div class="crop-shade crop-shade-left"></div>
+            <div class="crop-shade crop-shade-right"></div>
+            <!-- Draggable crop lines -->
+            <div class="crop-line crop-line-top"    data-side="top">   <div class="crop-line-grip"></div></div>
+            <div class="crop-line crop-line-bottom" data-side="bottom"><div class="crop-line-grip"></div></div>
+            <div class="crop-line crop-line-left"   data-side="left">  <div class="crop-line-grip"></div></div>
+            <div class="crop-line crop-line-right"  data-side="right"> <div class="crop-line-grip"></div></div>
+        </div>
+    </div>
+
+    <!-- Tab switcher -->
+    <div class="options-tabs">
+        <button class="tab-btn tab-active" data-tab="edit">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Bearbeiten
+        </button>
+        <button class="tab-btn" data-tab="color">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            Farbe
+        </button>
+    </div>
+
+    <!-- BEARBEITEN panel (default) -->
+    <div class="tab-panel" id="panelEdit">
+        <div class="controls-container">
+
+            <button id="rotateLeftBtn" class="control-btn" aria-label="Drehen" data-label="Drehen">
+                <svg xmlns="http://www.w3.org/2000/svg" height="100%" stroke-miterlimit="10" viewBox="0 0 1024 1024" width="100%" fill-rule="nonzero" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M663.905 390.563l-438.786.066a31.97 31.97 0 0 0-32 32l3.868 450.673a31.97 31.97 0 0 0 32 32l438.786-.066c8.49.008 30.757-3.24 32-32l-3.868-450.673a31.97 31.97 0 0 0-32-32zm-40.132 438.673l-350.786.066-3.868-362.673 350.786-.066 3.868 362.673zM830.32 279.754c-78.8-100.7-196-153.6-314.6-154.2l-.2-64c0-6.5-7.6-10.1-12.6-6.1l-128 101c-4 3.1-3.9 9.1 0 12.3l128.1 101.1c5.1 4 12.7.4 12.6-6.1v-63.9c12.9.1 25.9.9 38.8 2.5 42.1 5.2 82.1 18.2 119 38.7 38.1 21.2 71.2 49.7 98.4 84.3 27.1 34.7 46.7 73.7 58.1 115.8 11 40.7 14.636 86.641 8.9 124.8-.7 5.4-.495 18.075-2.4 16.1h74.9c14.8-103.6-11.3-213-81-302.3z" fill="red"/>
+                </svg>
+            </button>
+
+            <button id="cropBtn" class="control-btn crop-btn" aria-label="Perspektive korrigieren" data-label="Perspektive">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 2v14a2 2 0 0 0 2 2h14"/>
+                    <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+                </svg>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- FARBE panel -->
+    <div class="tab-panel" id="panelColor" style="display:none">
+        <div class="controls-container" style="grid-template-columns: repeat(3, 1fr);">
+
+            <button id="DocumentEnhancerBtn" class="control-btn" aria-label="Dokumentfilter" data-label="Dokument">
+                <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 840.361 862.189">
+                    <path d="M22.175 20.365h791.055v582.882H22.175z" fill="#00f4ff"/>
+                    <path d="M41.759 417.375l130.342-79.193 284.463 160.878 132.654-59.963 209.716 123.998v43.935l-756.27-.905z" fill="#008c00"/>
+                    <path d="M.458.458v632.29h839.445V.458zm41.215 39.408H798.69l-.905 549.91c-250.984.409-753.58-1.202-752.945-1.812z" fill="#f9f9f9"/>
+                    <g fill="#ffc100"><use href="#B"/><use href="#B" x="-57.7" y="15.6"/><use href="#B" x="-99.9" y="58.1"/><use href="#B" x="-115.2" y="115.9"/><use href="#B" x="-99.5" y="173.6"/><use href="#B" x="-57.1" y="215.7"/><use href="#B" x="0.7" y="231"/><use href="#B" x="58.5" y="215.4"/><use href="#B" x="100.6" y="172.9"/><use href="#B" x="115.9" y="115.1"/><path d="M571.09 208.148a66.407 68.59 0 1 0 132.814 0 66.407 68.59 0 1 0-132.814 0z"/><use href="#B" x="100.2" y="57.4"/><use href="#B" x="57.8" y="15.3"/></g>
+                    <path d="M500.588 303.447c-2.612-.371-4.832.148-6.468 1.756l-43.561 42.127 50.647 57.681 43.561-42.126c11.465-11.259-25.892-56.841-44.179-59.437zm-66.545 60.078l-15.057 14.786 50.647 57.681 15.057-14.786zm-33.19 32.473L40.978 760.374c-13.1 12.84 37.536 70.522 50.599 57.656l359.893-364.297z"/>
+                    <defs><path id="B" d="M621.023 93.784a10 10 0 1 0 20 0 10 10 0 1 0-20 0z"/></defs>
+                </svg>
+            </button>
+
+            <button id="pictureBtn" class="control-btn" aria-label="Bildmodus" data-label="Bild">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                </svg>
+            </button>
+
+            <button id="optimizeBtn" class="control-btn optimize-btn" data-label="Auto">
+                <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 840.361 862.189">
+                    <path d="M22.175 20.365h791.055v582.882H22.175z" fill="#00f4ff"/>
+                    <path d="M41.759 417.375l130.342-79.193 284.463 160.878 132.654-59.963 209.716 123.998v43.935l-756.27-.905z" fill="#008c00"/>
+                    <path d="M.458.458v632.29h839.445V.458zm41.215 39.408H798.69l-.905 549.91c-250.984.409-753.58-1.202-752.945-1.812z" fill="#f9f9f9"/>
+                    <g fill="#ffc100"><use href="#C"/><use href="#C" x="-57.7" y="15.6"/><use href="#C" x="-99.9" y="58.1"/><use href="#C" x="-115.2" y="115.9"/><use href="#C" x="-99.5" y="173.6"/><use href="#C" x="-57.1" y="215.7"/><use href="#C" x="0.7" y="231"/><use href="#C" x="58.5" y="215.4"/><use href="#C" x="100.6" y="172.9"/><use href="#C" x="115.9" y="115.1"/><path d="M571.09 208.148a66.407 68.59 0 1 0 132.814 0 66.407 68.59 0 1 0-132.814 0z"/><use href="#C" x="100.2" y="57.4"/><use href="#C" x="57.8" y="15.3"/></g>
+                    <path d="M500.588 303.447c-2.612-.371-4.832.148-6.468 1.756l-43.561 42.127 50.647 57.681 43.561-42.126c11.465-11.259-25.892-56.841-44.179-59.437zm-66.545 60.078l-15.057 14.786 50.647 57.681 15.057-14.786zm-33.19 32.473L40.978 760.374c-13.1 12.84 37.536 70.522 50.599 57.656l359.893-364.297z"/>
+                    <defs><path id="C" d="M621.023 93.784a10 10 0 1 0 20 0 10 10 0 1 0-20 0z"/></defs>
+                </svg>
+            </button>
+
+        </div>
+
+        <!-- Color adjustment sliders (always visible in Farbe tab) -->
+        <div class="sliders-container">
+            <div class="slider-group">
+                <label for="brightnessSlider">Helligkeit</label>
+                <div class="slider-controls">
+                    <input type="range" id="brightnessSlider" min="-100" max="100" value="0" class="slider">
+                    <button id="resetBrightnessBtn" class="reset-btn">Reset</button>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label for="contrastSlider">Kontrast</label>
+                <div class="slider-controls">
+                    <input type="range" id="contrastSlider" min="-100" max="100" value="0" class="slider">
+                    <button id="resetContrastBtn" class="reset-btn">Reset</button>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label for="whiteBalanceSlider">Weißabgleich</label>
+                <div class="slider-controls">
+                    <input type="range" id="whiteBalanceSlider" min="-100" max="100" value="0" class="slider">
+                    <button id="resetWhiteBalanceBtn" class="reset-btn">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom action bar -->
+    <div class="correction-controls">
+        <button id="cancelOptionsBtn" class="control-btn cancel-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+        <button id="ResetOptionsBtn" class="control-btn cancel-btn reset-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+        </button>
+        <button id="confirmOptionsBtn" class="control-btn confirm-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+        </button>
+    </div>
+
+</div>
+    </div>
+<script src="collegare.js"></script>
+<script src="camera.js"></script>
+<script src="detect.js"></script>
+<script src="correction.js"></script>
+<script src="options.js"></script>
+<script src="main.js"></script>
+<script src="quality.js"></script>
+</body>
+</html>

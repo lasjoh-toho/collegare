@@ -3,13 +3,18 @@
  * Chat je Gruppe und für alle im Projekt (Wunsch Jo, 11. November 2026). Echtzeit über den Namespace /project;
  * Lehrkräfte sehen alle Chats und dürfen Nachrichten löschen, Lernende ihre eigenen. Als eigene Seite oder als
  * zuschaltbare Leiste am rechten Rand; Beiträge lassen sich von dort in die Mindmap ziehen.
+ * „Bild aufnehmen“ (Wunsch Jo, 24. November 2026): Scanner aus Autogra.fi, das Bild geht mit der Nachricht mit;
+ * „Text erkennen“ am Bild legt den erkannten Text ins Eingabefeld.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import { href, projectSocket } from '@/lib/api';
+import { API_URL, BASE_PATH, href, projectSocket } from '@/lib/api';
 import { setChatDrag } from '@/lib/chatDrag';
+import { ocrState, recognizeText, type OcrState } from '@/lib/ocr';
 import type { Me, ProjectView } from '@/lib/types';
 import c from './chat.module.css';
+import { Icon } from './Icon';
+import { ScanDialog } from './ScanDialog';
 
 interface Msg {
   id: number;
@@ -17,6 +22,7 @@ interface Msg {
   name: string;
   body: string;
   at: number;
+  image?: true;
 }
 interface JoinAck {
   ok: boolean;
@@ -29,6 +35,7 @@ interface JoinAck {
 }
 
 const day = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+const imageUrl = (projectId: number, id: number) => `${API_URL}${BASE_PATH}/api/projects/${projectId}/chat/${id}/bild`;
 const time = (ms: number) => new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /** Links im Text anklickbar machen, sonst reiner Text (kein HTML aus Nachrichten). Adressen innerhalb von Collegare
@@ -64,6 +71,12 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
   const [draft, setDraft] = useState('');
   const [toast, setToast] = useState('');
   const [more, setMore] = useState(true);
+  const [scan, setScan] = useState(false);
+  /** aufgenommenes Bild, schon hochgeladen, geht mit der nächsten Nachricht mit */
+  const [pending, setPending] = useState<{ file: string; preview: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [ocr, setOcr] = useState<OcrState | null>(null);
+  const [reading, setReading] = useState<number | null>(null);
   const sock = useRef<Socket | null>(null);
   const scopeRef = useRef<string | null>(null);
   scopeRef.current = scope;
@@ -109,6 +122,45 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
     };
   }, [id, me, doJoin, wanted]);
 
+  useEffect(() => void ocrState(id).then(setOcr, () => setOcr(null)), [id]);
+  // Vorschau freigeben, wenn sie nicht mehr gebraucht wird
+  useEffect(() => () => void (pending && URL.revokeObjectURL(pending.preview)), [pending]);
+  // Bild gehört zum Chat, in dem es aufgenommen wurde
+  useEffect(() => setPending(null), [scope]);
+
+  async function upload(f: File) {
+    if (!scope) return;
+    setUploading(true);
+    try {
+      const res = await fetch(`${API_URL}${BASE_PATH}/api/projects/${id}/chat/bild?scope=${encodeURIComponent(scope)}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: f,
+      });
+      const j = (await res.json().catch(() => ({}))) as { file?: string; error?: string };
+      if (!res.ok || !j.file) throw new Error(j.error ?? `Fehler ${res.status}`);
+      setPending({ file: j.file, preview: URL.createObjectURL(f) });
+    } catch (e) {
+      show('Bild: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function read(m: Msg) {
+    setReading(m.id);
+    try {
+      const text = (await recognizeText(id, imageUrl(id, m.id))).text.trim();
+      if (!text) return show('Auf dem Bild wurde kein Text gefunden.');
+      setDraft((d) => (d.trim() ? d.trimEnd() + '\n' + text : text));
+    } catch (e) {
+      show('Texterkennung: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setReading(null);
+    }
+  }
+
   // beim Öffnen und bei neuen Nachrichten nach unten, außer man liest gerade weiter oben
   useLayoutEffect(() => {
     const el = list.current;
@@ -117,12 +169,14 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
 
   function send() {
     const text = draft.trim();
-    if (!text || !scope) return;
+    if ((!text && !pending) || !scope) return;
     if (!sock.current?.connected) return show('Keine Verbindung zum Server. Bitte kurz warten.');
     stick.current = true;
-    sock.current.emit('chat:send', { projectId: id, scope, text }, (r: { ok: boolean; error?: string }) => {
-      if (r.ok) setDraft('');
-      else show(r.error ?? 'Senden fehlgeschlagen');
+    sock.current.emit('chat:send', { projectId: id, scope, text, ...(pending ? { file: pending.file } : {}) }, (r: { ok: boolean; error?: string }) => {
+      if (r.ok) {
+        setDraft('');
+        setPending(null);
+      } else show(r.error ?? 'Senden fehlgeschlagen');
     });
   }
 
@@ -203,12 +257,24 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
                         <div
                           className={c.bubble}
                           draggable
-                          onDragStart={(e) => setChatDrag(e, { name: m.name, body: m.body })}
+                          onDragStart={(e) => setChatDrag(e, { name: m.name, body: m.body || 'Bild' })}
                           title="In die Mindmap ziehen"
                         >
-                          <span className={c.text}>
-                            <Body text={m.body} />
-                          </span>
+                          {m.image && (
+                            <a className={c.image} href={imageUrl(id, m.id)} target="_blank" rel="noopener" draggable={false} title="Bild in voller Größe">
+                              <img src={imageUrl(id, m.id)} alt={m.body ? '' : `Bild von ${m.name}`} loading="lazy" draggable={false} />
+                            </a>
+                          )}
+                          {m.image && ocr?.available && (
+                            <button type="button" className={`btn ${c.read}`} disabled={reading !== null} onClick={() => void read(m)} title="Text auf dem Bild von der KI lesen lassen und ins Eingabefeld legen">
+                              <Icon name="scan" size={13} /> {reading === m.id ? 'Text wird erkannt …' : 'Text erkennen'}
+                            </button>
+                          )}
+                          {m.body && (
+                            <span className={c.text}>
+                              <Body text={m.body} />
+                            </span>
+                          )}
                           <span className={c.time}>{time(m.at)}</span>
                           {(mine || teacher) && (
                             <button className={c.del} onClick={() => remove(m)} title="Löschen" aria-label="Nachricht löschen">
@@ -222,6 +288,15 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
                 })}
               </div>
             </div>
+            {pending && (
+              <div className={c.pending}>
+                <img src={pending.preview} alt="Aufgenommenes Bild" />
+                <span className="muted">Geht mit der nächsten Nachricht mit.</span>
+                <button type="button" className="btn icon" onClick={() => setPending(null)} title="Bild weglassen" aria-label="Bild weglassen">
+                  ×
+                </button>
+              </div>
+            )}
             <form
               className={c.compose}
               onSubmit={(e) => {
@@ -229,6 +304,9 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
                 send();
               }}
             >
+              <button type="button" className="btn icon" onClick={() => setScan(true)} disabled={uploading} title={uploading ? 'Bild wird hochgeladen …' : 'Bild aufnehmen'} aria-label="Bild aufnehmen">
+                <Icon name="camera" size={18} />
+              </button>
               <textarea
                 rows={1}
                 value={draft}
@@ -243,12 +321,13 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
                 }}
                 aria-label="Nachricht"
               />
-              <button className="btn primary" type="submit" disabled={!draft.trim()}>
+              <button className="btn primary" type="submit" disabled={(!draft.trim() && !pending) || uploading}>
                 Senden
               </button>
             </form>
           </>
         )}
+      {scan && <ScanDialog onClose={() => setScan(false)} onImage={(f) => void upload(f)} />}
       {toast && <div className={c.toast}>{toast}</div>}
     </div>
   );

@@ -1,11 +1,17 @@
 /**
  * Chat in Echtzeit im Namespace /project: chat:join, chat:send, chat:delete, chat:more.
+ * Bilder („Bild aufnehmen“, 24. November 2026) gehen per HTTP:
+ *   POST /api/projects/:id/chat/bild?scope=   rohe Bytes (JPEG, PNG, WebP, GIF) → {file}; danach chat:send mit file
+ *   GET  /api/projects/:id/chat/:mid/bild     Bild einer Nachricht, nur für wer den Chat sieht
  * Bereiche: 'p' = alle im Projekt, 'g<id>' = eine Gruppe. Lernende sehen nur den Chat ihrer Gruppe und den für alle;
  * die Lehrkraft alle. Beide lassen sich in den Projekt-Einstellungen abschalten.
  */
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Namespace, Socket } from 'socket.io';
 import { z } from 'zod';
+import { requireSession } from '../http/auth.js';
 import { CHAT_MAX } from '../projects/chat.js';
+import { IMAGE_MAX_BYTES, sniffImage } from '../projects/webImport.js';
 import type { Services } from '../services.js';
 
 type Ack = (r: Record<string, unknown>) => void;
@@ -34,7 +40,7 @@ export async function chatScopes(s: Services, userId: number, projectId: number)
   return { role, scopes };
 }
 
-const Send = z.object({ projectId: z.number().int(), scope: z.string().max(20), text: z.string().min(1).max(CHAT_MAX * 2) });
+const Send = z.object({ projectId: z.number().int(), scope: z.string().max(20), text: z.string().max(CHAT_MAX * 2), file: z.string().max(300).optional() });
 
 export function chatSocket(nsp: Namespace, s: Services) {
   nsp.on('connection', (socket: Socket) => {
@@ -81,7 +87,7 @@ export function chatSocket(nsp: Namespace, s: Services) {
         const t = Date.now();
         if (t - lastSend < 400) return ack?.({ ok: false, error: 'Bitte etwas langsamer' });
         lastSend = t;
-        const message = await s.chat.add(r.projectId, r.scope.scope, sess().userId, m.data.text);
+        const message = await s.chat.add(r.projectId, r.scope.scope, sess().userId, m.data.text, m.data.file);
         nsp.to(room(r.projectId, r.scope.scope)).emit('chat', { projectId: r.projectId, scope: r.scope.scope, message });
         ack?.({ ok: true, id: message.id });
       } catch (e) {
@@ -105,5 +111,45 @@ export function chatSocket(nsp: Namespace, s: Services) {
         ack?.({ ok: false, error: e instanceof Error ? e.message : 'Löschen fehlgeschlagen' });
       }
     });
+  });
+}
+
+const CHAT_IMAGE = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+export function chatRoutes(app: FastifyInstance, s: Services) {
+  async function member(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const sess = requireSession(req, reply);
+    if (!sess) return null;
+    const projectId = Number(req.params.id);
+    if (!Number.isInteger(projectId) || (sess.projectId !== null && sess.projectId !== projectId)) return void reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    const r = await chatScopes(s, sess.userId, projectId);
+    if (!r) return void reply.code(403).send({ error: 'Kein Zugriff auf dieses Projekt' });
+    return { userId: sess.userId, projectId, scopes: r.scopes };
+  }
+
+  app.post<{ Params: { id: string }; Querystring: { scope?: string } }>('/api/projects/:id/chat/bild', { bodyLimit: IMAGE_MAX_BYTES + 64 * 1024 }, async (req, reply) => {
+    const a = await member(req, reply);
+    if (!a) return;
+    const scope = String(req.query.scope ?? '');
+    if (!a.scopes.some((x) => x.scope === scope)) return reply.code(403).send({ error: 'Kein Zugriff auf diesen Chat' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return reply.code(400).send({ error: 'Bild fehlt' });
+    const mime = sniffImage(req.body);
+    if (!mime || !CHAT_IMAGE.has(mime)) return reply.code(415).send({ error: 'Nur Bilder (JPEG, PNG, WebP, GIF)' });
+    const key = 'chatbild:' + a.userId;
+    if (s.webLimiter.blocked(key)) return reply.code(429).send({ error: 'Zu viele Bilder. Bitte in ein paar Minuten noch einmal.' });
+    s.webLimiter.fail(key);
+    return { file: await s.chat.storeImage(a.projectId, scope, req.body) };
+  });
+
+  app.get<{ Params: { id: string; mid: string } }>('/api/projects/:id/chat/:mid/bild', async (req, reply) => {
+    const a = await member(req, reply);
+    if (!a) return;
+    const row = await s.chat.get(Number(req.params.mid));
+    if (!row || row.projectId !== a.projectId || !row.filePath || !a.scopes.some((x) => x.scope === row.scope)) return reply.code(404).send({ error: 'Bild nicht gefunden' });
+    const data = await s.chat.files?.read(row.filePath);
+    const mime = data && sniffImage(data);
+    if (!data || !mime || !CHAT_IMAGE.has(mime)) return reply.code(404).send({ error: 'Bild nicht gefunden' });
+    void reply.header('Cache-Control', 'private, max-age=86400').header('X-Content-Type-Options', 'nosniff').type(mime);
+    return reply.send(data);
   });
 }

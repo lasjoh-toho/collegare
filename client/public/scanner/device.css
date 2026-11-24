@@ -1,0 +1,110 @@
+/* Autogra.fi-Kern: Kopplungs- und Statusansichten des Scanners.
+   Farben, Formen und Schrift wie welcome.php und step-info.php der alten App. */
+:root {
+    --ag-grad: linear-gradient(135deg, #003264 0%, #0055a5 100%);
+    --ag-grad-light: linear-gradient(135deg, #f0f4ff 0%, #e8f0fb 100%);
+    --ag-primary: #003264;
+    --ag-text: #1a1a2e;
+    --ag-muted: #6b7280;
+    --ag-border: #e5e7eb;
+}
+[hidden] { display: none !important; }
+
+.ag-screen {
+    position: fixed; inset: 0; z-index: 2000; overflow-y: auto;
+    background: var(--ag-grad-light); color: var(--ag-text);
+}
+.ag-hero {
+    background: var(--ag-grad); color: white; text-align: center;
+    padding: 48px 20px 72px; position: relative; overflow: hidden;
+}
+.ag-hero::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 50px;
+    background: #f0f4ff; clip-path: ellipse(55% 100% at 50% 100%);
+}
+.ag-hero-logo {
+    width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 20px;
+    background: rgba(255,255,255,.18); border: 2px solid rgba(255,255,255,.3);
+    display: flex; align-items: center; justify-content: center;
+}
+.ag-hero h1 { font-size: clamp(1.5rem, 6vw, 2.2rem); font-weight: 800; margin: 0 0 12px; line-height: 1.15; }
+.ag-hero p { font-size: 1rem; opacity: .85; max-width: 420px; margin: 0 auto; line-height: 1.5; }
+
+.ag-code-card {
+    background: white; border-radius: 20px; padding: 28px 24px;
+    max-width: 420px; width: calc(100% - 32px); margin: -30px auto 40px;
+    box-shadow: 0 8px 40px rgba(0,50,100,.12), 0 2px 8px rgba(0,0,0,.06);
+    position: relative; z-index: 2;
+}
+.ag-code-card h2 { font-size: 1.15rem; font-weight: 700; margin: 0 0 6px; }
+.ag-code-card p { font-size: .88rem; color: var(--ag-muted); margin: 0 0 18px; line-height: 1.5; }
+.ag-code-row { display: flex; gap: 10px; }
+.ag-code-input {
+    flex: 1; min-width: 0; padding: 14px 12px; border: 2px solid var(--ag-border); border-radius: 12px;
+    font-size: 1.3rem; font-weight: 700; letter-spacing: .2em; text-align: center; text-transform: uppercase;
+    outline: none; transition: border-color .2s; font-family: inherit;
+}
+.ag-code-input:focus { border-color: var(--ag-primary); }
+.ag-code-input::placeholder { font-size: .9rem; letter-spacing: 0; font-weight: 400; color: #bbb; text-transform: none; }
+.ag-code-btn {
+    padding: 0 20px; background: var(--ag-grad); color: white; border: none; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center;
+}
+.ag-code-btn:disabled { opacity: .6; }
+.ag-code-error {
+    margin-top: 12px; padding: 10px 14px; background: #fef2f2; border: 1px solid #fee2e2;
+    border-radius: 8px; color: #dc2626; font-size: .84rem;
+}
+
+/* Ziel der Aufnahme (neu: am Handy fehlt die Schrittleiste des Computers) */
+.ag-topbar {
+    position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));
+    background: var(--ag-grad); color: white; font-size: .9rem; line-height: 1.3;
+}
+.ag-topbar-text { flex: 1; min-width: 0; }
+.ag-topbar-text strong, .ag-topbar-text span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-topbar-text span { opacity: .8; font-size: .8rem; }
+.ag-topbar-pages { background: rgba(255,255,255,.2); border-radius: 999px; padding: 3px 10px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+
+.ag-done {
+    position: fixed; inset: 0; z-index: 1500; background: rgba(0,30,60,.55);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.ag-done-card {
+    background: white; border-radius: 20px; padding: 28px 24px; max-width: 380px; width: 100%;
+    text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,.2);
+}
+.ag-done-icon {
+    width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%; color: white;
+    background: linear-gradient(135deg, #34a853, #2d9247); display: flex; align-items: center; justify-content: center;
+}
+.ag-done-card h2 { margin: 0 0 8px; color: var(--ag-primary); font-size: 1.3rem; }
+.ag-done-card p { margin: 0 0 20px; color: #444; line-height: 1.5; }
+.ag-btn {
+    display: block; width: 100%; margin-top: 10px; padding: 13px 20px; border: none; border-radius: 12px;
+    background: var(--ag-grad); color: white; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.ag-btn-secondary { background: #f1f5f9; color: #334155; }
+a.ag-btn { box-sizing: border-box; text-align: center; text-decoration: none; }
+.ag-btn[hidden] { display: none; }
+
+/* Qualitätshinweis nach dem Entzerren (neu) */
+.ag-quality {
+    position: absolute; left: 12px; right: 12px; top: calc(12px + env(safe-area-inset-top)); z-index: 3000;
+    background: #fff8e1; border: 1px solid #ffc107; border-left: 4px solid #f59e0b; border-radius: 12px;
+    padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.25); color: #7c4a03; font-size: .9rem; line-height: 1.4;
+}
+.ag-quality p { margin: 0 0 10px; }
+.ag-quality-actions { display: flex; gap: 8px; }
+.ag-quality-btn {
+    flex: 1; padding: 10px 8px; border: none; border-radius: 10px; font-weight: 700; font-size: .9rem;
+    background: var(--ag-grad); color: white; cursor: pointer; font-family: inherit;
+}
+.ag-quality-keep { background: #fff; color: #7c4a03; border: 1px solid #f2c46d; }
+.thumbnail { position: relative; }
+.ag-quality-badge {
+    position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%;
+    background: #f59e0b; color: white; font-weight: 800; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3); pointer-events: none;
+}
