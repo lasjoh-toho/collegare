@@ -694,8 +694,55 @@ function extractCornersFromLines(verticalLines, horizontalLines, width, height) 
 
 // Autogra.fi-Kern: fehlte im alten Scanner (Aufruf unten lief ins Leere).
 // Stellt das Ausgabeformat nach den erkannten Ecken auf Hoch- oder Querformat.
+// Collegare (Wunsch Jo, 24. November 2026): Karteikarten, Buchseiten und Ausschnitte haben kein festes Format.
+// Mit SCANNER_ZIEL.format === 'frei' gilt zuerst „Seitenverhältnis aus den Ecken“: das echte Verhältnis der
+// Vorlage wird aus der Perspektive geschätzt (Zhang und He, „Whiteboard scanning and image enhancement“, 2007:
+// Brennweite aus den Fluchtpunkten, Bildmitte als Hauptpunkt). Ohne erkennbare Perspektive (Vorlage frontal
+// aufgenommen) gilt das gemessene Verhältnis der Kanten. Der Knopf schaltet weiter auf A4 hoch/quer und Quadrat.
+const FREE_FORMAT = !!(window.SCANNER_ZIEL && window.SCANNER_ZIEL.format === 'frei');
+const FORMAT_ICON = { auto: '⬚', portrait: '▯', landscape: '▭', square: '□' };
+const FORMAT_TITLE = { auto: 'Seitenverhältnis aus den Ecken berechnet', portrait: 'A4 hoch', landscape: 'A4 quer', square: 'Quadrat' };
+
+/** Breite durch Höhe der Vorlage aus vier Ecken (TL, TR, BR, BL) in Bildpunkten des Originals */
+function estimateAspect(c, imgW, imgH) {
+    const side = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const measured = (side(c[0], c[1]) + side(c[3], c[2])) / (side(c[0], c[3]) + side(c[1], c[2]));
+    const u0 = imgW / 2, v0 = imgH / 2;
+    const h = (p) => [p.x, p.y, 1];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    // Bezeichnungen wie bei Zhang: m1 oben links, m2 oben rechts, m3 unten links, m4 unten rechts
+    const m1 = h(c[0]), m2 = h(c[1]), m3 = h(c[3]), m4 = h(c[2]);
+    const k2 = dot(cross(m1, m4), m3) / dot(cross(m2, m4), m3);
+    const k3 = dot(cross(m1, m4), m2) / dot(cross(m3, m4), m2);
+    const n2 = [k2 * m2[0] - m1[0], k2 * m2[1] - m1[1], k2 * m2[2] - m1[2]];
+    const n3 = [k3 * m3[0] - m1[0], k3 * m3[1] - m1[1], k3 * m3[2] - m1[2]];
+    // Kanten nahezu parallel: keine Perspektive, gemessenes Verhältnis stimmt
+    if (Math.abs(n2[2]) < 1e-3 || Math.abs(n3[2]) < 1e-3) return measured;
+    const f2 = -((n2[0] * n3[0] - (n2[0] * n3[2] + n2[2] * n3[0]) * u0 + n2[2] * n3[2] * u0 * u0)
+               + (n2[1] * n3[1] - (n2[1] * n3[2] + n2[2] * n3[1]) * v0 + n2[2] * n3[2] * v0 * v0)) / (n2[2] * n3[2]);
+    if (!(f2 > 0) || !isFinite(f2)) return measured;
+    const f = Math.sqrt(f2);
+    // Brennweite außerhalb dessen, was Handys haben (etwa 0,4- bis 4-fache Bildbreite): Messung unsicher
+    const long = Math.max(imgW, imgH);
+    if (f < 0.4 * long || f > 4 * long) return measured;
+    const norm2 = (n) => {
+        const a = (n[0] - u0 * n[2]) / f, b = (n[1] - v0 * n[2]) / f;
+        return a * a + b * b + n[2] * n[2];
+    };
+    const r = Math.sqrt(norm2(n2) / norm2(n3));
+    return isFinite(r) && r > 0.15 && r < 7 ? r : measured;
+}
+
 function determineOrientation() {
     if (!corners || corners.length !== 4) return;
+    if (FREE_FORMAT) {
+        currentFormat = 'auto';
+        formatBtn.innerHTML = FORMAT_ICON.auto;
+        formatBtn.title = FORMAT_TITLE.auto;
+        formatBtn.classList.remove('portrait', 'landscape', 'square');
+        return;
+    }
     const side = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
     const w = (side(corners[0], corners[1]) + side(corners[3], corners[2])) / 2;
     const h = (side(corners[0], corners[3]) + side(corners[1], corners[2])) / 2;
@@ -948,6 +995,10 @@ async function applyPerspectiveCorrection() {
         const A4_RATIO = Math.sqrt(2);
         
         switch(currentFormat) {
+            case 'auto':
+                // Höhe durch Breite, wie die übrigen Fälle
+                targetRatio = 1 / estimateAspect(unscaledCorners, originalImage.width, originalImage.height);
+                break;
             case 'landscape':
                 targetRatio = 1 / A4_RATIO;
                 break;
@@ -1510,6 +1561,16 @@ cancelCorrectionBtn.addEventListener('click', () => {
 
 formatBtn.addEventListener('click', () => {
     console.log('Format toggle button clicked');
+    if (FREE_FORMAT) {
+        const order = ['auto', 'portrait', 'landscape', 'square'];
+        currentFormat = order[(order.indexOf(currentFormat) + 1) % order.length];
+        formatBtn.innerHTML = FORMAT_ICON[currentFormat];
+        formatBtn.title = FORMAT_TITLE[currentFormat];
+        formatBtn.classList.remove('portrait', 'landscape', 'square', 'auto');
+        formatBtn.classList.add(currentFormat);
+        drawPreview();
+        return;
+    }
     switch (currentFormat) {
         case 'portrait':
             currentFormat = 'landscape';

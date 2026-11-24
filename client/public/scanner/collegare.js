@@ -7,7 +7,8 @@
     const q = new URLSearchParams(location.search);
     const max = Math.max(1, Math.min(10, Number(q.get('max')) || 1));
     // Bild bleibt in Farbe: aufbereitet wird erst vor der Texterkennung (options.js liest das)
-    window.SCANNER_ZIEL = { maxSeiten: max, dokumentfilter: false };
+    // format 'frei': Seitenverhältnis aus den Ecken statt A4 (correction.js)
+    window.SCANNER_ZIEL = { maxSeiten: max, dokumentfilter: false, format: 'frei' };
     const $ = (id) => document.getElementById(id);
     const parentWin = window.parent !== window ? window.parent : window.opener;
     const send = (msg) => parentWin && parentWin.postMessage(msg, location.origin);
