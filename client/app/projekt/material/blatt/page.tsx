@@ -71,6 +71,7 @@ import {
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import { type Crop, cropImage, kb, loadImage, removeBackground, shrinkImage, srcBytes } from '@/lib/blattImage';
+import { ScanDialog } from '@/components/ScanDialog';
 import st from './blatt.module.css';
 
 interface Page {
@@ -165,6 +166,8 @@ export default function BlattPage() {
   const [pageCount, setPageCount] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [printing, setPrinting] = useState(false);
+  /** „Bild aufnehmen“ mit dem Scanner aus Autogra.fi (Wunsch Jo, 24. November 2026) */
+  const [scan, setScan] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   /** Kontextmenü „Umwandeln in“ für einen Baustein der linken Leiste */
   const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
@@ -1008,6 +1011,7 @@ export default function BlattPage() {
               toColumns={toColumns}
               unColumns={unColumns}
               onImage={(f) => void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null)}
+              onScan={() => setScan(true)}
               ensureGlossary={() => change((d) => (walk(d.blocks).some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))}
               onError={setError}
               painter={painter}
@@ -1201,6 +1205,7 @@ export default function BlattPage() {
           </div>
         </div>
       )}
+      {scan && <ScanDialog onClose={() => setScan(false)} onImage={(f) => void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null)} />}
       {printing && doc && <PrintDialog doc={doc} title={title} head={{ title: title.trim(), course: project.course.title, teacher: me.name }} onClose={() => setPrinting(false)} />}
     </ProjectShell>
   );
@@ -1588,9 +1593,13 @@ const TEXT_TYPES: BlockType[] = ['heading', 'text', 'material', 'quote', 'task',
 const QR_SVG =
   '<svg class="cb" viewBox="0 0 24 24"><g fill="#3a3a38"><path d="M3 3h7v7H3zm1 1v5h5V4zm10-1h7v7h-7zm1 1v5h5V4zM3 14h7v7H3zm1 1v5h5v-5z"/><path d="M5 5h3v3H5zm11 0h3v3h-3zM5 16h3v3H5zm9-2h2v2h-2zm2 2h2v2h-2zm2-2h3v2h-3zm-4 4h2v3h-2zm4 0h3v3h-3zm-2 2h2v1h-2z"/></g></svg>';
 
+/** Kamera für „Bild aufnehmen“ (Colibre hat keine) im selben Strich */
+const CAM_SVG =
+  '<svg class="cb" viewBox="0 0 24 24"><g fill="none" stroke="#3a3a38" stroke-width="1.2" stroke-linejoin="round"><path d="M3.5 7.5h4l1.5-2.5h6l1.5 2.5h4v12h-17z"/><circle cx="12" cy="13" r="3.8"/></g><circle cx="18" cy="10" r=".9" fill="#3a3a38"/></svg>';
+
 /** Colibre-Icon (LibreOffice) */
 function Ico({ n, size = 24 }: { n: string; size?: number }) {
-  return <span className={st.ico} style={{ width: size, height: size }} aria-hidden dangerouslySetInnerHTML={{ __html: n === 'qr' ? QR_SVG : colibre(n) }} />;
+  return <span className={st.ico} style={{ width: size, height: size }} aria-hidden dangerouslySetInnerHTML={{ __html: n === 'qr' ? QR_SVG : n === 'camera' ? CAM_SVG : colibre(n) }} />;
 }
 /** Knopf im Menüband: groß (Icon über der Beschriftung) oder klein (Icon, Beschriftung daneben) */
 function RB({ icon, label, big, on, disabled, onClick, title, hideLabel }: { icon: string; label: string; big?: boolean; on?: boolean; disabled?: boolean; onClick: () => void; title?: string; hideLabel?: boolean }) {
@@ -1643,6 +1652,8 @@ type RibbonProps = {
   unColumns: (id: string) => void;
   setColCount: (id: string, n: number) => void;
   onImage: (f: Blob) => void;
+  /** Scanner öffnen; das Bild kommt über onImage */
+  onScan: () => void;
   ensureGlossary: () => void;
   onError: (m: string) => void;
   /** Format übertragen läuft (sticky: auf mehrere Bausteine) */
@@ -2020,6 +2031,7 @@ function Ribbon(props: RibbonProps) {
             </Group>
             <Group label="Illustrationen">
               <RB icon={BICON.image} label="Bild" big onClick={() => props.add('image')} />
+              <RB icon="camera" label="Bild aufnehmen" big onClick={props.onScan} title="Blatt, Buchseite oder Karteikarte mit der Kamera aufnehmen: Ecken werden erkannt und gerade gezogen" />
               <RB icon={BICON.table} label="Tabelle" big onClick={() => props.add('table')} />
               <RB
                 icon={BICON.chart}
@@ -2555,6 +2567,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               <span>{b.src ? 'Anderes Bild' : 'Auswählen'}</span>
               <input type="file" accept="image/*" hidden onChange={(e) => (e.target.files?.[0] && props.onImage(e.target.files[0]), (e.target.value = ''))} />
             </label>
+            <RB icon="camera" label="Aufnehmen" big onClick={props.onScan} title="Bild mit der Kamera aufnehmen (Scanner)" />
             <RB icon="gallery" label="Aus dem Material" big onClick={() => props.setPanel('material')} />
             <Drop icon="inserthyperlink" label="Aus dem Netz" value={loading ? 'lädt …' : undefined} big wide title="Bild über seine Adresse im Netz holen">
               <MH>Adresse des Bilds</MH>

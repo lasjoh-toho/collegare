@@ -14,6 +14,7 @@ import { editToTufte, glossHtml, imageHtml, noteHtml, tufteToEdit } from '@/lib/
 import { API_URL, BASE_PATH, ApiError, get, post } from '@/lib/api';
 import { isChatDrag, readChatDrop } from '@/lib/chatDrag';
 import w from './writecard.module.css';
+import { ScanDialog } from './ScanDialog';
 
 export interface WriteDoc {
   id: number;
@@ -161,6 +162,8 @@ export function WriteCard({
   const busy = useRef(false);
   const apiRef = useRef<EditorApi | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** „Bild aufnehmen“ mit dem Scanner aus Autogra.fi (Wunsch Jo, 24. November 2026) */
+  const [scan, setScan] = useState(false);
   const [dropY, setDropY] = useState<number | null>(null);
   const card = useRef<HTMLElement>(null);
   const showRef = useRef(show);
@@ -366,6 +369,9 @@ export function WriteCard({
         </button>
         <button type="button" className="btn" onClick={() => fileRef.current?.click()} title={praes ? 'Bild für die Folie' : 'Bild in den Text, Unterschrift steht am Rand'}>
           Bild
+        </button>
+        <button type="button" className="btn" onClick={() => setScan(true)} title="Bild mit der Kamera aufnehmen: Blatt, Buchseite oder Karteikarte, Ecken werden gerade gezogen">
+          Aufnehmen
         </button>
       </>
     );
@@ -582,6 +588,7 @@ export function WriteCard({
         )}
       </div>
       {dropY !== null && <div className={w.dropLine} style={{ top: dropY }} aria-hidden="true" />}
+      {scan && <ScanDialog onClose={() => setScan(false)} onImage={(f) => void image(f)} />}
       <input
         ref={fileRef}
         type="file"
