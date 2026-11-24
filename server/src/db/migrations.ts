@@ -548,6 +548,13 @@ migrations['0023_doc_comments'] = {
   },
 };
 
+migrations['0024_chat_image'] = {
+  async up(db) {
+    // Bilder im Chat („Bild aufnehmen“, Wunsch Jo vom 24. November 2026)
+    await db.schema.alterTable('chat_messages').addColumn('file_path', 'varchar(300)').execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

@@ -42,3 +42,10 @@
 }
 .compose :global(.btn) { height: 40px; }
 @supports (field-sizing: content) { .compose textarea { field-sizing: content; resize: none; } }
+/* Bild aufnehmen: Bild in der Blase, Vorschau über dem Eingabefeld */
+.image { display: block; margin: 2px -6px 4px; }
+.image img { display: block; max-width: 100%; max-height: 320px; border-radius: 10px; background: var(--bg); }
+.read { display: flex; width: fit-content; height: auto; padding: 2px 8px; font-size: 12px; margin-bottom: 4px; }
+.pending { display: flex; align-items: center; gap: 10px; padding: 8px 16px 0; background: var(--bg-elev); border-top: 1px solid var(--line); font-size: 13px; }
+.pending img { height: 56px; max-width: 90px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.pending + .compose { border-top: 0; }

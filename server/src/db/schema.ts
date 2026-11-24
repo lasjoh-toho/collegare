@@ -289,6 +289,8 @@ export interface ChatMessagesTable {
   user_id: number;
   body: string;
   created_at: Ms;
+  /** Bild der Nachricht (Bild aufnehmen), relativ zum Chat-Ordner */
+  file_path: string | null;
 }
 
 /**

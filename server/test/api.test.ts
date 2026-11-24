@@ -589,6 +589,32 @@ describe('Mindmap in Echtzeit', () => {
     // Chat für alle
     expect((await emit(sc, 'chat:send', { projectId: project, scope: 'p', text: 'Hallo alle' })).ok).toBe(true);
     expect(((await emit(sa, 'chat:join', { projectId: project, scope: 'p' })).messages as J[]).map((x) => x.body)).toEqual(['Hallo alle']);
+    // Bild aufnehmen: erst hochladen, dann mit der Nachricht verschicken; nur wer den Chat sieht, bekommt das Bild
+    const JPEG = Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
+    const up = async (tok: string, scope: string, data: Buffer) => {
+      const res = await fetch(base + `/api/projects/${project}/chat/bild?scope=${scope}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream', authorization: 'Bearer ' + tok }, body: data });
+      return { status: res.status, json: (await res.json()) as J };
+    };
+    expect((await up(clara, 'g' + g1, JPEG)).status).toBe(403);
+    expect((await up(t, 'g' + g1, Buffer.from('<svg></svg>'))).status).toBe(415);
+    const pic = await up(t, 'g' + g1, JPEG);
+    expect(pic.status).toBe(200);
+    expect((await emit(st, 'chat:send', { projectId: project, scope: 'p', text: '', file: pic.json.file })).ok).toBe(false);
+    await new Promise((r) => setTimeout(r, 450));
+    const imgSeen = new Promise<J>((r) => st.once('chat', r));
+    expect((await emit(st, 'chat:send', { projectId: project, scope: 'g' + g1, text: '', file: pic.json.file })).ok).toBe(true);
+    const im = (await imgSeen).message;
+    expect(im).toMatchObject({ body: '', image: true });
+    await new Promise((r) => setTimeout(r, 450));
+    expect((await emit(st, 'chat:send', { projectId: project, scope: 'g' + g1, text: 'nochmal', file: pic.json.file })).error).toMatch(/schon/);
+    const get = (tok: string) => fetch(base + `/api/projects/${project}/chat/${im.id}/bild`, { headers: { authorization: 'Bearer ' + tok } });
+    const got = await get(anna);
+    expect(got.status).toBe(200);
+    expect(got.headers.get('content-type')).toBe('image/jpeg');
+    expect(Buffer.from(await got.arrayBuffer()).equals(JPEG)).toBe(true);
+    expect((await get(clara)).status).toBe(404);
+    expect((await emit(st, 'chat:delete', { projectId: project, id: im.id })).ok).toBe(true);
+    expect((await get(t)).status).toBe(404);
     // Lehrkraft löscht
     expect((await emit(st, 'chat:delete', { projectId: project, id: m.message.id })).ok).toBe(true);
     expect((await emit(sa, 'chat:join', { projectId: project, scope: 'g' + g1 })).messages).toEqual([]);

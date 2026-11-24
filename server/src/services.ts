@@ -124,7 +124,7 @@ export async function createServices(config: Config, now: () => number = Date.no
     maps,
     gradings: new Gradings(db, projects, maps, now),
     materials: new Materials(db, now),
-    chat: new Chat(db, now),
+    chat: new Chat(db, now, new NoteFiles(dataDir, 'chat')),
     notes: new Notes(db, now, new NoteFiles(dataDir)),
     noteLines: new NoteLines(db, now),
     pastes: new Pastes(db, now),

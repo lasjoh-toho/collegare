@@ -38,8 +38,9 @@ export const noteFileAllowed = (mime: string) => Object.hasOwn(NOTE_FILE_TYPES, 
 
 export class NoteFiles {
   readonly root: string;
-  constructor(dataDir: string) {
-    this.root = resolve(dataDir, 'notizen');
+  /** sub: Unterordner im Datenordner (Notizen „notizen“, Bilder im Chat „chat“) */
+  constructor(dataDir: string, sub = 'notizen') {
+    this.root = resolve(dataDir, sub);
   }
 
   /** Ordnerpräfix eines Bereichs (relativ), z. B. „12/g3/“ */

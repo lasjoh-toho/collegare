@@ -16,7 +16,7 @@ import { materialRoutes } from './routes/materials.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { ltiRoutes } from './routes/lti.js';
 import { mapSocket } from './routes/maps.js';
-import { chatSocket } from './routes/chat.js';
+import { chatRoutes, chatSocket } from './routes/chat.js';
 import { notesSocket } from './routes/notes.js';
 import { pinnwandRoutes, pinnwandSocket } from './routes/pinnwand.js';
 import { bentoRoutes } from './routes/bento.js';
@@ -143,6 +143,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<App> {
     pasteRoutes(http, s);
     webImageRoutes(http, s, opts.webAllowed);
     aiRoutes(http, s);
+    chatRoutes(http, s);
     await oidcRoutes(http, s);
     await ltiRoutes(http, s, bc);
 
