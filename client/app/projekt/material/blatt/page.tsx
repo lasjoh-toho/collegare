@@ -14,7 +14,9 @@ import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { fileUrl, type Material } from '@/components/Materials';
 import { colibre } from '@/lib/colibre';
 import { fromTypst, toTypst } from '@/lib/blattTypst';
-import { ApiError, get, href, patch } from '@/lib/api';
+import { ApiError, get, href, patch, post } from '@/lib/api';
+import { toDocx, docxName } from '@/lib/blattDocx';
+import { download, pickFile } from '@/lib/bentoFiles';
 import {
   BLOCK_LABEL,
   blockSummary,
@@ -79,7 +81,7 @@ const MAX = 4_000_000;
 
 const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken. Du schreibst direkt auf der Seite wie in Word: Klick in einen Text und tipp los. Ein Klick ins Leere unter dem letzten Baustein schreibt dort weiter; ein neuer Textbaustein öffnet sich gleich zum Schreiben. Esc beendet das Schreiben.
 
-Den Namen des Blatts änderst du oben in der Kopfleiste. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
+Den Namen des Blatts änderst du oben in der Kopfleiste. „Datei“: speichern, Kopie anlegen (z. B. für Gruppe B), drucken oder als PDF speichern, als Word-Datei, Webseite oder Text exportieren und das Blatt als Blatt-Datei weitergeben oder öffnen. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
 
 Format übertragen: Baustein wählen, „Format übertragen“, dann auf einen anderen Baustein klicken. Doppelklick auf den Knopf überträgt auf mehrere nacheinander; Esc beendet.
 
@@ -158,6 +160,7 @@ export default function BlattPage() {
   /** Format übertragen: Gestaltung, die beim nächsten Klick auf einen Baustein übernommen wird */
   const [painter, setPainter] = useState<{ type: BlockType; style: Partial<Block>; sticky: boolean } | null>(null);
   const [flowView, setFlowView] = useState(false);
+  const [busy, setBusy] = useState('');
   const [pro, setPro] = useState(false);
   useEffect(() => {
     try {
@@ -610,6 +613,50 @@ export default function BlattPage() {
     else if (b?.type === 'task' && tab === 'block') setTab('task');
     else if (b && tab === 'block' && !CTX_TYPES.includes(b.type)) setTab('start');
   }
+  /** Reiter „Datei“: speichern, Kopie, Druck und Export */
+  async function fileAction(a: FileAction) {
+    if (!doc) return;
+    const name = (title.trim() || 'Arbeitsblatt').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const headCtx = { title: title.trim(), course: project?.course.title ?? '', teacher: me?.name ?? '' };
+    setError('');
+    try {
+      if (a === 'save') return void (await save());
+      if (a === 'print') return setPrinting(true);
+      if (a === 'md') return download(new Blob([toMarkdown(doc)], { type: 'text/markdown' }), name + '.md');
+      if (a === 'typst') return download(new Blob([toTypst(doc)], { type: 'text/plain' }), name + '.typ');
+      if (a === 'json') return download(new Blob([JSON.stringify({ ...doc, title: title.trim() })], { type: 'application/json' }), name + '.blatt.json');
+      if (a === 'html') return download(new Blob([exportHtml(doc, title.trim(), headCtx)], { type: 'text/html' }), name + '.html');
+      if (a === 'docx') {
+        setBusy('Word-Datei entsteht …');
+        download(await toDocx(doc, headCtx), docxName(name));
+        return;
+      }
+      if (a === 'open') {
+        const f = await pickFile('.json,application/json');
+        if (!f) return;
+        const j = JSON.parse(await f.text()) as { format?: string; title?: string };
+        if (j.format !== 'ag-blatt/1') throw new Error('Das ist keine Blatt-Datei.');
+        setEdit(null);
+        setSel(null);
+        change(() => parseDoc(JSON.stringify(j)));
+        if (j.title && !title.trim()) setTitle(j.title);
+        return;
+      }
+      if (a === 'copy') {
+        await save();
+        setBusy('Kopie wird angelegt …');
+        const r = await post<{ material?: { id: number }; id?: number }>(`/api/projects/${id}/materials/page`, { kind: 'blatt', title: `${title.trim() || 'Arbeitsblatt'} (Kopie)` });
+        const nid = r.material?.id ?? r.id;
+        if (!nid) throw new Error('Die Kopie ließ sich nicht anlegen.');
+        await patch(`/api/projects/${id}/materials/${nid}`, { title: `${title.trim() || 'Arbeitsblatt'} (Kopie)`, body: JSON.stringify(doc) });
+        location.href = href(`/projekt/material/blatt/?id=${id}&m=${nid}`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  }
   /** Format übertragen (wie in Bento): Vorlage und eigene Gestaltung des gewählten Bausteins */
   function startPainter(sticky: boolean) {
     if (painter && !sticky) return setPainter(null);
@@ -933,6 +980,8 @@ export default function BlattPage() {
               flowView={flowView}
               setFlowView={setFlowView}
               pro={pro || panel === 'typst'}
+              file={(a) => void fileAction(a)}
+              busy={busy}
             />
           )}
           {headOpen && editing && (
@@ -1078,7 +1127,8 @@ export default function BlattPage() {
 }
 
 // ---------- Bearbeiten direkt auf der Seite ----------
-type Tab = 'start' | 'insert' | 'task' | 'design' | 'layout' | 'block';
+type Tab = 'file' | 'start' | 'insert' | 'task' | 'design' | 'layout' | 'block';
+type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' | 'json' | 'open';
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
 const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak'];
 type Panel = 'search' | 'material' | 'glossary' | 'typst';
@@ -1323,6 +1373,8 @@ type RibbonProps = {
   setFlowView: (v: boolean) => void;
   /** Typst-Code anbieten (für Fortgeschrittene) */
   pro: boolean;
+  file: (a: FileAction) => void;
+  busy: string;
 };
 
 /** Klappmenü im Menüband: Knopf mit der aktuellen Wahl, darunter die Möglichkeiten mit Häkchen (wie in OnlyOffice) */
@@ -1447,6 +1499,9 @@ function Ribbon(props: RibbonProps) {
   return (
     <div className={st.ribbon} onMouseDown={keep}>
       <div className={st.tabs} role="tablist">
+        <button role="tab" aria-selected={tab === 'file'} className={`${st.tab} ${st.tabFile} ${tab === 'file' ? st.tabOn : ''}`} onClick={() => setTab('file')}>
+          Datei
+        </button>
         {(
           [
             ['start', 'Start'],
@@ -1481,6 +1536,29 @@ function Ribbon(props: RibbonProps) {
         ))}
       </div>
       <div className={st.groups}>
+        {tab === 'file' && (
+          <>
+            <Group label="Blatt">
+              <RB icon="save" label="Speichern" big onClick={() => props.file('save')} title="Jetzt speichern (Strg+S); sonst speichert das Blatt von selbst" />
+              <RB icon="duplicatepage" label="Kopie anlegen" big onClick={() => props.file('copy')} title="Neues Blatt mit demselben Inhalt anlegen und öffnen, z. B. für Gruppe B oder eine Nachschrift" />
+            </Group>
+            <Group label="Drucken">
+              <RB icon="print" label="Drucken …" big onClick={() => props.file('print')} title="Drucken oder als PDF speichern, auch persönliche Exemplare mit QR-Code aus Autogra.fi" />
+            </Group>
+            <Group label="Exportieren">
+              <RB icon="exportdirecttopdf" label="PDF" big onClick={() => props.file('print')} title="Im Druckfenster als Ziel „Als PDF speichern“ wählen" />
+              <RB icon="exportto" label="Word" big disabled={!!props.busy} onClick={() => props.file('docx')} title="Als Word-Datei (.docx) zum Weiterbearbeiten; Seitenumbruch und Spalten legt Word selbst fest" />
+              <RB icon="insertdoc" label="Webseite" big onClick={() => props.file('html')} title="Alle Seiten als eine HTML-Datei, so wie sie hier aussehen" />
+              <RB icon="text" label="Text" big onClick={() => props.file('md')} title="Nur der Text als Markdown (.md), z. B. für eine Lernplattform" />
+              {props.pro && <RB icon="basicideappear" label="Typst" big onClick={() => props.file('typst')} title="Typst-Code des Blatts (.typ)" />}
+            </Group>
+            <Group label="Weitergeben">
+              <RB icon="saveas" label="Blatt-Datei" big onClick={() => props.file('json')} title="Das ganze Blatt mit Bildern als Datei (.blatt.json), z. B. für Kolleginnen und Kollegen" />
+              <RB icon="open" label="Blatt-Datei öffnen" big onClick={() => props.file('open')} title="Eine Blatt-Datei hier übernehmen; ersetzt den Inhalt (Rückgängig holt ihn zurück)" />
+            </Group>
+            {props.busy && <span className={st.hint}>{props.busy}</span>}
+          </>
+        )}
         {tab === 'start' && (
           <>
             <Group label="Format">
@@ -3164,6 +3242,33 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
 }
 
 /** Alle Exemplare setzen, in Bögen legen und das Druckfenster öffnen. */
+/** Alle Seiten als eine HTML-Datei, mit den Regeln des Seitensatzes (Bilder stecken schon im Blatt) */
+function exportHtml(doc: BlattDoc, title: string, head: HeadCtx): string {
+  const tmp = document.createElement('div');
+  tmp.className = st.host;
+  tmp.style.cssText = 'position:absolute;left:-10000px;top:0';
+  document.body.appendChild(tmp);
+  const r = paginate(doc, tmp, undefined, { head });
+  const pages = r.pages.map((p) => p.outerHTML).join('\n');
+  tmp.remove();
+  const css: string[] = [];
+  for (const sh of [...document.styleSheets]) {
+    try {
+      for (const rule of [...sh.cssRules]) css.push(rule.cssText);
+    } catch {
+      /* fremde Stilvorlagen */
+    }
+  }
+  const g = pageGeom(doc);
+  const esc = (x: string) => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || 'Arbeitsblatt')}</title><style>${css.join('\n')}
+body { margin: 0; background: #e8e8e8; }
+.${st.host} { display: flex; flex-direction: column; align-items: center; gap: 8mm; padding: 8mm 0; }
+@page { size: ${g.w}mm ${g.h}mm; margin: 0; }
+@media print { body { background: #fff; } .${st.host} { padding: 0; gap: 0; } .${st.host} .bl-page { box-shadow: none; break-after: page; } }
+</style></head><body><div class="${st.host}">${pages}</div></body></html>`;
+}
+
 function printCopies(doc: BlattDoc, copies: Copy[], title: string, head: HeadCtx) {
   const printHost = document.createElement('div');
   printHost.className = `${st.host} ${st.printHost}`;

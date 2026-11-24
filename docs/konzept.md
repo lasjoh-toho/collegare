@@ -1435,6 +1435,13 @@ zu komplex“):
   `#rand[…]`, `#begriff[Wort][Erklärung]`). Bilder stehen nur als Verweis `#bild("id")` im Code. Zum Setzen mit Typst
   selbst fehlt noch die Vorlage mit diesen Funktionen (nächste Stufe).
 
+- **Reiter „Datei“** (Jo, 24. November 2026, nach dem Typst-Vorschlag: „nicht doppelt moppeln, mein Editor reicht“;
+  keine Typst-Vorschau, der Editor bleibt maßgeblich): speichern, Kopie anlegen, Drucken/PDF, Word (.docx,
+  `client/lib/blattDocx.ts`: Kopf, Fußnoten als Word-Fußnoten, Randbemerkungen in Klammern, Aufgaben mit Punkten und
+  Schreiblinien als Tabulator mit Unterstrich, Tabellen, Bilder, Diagramme als PNG; Umbruch und Spalten macht Word),
+  Webseite (alle Seiten als eine HTML-Datei), Text (Markdown), für Fortgeschrittene Typst (.typ), Blatt-Datei
+  (.blatt.json mit Bildern) weitergeben und öffnen.
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).
@@ -1444,7 +1451,6 @@ zu komplex“):
 4. Abgabe digital: dasselbe Blatt auch in der Ausarbeitung; Aufgaben einzeln als Teilaufgaben übernehmen, Bilder
    mitschicken.
 5. Ausarbeitung und Lernseite als Broschüre über denselben Satz (8i.3), Druck über Typst nur „für Fortgeschrittene“.
-6. Typst-Vorlage `blatt.typ` mit den Funktionen aus 8j.9, damit der Code auch mit Typst selbst ein PDF ergibt.
 
 ## 9. Umsetzungsplan
 

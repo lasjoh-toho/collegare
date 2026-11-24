@@ -383,3 +383,6 @@
 .host :global(.bl-flow .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
 .host :global(.bl-flow .bl-mnote)::before { content: ' ('; }
 .host :global(.bl-flow .bl-mnote)::after { content: ')'; }
+.tabFile { color: #fff; background: var(--office-word, #2b579a); margin-right: 4px; }
+.tabFile:hover { color: #fff; background: color-mix(in srgb, var(--office-word, #2b579a) 85%, #000); }
+.tabFile.tabOn { color: var(--office-word, #2b579a); background: var(--bg-elev); }
