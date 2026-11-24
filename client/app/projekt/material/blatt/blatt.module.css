@@ -23,18 +23,8 @@
 .urlRow { display: flex; gap: 4px; }
 .urlRow input { width: 180px; height: 28px; border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; background: var(--bg-elev); color: var(--fg); font-size: 12.5px; }
 
-/* Bearbeiten auf der Seite: der Editor liegt genau über dem Feld */
+/* Bearbeiten direkt im gesetzten Text */
 .zoomWrap { position: relative; width: max-content; margin: 0 auto; }
-.ov { position: absolute; z-index: 6; background: #fff; outline: 2px solid var(--ui-accent, #2563eb); outline-offset: 1mm; border-radius: 1px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
-.ovField { outline: 0; cursor: text; caret-color: #111; }
-.ovField:empty::before { content: 'Hier schreiben …'; color: #aaa; font-style: italic; }
-.ov :global(.ed-note) { display: inline-block; font-size: 0.75em; line-height: 1.2; padding: 0 0.35em; margin: 0 0.1em; border-radius: 0.6em; background: #e8f0fe; color: #1e3a8a; cursor: pointer; vertical-align: 0.15em; font-style: normal; font-weight: 400; max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov :global(.ed-note)::before { content: '¹ '; }
-.ov :global(.ed-margin)::before { content: '↦ '; }
-.ov :global(.ed-mark) { display: none; }
-.ov :global(.ed-gloss) { border-bottom: 2px dotted #2563eb; cursor: pointer; }
-.ov :global(mark) { background: #fff176; color: inherit; }
-.ov .atom { position: absolute; left: 0; top: 100%; width: min(360px, 100%); min-width: 260px; margin-top: 10px; z-index: 7; }
 
 /* Seitenleiste rechts */
 .hit { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--bg-elev); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 12.5px; color: var(--fg); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -269,7 +259,6 @@
 .host.editing :global(.bl-head) { cursor: pointer; }
 .host.editing :global(.bl-head:hover) { outline: 1px dashed var(--ui-accent, #2563eb); outline-offset: 1mm; }
 .host.editing :global(.bl-page) { cursor: text; }
-.ov :global(td), .ov :global(th) { padding: 0; }
 
 /* Menüband mit Colibre-Icons (Runde 4) */
 .ico { display: inline-flex; flex: none; align-items: center; justify-content: center; }
@@ -309,3 +298,14 @@
 .headTable tr.off td { color: var(--fg-faint); }
 .host :global(.bl-wm) { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 64pt; font-weight: 800; letter-spacing: 0.08em; color: rgba(0, 0, 0, 0.07); white-space: nowrap; pointer-events: none; z-index: 0; }
 .headAnchor { position: relative; height: 0; z-index: 9; }
+
+/* Runde 5: Schreiben direkt im Text (kein Feld darüber) */
+.host :global(.bl-live) { outline: 1px dashed color-mix(in srgb, var(--ui-accent, #2563eb) 70%, transparent); outline-offset: 1.5mm; cursor: text; caret-color: #111; min-width: 2em; min-height: 1.2em; }
+.host :global(.bl-live:empty)::before { content: 'Hier schreiben …'; color: #aaa; font-style: italic; }
+.host :global(.bl-live .ed-note) { display: inline-block; font-size: 0.75em; line-height: 1.2; padding: 0 0.35em; margin: 0 0.1em; border-radius: 0.6em; background: #e8f0fe; color: #1e3a8a; cursor: pointer; vertical-align: 0.15em; font-style: normal; font-weight: 400; max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host :global(.bl-live .ed-note)::before { content: '¹ '; }
+.host :global(.bl-live .ed-margin)::before { content: '↦ '; }
+.host :global(.bl-live .ed-mark) { display: none; }
+.host :global(.bl-live .ed-gloss) { border-bottom: 2px dotted #2563eb; cursor: pointer; }
+.host :global(.bl-live mark) { background: #fff176; color: inherit; }
+.atom { position: absolute; z-index: 9; width: 340px; }

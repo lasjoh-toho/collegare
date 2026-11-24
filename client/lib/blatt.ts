@@ -476,6 +476,39 @@ function inline(s: string, ctx: TextCtx | null, notes = true): string {
 }
 
 /** Markdown → Absätze (je Absatz bzw. Liste ein Stück HTML); Fußnoten werden dabei nummeriert. */
+/**
+ * Zeilen des Markdowns je gesetztem Absatz (Listen bilden einen Absatz), als [erste Zeile, Zeile danach].
+ * Damit wird auf der Seite nur das Stück bearbeitet, das dort steht, auch wenn der Baustein über Seiten läuft.
+ */
+export function paraSpans(md: string | undefined): [number, number][] {
+  const out: [number, number][] = [];
+  const lines = (md ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const item = /^\s*([-*•]|\d+[.)])\s+(.*)$/;
+  let i = 0;
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (!t) {
+      i++;
+      continue;
+    }
+    const li = item.exec(t);
+    if (li) {
+      const ordered = /^\d/.test(li[1]);
+      const a = i;
+      while (i < lines.length) {
+        const m = item.exec(lines[i].trim());
+        if (!m || /^\d/.test(m[1]) !== ordered) break;
+        i++;
+      }
+      out.push([a, i]);
+      continue;
+    }
+    out.push([i, i + 1]);
+    i++;
+  }
+  return out;
+}
+
 function paragraphs(md: string | undefined, ctx: TextCtx | null): string[] {
   const out: string[] = [];
   const lines = (md ?? '').replace(/\r\n?/g, '\n').split('\n');
@@ -870,6 +903,8 @@ interface Part {
   kids?: { b: Block; ctx: Ctx; part: Part }[][];
   /** Tabelle: Zellen als HTML */
   cells?: string[][];
+  /** welche Absätze dieses Stück zeigt (für das Bearbeiten auf der Seite) */
+  range?: [number, number];
 }
 
 /** Vorlage und eigene Gestaltung auf den Baustein anwenden */
@@ -894,9 +929,10 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
 }
 
 /** Feld, das man auf der Seite anklicken und dort bearbeiten kann */
-function field(tag: string, cls: string, name: string, html: string): HTMLElement {
+function field(tag: string, cls: string, name: string, html: string, range?: [number, number]): HTMLElement {
   const e = el(tag, cls, html);
   e.dataset.field = name;
+  if (range) e.dataset.r = range.join(':');
   return e;
 }
 
@@ -911,7 +947,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       box.appendChild(field(b.level === 1 ? 'h2' : 'h3', '', 'text', part.title || esc(b.text) || '<span class="bl-ph">Überschrift</span>'));
       break;
     case 'text':
-      box.appendChild(field('div', 'bl-text', 'md', html || '<p class="bl-ph">Erklärtext …</p>'));
+      box.appendChild(field('div', 'bl-text', 'md', html || '<p class="bl-ph">Erklärtext …</p>', part.range));
       break;
     case 'material': {
       if (first) {
@@ -922,11 +958,11 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
         if (part.mark) t.insertAdjacentHTML('beforeend', part.mark);
         box.appendChild(t);
       }
-      box.appendChild(field('div', 'bl-mat-body' + (b.lineNumbers !== false ? ' bl-numbered' : ''), 'md', html || '<p class="bl-ph">Text des Materials …</p>'));
+      box.appendChild(field('div', 'bl-mat-body' + (b.lineNumbers !== false ? ' bl-numbered' : ''), 'md', html || '<p class="bl-ph">Text des Materials …</p>', part.range));
       break;
     }
     case 'quote':
-      box.appendChild(field('div', 'bl-quote-text', 'md', html || '<p class="bl-ph">Zitat …</p>'));
+      box.appendChild(field('div', 'bl-quote-text', 'md', html || '<p class="bl-ph">Zitat …</p>', part.range));
       if (part.last !== false) box.appendChild(field('div', 'bl-quote-src', 'source', esc(b.source) || (ctx.editing ? '<span class="bl-ph">Quelle</span>' : '')));
       break;
     case 'image': {
@@ -995,7 +1031,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     }
     case 'box':
       if (first && (b.text || ctx.editing)) box.appendChild(field('div', 'bl-box-title', 'text', esc(b.text) || '<span class="bl-ph">Titel (optional)</span>'));
-      box.appendChild(field('div', 'bl-box-text', 'md', html || '<p class="bl-ph">Inhalt des Kastens …</p>'));
+      box.appendChild(field('div', 'bl-box-text', 'md', html || '<p class="bl-ph">Inhalt des Kastens …</p>', part.range));
       break;
     case 'glossary':
       if (first) box.appendChild(field('div', 'bl-gl-title', 'text', esc(b.text) || (ctx.editing ? '<span class="bl-ph">Überschrift</span>' : '')));
@@ -1355,7 +1391,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     let first = true;
     while (i < paras.length) {
       let j = paras.length;
-      const part = (k: number): Part => ({ ...prep, paras: paras.slice(i, k), first, last: k === paras.length });
+      const part = (k: number): Part => ({ ...prep, paras: paras.slice(i, k), first, last: k === paras.length, range: [i, k] });
       let p = place(b, ctx, part(j));
       while (over(pg) && j - i > 1) {
         p.remove();

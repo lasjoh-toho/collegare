@@ -20,6 +20,7 @@ import {
   findBlock,
   fromEditMd,
   glossaryTerms,
+  paraSpans,
   HEAD_KEYS,
   headFields,
   insertAfter,
@@ -153,7 +154,6 @@ export default function BlattPage() {
   const pagesRef = useRef<HTMLElement[]>([]);
   /** Feld, das gerade auf der Seite bearbeitet wird */
   const [edit, setEdit] = useState<EditTarget | null>(null);
-  const [ov, setOv] = useState<Overlay | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const center = useRef<HTMLDivElement>(null);
@@ -260,10 +260,179 @@ export default function BlattPage() {
     return () => removeEventListener('keydown', key);
   });
 
+  // ---------- Schreiben direkt im Text der Seite (Wunsch Jo, 24. November 2026: echtes WYSIWYG) ----------
+  /**
+   * Das gesetzte Feld selbst wird bearbeitbar: gleiche Schrift, gleicher Umbruch, gleiche Stelle. Beim Tippen wird
+   * nicht neu gesetzt (sonst springt die Schreibmarke); erst nach einer kurzen Pause oder am Ende. Läuft ein Baustein
+   * über Seiten, wird nur das Stück auf dieser Seite bearbeitet.
+   */
+  const live = useRef<{ el: HTMLElement; t: EditTarget; rich: boolean; range: [number, number] | null; spans: [number, number][]; value: string } | null>(null);
+  /** Zeitpunkt der letzten Eingabe: das Setzen gleich danach fällt aus */
+  const skipRender = useRef(0);
+  /** Schreibmarke über das Neusetzen hinweg: Absatz im ganzen Feld und Zeichen darin */
+  const caret = useRef<{ key: string; para: number; off: number } | null>(null);
+  const savedRange = useRef<Range | null>(null);
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tick, setTick] = useState(0);
+  const [atom, setAtom] = useState<AtomState | null>(null);
+  const editKey = (t: EditTarget) => `${t.bid}|${t.field}`;
+
+  function rememberCaret() {
+    const L = live.current;
+    const s = getSelection();
+    if (!L || !s?.rangeCount || !L.el.contains(s.anchorNode)) return;
+    savedRange.current = s.getRangeAt(0).cloneRange();
+    const c = caretIn(L.el, s.focusNode!, s.focusOffset);
+    if (c) caret.current = { key: editKey(L.t), para: (L.range?.[0] ?? 0) + c.k, off: c.off };
+  }
+  useEffect(() => {
+    document.addEventListener('selectionchange', rememberCaret);
+    return () => document.removeEventListener('selectionchange', rememberCaret);
+  });
+
+  function emitLive() {
+    const L = live.current;
+    if (!L) return;
+    let v = L.rich ? fromEditMd(editToTufte(L.el)) : (L.el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!MULTI.includes(L.t.field)) v = v.replace(/\n+/g, ' ');
+    let full = v;
+    if (L.range) {
+      // nur die Absätze dieses Stücks ersetzen
+      const lines = L.value.replace(/\r\n?/g, '\n').split('\n');
+      const [a, z] = L.range;
+      const s0 = L.spans[a]?.[0] ?? lines.length;
+      const s1 = L.spans[z - 1]?.[1] ?? lines.length;
+      const mine = v ? v.split('\n') : [];
+      full = [...lines.slice(0, s0), ...mine, ...lines.slice(s1)].join('\n');
+      L.range = [a, a + paraSpans(v).length];
+    }
+    L.value = full;
+    L.spans = paraSpans(full);
+    rememberCaret();
+    skipRender.current = performance.now();
+    if (L.t.field.startsWith('cell:')) setCell(L.t.bid, L.t.field, full);
+    else setBlock(L.t.bid, { [L.t.field]: full });
+    // nach einer kurzen Pause neu setzen (Seitenumbruch, Zeilennummern, Fußnoten)
+    if (idle.current) clearTimeout(idle.current);
+    idle.current = setTimeout(() => setTick((x) => x + 1), 1100);
+  }
+
+  function activate(h: HTMLElement, t: EditTarget, d: BlattDoc) {
+    const b = findBlock(d.blocks, t.bid);
+    if (!b) return;
+    const all = [...h.querySelectorAll<HTMLElement>(`[data-bid="${t.bid}"] [data-field="${t.field}"]`)].filter((x) => x.closest('[data-bid]')?.getAttribute('data-bid') === t.bid);
+    if (!all.length) return;
+    const rangeOf = (x: HTMLElement) => (x.dataset.r ? (x.dataset.r.split(':').map(Number) as [number, number]) : null);
+    const want = caret.current?.key === editKey(t) ? caret.current : null;
+    let f = all[Math.min(t.idx, all.length - 1)];
+    if (want) {
+      const k = all.findIndex((x) => {
+        const r = rangeOf(x);
+        return !r || (want.para >= r[0] && want.para < r[1]);
+      });
+      if (k >= 0) f = all[k];
+    }
+    const value = fieldValue(b, t.field);
+    const rich = RICH(t.field);
+    const spans = paraSpans(value);
+    const range = t.field === 'md' ? rangeOf(f) : null;
+    let slice = value;
+    if (range) {
+      const lines = value.replace(/\r\n?/g, '\n').split('\n');
+      slice = lines.slice(spans[range[0]]?.[0] ?? lines.length, spans[range[1] - 1]?.[1] ?? lines.length).join('\n');
+    }
+    // Stelle des Klicks vor dem Austausch merken
+    let click: { k: number; off: number } | null = null;
+    if (!want && t.at) {
+      const pos = (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(t.at.x, t.at.y);
+      if (pos && f.contains(pos.startContainer) && !(pos.startContainer.parentElement?.closest('.bl-ph'))) click = caretIn(f, pos.startContainer, pos.startOffset);
+    }
+    f.innerHTML = rich ? tufteToEdit(toEditMd(slice)) : escHtml(slice);
+    if (getComputedStyle(f).display === 'inline') f.style.display = 'inline-block';
+    f.contentEditable = 'true';
+    f.spellcheck = true;
+    f.classList.add('bl-live');
+    f.setAttribute('role', 'textbox');
+    f.setAttribute('aria-label', 'Text auf der Seite');
+    live.current = { el: f, t, rich, range, spans, value };
+    inline.current = {
+      el: f,
+      emit: emitLive,
+      rich,
+      restore: () => {
+        if (document.activeElement !== f) f.focus();
+        const s = getSelection();
+        if (savedRange.current && f.contains(savedRange.current.startContainer)) {
+          s?.removeAllRanges();
+          s?.addRange(savedRange.current);
+        }
+      },
+    };
+    const multi = MULTI.includes(t.field);
+    f.oninput = () => emitLive();
+    f.onkeydown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setEdit(null);
+      } else if (e.key === 'Tab' && t.field.startsWith('cell:')) {
+        e.preventDefault();
+        emitLive();
+        moveCell(t, e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Enter' && !multi) e.preventDefault();
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u' && rich) {
+        e.preventDefault();
+        document.execCommand('underline');
+        emitLive();
+      }
+    };
+    f.onpaste = (e) => {
+      e.preventDefault();
+      const txt = e.clipboardData?.getData('text/plain') ?? '';
+      if (txt && t.field.startsWith('cell:') && /[\t\n]/.test(txt.trim())) return pasteGrid(t, txt);
+      if (txt) document.execCommand('insertText', false, multi ? txt : txt.replace(/\s*\n\s*/g, ' '));
+      emitLive();
+    };
+    f.onclick = (e) => {
+      const a = (e.target as HTMLElement).closest('.ed-note, .ed-gloss') as HTMLElement | null;
+      if (!a || !wrap.current) return;
+      const w = wrap.current.getBoundingClientRect();
+      const r = a.getBoundingClientRect();
+      setAtom({ el: a, left: (r.left - w.left) / zoom, top: (r.bottom - w.top) / zoom + 6, ...(a.classList.contains('ed-gloss') ? { text: a.textContent ?? '', extra: a.dataset.explain ?? '' } : { text: a.dataset.text ?? '', extra: '' }) });
+    };
+    f.focus({ preventScroll: true });
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+    if (want) placeCaret(f, want.para - (range?.[0] ?? 0), want.off);
+    else if (click) placeCaret(f, click.k, click.off);
+    else placeCaret(f, null, 0);
+    rememberCaret();
+  }
+  function saveAtom(removeIt: boolean) {
+    if (!atom) return;
+    const { el, text, extra } = atom;
+    if (removeIt) {
+      if (el.classList.contains('ed-gloss')) el.replaceWith(document.createTextNode(el.textContent ?? ''));
+      else el.remove();
+    } else {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = el.classList.contains('ed-gloss') ? glossHtml(text.trim(), extra.trim()) : noteHtml(el.dataset.kind === 'margin' ? 'margin' : 'note', text.trim());
+      if (tpl.content.firstChild) el.replaceWith(tpl.content.firstChild);
+    }
+    emitLive();
+    setAtom(null);
+  }
+
   // ---------- Setzen ----------
   useLayoutEffect(() => {
     const h = host.current;
     if (!h || !doc) return;
+    // beim Tippen nicht neu setzen: das Feld auf der Seite ist schon richtig
+    if (skipRender.current && performance.now() - skipRender.current < 250) {
+      skipRender.current = 0;
+      return;
+    }
+    skipRender.current = 0;
+    live.current = null;
+    inline.current = null;
     const r = paginate(doc, h, undefined, { editing: canEdit, head: { title: title.trim(), course: project?.course.title ?? '', teacher: me?.name ?? '' } });
     setProblems(r.problems);
     setPageCount(r.pages.length);
@@ -299,8 +468,13 @@ export default function BlattPage() {
     // Auswahl markieren und das bearbeitete Feld wiederfinden (es kann durch den Umbruch gewandert sein)
     h.querySelectorAll(`[data-bid="${sel}"]`).forEach((e) => e.classList.add('bl-sel'));
     if (selCol) h.querySelector(`[data-col="${selCol.id}:${selCol.k}"]`)?.classList.add('bl-col-sel');
-    setOv(edit ? overlayFor(h, wrap.current, edit, zoom) : null);
-  }, [doc, view, canEdit, sel, selCol, edit, zoom, leftTab, title, project, me]);
+    if (edit && canEdit && view !== 'sheets') activate(h, edit, doc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, view, canEdit, sel, selCol, edit, zoom, leftTab, title, project, me, tick]);
+  useEffect(() => {
+    setAtom(null);
+    if (!edit && idle.current) clearTimeout(idle.current);
+  }, [edit]);
   // auf die Breite der Mitte einpassen
   useEffect(() => {
     const c = center.current;
@@ -418,7 +592,8 @@ export default function BlattPage() {
   function onPagesClick(e: React.MouseEvent) {
     if (!canEdit || !doc) return;
     const t = e.target as HTMLElement;
-    if (t.closest('[data-ov]') || t.closest('.bl-gutter')) return;
+    // im Text, der gerade bearbeitet wird, setzt der Browser die Schreibmarke selbst
+    if (t.closest('.bl-live') || t.closest('[data-atom]') || t.closest('.bl-gutter')) return;
     // Kopf der Seite: Rahmendaten
     if (t.closest('[data-head]') && view !== 'sheets') {
       setEdit(null);
@@ -784,21 +959,10 @@ export default function BlattPage() {
               <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragOver={(e) => canEdit && e.preventDefault()} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
                   <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''}`} />
-                  {edit && ov && (
-                    <InlineEditor
-                      key={`${edit.bid}:${edit.field}`}
-                      ov={ov}
-                      field={edit.field}
-                      at={edit.at}
-                      value={editValue}
-                      api={inline}
-                      doc={doc}
-                      onChange={(v) => (edit.field.startsWith('cell:') ? setCell(edit.bid, edit.field, v) : setBlock(edit.bid, { [edit.field]: v }))}
-                      onTab={edit.field.startsWith('cell:') ? (dir) => moveCell(edit, dir) : undefined}
-                      onGrid={edit.field.startsWith('cell:') ? (text) => pasteGrid(edit, text) : undefined}
-                      onClose={() => setEdit(null)}
-                      ensureGlossary={() => change((d) => (walk(d.blocks).some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))}
-                    />
+                  {atom && atom.el.isConnected && (
+                    <div data-atom>
+                      <AtomForm atom={atom} setAtom={setAtom} onSave={saveAtom} />
+                    </div>
                   )}
                 </div>
               </div>
@@ -841,52 +1005,11 @@ interface EditTarget {
   at?: { x: number; y: number };
 }
 /** Lage und Aussehen des Felds auf der Seite, damit der Editor genau darüber liegt */
-interface Overlay {
-  left: number;
-  top: number;
-  width: number;
-  minHeight: number;
-  tag: string;
-  pageStyle: string;
-  blockClass: string;
-  blockStyle: string;
-  fieldClass: string;
-  fieldStyle: string;
-}
 interface InlineApi {
   el: HTMLElement;
   emit: () => void;
   restore: () => void;
   rich: boolean;
-}
-
-function overlayFor(host: HTMLElement, wrapEl: HTMLElement | null, t: EditTarget, zoom: number): Overlay | null {
-  if (!wrapEl) return null;
-  const all = [...host.querySelectorAll<HTMLElement>(`[data-bid="${t.bid}"] [data-field="${t.field}"]`)].filter((x) => x.closest('[data-bid]')?.getAttribute('data-bid') === t.bid);
-  const f = all[Math.min(t.idx, all.length - 1)];
-  if (!f) return null;
-  const block = f.closest<HTMLElement>('.bl-block')!;
-  const pg = f.closest<HTMLElement>('.bl-page');
-  const w = wrapEl.getBoundingClientRect();
-  const inlineEl = getComputedStyle(f).display === 'inline';
-  const r = inlineEl ? (f.getClientRects()[0] ?? f.getBoundingClientRect()) : f.getBoundingClientRect();
-  const parent = (inlineEl ? f.parentElement : f)!.getBoundingClientRect();
-  const left = (r.left - w.left) / zoom;
-  const top = (r.top - w.top) / zoom;
-  const width = inlineEl ? (parent.right - r.left) / zoom : f.offsetWidth;
-  return {
-    left,
-    top,
-    width: Math.max(40, width),
-    minHeight: inlineEl ? r.height / zoom : f.offsetHeight,
-    tag: inlineEl || ['figcaption', 'td', 'th'].includes(f.tagName.toLowerCase()) ? 'div' : f.tagName.toLowerCase(),
-    pageStyle: `font-family:${pg?.style.fontFamily ?? ''};font-size:${pg?.style.fontSize ?? ''};line-height:1.35;color:#111`,
-    blockClass: block.className.replace(/\bbl-sel\b|\bbl-overflow\b/g, ''),
-    blockStyle: block.style.cssText,
-    fieldClass: f.className,
-    // Tabellenzelle: Innenabstand, Schrift und Hintergrund der Zelle mitnehmen
-    fieldStyle: /^t[dh]$/i.test(f.tagName) ? `${f.style.cssText};padding:${getComputedStyle(f).padding};font-weight:${getComputedStyle(f).fontWeight};background:${getComputedStyle(f).backgroundColor};min-height:${f.offsetHeight}px` : f.style.cssText,
-  };
 }
 
 function fieldValue(b: Block | null, f: FieldName): string {
@@ -900,193 +1023,104 @@ function fieldValue(b: Block | null, f: FieldName): string {
 const RICH = (f: FieldName) => f === 'md' || f === 'title' || f === 'text' || f.startsWith('cell:');
 const MULTI: FieldName[] = ['md'];
 
-function InlineEditor({
-  ov,
-  field,
-  at,
-  value,
-  api,
-  doc,
-  onChange,
-  onTab,
-  onGrid,
-  onClose,
-  ensureGlossary,
-}: {
-  ov: Overlay;
-  field: FieldName;
-  at?: { x: number; y: number };
-  value: string;
-  api: React.MutableRefObject<InlineApi | null>;
-  doc: BlattDoc;
-  onChange: (v: string) => void;
-  onTab?: (dir: 1 | -1) => void;
-  onGrid?: (text: string) => void;
-  onClose: () => void;
-  ensureGlossary: () => void;
-}) {
-  const box = useRef<HTMLElement | null>(null);
-  const emitted = useRef<string | null>(null);
-  const saved = useRef<Range | null>(null);
-  const [atom, setAtom] = useState<{ el: HTMLElement; text: string; extra: string } | null>(null);
-  const rich = RICH(field);
-  const multi = MULTI.includes(field);
-
-  function emit() {
-    const el = box.current;
-    if (!el) return;
-    let v = rich ? fromEditMd(editToTufte(el)) : (el.textContent ?? '').replace(/\s+/g, ' ').trim();
-    if (!multi) v = v.replace(/\n+/g, ' ');
-    emitted.current = v;
-    onChange(v);
+// ---------- Schreibmarke im Text auf der Seite ----------
+/** Absätze des bearbeiteten Felds (Zeilennummern und Platzhalter zählen nicht) */
+const topChildren = (el: HTMLElement) => [...el.children].filter((c) => !c.classList.contains('bl-lno')) as HTMLElement[];
+/** Stelle (Absatz, Zeichen) einer Schreibmarke im Feld */
+function caretIn(el: HTMLElement, node: Node, offset: number): { k: number; off: number } | null {
+  if (!el.contains(node)) return null;
+  const kids = topChildren(el);
+  const k = kids.findIndex((c) => c.contains(node) || c === node);
+  const top = k >= 0 ? kids[k] : el;
+  const r = document.createRange();
+  r.selectNodeContents(top);
+  try {
+    r.setEnd(node, offset);
+  } catch {
+    return { k: Math.max(0, k), off: 0 };
   }
-  function restore() {
-    const el = box.current;
-    if (!el) return;
-    if (document.activeElement !== el) el.focus();
-    const s = getSelection();
-    if (saved.current && el.contains(saved.current.startContainer)) {
-      s?.removeAllRanges();
-      s?.addRange(saved.current);
-    }
-  }
-  // Inhalt nur setzen, wenn er von außen kommt (Rückgängig, Glossar …), sonst springt die Schreibmarke
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el || value === emitted.current) return;
-    const first = emitted.current === null;
-    if (rich) el.innerHTML = tufteToEdit(toEditMd(value));
-    else el.textContent = value;
-    emitted.current = value;
-    if (first) {
-      el.focus();
-      // Schreibmarke dorthin, wo geklickt wurde
-      const pos = at && (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(at.x, at.y);
-      const s = getSelection();
-      if (pos && el.contains(pos.startContainer)) {
-        s?.removeAllRanges();
-        s?.addRange(pos);
-      } else {
-        const r = document.createRange();
-        r.selectNodeContents(el);
-        r.collapse(false);
-        s?.removeAllRanges();
-        s?.addRange(r);
+  return { k: Math.max(0, k), off: r.toString().length };
+}
+/** Schreibmarke an (Absatz, Zeichen) setzen; fehlt der Absatz, ans Ende */
+function placeCaret(el: HTMLElement, k: number | null, off: number) {
+  const kids = topChildren(el);
+  const top = k === null ? null : (kids[Math.min(k, kids.length - 1)] ?? null);
+  const s = getSelection();
+  const r = document.createRange();
+  if (!top) {
+    r.selectNodeContents(el);
+    r.collapse(false);
+  } else {
+    const w = document.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+    let left = off;
+    let n: Node | null;
+    let done = false;
+    while ((n = w.nextNode())) {
+      const len = n.textContent?.length ?? 0;
+      if (left <= len) {
+        r.setStart(n, left);
+        done = true;
+        break;
       }
+      left -= len;
     }
-  }, [value, rich, at]);
-  useEffect(() => {
-    api.current = box.current ? { el: box.current, emit, restore, rich } : null;
-    return () => {
-      api.current = null;
-    };
-  });
-  useEffect(() => {
-    const onSel = () => {
-      const s = getSelection();
-      if (box.current && s?.rangeCount && box.current.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange();
-    };
-    document.addEventListener('selectionchange', onSel);
-    return () => document.removeEventListener('selectionchange', onSel);
-  }, []);
-  function saveAtom(removeIt = false) {
-    if (!atom) return;
-    const { el, text, extra } = atom;
-    if (removeIt) {
-      if (el.classList.contains('ed-gloss')) el.replaceWith(document.createTextNode(el.textContent ?? ''));
-      else el.remove();
-    } else {
-      const tpl = document.createElement('template');
-      tpl.innerHTML = el.classList.contains('ed-gloss') ? glossHtml(text.trim(), extra.trim()) : noteHtml(el.dataset.kind === 'margin' ? 'margin' : 'note', text.trim());
-      if (tpl.content.firstChild) el.replaceWith(tpl.content.firstChild);
-    }
-    emit();
-    setAtom(null);
+    if (!done) {
+      r.selectNodeContents(top);
+      r.collapse(false);
+    } else r.collapse(true);
   }
-  void doc;
-  void ensureGlossary;
-  const Tag = ov.tag as 'div';
+  s?.removeAllRanges();
+  s?.addRange(r);
+}
+
+/** Fußnote, Randbemerkung oder Glossar-Wort im Text ändern */
+interface AtomState {
+  el: HTMLElement;
+  text: string;
+  extra: string;
+  left: number;
+  top: number;
+}
+function AtomForm({ atom, setAtom, onSave }: { atom: AtomState; setAtom: (a: AtomState | null) => void; onSave: (removeIt: boolean) => void }) {
+  const gloss = atom.el.classList.contains('ed-gloss');
   return (
-    <div className={`${st.host} ${st.ov}`} data-ov style={{ left: ov.left, top: ov.top, width: ov.width }} onClick={(e) => e.stopPropagation()}>
-      <div style={cssObj(ov.pageStyle)}>
-        <div className={ov.blockClass} style={{ ...cssObj(ov.blockStyle), padding: 0, margin: 0, border: 0, background: 'none', boxShadow: 'none', outline: 0, minHeight: 0, height: 'auto' }}>
-          <Tag
-            ref={(e: HTMLElement | null) => {
-              box.current = e;
-            }}
-            className={`${ov.fieldClass} ${st.ovField}`}
-            style={{ ...cssObj(ov.fieldStyle), margin: 0, minHeight: ov.minHeight, width: '100%' }}
-            contentEditable
-            suppressContentEditableWarning
-            role="textbox"
-            aria-multiline={multi}
-            aria-label="Text auf der Seite"
-            onInput={emit}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose();
-              if (e.key === 'Tab' && onTab) {
-                e.preventDefault();
-                emit();
-                onTab(e.shiftKey ? -1 : 1);
-                return;
-              }
-              if (e.key === 'Enter' && !multi) e.preventDefault();
-              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u' && rich) {
-                e.preventDefault();
-                document.execCommand('underline');
-                emit();
-              }
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              const t = e.clipboardData.getData('text/plain');
-              if (t && onGrid && /[\t\n]/.test(t.trim())) return onGrid(t);
-              if (t) document.execCommand('insertText', false, multi ? t : t.replace(/\s*\n\s*/g, ' '));
-              emit();
-            }}
-            onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'p')}
-            onClick={(e) => {
-              const a = (e.target as HTMLElement).closest('.ed-note, .ed-gloss') as HTMLElement | null;
-              if (a) setAtom(a.classList.contains('ed-gloss') ? { el: a, text: a.textContent ?? '', extra: a.dataset.explain ?? '' } : { el: a, text: a.dataset.text ?? '', extra: '' });
-            }}
-          />
-        </div>
+    <form
+      className={st.atom}
+      style={{ left: atom.left, top: atom.top }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(false);
+      }}
+    >
+      <strong>{gloss ? 'Glossar' : atom.el.dataset.kind === 'margin' ? 'Randbemerkung' : 'Fußnote'}</strong>
+      {gloss && <input value={atom.text} onChange={(e) => setAtom({ ...atom, text: e.target.value })} aria-label="Wort" placeholder="Wort" />}
+      <textarea
+        autoFocus
+        rows={3}
+        value={gloss ? atom.extra : atom.text}
+        onChange={(e) => setAtom(gloss ? { ...atom, extra: e.target.value } : { ...atom, text: e.target.value })}
+        placeholder={gloss ? 'Erklärung fürs Glossar' : atom.el.dataset.kind === 'margin' ? 'Text im Rand' : 'Text der Fußnote'}
+        aria-label="Inhalt"
+      />
+      <div className="row">
+        <button type="button" className="btn danger" onClick={() => onSave(true)}>
+          Entfernen
+        </button>
+        <span className="grow" />
+        <button type="button" className="btn" onClick={() => setAtom(null)}>
+          Abbrechen
+        </button>
+        <button type="submit" className="btn primary">
+          Übernehmen
+        </button>
       </div>
-      {atom && atom.el.isConnected && (
-        <form
-          className={st.atom}
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveAtom();
-          }}
-        >
-          <strong>{atom.el.classList.contains('ed-gloss') ? 'Glossar' : atom.el.dataset.kind === 'margin' ? 'Randbemerkung' : 'Fußnote'}</strong>
-          {atom.el.classList.contains('ed-gloss') && <input value={atom.text} onChange={(e) => setAtom({ ...atom, text: e.target.value })} aria-label="Wort" placeholder="Wort" />}
-          <textarea
-            autoFocus
-            rows={3}
-            value={atom.el.classList.contains('ed-gloss') ? atom.extra : atom.text}
-            onChange={(e) => setAtom(atom.el.classList.contains('ed-gloss') ? { ...atom, extra: e.target.value } : { ...atom, text: e.target.value })}
-            placeholder={atom.el.classList.contains('ed-gloss') ? 'Erklärung fürs Glossar' : atom.el.dataset.kind === 'margin' ? 'Text im Rand' : 'Text der Fußnote'}
-            aria-label="Inhalt"
-          />
-          <div className="row">
-            <button type="button" className="btn danger" onClick={() => saveAtom(true)}>
-              Entfernen
-            </button>
-            <span className="grow" />
-            <button type="button" className="btn" onClick={() => setAtom(null)}>
-              Abbrechen
-            </button>
-            <button type="submit" className="btn primary">
-              Übernehmen
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
+    </form>
   );
 }
+
+const escHtml = (x: string) => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** style.cssText → Objekt für React */
 function cssObj(css: string): React.CSSProperties {
