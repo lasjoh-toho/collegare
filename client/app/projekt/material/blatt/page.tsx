@@ -70,6 +70,7 @@ import {
 } from '@/lib/blatt';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
+import { type Crop, cropImage, kb, loadImage, removeBackground, shrinkImage, srcBytes } from '@/lib/blattImage';
 import st from './blatt.module.css';
 
 interface Page {
@@ -96,6 +97,8 @@ Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden
 Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
 
 Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+
+Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
 Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte. Mit „Sollpunktzahl zeigen“ steht die mögliche Punktzahl gleich im Feld (z. B. [    / 6 P.]), sonst bleibt sie im Text der Aufgabe. „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (abschaltbar). Die Stärke der Rahmenlinien wählst du bei Kästen unter „Start“ → Formatvorlagen → „Linie“ (Haarlinie bis kräftig), beim Notenkasten auch in seinem Reiter.
 
@@ -165,6 +168,8 @@ export default function BlattPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   /** Kontextmenü „Umwandeln in“ für einen Baustein der linken Leiste */
   const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
+  /** Bild, das gerade auf der Seite zugeschnitten wird */
+  const [cropBid, setCropBid] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('insert');
   /** Format übertragen: Gestaltung, die beim nächsten Klick auf einen Baustein übernommen wird */
@@ -589,6 +594,8 @@ export default function BlattPage() {
     });
     setSel(nid);
   }
+  // Zuschneiden endet, wenn ein anderer Baustein gewählt wird
+  useEffect(() => setCropBid((c) => (c && c !== sel ? null : c)), [sel]);
   /** Baustein in eine andere Art umwandeln (Überschrift, Erklärtext, Material, Zitat, Kasten, Aufgabe) */
   function transform(bid: string, to: BlockType) {
     change((d) => ({
@@ -1011,6 +1018,26 @@ export default function BlattPage() {
               file={(a) => void fileAction(a)}
               select={(bid) => (select(bid), setEdit(null), setTab('block'), host.current?.querySelector(`[data-bid="${bid}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
               busy={busy}
+              crop={cropBid}
+              setCrop={setCropBid}
+            />
+          )}
+          {cropBid && selBlock?.id === cropBid && selBlock.src && (
+            <CropOverlay
+              host={host}
+              bid={cropBid}
+              onCancel={() => setCropBid(null)}
+              onApply={async (c) => {
+                const b = selBlock;
+                setCropBid(null);
+                if (!b.src || c.every((x) => x < 0.002)) return;
+                try {
+                  const r = await cropImage(b.src, Number(b.rot) || 0, c);
+                  setBlock(b.id, { src: r.src, ar: r.ar, rot: 0, orig: b.orig ?? b.src, origRot: b.orig ? b.origRot : b.rot });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                }
+              }}
             />
           )}
           {headOpen && editing && (
@@ -1325,6 +1352,178 @@ function cssObj(css: string): React.CSSProperties {
   return o as React.CSSProperties;
 }
 
+/** Reiter „Bild“: Anpassen (Helligkeit, Kontrast, Graustufen), Bearbeiten (Zuschneiden, Freistellen, Verkleinern), Rahmen */
+function ImageTools({ b, set, crop, setCrop, onError }: { b: Block; set: (p: Partial<Block>) => void; crop: string | null; setCrop: (bid: string | null) => void; onError: (m: string) => void }) {
+  const [work, setWork] = useState('');
+  const rot = Number(b.rot) || 0;
+  const keepOrig = () => ({ orig: b.orig ?? b.src, origRot: b.orig ? b.origRot : b.rot });
+  async function run(label: string, fn: () => Promise<{ src: string; ar: number }>) {
+    if (!b.src) return;
+    setWork(label);
+    onError('');
+    try {
+      const r = await fn();
+      if (label === 'klein' && srcBytes(r.src) >= srcBytes(b.src)) return onError('Kleiner geht es so nicht: das Bild ist schon so klein (freigestellte Bilder bleiben PNG).');
+      set({ src: r.src, ar: r.ar, rot: 0, ...keepOrig() });
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWork('');
+    }
+  }
+  async function restore() {
+    if (!b.orig) return;
+    const img = await loadImage(b.orig).catch(() => null);
+    set({ src: b.orig, rot: b.origRot, ar: img ? img.naturalHeight / Math.max(1, img.naturalWidth) : b.ar, orig: undefined, origRot: undefined });
+  }
+  const pct = (v?: number) => (v ? `${v > 0 ? '+' : '−'}${Math.abs(v)} %` : 'normal');
+  const steps = [-40, -20, -10, 0, 10, 20, 40];
+  const bytes = srcBytes(b.src);
+  return (
+    <>
+      <Group label="Anpassen">
+        <div className={st.rows}>
+          <div className={st.row}>
+            <Drop icon="grow" label="Helligkeit" value={pct(b.bright)} disabled={!b.src} title="Bild heller oder dunkler">
+              <MH>Helligkeit</MH>
+              {steps.map((v) => (
+                <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.bright ?? 0) === v} onClick={() => set({ bright: v || undefined })} />
+              ))}
+            </Drop>
+          </div>
+          <div className={st.row}>
+            <Drop icon="spacing" label="Kontrast" value={pct(b.contrast)} disabled={!b.src} title="Kontrast verringern oder verstärken (z. B. für blasse Kopien)">
+              <MH>Kontrast</MH>
+              {steps.map((v) => (
+                <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.contrast ?? 0) === v} onClick={() => set({ contrast: v || undefined })} />
+              ))}
+            </Drop>
+          </div>
+        </div>
+        <div className={st.rows}>
+          <div className={st.row}>
+            <Drop icon="formatline" label="Rahmen" value={b.frame ? LINE_LABEL[b.frame] : 'kein'} disabled={!b.src} title="Rahmen, runde Ecken und Schatten">
+              <MH>Rahmenlinie</MH>
+              <MI label="keine" on={!b.frame} onClick={() => set({ frame: undefined })} />
+              {(Object.keys(LINE_MM) as LineWeight[]).map((k) => (
+                <MI key={k} label={LINE_LABEL[k]} hint={`${de(LINE_MM[k])} mm`} on={b.frame === k} onClick={() => set({ frame: k })} />
+              ))}
+              <MH>Form</MH>
+              <MI label="Runde Ecken" stay on={!!b.round} onClick={() => set({ round: !b.round || undefined })} />
+              <MI label="Schatten" stay on={!!b.shadow} onClick={() => set({ shadow: !b.shadow || undefined })} />
+            </Drop>
+          </div>
+          <div className={st.row}>
+            <RB icon="backcolor" label="Graustufen" disabled={!b.src} on={!!b.gray} onClick={() => set({ gray: !b.gray || undefined })} title="Bild schwarz-weiß (spart Farbe beim Kopieren)" />
+          </div>
+        </div>
+      </Group>
+      <Group label="Bearbeiten">
+        <RB icon="insertframe" label="Zuschneiden" big disabled={!b.src || !!work} on={crop === b.id} onClick={() => setCrop(crop === b.id ? null : b.id)} title="Ränder auf der Seite wegziehen; Enter übernimmt, Esc bricht ab" />
+        <Drop icon="rect" label="Freistellen" value={work === 'frei' ? 'läuft …' : undefined} big disabled={!b.src || !!work} title="Hintergrund entfernen: was vom Rand her zusammenhängt und ihm ähnelt, wird durchsichtig">
+          <MH>Hintergrund entfernen</MH>
+          <MI label="genau" hint="nur fast gleiche Farbe wie am Rand" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 18))} />
+          <MI label="mittel" hint="für Fotos vor hellem Hintergrund" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 36))} />
+          <MI label="großzügig" hint="auch Schatten und Verläufe" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 64))} />
+        </Drop>
+        <Drop icon="shrink" label="Verkleinern" value={work === 'klein' ? 'läuft …' : bytes ? kb(bytes) : undefined} big disabled={!b.src || !!work} title="Datei verkleinern: das Blatt lädt und speichert schneller">
+          <MH>Datei verkleinern (jetzt {bytes ? kb(bytes) : '–'})</MH>
+          <MI label="für den Druck" hint="längste Seite 1600 Bildpunkte" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 1600, 0.82))} />
+          <MI label="kleiner" hint="1000 Bildpunkte, für kleine Bilder" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 1000, 0.78))} />
+          <MI label="sehr klein" hint="600 Bildpunkte, Symbole und Skizzen" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 600, 0.75))} />
+        </Drop>
+        <RB icon="resetattributes" label="Original" big disabled={!b.orig || !!work} onClick={() => void restore()} title="Zuschneiden, Freistellen und Verkleinern zurücknehmen" />
+      </Group>
+    </>
+  );
+}
+
+/** Zuschneiden auf der Seite: Rahmen über dem Bild mit Griffen an Ecken und Kanten; Enter übernimmt, Esc bricht ab */
+function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<HTMLDivElement | null>; bid: string; onApply: (c: Crop) => void; onCancel: () => void }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [c, setC] = useState<Crop>([0, 0, 0, 0]);
+  const cRef = useRef(c);
+  cRef.current = c;
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const img = host.current?.querySelector<HTMLElement>(`[data-bid="${bid}"] img`);
+      const r = img?.getBoundingClientRect() ?? null;
+      setRect((o) => (r && o && r.x === o.x && r.y === o.y && r.width === o.width && r.height === o.height ? o : r));
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') (e.preventDefault(), e.stopPropagation(), onCancel());
+      if (e.key === 'Enter') (e.preventDefault(), e.stopPropagation(), onApply(cRef.current));
+    };
+    addEventListener('keydown', key, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener('keydown', key, true);
+    };
+  }, [host, bid, onApply, onCancel]);
+  if (!rect) return null;
+  const drag = (e: React.PointerEvent, edges: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const s = [...cRef.current] as Crop;
+    const min = 0.05;
+    const move = (ev: PointerEvent) => {
+      const dx = (ev.clientX - x0) / rect.width;
+      const dy = (ev.clientY - y0) / rect.height;
+      const n = [...s] as Crop;
+      const cl = (v: number, other: number) => Math.max(0, Math.min(1 - other - min, v));
+      if (edges === 'move') {
+        const w = 1 - s[0] - s[2];
+        const h = 1 - s[1] - s[3];
+        n[0] = Math.max(0, Math.min(1 - w, s[0] + dx));
+        n[2] = 1 - w - n[0];
+        n[1] = Math.max(0, Math.min(1 - h, s[1] + dy));
+        n[3] = 1 - h - n[1];
+      } else {
+        if (edges.includes('l')) n[0] = cl(s[0] + dx, s[2]);
+        if (edges.includes('r')) n[2] = cl(s[2] - dx, s[0]);
+        if (edges.includes('t')) n[1] = cl(s[1] + dy, s[3]);
+        if (edges.includes('b')) n[3] = cl(s[3] - dy, s[1]);
+      }
+      setC(n);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  };
+  const [l, t, r, b] = c;
+  const box = { left: rect.left + l * rect.width, top: rect.top + t * rect.height, width: (1 - l - r) * rect.width, height: (1 - t - b) * rect.height };
+  return (
+    <>
+      <div className={st.cropClip} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }} onPointerDown={(e) => e.stopPropagation()}>
+        <div className={st.cropBox} style={{ left: box.left - rect.left, top: box.top - rect.top, width: box.width, height: box.height }} onPointerDown={(e) => drag(e, 'move')}>
+          {['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'].map((k) => (
+            <span key={k} className={`${st.cropH} ${st['cropH_' + k]}`} onPointerDown={(e) => drag(e, k)} />
+          ))}
+        </div>
+      </div>
+      <div className={st.cropBar} style={{ left: Math.max(8, box.left), top: Math.min(innerHeight - 48, box.top + box.height + 8) }} onPointerDown={(e) => e.stopPropagation()}>
+        <button type="button" className="btn" onClick={onCancel}>
+          Abbrechen
+        </button>
+        <button type="button" className="btn" onClick={() => setC([0, 0, 0, 0])} disabled={c.every((x) => x === 0)}>
+          Ganzes Bild
+        </button>
+        <button type="button" className="btn primary" onClick={() => onApply(c)}>
+          Zuschneiden
+        </button>
+      </div>
+    </>
+  );
+}
+
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
 function ConvMenu({ conv, b, onPick, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; onPick: (to: BlockType) => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -1456,6 +1655,8 @@ type RibbonProps = {
   select: (bid: string) => void;
   file: (a: FileAction) => void;
   busy: string;
+  crop: string | null;
+  setCrop: (bid: string | null) => void;
 };
 
 /** Klappmenü im Menüband: Knopf mit der aktuellen Wahl, darunter die Möglichkeiten mit Häkchen (wie in OnlyOffice) */
@@ -2355,19 +2556,22 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               <input type="file" accept="image/*" hidden onChange={(e) => (e.target.files?.[0] && props.onImage(e.target.files[0]), (e.target.value = ''))} />
             </label>
             <RB icon="gallery" label="Aus dem Material" big onClick={() => props.setPanel('material')} />
-            <form
-              className={st.urlRow}
-              onSubmit={(e) => {
-                e.preventDefault();
-                void fromUrl();
-              }}
-            >
-              <Ico n="inserthyperlink" size={16} />
-              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Adresse: https://…" aria-label="Adresse des Bilds im Netz" />
-              <button type="submit" className="btn" disabled={loading || !url.trim()}>
-                {loading ? 'Lädt …' : 'Laden'}
-              </button>
-            </form>
+            <Drop icon="inserthyperlink" label="Aus dem Netz" value={loading ? 'lädt …' : undefined} big wide title="Bild über seine Adresse im Netz holen">
+              <MH>Adresse des Bilds</MH>
+              <form
+                className={st.urlRow}
+                style={{ padding: '4px 8px 8px' }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void fromUrl();
+                }}
+              >
+                <input autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" aria-label="Adresse des Bilds im Netz" style={{ width: 240 }} />
+                <button type="submit" className="btn" disabled={loading || !url.trim()}>
+                  {loading ? 'Lädt …' : 'Laden'}
+                </button>
+              </form>
+            </Drop>
           </Group>
           <Group label="Größe und Lage">
             <div className={st.rows}>
@@ -2387,13 +2591,9 @@ function BlockTab(props: RibbonProps & { b: Block }) {
                   An seinen Platz
                 </button>
               </div>
-            ) : (
-              <span className={st.hint}>Ziehen verschiebt
-                <br />
-                das Bild.
-              </span>
-            )}
+            ) : null}
           </Group>
+          <ImageTools b={b} set={set} crop={props.crop} setCrop={props.setCrop} onError={props.onError} />
         </>
       )}
       {b.type === 'table' && (

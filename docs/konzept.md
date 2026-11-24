@@ -1456,6 +1456,10 @@ zu komplex“):
   Erklärtext, Material, Zitat, Kasten, Aufgabe; Titel und Text wandern mit, aus mehrzeiligem Text wird Überschrift +
   Erklärtext). Die Erklärung hinter dem ⓘ ist in allen Projektseiten keine Blase mehr, sondern eine Leiste am rechten
   Rand, die sie sich mit Chat, Notizen, Verlauf und Gliederung teilt (immer nur eine offen).
+- **Bilder** (Jo, 24. November 2026): `bright`, `contrast`, `gray` als CSS-Filter (Word: ins Bild gerechnet), `frame`
+  (Linienstärke), `round`, `shadow`. Zuschneiden, Freistellen (Flutfüllung vom Rand, Toleranz 18/36/64) und Verkleinern
+  rechnen das Bild im Browser neu (`client/lib/blattImage.ts`), die Drehung wird dabei übernommen; `orig`/`origRot`
+  halten das Original. Kontextreiter rechts abgesetzt und schwebend, „Datei“ ein normaler Reiter.
 
 ### 8j.5 Nächste Stufen
 

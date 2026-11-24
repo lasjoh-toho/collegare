@@ -54,6 +54,15 @@ export interface Block {
   /** Bild: Drehung in Grad (90er-Schritte), Seitenverhältnis Höhe/Breite, frei auf der Seite verschoben (mm) */
   rot?: number;
   ar?: number;
+  /** Bild: Helligkeit und Kontrast in Prozent (−60 … +60), Rahmen, runde Ecken, Schatten; Original vor dem Zuschneiden,
+   *  Freistellen oder Verkleinern (Wunsch Jo, 24. November 2026) */
+  bright?: number;
+  contrast?: number;
+  frame?: LineWeight;
+  round?: boolean;
+  shadow?: boolean;
+  orig?: string;
+  origRot?: number;
   free?: boolean;
   /** frei verschobenes Bild liegt vor dem Text und nimmt keinen Platz ein */
   over?: boolean;
@@ -1106,6 +1115,11 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       if (b.src) {
         const img = el('img') as HTMLImageElement;
         img.src = b.src;
+        const filter = [b.bright ? `brightness(${1 + b.bright / 100})` : '', b.contrast ? `contrast(${1 + b.contrast / 100})` : '', b.gray ? 'grayscale(1)' : ''].filter(Boolean).join(' ');
+        if (filter) img.style.filter = filter;
+        if (b.frame && LINE_MM[b.frame]) img.style.border = `${LINE_MM[b.frame]}mm solid #333`;
+        if (b.round) img.style.borderRadius = '2.5mm';
+        if (b.shadow) img.style.boxShadow = '0.6mm 0.8mm 2mm rgba(0, 0, 0, 0.35)';
         img.alt = b.caption ?? '';
         img.draggable = false;
         if (rot % 180 && b.ar) {

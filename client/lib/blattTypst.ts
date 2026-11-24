@@ -466,7 +466,7 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['lineStyle', 'linien', 'str'],
     ['line', 'linie', 'str'],
   ],
-  image: [...PLACE, ['rot', 'drehung', 'num'], ['ar', 'seitenverhaeltnis', 'num']],
+  image: [...PLACE, ['rot', 'drehung', 'num'], ['ar', 'seitenverhaeltnis', 'num'], ['bright', 'helligkeit', 'num'], ['contrast', 'kontrast', 'num'], ['gray', 'grau', 'bool'], ['frame', 'rahmen', 'str'], ['round', 'rund', 'bool'], ['shadow', 'schatten', 'bool']],
   chart: [['ref', 'tabelle', 'str'], ['kind', 'art', 'str'], ['gray', 'grau', 'bool'], ['hMm', 'hoehe', 'mm'], ...PLACE],
   table: [
     ['headRow', 'kopfzeile', 'bool'],
@@ -575,7 +575,7 @@ function blockCode(b: Block, ind: string): string {
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) continue;
     if (b.type === 'cols' && k === 'ratio' && (v as number[]).every((x) => x === 1)) continue;
     // Schalter, die von sich aus aus sind, nur zeigen, wenn sie an sind (fett/kursiv nicht: „aus“ kann die Vorlage ändern)
-    if (v === false && ['free', 'over', 'subtask', 'gray', 'breakBefore', 'keep', 'keepNext', 'korrOff', 'sign', 'remark'].includes(k)) continue;
+    if (v === false && ['free', 'over', 'subtask', 'gray', 'breakBefore', 'keep', 'keepNext', 'korrOff', 'sign', 'remark', 'round', 'shadow'].includes(k)) continue;
     args.push(`${n}: ${emit(v, kind)}`);
   }
   if (b.type === 'cols' && b.gap) args.push(`steg: ${num(b.gap)}mm`);

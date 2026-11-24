@@ -8,6 +8,7 @@
  */
 import { type BlattDoc, type Block, type HeadCtx, chartSvg, glossaryTerms, headFields, LINE_MM, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
+import { imageFilter } from './blattImage';
 
 const xe = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const TW = 56.6929; // twips je mm
@@ -178,7 +179,7 @@ function dataUrlBytes(src: string): { data: Uint8Array; ext: string } | null {
   return { data, ext: m[1] === 'jpg' ? 'jpeg' : m[1] };
 }
 /** Bild als PNG (andere Formate und SVG über eine Leinwand) */
-async function toPng(src: string, wPx?: number): Promise<{ data: Uint8Array; ext: string; ar: number } | null> {
+async function toPng(src: string, wPx?: number, look?: { filter?: string; frame?: number }): Promise<{ data: Uint8Array; ext: string; ar: number } | null> {
   const img = new Image();
   img.src = src;
   try {
@@ -188,14 +189,24 @@ async function toPng(src: string, wPx?: number): Promise<{ data: Uint8Array; ext
   }
   const ar = img.naturalHeight / Math.max(1, img.naturalWidth);
   const direct = dataUrlBytes(src);
-  if (direct && !wPx) return { ...direct, ar };
+  if (direct && !wPx && !look?.filter && !look?.frame) return { ...direct, ar };
   const c = document.createElement('canvas');
   c.width = wPx ?? img.naturalWidth;
   c.height = Math.round(c.width * ar);
   const g = c.getContext('2d')!;
   g.fillStyle = '#fff';
   g.fillRect(0, 0, c.width, c.height);
+  // Helligkeit, Kontrast, Graustufen und Rahmen ins Bild übernehmen (Word kennt die Filter nicht)
+  if (look?.filter) g.filter = look.filter;
   g.drawImage(img, 0, 0, c.width, c.height);
+  g.filter = 'none';
+  if (look?.frame) {
+    // Linienstärke als Anteil der Bildbreite
+    const lw = Math.max(1, Math.round(look.frame * c.width));
+    g.strokeStyle = '#333';
+    g.lineWidth = lw;
+    g.strokeRect(lw / 2, lw / 2, c.width - lw, c.height - lw);
+  }
   const bytes = dataUrlBytes(c.toDataURL('image/png'));
   return bytes ? { ...bytes, ar } : null;
 }
@@ -254,9 +265,10 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
     }
     case 'image': {
       if (!b.src) return '';
-      const img = await toPng(b.src);
-      if (!img) return '';
       const w = (ctx.width * Math.min(100, b.width ?? 100)) / 100;
+      const filter = imageFilter(b);
+      const img = await toPng(b.src, undefined, filter || b.frame ? { filter, frame: b.frame ? LINE_MM[b.frame] / w : 0 } : undefined);
+      if (!img) return '';
       const rot = ((Number(b.rot) || 0) % 180) !== 0;
       const h = rot ? w / Math.max(0.05, img.ar) : w * img.ar;
       return `<w:p>${pPr({ align: b.align ?? 'center', keep: !!b.caption })}${drawing(ctx, img.data, img.ext, w, h)}</w:p>` + (b.caption?.trim() ? para(runs(b.caption), ctx, { style: 'Caption', align: b.align ?? 'center' }) : '');

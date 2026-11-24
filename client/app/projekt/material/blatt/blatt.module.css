@@ -156,7 +156,7 @@
 .host :global(.bl-fig) { margin: 0; }
 .host :global(.bl-align-center) { margin-left: auto; margin-right: auto; }
 .host :global(.bl-align-right) { margin-left: auto; }
-.host :global(.bl-fig img) { width: 100%; display: block; }
+.host :global(.bl-fig img) { width: 100%; display: block; box-sizing: border-box; }
 .host :global(.bl-fig figcaption) { font-size: 0.85em; text-align: center; margin-top: 1mm; }
 .host :global(.bl-img-empty) { height: 40mm; border: 0.3mm dashed #aaa; display: grid; place-items: center; color: #999; font-size: 0.85em; text-align: center; }
 .host :global(.bl-task-row) { display: flex; gap: 2mm; }
@@ -430,3 +430,20 @@
 .convMenu { position: fixed; top: auto; z-index: 60; min-width: 210px; }
 .convBtn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-elev); cursor: pointer; padding: 0; }
 .convBtn:hover { background: var(--accent-soft); }
+
+/* Bild zuschneiden auf der Seite */
+.cropClip { position: fixed; z-index: 70; overflow: hidden; outline: 1px dashed rgba(0, 0, 0, 0.4); }
+.cropBox { position: absolute; box-shadow: 0 0 0 9999px rgba(20, 24, 30, 0.55); outline: 2px solid #fff; cursor: move; touch-action: none; }
+.cropBox::before, .cropBox::after { content: ''; position: absolute; inset: 0; pointer-events: none; border: 0 solid rgba(255, 255, 255, 0.45); }
+.cropBox::before { border-width: 0 1px; left: 33.33%; right: 33.33%; }
+.cropBox::after { border-width: 1px 0; top: 33.33%; bottom: 33.33%; }
+.cropH { position: absolute; width: 14px; height: 14px; background: #fff; border: 2px solid var(--office-word, #2b579a); border-radius: 3px; touch-action: none; z-index: 1; }
+.cropH_tl { left: -7px; top: -7px; cursor: nwse-resize; }
+.cropH_tr { right: -7px; top: -7px; cursor: nesw-resize; }
+.cropH_bl { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.cropH_br { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.cropH_t { left: calc(50% - 10px); top: -5px; width: 20px; height: 8px; cursor: ns-resize; }
+.cropH_b { left: calc(50% - 10px); bottom: -5px; width: 20px; height: 8px; cursor: ns-resize; }
+.cropH_l { top: calc(50% - 10px); left: -5px; width: 8px; height: 20px; cursor: ew-resize; }
+.cropH_r { top: calc(50% - 10px); right: -5px; width: 8px; height: 20px; cursor: ew-resize; }
+.cropBar { position: fixed; z-index: 71; display: flex; gap: 6px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
