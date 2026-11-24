@@ -118,6 +118,17 @@ export interface Block {
   line?: LineWeight;
 }
 
+/** Gestaltung der Unterschriften unter Bildern, Diagrammen und Tabellen */
+export interface CaptionStyle {
+  /** Größe in Prozent der Grundschrift (Standard 85) */
+  size?: number;
+  style?: 'normal' | 'italic' | 'bold' | 'bolditalic';
+  align?: 'left' | 'center' | 'right';
+  gray?: boolean;
+  /** automatisch nummerieren: „Abb. 1:“, „Tab. 1:“ */
+  number?: boolean;
+}
+
 /** Linienstärken für Kästen; Standard „dünn“ */
 export type LineWeight = 'hair' | 'thin' | 'medium' | 'thick';
 export const LINE_MM: Record<LineWeight, number> = { hair: 0.12, thin: 0.2, medium: 0.35, thick: 0.6 };
@@ -174,6 +185,10 @@ export interface BlattDoc {
     earned?: 'none' | 'box' | 'line';
     /** Sollpunktzahl „/ 6 P.“ im Punktefeld zeigen (Standard an); beim Kästchen steht sie im Kästchen */
     earnedMax?: boolean;
+    /** Bild- und Tabellenunterschriften (Wunsch Jo, 24. November 2026) */
+    caption?: CaptionStyle;
+    /** eigene Absatzvorlagen, aus dem Format eines Bausteins gemerkt */
+    styles?: { name: string; style: Partial<Pick<Block, 'fs' | 'lh' | 'ta' | 'it' | 'bd' | 'nm' | 'ind' | 'fw' | 'ls' | 'ps' | 'flow'>> }[];
   };
   blocks: Block[];
 }
@@ -1018,6 +1033,8 @@ interface Ctx {
   /** Feld für erreichte Punkte hinter den Aufgaben; Aufgaben mit Punkten für die Bewertung */
   earned?: 'box' | 'line';
   earnedMax?: boolean;
+  /** automatische Nummer vor der Unterschrift („Abb. 2:“) */
+  capLabel?: string;
   scores?: { label: string; max: string }[];
   /** Blatt hat einen QR-Code aus Autogra.fi */
   qr?: boolean;
@@ -1067,6 +1084,14 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
     box.classList.add('bl-hasnm');
     box.style.setProperty('--nm', Math.max(10, Math.min(70, nm)) + 'mm');
   }
+}
+
+/** Unterschrift mit automatischer Nummer davor (die Nummer gehört nicht zum Text, den man bearbeitet) */
+function capField(tag: string, cls: string, b: Block, ctx: Ctx, ph: string): HTMLElement {
+  const f = field(tag, cls, 'caption', esc(b.caption) || `<span class="bl-ph">${ph}</span>`);
+  // steht schon „Abb. 1:“ im Text, keine zweite Nummer davor
+  if (ctx.capLabel && b.caption?.trim() && !/^\s*(abb|abbildung|tab|tabelle|fig|m)\.?\s*\d+/i.test(b.caption)) f.dataset.cap = ctx.capLabel;
+  return f;
 }
 
 /** Feld, das man auf der Seite anklicken und dort bearbeiten kann */
@@ -1137,7 +1162,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
           fig.appendChild(img);
         }
       } else fig.appendChild(el('div', 'bl-img-empty', '<span>Bild hierher ziehen<br>oder im Menüband auswählen</span>'));
-      if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
+      if (b.caption || ctx.editing) fig.appendChild(capField('figcaption', '', b, ctx, 'Bildunterschrift'));
       // Umfluss: links oder rechts vom folgenden Text umflossen
       if (b.wrap === 'left' || b.wrap === 'right') {
         box.classList.add('bl-wrap-' + b.wrap);
@@ -1244,7 +1269,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       }
       tb.appendChild(body);
       box.appendChild(tb);
-      if (b.caption || ctx.editing) box.appendChild(field('div', 'bl-cap', 'caption', esc(b.caption) || '<span class="bl-ph">Beschriftung (optional)</span>'));
+      if (b.caption || ctx.editing) box.appendChild(capField('div', 'bl-cap', b, ctx, 'Beschriftung (optional)'));
       break;
     }
     case 'chart': {
@@ -1259,7 +1284,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       }
       const rows = b.ref ? ctx.tables?.get(b.ref) : undefined;
       fig.innerHTML = rows ? chartSvg(rows, b.kind ?? 'col', wMm, Math.max(25, Math.min(200, Number(b.hMm) || 60)), !!b.gray) : `<div class="bl-img-empty" style="height:${Number(b.hMm) || 60}mm"><span>${b.ref ? 'Die Tabelle fehlt.' : 'Noch keine Tabelle gewählt.'}<br>Im Reiter „Diagramm“ eine Tabelle wählen.</span></div>`;
-      if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
+      if (b.caption || ctx.editing) fig.appendChild(capField('figcaption', '', b, ctx, 'Bildunterschrift'));
       box.appendChild(fig);
       break;
     }
@@ -1304,6 +1329,16 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       break;
   }
   if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart') applyStyle(box, b, /bl-mnote/.test(html));
+  // im Editor: X zum Löschen hinten am Baustein (Wunsch Jo, 24. November 2026); sichtbar beim Darüberfahren und gewählt
+  if (ctx.editing && first) {
+    const x = el('button', 'bl-x', '×');
+    x.setAttribute('type', 'button');
+    x.setAttribute('data-del', b.id);
+    x.setAttribute('title', `${BLOCK_LABEL[b.type]} löschen`);
+    x.setAttribute('aria-label', `${BLOCK_LABEL[b.type]} löschen`);
+    x.contentEditable = 'false';
+    box.appendChild(x);
+  }
   return box;
 }
 
@@ -1393,6 +1428,14 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
   page.style.padding = `${m}mm ${m}mm ${m * 0.8}mm`;
   page.style.fontFamily = FONTS[P.font] ?? FONTS.sans;
   page.style.fontSize = (Number(P.fontSize) || 11) + 'pt';
+  const C = P.caption;
+  if (C) {
+    if (C.size) page.style.setProperty('--cap-fs', Math.max(60, Math.min(120, C.size)) / 100 + 'em');
+    if (C.style === 'italic' || C.style === 'bolditalic') page.style.setProperty('--cap-it', 'italic');
+    if (C.style === 'bold' || C.style === 'bolditalic') page.style.setProperty('--cap-fw', '700');
+    if (C.align) page.style.setProperty('--cap-ta', C.align);
+    if (C.gray) page.style.setProperty('--cap-col', '#555');
+  }
   const H = P.header;
   const qrHere = H.qr === 'all' || (H.qr === 'first' && index === 0);
   const F = headFields(doc);
@@ -1452,6 +1495,14 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
       } else q.appendChild(el('div', 'bl-qr-ph', '<span>QR-Code<br>Autogra.fi</span>'));
       head.appendChild(q);
     }
+    if (editing && index === 0) {
+      const x = el('button', 'bl-x', '×');
+      x.setAttribute('type', 'button');
+      x.setAttribute('data-del', '__head');
+      x.setAttribute('title', 'Kopf mit Rahmendaten entfernen (unter „Aufgabe“ → Rahmendaten wieder einschalten)');
+      x.setAttribute('aria-label', 'Kopf entfernen');
+      head.appendChild(x);
+    }
     if (left.children.length || qrHere) page.appendChild(head);
   }
   if (P.watermark?.trim()) page.appendChild(el('div', 'bl-wm', esc(P.watermark.trim())));
@@ -1499,6 +1550,8 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   };
   const keepNextIds = new Set(walk(doc.blocks).filter((b) => b.keepNext).map((b) => b.id));
   let matNo = 0;
+  let figNo = 0;
+  let tabNo = 0;
   const labels = taskLabels(doc);
   const gloss = walk(doc.blocks).find((b) => b.type === 'glossary');
   const text = newTextCtx(gloss?.mark ?? 'star');
@@ -1515,6 +1568,10 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   const number = (b: Block, ctx: Ctx) => {
     if (b.type === 'task') ctx.label = labels.get(b.id);
     if (b.type === 'material') ctx.number = ++matNo;
+    if (doc.page.caption?.number && b.caption?.trim()) {
+      if (b.type === 'table') ctx.capLabel = `Tab. ${++tabNo}:`;
+      else if (b.type === 'image' || b.type === 'chart') ctx.capLabel = `Abb. ${++figNo}:`;
+    }
   };
 
   const place = (b: Block, ctx: Ctx, part?: Part) => {

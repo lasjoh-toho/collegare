@@ -7,7 +7,7 @@
  * einer Autogra.fi-Aufgabe ein Exemplar mit deren persönlichem QR-Code (Klassenliste und Codes holt der Browser dort,
  * mit der Anmeldung in Autogra.fi). Die Broschüre wird ausgeschossen: Seite 1 steht auf dem Bogen neben der letzten.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ProjectShell } from '@/components/ProjectShell';
 import { Topbar } from '@/components/Topbar';
 import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
@@ -48,6 +48,7 @@ import {
   LINE_LABEL,
   hasFrame,
   type LineWeight,
+  type CaptionStyle,
   toCriteria,
   toEditMd,
   toMarkdown,
@@ -97,6 +98,8 @@ Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden
 Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
 
 Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+
+„Vorlagen“: Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -170,6 +173,8 @@ export default function BlattPage() {
   const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
   /** Bild, das gerade auf der Seite zugeschnitten wird */
   const [cropBid, setCropBid] = useState<string | null>(null);
+  /** wo die Seiten beginnen: vor welchem Baustein (oder mitten in ihm, wenn er weiterläuft) */
+  const [pageMarks, setPageMarks] = useState<Map<string, { page: number; cont: boolean }[]>>(new Map());
   const [dropAt, setDropAt] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('insert');
   /** Format übertragen: Gestaltung, die beim nächsten Klick auf einen Baustein übernommen wird */
@@ -331,7 +336,7 @@ export default function BlattPage() {
   function emitLive() {
     const L = live.current;
     if (!L) return;
-    let v = L.rich ? fromEditMd(editToTufte(L.el)) : (L.el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    let v = L.rich ? (MULTI.includes(L.t.field) ? keepBlank(fromEditMd(editToTufte(markBlank(L.el)))) : fromEditMd(editToTufte(L.el))) : (L.el.textContent ?? '').replace(/\s+/g, ' ').trim();
     if (!MULTI.includes(L.t.field)) v = v.replace(/\n+/g, ' ');
     let full = v;
     if (L.range) {
@@ -437,6 +442,9 @@ export default function BlattPage() {
       const r = a.getBoundingClientRect();
       setAtom({ el: a, left: (r.left - w.left) / zoom, top: (r.bottom - w.top) / zoom + 6, ...(a.classList.contains('ed-gloss') ? { text: a.textContent ?? '', extra: a.dataset.explain ?? '' } : { text: a.dataset.text ?? '', extra: '' }) });
     };
+    // tippt man gerade in ein Feld im Menüband (z. B. Punkte), bleibt dort der Fokus (Fehler, Jo 24. November 2026)
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && !h.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
     f.focus({ preventScroll: true });
     document.execCommand('defaultParagraphSeparator', false, 'p');
     if (want) placeCaret(f, want.para - (range?.[0] ?? 0), want.off);
@@ -475,6 +483,20 @@ export default function BlattPage() {
     setProblems(r.problems);
     setPageCount(r.pages.length);
     pagesRef.current = r.pages;
+    {
+      const firstPage = new Map<string, number>();
+      const marks = new Map<string, { page: number; cont: boolean }[]>();
+      r.pages.forEach((p, k) => {
+        const ids = [...p.querySelectorAll<HTMLElement>('[data-bid]')].map((e) => e.dataset.bid!);
+        if (k > 0 && ids[0]) {
+          const cont = firstPage.has(ids[0]);
+          marks.set(ids[0], [...(marks.get(ids[0]) ?? []), { page: k + 1, cont }]);
+        }
+        for (const id of ids) if (!firstPage.has(id)) firstPage.set(id, k);
+      });
+      const key = (m: typeof marks) => [...m].map(([a, l]) => a + l.map((x) => x.page + (x.cont ? 'c' : '')).join()).join('|');
+      setPageMarks((o) => (key(o) === key(marks) ? o : marks));
+    }
     // Seitenminiaturen links
     const th = thumbs.current;
     if (th) {
@@ -609,7 +631,7 @@ export default function BlattPage() {
     setEdit(null);
   }
   const openConv = (e: React.MouseEvent, b: Block) => {
-    if (!editing || !CONVERTIBLE.includes(b.type)) return;
+    if (!editing) return;
     e.preventDefault();
     select(b.id);
     setConv({ bid: b.id, x: e.clientX, y: e.clientY });
@@ -722,6 +744,12 @@ export default function BlattPage() {
   function onPagesClick(e: React.MouseEvent) {
     if (!canEdit || !doc) return;
     const t = e.target as HTMLElement;
+    const del = t.closest<HTMLElement>('[data-del]');
+    if (del?.dataset.del) {
+      e.stopPropagation();
+      if (del.dataset.del === '__head') return setHeader({ show: false });
+      return remove(del.dataset.del);
+    }
     // Ansicht Textfluss: Bausteine verbinden (zusammenhalten) oder trennen
     const link = t.closest<HTMLElement>('[data-link]');
     if (link?.dataset.link) {
@@ -807,6 +835,7 @@ export default function BlattPage() {
   // Bilder auf der Seite verschieben: ziehen; ein Bild im Text wird dabei frei
   function onPointerDown(e: React.PointerEvent) {
     if (!canEdit || view === 'sheets' || e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('[data-del]')) return;
     const gut = (e.target as HTMLElement).closest<HTMLElement>('.bl-gutter');
     if (gut?.dataset.gutter) return dragGutter(e, gut);
     const fig = (e.target as HTMLElement).closest<HTMLElement>('.bl-fig');
@@ -1098,11 +1127,22 @@ export default function BlattPage() {
                   ))}
                 </div>
               )}
-              {conv && (
+              {conv?.bid === '__head' && (
+                <ConvMenu
+                  conv={conv}
+                  b={{ id: '__head', type: 'heading' } as Block}
+                  head
+                  onPick={() => setConv(null)}
+                  onDelete={() => (setHeader({ show: false }), setConv(null))}
+                  onClose={() => setConv(null)}
+                />
+              )}
+              {conv && conv.bid !== '__head' && (
                 <ConvMenu
                   conv={conv}
                   b={doc ? findBlock(doc.blocks, conv.bid) : null}
                   onPick={(to) => (transform(conv.bid, to), setConv(null))}
+                  onDelete={() => (remove(conv.bid), setConv(null))}
                   onClose={() => setConv(null)}
                 />
               )}
@@ -1110,7 +1150,40 @@ export default function BlattPage() {
                 <section className={st.sec}>
                   {!doc.blocks.length && <div className={st.empty}>Noch leer. Klick auf die Seite und schreib los, oder füge unter „Einfügen“ Material, Bilder, Tabellen und Aufgaben ein.</div>}
                   <div className={st.list} onDragOver={(e) => dragId && e.preventDefault()} onDrop={() => dragId && (moveTo(dragId, dropAt), setDragId(null), setDropAt(null))}>
+                    {doc.page.header.show !== false ? (
+                      <div
+                        className={`${st.item} ${headOpen ? st.sel : ''}`}
+                        onClick={() => (setEdit(null), setHeadOpen(true), host.current?.querySelector('[data-head]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
+                        onContextMenu={(e) => editing && (e.preventDefault(), setConv({ bid: '__head', x: e.clientX, y: e.clientY }))}
+                        title="Kopf der Klausur: Titel, Name, Datum, QR-Code … Klick zum Bearbeiten, Rechtsklick zum Löschen"
+                      >
+                        <span className={st.itemIcon}>
+                          <Ico n="insertheader" size={16} />
+                        </span>
+                        <span className={st.itemText}>
+                          Kopf
+                          <small>Rahmendaten{doc.page.header.qr !== 'none' ? ', QR-Code' : ''}</small>
+                        </span>
+                        {editing && (
+                          <button type="button" className={st.convBtn} title="Kopf entfernen" aria-label="Kopf entfernen" onClick={(e) => (e.stopPropagation(), setHeader({ show: false }))}>
+                            <span aria-hidden>×</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      editing && (
+                        <button type="button" className={st.oItem} style={{ opacity: 0.7 }} onClick={() => setHeader({ show: true })} title="Kopf mit Titel, Name, Datum und QR-Code wieder zeigen">
+                          + Kopf mit Rahmendaten
+                        </button>
+                      )
+                    )}
                     {outline.map(({ b, depth }) => (
+                      <Fragment key={b.id}>
+                      {(pageMarks.get(b.id) ?? []).filter((m) => !m.cont).map((m) => (
+                        <div key={'p' + m.page} className={st.pageMark} style={{ marginLeft: depth * 14 }}>
+                          <span>Seite {m.page}</span>
+                        </div>
+                      ))}
                       <div
                         key={b.id}
                         className={`${st.item} ${sel === b.id ? st.sel : ''} ${bad.has(b.id) ? st.bad : ''} ${dragId === b.id ? st.drag : ''} ${dropAt === b.id && dragId !== b.id ? st.dropAbove : ''}`}
@@ -1130,22 +1203,28 @@ export default function BlattPage() {
                           {BLOCK_LABEL[b.type]}
                           <small>{blockSummary(b)}</small>
                         </span>
-                        {editing && sel === b.id && CONVERTIBLE.includes(b.type) && (
+                        {editing && sel === b.id && (
                           <button
                             type="button"
                             className={st.convBtn}
-                            title="Umwandeln in … (auch mit Rechtsklick)"
-                            aria-label="Umwandeln"
+                            title={CONVERTIBLE.includes(b.type) ? 'Umwandeln oder löschen (auch mit Rechtsklick)' : 'Löschen (auch mit Rechtsklick)'}
+                            aria-label="Umwandeln oder löschen"
                             onClick={(e) => {
                               e.stopPropagation();
                               const r = e.currentTarget.getBoundingClientRect();
                               setConv({ bid: b.id, x: r.left, y: r.bottom + 2 });
                             }}
                           >
-                            <Ico n="editstyle" size={14} />
+                            <span aria-hidden>⋯</span>
                           </button>
                         )}
                       </div>
+                      {(pageMarks.get(b.id) ?? []).filter((m) => m.cont).map((m) => (
+                        <div key={'c' + m.page} className={`${st.pageMark} ${st.pageMarkIn}`} style={{ marginLeft: depth * 14 + 10 }} title="Der Baustein läuft auf der nächsten Seite weiter">
+                          <span>Seite {m.page} · läuft weiter</span>
+                        </div>
+                      ))}
+                      </Fragment>
                     ))}
                     {dragId && (
                       <div className={st.empty} onDragOver={() => setDropAt(null)}>
@@ -1207,7 +1286,7 @@ export default function BlattPage() {
 }
 
 // ---------- Bearbeiten direkt auf der Seite ----------
-type Tab = 'file' | 'start' | 'insert' | 'task' | 'design' | 'layout' | 'block';
+type Tab = 'file' | 'start' | 'insert' | 'styles' | 'task' | 'design' | 'layout' | 'block';
 type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' | 'json' | 'open';
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
 const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade'];
@@ -1257,6 +1336,26 @@ function caretIn(el: HTMLElement, node: Node, offset: number): { k: number; off:
   }
   return { k: Math.max(0, k), off: r.toString().length };
 }
+/**
+ * Leere Zeilen behalten (Fehler, Jo 24. November 2026: einfache Zeilenumbrüche verschwanden). Ein leerer Absatz und ein
+ * Zeilenumbruch (Umschalt+Enter) bekommen ein unsichtbares Zeichen (U+200B), damit sie die Umwandlung überstehen; im Blatt
+ * steht ein leerer Absatz als Zeile mit nur diesem Zeichen.
+ */
+const ZW = '\u200b';
+function markBlank(el: HTMLElement): HTMLElement {
+  const c = el.cloneNode(true) as HTMLElement;
+  c.querySelectorAll('br').forEach((br) => br.after(document.createTextNode(ZW)));
+  c.querySelectorAll('p, div').forEach((p) => {
+    if (!(p.textContent ?? '').replace(/[\s\u200b]/g, '') && !p.querySelector('img, .ed-note')) p.append(ZW);
+  });
+  return c;
+}
+function keepBlank(v: string): string {
+  const lines = v.split('\n').map((l) => (l.includes(ZW) ? l.replace(/\u200b/g, '').trim() || ZW : l));
+  // ein Umbruch am Ende eines Absatzes, auf den noch nichts folgt, zählt als leere Zeile; doppelte Leerzeichen entfallen
+  return lines.join('\n');
+}
+
 /** Schreibmarke an (Absatz, Zeichen) setzen; fehlt der Absatz, ans Ende */
 function placeCaret(el: HTMLElement, k: number | null, off: number) {
   const kids = topChildren(el);
@@ -1525,7 +1624,7 @@ function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<H
 }
 
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
-function ConvMenu({ conv, b, onPick, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; onPick: (to: BlockType) => void; onClose: () => void }) {
+function ConvMenu({ conv, b, head, onPick, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onDelete: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
@@ -1542,10 +1641,16 @@ function ConvMenu({ conv, b, onPick, onClose }: { conv: { x: number; y: number }
   const top = Math.min(conv.y, innerHeight - 300);
   return (
     <div ref={box} className={`${st.menu} ${st.convMenu}`} style={{ left, top }} role="menu">
-      <div className={st.mh}>Umwandeln in</div>
-      {CONVERTIBLE.map((t) => (
-        <MI key={t} icon={BICON[t]} label={BLOCK_LABEL[t]} on={b.type === t} disabled={b.type === t} onClick={() => onPick(t)} />
-      ))}
+      {!head && CONVERTIBLE.includes(b.type) && (
+        <>
+          <div className={st.mh}>Umwandeln in</div>
+          {CONVERTIBLE.map((t) => (
+            <MI key={t} icon={BICON[t]} label={BLOCK_LABEL[t]} on={b.type === t} disabled={b.type === t} onClick={() => onPick(t)} />
+          ))}
+        </>
+      )}
+      <div className={st.mh}>{head ? 'Kopf' : BLOCK_LABEL[b.type]}</div>
+      <MI icon="delete" label="Löschen" onClick={onDelete} />
     </div>
   );
 }
@@ -1713,6 +1818,175 @@ function MI({ label, on, onClick, icon, hint, disabled, stay }: { label: string;
     </button>
   );
 }
+/** Absatzvorlagen für jeden Textbaustein (Wunsch Jo, 24. November 2026: Formate der Vorlagen übertragen) */
+const PARA_PRESETS: { id: string; label: string; style: NonNullable<BlattDoc['page']['styles']>[number]['style'] }[] = [
+  { id: 'standard', label: 'Standard', style: {} },
+  { id: 'einleitung', label: 'Einleitung', style: { it: true, lh: 1.5 } },
+  { id: 'klein', label: 'Kleingedruckt', style: { fs: 85 } },
+  { id: 'betont', label: 'Betont', style: { bd: true } },
+  { id: 'block', label: 'Blocksatz', style: { ta: 'justify', lh: 1.45 } },
+  { id: 'rand', label: 'Mit Randspalte', style: { ta: 'justify', lh: 1.6, nm: 35 } },
+  { id: 'kompakt', label: 'Kompakt', style: { fs: 92, lh: 1.3 } },
+  { id: 'luftig', label: 'Luftig', style: { lh: 1.8, ps: 0.8 } },
+  { id: 'eingerueckt', label: 'Eingerückt', style: { ind: 10 } },
+  { id: 'mitte', label: 'Groß, Mitte', style: { fs: 120, ta: 'center', it: true } },
+  { id: 'spalten', label: 'Zwei Spalten', style: { flow: 2, ta: 'justify' } },
+];
+const STYLE_CLEAR = Object.fromEntries(STYLE_KEYS.map((k) => [k, undefined])) as Partial<Block>;
+
+/** Vorschau einer Absatzvorlage als Knopf */
+function presetCss(st0: Partial<Block>): React.CSSProperties {
+  return {
+    fontSize: st0.fs ? `${Math.min(st0.fs, 115)}%` : undefined,
+    fontStyle: st0.it ? 'italic' : undefined,
+    fontWeight: st0.bd ? 700 : st0.fw,
+    textAlign: st0.ta,
+    paddingLeft: st0.ind ? 8 : undefined,
+    letterSpacing: st0.ls ? `${st0.ls}em` : undefined,
+  };
+}
+
+/**
+ * Reiter „Vorlagen“: Absatzvorlagen auf den gewählten Baustein übertragen (jede Art), Zeichenvorlagen auf den markierten
+ * Text, eigene Vorlagen aus dem Format eines Bausteins speichern (im Blatt gemerkt).
+ */
+function StylesTab(props: {
+  doc: BlattDoc;
+  b: Block | null;
+  textBlock: boolean;
+  rich: boolean;
+  set: (p: Partial<Block>) => void;
+  setPageOpt: (p: Partial<BlattDoc['page']>) => void;
+  exec: (c: string, v?: string) => boolean;
+  selectedText: () => string;
+  onError: (m: string) => void;
+  ensureGlossary: () => void;
+}) {
+  const { doc, b, textBlock, rich, set, exec } = props;
+  const [name, setName] = useState('');
+  const own = doc.page.styles ?? [];
+  const cur = b ? styleOf(b) : {};
+  const same = (x: Partial<Block>) => STYLE_KEYS.every((k) => (x[k] ?? undefined) === ((cur as Partial<Block>)[k] ?? undefined));
+  const apply = (x: Partial<Block>) => set({ ...STYLE_CLEAR, ...x, ...(b?.type === 'material' ? { justify: undefined } : {}) });
+  const sel = () => {
+    const w = props.selectedText();
+    if (!w.trim()) props.onError('Erst im Text etwas markieren.');
+    else props.onError('');
+    return w;
+  };
+  const wrapNote = (kind: 'margin' | 'note') => {
+    const w = sel().trim();
+    if (w) exec('insertHTML', noteHtml(kind, w));
+  };
+  return (
+    <>
+      <Group label={b ? `Absatzvorlagen für: ${BLOCK_LABEL[b.type]}` : 'Absatzvorlagen'}>
+        <div className={st.presets}>
+          {PARA_PRESETS.map((p) => (
+            <button key={p.id} type="button" className={`${st.preset} ${textBlock && same(p.style) ? st.presetOn : ''}`} disabled={!textBlock} onClick={() => apply(p.style)} title={textBlock ? `„${p.label}“ auf den Baustein übertragen` : 'Erst einen Textbaustein anklicken'}>
+              <span style={presetCss(p.style)}>{p.label}</span>
+            </button>
+          ))}
+          {own.map((p, i) => (
+            <button
+              key={'o' + i}
+              type="button"
+              className={`${st.preset} ${st.presetOwn} ${textBlock && same(p.style) ? st.presetOn : ''}`}
+              disabled={!textBlock}
+              onClick={() => apply(p.style)}
+              onContextMenu={(e) => (e.preventDefault(), props.setPageOpt({ styles: own.filter((_, j) => j !== i) }))}
+              title={`Eigene Vorlage „${p.name}“ übertragen (Rechtsklick löscht sie)`}
+            >
+              <span style={presetCss(p.style)}>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      </Group>
+      <Group label="Eigene Vorlage">
+        <div className={st.rows}>
+          <input className={st.rIn} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, z. B. Merktext" aria-label="Name der Vorlage" style={{ width: 150 }} disabled={!textBlock} />
+          <button
+            type="button"
+            className="btn"
+            disabled={!textBlock || !name.trim()}
+            onClick={() => {
+              const style = Object.fromEntries(STYLE_KEYS.filter((k) => (cur as Partial<Block>)[k] !== undefined).map((k) => [k, (cur as Partial<Block>)[k]]));
+              props.setPageOpt({ styles: [...own.filter((x) => x.name !== name.trim()), { name: name.trim(), style }] });
+              setName('');
+            }}
+            title="Das Format des gewählten Bausteins als Vorlage merken"
+          >
+            Format merken
+          </button>
+        </div>
+      </Group>
+      <Group label="Zeichenvorlagen für markierten Text">
+        <div className={st.rows}>
+          <div className={st.row}>
+            <RB icon="italic" label="Betont" disabled={!rich} onClick={() => sel() && exec('italic')} title="kursiv" />
+            <RB icon="bold" label="Stark" disabled={!rich} onClick={() => sel() && exec('bold')} title="fett" />
+            <RB icon="backcolor" label="Markiert" disabled={!rich} onClick={() => sel() && exec('hiliteColor', '#fff59a')} title="Textmarker" />
+            <RB icon="underline" label="Unterstrichen" disabled={!rich} onClick={() => sel() && exec('underline')} />
+          </div>
+          <div className={st.row}>
+            <RB icon="insertannotation" label="In den Rand" disabled={!rich} onClick={() => wrapNote('margin')} title="Markierten Text als Randbemerkung neben die Zeile setzen" />
+            <RB icon="insertfootnote" label="Als Fußnote" disabled={!rich} onClick={() => wrapNote('note')} title="Markierten Text als Fußnote unten auf die Seite" />
+            <RB
+              icon="insertmultiindex"
+              label="Begriff"
+              disabled={!rich}
+              title="Markiertes Wort als Begriff ins Glossar"
+              onClick={() => {
+                const w = sel().trim();
+                if (!w) return;
+                const known = glossaryTerms(doc).find((t) => t.word.toLowerCase() === w.toLowerCase());
+                exec('insertHTML', glossHtml(w, known?.explain ?? ''));
+                props.ensureGlossary();
+              }}
+            />
+            <RB icon="resetattributes" label="Zeichenformat entfernen" disabled={!rich} onClick={() => sel() && exec('removeFormat')} />
+          </div>
+        </div>
+      </Group>
+    </>
+  );
+}
+
+/** Gestaltung aller Unterschriften unter Bildern, Diagrammen und Tabellen (gilt fürs ganze Blatt) */
+function CaptionDrop({ doc, setPageOpt, big }: { doc: BlattDoc; setPageOpt: (p: Partial<BlattDoc['page']>) => void; big?: boolean }) {
+  const C = doc.page.caption ?? {};
+  const setC = (p: Partial<CaptionStyle>) => setPageOpt({ caption: { ...C, ...p } });
+  const size = C.size ?? 85;
+  const style = C.style ?? 'normal';
+  const STYLE: Record<NonNullable<CaptionStyle['style']>, string> = { normal: 'normal', italic: 'kursiv', bold: 'fett', bolditalic: 'fett kursiv' };
+  return (
+    <Drop icon="insertcaptiondialog" label="Bildunterschrift" value={`${size} %, ${STYLE[style]}`} big={big} title="Schrift der Unterschriften unter Bildern, Diagrammen und Tabellen (für das ganze Blatt)">
+      <MH>Größe</MH>
+      {[70, 80, 85, 90, 100].map((v) => (
+        <MI key={v} label={`${v} %${v === 85 ? ' (Standard)' : ''}`} on={size === v} stay onClick={() => setC({ size: v === 85 ? undefined : v })} />
+      ))}
+      <MH>Schnitt</MH>
+      {(Object.keys(STYLE) as (keyof typeof STYLE)[]).map((k) => (
+        <MI key={k} label={STYLE[k]} on={style === k} stay onClick={() => setC({ style: k === 'normal' ? undefined : k })} />
+      ))}
+      <MH>Ausrichtung</MH>
+      {(
+        [
+          [undefined, 'wie das Bild (Standard)'],
+          ['left', 'links'],
+          ['center', 'Mitte'],
+          ['right', 'rechts'],
+        ] as const
+      ).map(([v, l]) => (
+        <MI key={l} label={l} on={C.align === v} stay onClick={() => setC({ align: v })} />
+      ))}
+      <MH>Mehr</MH>
+      <MI label="grau" on={!!C.gray} stay onClick={() => setC({ gray: !C.gray || undefined })} />
+      <MI label="nummerieren" hint="Abb. 1:, Tab. 1: davor" on={!!C.number} stay onClick={() => setC({ number: !C.number || undefined })} />
+    </Drop>
+  );
+}
+
 /** Linienstärke für Kästen (Kasten, Aufgabe oder Glossar im Kasten, Bewertung) */
 function LineDrop({ b, set }: { b: Block | null | undefined; set: (p: Partial<Block>) => void }) {
   const ok = hasFrame(b);
@@ -1801,6 +2075,7 @@ function Ribbon(props: RibbonProps) {
           [
             ['start', 'Start'],
             ['insert', 'Einfügen'],
+            ['styles', 'Vorlagen'],
             ['task', 'Aufgabe'],
             ['design', 'Entwurf'],
             ['layout', 'Layout'],
@@ -2159,6 +2434,20 @@ function Ribbon(props: RibbonProps) {
             </Group>
           </>
         )}
+        {tab === 'styles' && (
+          <StylesTab
+            doc={doc}
+            b={b}
+            textBlock={textBlock}
+            rich={rich}
+            set={set}
+            setPageOpt={props.setPageOpt}
+            exec={exec}
+            selectedText={selectedText}
+            onError={props.onError}
+            ensureGlossary={props.ensureGlossary}
+          />
+        )}
         {tab === 'design' && (
           <>
             <Group label="Schrift des Blatts">
@@ -2171,6 +2460,9 @@ function Ribbon(props: RibbonProps) {
                   <MI key={z} label={`${de(z)} pt`} on={P.fontSize === z} onClick={() => props.setPageOpt({ fontSize: z })} />
                 ))}
               </Drop>
+            </Group>
+            <Group label="Unterschriften">
+              <CaptionDrop doc={doc} setPageOpt={props.setPageOpt} big />
             </Group>
             <Group label="Kopf der Seite">
               <Drop icon="insertheader" label="Kopfzeile" value={H.style === 'box' ? 'Kasten' : H.style === 'none' ? 'schlicht' : 'Linie'} big>
@@ -2433,7 +2725,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Anordnen: nach oben/unten, verdoppeln, neben den nächsten, entfernen */
-function ArrangeRows(props: RibbonProps & { b: Block }) {
+function ArrangeRows(props: RibbonProps & { b: Block; noDelete?: boolean }) {
   const { b, doc } = props;
   const inCols = !!listOf(doc.blocks, b.id)?.parent;
   return (
@@ -2445,7 +2737,7 @@ function ArrangeRows(props: RibbonProps & { b: Block }) {
       </div>
       <div className={st.row}>
         {b.type !== 'cols' && !inCols && <RB icon="formatcolumns" label="Neben den nächsten" hideLabel onClick={() => props.toColumns(b.id)} title="Diesen und den nächsten Baustein nebeneinander setzen" />}
-        <RB icon="delete" label="Entfernen" hideLabel onClick={() => props.remove(b.id)} title="Entfernen (Entf)" />
+        {!props.noDelete && <RB icon="delete" label="Entfernen" hideLabel onClick={() => props.remove(b.id)} title="Entfernen (Entf)" />}
       </div>
     </div>
   );
@@ -2453,7 +2745,7 @@ function ArrangeRows(props: RibbonProps & { b: Block }) {
 function Arrange(props: RibbonProps & { b: Block }) {
   return (
     <Group label="Anordnen">
-      <ArrangeRows {...props} />
+      <ArrangeRows {...props} noDelete />
     </Group>
   );
 }
@@ -2763,7 +3055,16 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           <span className={st.hint}>Der nächste Baustein beginnt auf einer neuen Seite.</span>
         </Group>
       )}
+      {(b.type === 'image' || b.type === 'chart' || b.type === 'table') && (
+        <Group label="Unterschrift">
+          <CaptionDrop doc={doc} setPageOpt={props.setPageOpt} big />
+        </Group>
+      )}
       <Arrange {...props} />
+      <span className={st.groupGap} />
+      <Group label="Baustein">
+        <RB icon="delete" label="Löschen" big onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
+      </Group>
     </>
   );
 }

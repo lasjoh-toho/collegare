@@ -1460,6 +1460,12 @@ zu komplex“):
   (Linienstärke), `round`, `shadow`. Zuschneiden, Freistellen (Flutfüllung vom Rand, Toleranz 18/36/64) und Verkleinern
   rechnen das Bild im Browser neu (`client/lib/blattImage.ts`), die Drehung wird dabei übernommen; `orig`/`origRot`
   halten das Original. Kontextreiter rechts abgesetzt und schwebend, „Datei“ ein normaler Reiter.
+- **Nachmittag 24. November 2026** (Jo): Reiter „Vorlagen“ (Absatzvorlagen für jede Bausteinart, eigene Vorlagen in
+  `page.styles`, Zeichenvorlagen für markierten Text inkl. „in den Rand“/„als Fußnote“); Löschen per × am Baustein, im
+  Kontextmenü links und ganz rechts im Kontextreiter; Kopf als Element links (× blendet aus); Seitenmarken in
+  „Elemente“ (aus dem Umbruch berechnet, „läuft weiter“ bei geteilten Bausteinen); `page.caption` (Größe, Schnitt,
+  Ausrichtung, grau, Abb./Tab.-Nummern). Fehler: Fokus im Punkte-Feld blieb nicht (Neusetzen holte ihn auf die Seite),
+  leere Absätze verschwanden (jetzt Zeile mit U+200B).
 
 ### 8j.5 Nächste Stufen
 

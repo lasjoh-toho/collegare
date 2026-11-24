@@ -115,7 +115,7 @@
 .host { display: flex; flex-direction: column; align-items: center; gap: 18px; transform-origin: top center; }
 .host.spreads { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
 .host :global(.bl-page) { box-sizing: border-box; background: #fff; color: #111; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 6px 18px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; overflow: hidden; line-height: 1.35; position: relative; flex: none; }
-.host :global(.bl-head) { display: flex; gap: 4mm; align-items: flex-start; margin-bottom: 4mm; padding-bottom: 2mm; border-bottom: 0.3mm solid #444; }
+.host :global(.bl-head) { position: relative; display: flex; gap: 4mm; align-items: flex-start; margin-bottom: 4mm; padding-bottom: 2mm; border-bottom: 0.3mm solid #444; }
 .host :global(.bl-head-left) { flex: 1; min-width: 0; }
 .host :global(.bl-head-title) { font-size: 1.35em; font-weight: 700; margin-bottom: 1.5mm; }
 .host :global(.bl-head-fields) { display: flex; gap: 6mm; flex-wrap: wrap; }
@@ -157,7 +157,8 @@
 .host :global(.bl-align-center) { margin-left: auto; margin-right: auto; }
 .host :global(.bl-align-right) { margin-left: auto; }
 .host :global(.bl-fig img) { width: 100%; display: block; box-sizing: border-box; }
-.host :global(.bl-fig figcaption) { font-size: 0.85em; text-align: center; margin-top: 1mm; }
+.host :global(.bl-fig figcaption) { font-size: var(--cap-fs, 0.85em); font-style: var(--cap-it, normal); font-weight: var(--cap-fw, 400); color: var(--cap-col, inherit); text-align: var(--cap-ta, center); margin-top: 1mm; }
+.host :global([data-cap]::before) { content: attr(data-cap) ' '; font-weight: 700; font-style: normal; }
 .host :global(.bl-img-empty) { height: 40mm; border: 0.3mm dashed #aaa; display: grid; place-items: center; color: #999; font-size: 0.85em; text-align: center; }
 .host :global(.bl-task-row) { display: flex; gap: 2mm; }
 .host :global(.bl-task-no) { flex: none; min-width: 5mm; }
@@ -270,7 +271,7 @@
 .host :global(.bl-grid-rows tr:first-child > *) { border-top: 0.35mm solid #222; }
 .host :global(.bl-grid-rows tr:last-child > *) { border-bottom: 0.35mm solid #222; }
 .host :global(.bl-grid-none th) { background: none; border-bottom: 0.3mm solid #222; }
-.host :global(.bl-cap) { font-size: 0.85em; margin-top: 1mm; }
+.host :global(.bl-cap) { font-size: var(--cap-fs, 0.85em); font-style: var(--cap-it, normal); font-weight: var(--cap-fw, 400); color: var(--cap-col, inherit); text-align: var(--cap-ta, left); margin-top: 1mm; }
 .host :global(.bl-chart-svg) { display: block; max-width: 100%; height: auto; }
 .host :global(.bl-chart-svg text) { font-family: inherit; }
 .host.editing :global(.bl-head) { cursor: pointer; }
@@ -447,3 +448,26 @@
 .cropH_l { top: calc(50% - 10px); left: -5px; width: 8px; height: 20px; cursor: ew-resize; }
 .cropH_r { top: calc(50% - 10px); right: -5px; width: 8px; height: 20px; cursor: ew-resize; }
 .cropBar { position: fixed; z-index: 71; display: flex; gap: 6px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+
+.groupGap { flex: 1 1 0; min-width: 8px; }
+
+/* X zum Löschen am Baustein: nur im Editor, beim Darüberfahren oder gewählt */
+.host :global(.bl-x) { display: none; position: absolute; top: -3mm; right: -3mm; z-index: 6; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg-muted); font: 600 15px/1 system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.host.editing :global([data-bid]:hover > .bl-x), .host.editing :global(.bl-sel > .bl-x), .host.editing :global(.bl-head:hover > .bl-x) { display: inline-flex; align-items: center; justify-content: center; }
+.host :global(.bl-x:hover) { color: #fff; background: #c0392b; border-color: #c0392b; }
+@media print { .host :global(.bl-x) { display: none !important; } }
+
+/* Elemente: wo eine neue Seite beginnt (Wunsch Jo, 24. November 2026) */
+.pageMark { display: flex; align-items: center; gap: 6px; margin: 2px 0; font-size: 10.5px; color: var(--fg-muted); letter-spacing: 0.03em; }
+.pageMark::before, .pageMark::after { content: ''; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--office-word, #2b579a) 50%, transparent); }
+.pageMark::before { flex: 0 0 10px; }
+.pageMarkIn { opacity: 0.8; }
+
+/* Reiter Vorlagen: Galerie der Absatzvorlagen */
+.presets { display: grid; grid-template-columns: repeat(6, 96px); grid-auto-rows: 30px; gap: 4px; max-height: 64px; overflow: auto; padding-right: 2px; }
+.preset { border: 1px solid var(--line); border-radius: 6px; background: var(--bg-elev); color: var(--fg); padding: 0 6px; font: inherit; font-size: 12px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
+.preset span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.preset:hover:not(:disabled) { border-color: var(--office-word, #2b579a); }
+.preset:disabled { opacity: 0.5; cursor: default; }
+.presetOn { border-color: var(--office-word, #2b579a); background: color-mix(in srgb, var(--office-word, #2b579a) 10%, var(--bg-elev)); }
+.presetOwn { border-style: dashed; }
