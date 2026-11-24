@@ -11,6 +11,19 @@
 .tab:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 5%, transparent); }
 .tabOn { color: var(--fg); background: var(--bg-elev); box-shadow: 0 -1px 0 var(--line), 1px 0 0 var(--line), -1px 0 0 var(--line); font-weight: 600; }
 .tabCtx { color: var(--office-word, #2b579a); font-weight: 600; }
+/* Kontextreiter (Jo, 24. November 2026): rechts abgesetzt und schwebend, damit man sieht, dass er zum gewählten Baustein gehört */
+.ctxWrap { position: relative; display: inline-flex; align-items: flex-end; margin-left: 26px; padding-left: 14px; }
+.ctxWrap::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 6px; border-left: 1px dashed color-mix(in srgb, var(--office-word, #2b579a) 45%, transparent); }
+.ctxWrap .tabCtx {
+  margin-bottom: 3px; border-radius: 8px; padding: 4px 14px 5px; background: color-mix(in srgb, var(--office-word, #2b579a) 12%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--office-word, #2b579a) 40%, transparent); box-shadow: 0 4px 12px color-mix(in srgb, var(--office-word, #2b579a) 22%, transparent);
+  transform: translateY(-2px); animation: ctxIn 0.22s ease-out;
+}
+.ctxWrap .tabCtx:hover { background: color-mix(in srgb, var(--office-word, #2b579a) 18%, var(--bg-elev)); }
+.ctxWrap .tabCtx.tabOn { color: #fff; background: var(--office-word, #2b579a); border-color: var(--office-word, #2b579a); }
+.ctxOn .groups { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--office-word, #2b579a) 55%, transparent); background: color-mix(in srgb, var(--office-word, #2b579a) 4%, var(--bg-elev)); }
+@keyframes ctxIn { from { opacity: 0; transform: translate(-8px, -2px); } to { opacity: 1; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .ctxWrap .tabCtx { animation: none; } }
 .groups { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; padding: 6px 8px 4px; background: var(--bg-elev); min-height: 64px; }
 .group { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px; border-right: 1px solid var(--line); }
 .group:last-child { border-right: 0; }

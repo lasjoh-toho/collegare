@@ -1591,7 +1591,7 @@ function Ribbon(props: RibbonProps) {
   const task = b?.type === 'task' ? b : null;
   const total = totalPoints(doc);
   return (
-    <div className={st.ribbon} onMouseDown={keep}>
+    <div className={`${st.ribbon} ${ctx && tab === 'block' ? st.ctxOn : ''}`} onMouseDown={keep}>
       <div className={st.tabs} role="tablist">
         <button role="tab" aria-selected={tab === 'file'} className={`${st.tab} ${st.tabFile} ${tab === 'file' ? st.tabOn : ''}`} onClick={() => setTab('file')}>
           Datei
@@ -1610,9 +1610,11 @@ function Ribbon(props: RibbonProps) {
           </button>
         ))}
         {ctx && (
-          <button role="tab" aria-selected={tab === 'block'} className={`${st.tab} ${st.tabCtx} ${tab === 'block' ? st.tabOn : ''}`} onClick={() => setTab('block')}>
-            {ctx}
-          </button>
+          <span className={st.ctxWrap}>
+            <button role="tab" aria-selected={tab === 'block'} className={`${st.tab} ${st.tabCtx} ${tab === 'block' ? st.tabOn : ''}`} onClick={() => setTab('block')} title={`Einstellungen für den gewählten Baustein: ${ctx}`}>
+              {ctx}
+            </button>
+          </span>
         )}
         <span className="grow" />
         {(
