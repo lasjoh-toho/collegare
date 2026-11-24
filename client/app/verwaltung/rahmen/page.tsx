@@ -114,6 +114,13 @@ export default function Rahmen() {
                   <option value="students_teachers">Lernende; Lehrkraft darf Hinweise und Antworten sehen</option>
                 </select>
               </div>
+              <label className={v.check}>
+                <input type="checkbox" checked={frame.ocr} onChange={(e) => change({ ...frame, ocr: e.target.checked })} />
+                <span>
+                  Texterkennung erlauben
+                  <small>„Bild aufnehmen“ in den Notizen kann den Text auf dem Bild erkennen lassen. Den Dienst legt die KI-Konfiguration fest.</small>
+                </span>
+              </label>
               <p className="muted">Hinweise sind nie eine Bewertung. Ob die Lehrkraft sie sieht, entscheidet sie innerhalb dieses Rahmens je Projekt.</p>
             </section>
             <section className={`panel ${v.box}`}>

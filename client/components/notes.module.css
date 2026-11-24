@@ -119,3 +119,12 @@
 .usePill:hover { filter: brightness(1.12); }
 .useAusarb { background: #2b579a; }
 .usePraes { background: #d9541a; }
+/* Bild aufnehmen + Texterkennung: Bild und erkannter Text nebeneinander zum Überarbeiten (wie „Erkennen“ in Autogra.fi) */
+.ocrPair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start; }
+.ocrImage { display: block; border: 1px solid var(--line); border-radius: 6px; overflow: auto; max-height: 420px; background: #fff; cursor: zoom-in; }
+.ocrImage img { display: block; width: 100%; height: auto; }
+.ocrText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ocrText textarea { min-height: 260px; }
+@supports (field-sizing: content) { .ocrText textarea { max-height: 420px; } }
+.modal .ocrText textarea { min-height: 300px; }
+@media (max-width: 700px) { .ocrPair { grid-template-columns: 1fr; } .ocrImage { max-height: 260px; } }

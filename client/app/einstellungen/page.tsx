@@ -379,6 +379,8 @@ export default function Einstellungen() {
             <label>Höchstgröße je Aufnahme (MB, Rahmen: {f.notesMediaMb})</label>
             <input type="number" min={1} max={f.notesMediaMb} value={s.notesMediaMb} onChange={(ev) => set('notesMediaMb', Math.max(1, Math.min(Number(ev.target.value) || 1, f.notesMediaMb)))} />
           </div>
+          <h4>Texterkennung</h4>
+          <Check label="Text in aufgenommenen Bildern erkennen (KI)" checked={s.notesOcr} disabled={f.ocr === false} onChange={(v) => set('notesOcr', v)} />
         </AccBox>
 
         <AccBox open={open.has('formula')} onToggle={toggle} id="formula" title="Formeln" inactive={!s.docTypes.formula}>

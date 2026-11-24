@@ -26,6 +26,8 @@ import { Icon } from './Icon';
 import { ImageImport } from './ImageImport';
 import { NoteSplit, type SplitNoteInput } from './NoteSplit';
 import { PasteNotes } from './PasteNotes';
+import { ScanDialog } from './ScanDialog';
+import { logRecognised, ocrState, recognizeText, type OcrState } from '@/lib/ocr';
 import type { Me, ProjectView } from '@/lib/types';
 
 /** Wo eine Notiz schon verbaut ist (GET …/notizen-verwendung) */
@@ -90,6 +92,9 @@ interface Draft {
   preview?: string;
   /** Typ der Datei, damit die Vorschau Bild, Ton oder Video zeigt */
   mime?: string;
+  /** zuletzt erkannter Text (Texterkennung); ocrNew: noch nicht ins Einfüge-Protokoll geschrieben */
+  ocr?: string;
+  ocrNew?: boolean;
 }
 type Res = { ok: boolean; error?: string; id?: number };
 
@@ -299,6 +304,8 @@ function Editor({
   fromUrl,
   guard,
   media,
+  ocr,
+  recognize,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
@@ -314,11 +321,17 @@ function Editor({
   fromUrl: (url: string, d: Draft) => void;
   guard: PasteGuard;
   media: MediaRules;
+  /** Texterkennung im Projekt verfügbar? (null = noch unbekannt) */
+  ocr: OcrState | null;
+  /** Text im Bild des Entwurfs erkennen */
+  recognize: (src: string) => Promise<string>;
 }) {
   const fk = FILE_KINDS[draft.kind];
   const hasFile = !!(draft.file || draft.preview);
   const [err, setErr] = useState('');
   const [sel, setSel] = useState('');
+  const [scan, setScan] = useState(false);
+  const [reading, setReading] = useState(false);
   const root = useRef<HTMLFormElement>(null);
   const body = useRef<HTMLTextAreaElement>(null);
   const ok = NEEDS_FILE.includes(draft.kind)
@@ -369,6 +382,28 @@ function Editor({
     fromUrl(url, { ...draft, url });
   }
 
+  /** Text erkennen geht bei Bildern und Handschrift mit Bild (nicht bei SVG) */
+  const canRead = (draft.kind === 'hand' || draft.kind === 'image') && !!draft.preview && draft.mime !== 'image/svg+xml';
+  /** Bild und erkannter Text nebeneinander zum Überarbeiten */
+  const pair = !!draft.ocr && canRead;
+
+  async function read() {
+    if (!draft.preview) return;
+    setErr('');
+    setReading(true);
+    try {
+      const text = await recognize(draft.preview);
+      if (!text.trim()) return setErr('Auf dem Bild wurde kein Text gefunden.');
+      const keep = draft.body.trim() && draft.body !== draft.ocr;
+      // eigener Text bleibt stehen, der erkannte kommt darunter
+      setDraft({ ...draft, body: keep ? draft.body.trimEnd() + '\n\n' + text : text, ocr: text, ocrNew: true });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
+    }
+  }
+
   function onSelect() {
     const ta = body.current;
     if (!ta) return;
@@ -384,6 +419,32 @@ function Editor({
         </option>
       ))}
     </select>
+  );
+
+  const textArea = (
+    <textarea
+      ref={body}
+      rows={draft.kind === 'data' ? 2 : 4}
+      value={draft.body}
+      maxLength={10_000}
+      placeholder={
+        draft.kind === 'source'
+          ? 'Zitat oder Zusammenfassung …'
+          : draft.kind === 'link'
+            ? 'Worum geht es auf der Seite?'
+            : draft.kind === 'hand'
+              ? 'Text der Notiz (abgetippt oder erkannt)'
+              : draft.kind === 'audio' || draft.kind === 'video'
+                ? 'Worum geht es? Wichtige Stellen mit Zeit, z. B. 1:20 …'
+                : draft.kind === 'data'
+                  ? 'Erklärung zur Tabelle (freiwillig)'
+                  : 'Gedanke, Frage, Absprache …'
+      }
+      onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+      onSelect={onSelect}
+      onPaste={guard.onPaste}
+      aria-label="Text"
+    />
   );
 
   return (
@@ -423,15 +484,24 @@ function Editor({
           <Icon name="upload" size={15} /> Datei
           <input type="file" accept={['image/*', media.audio ? 'audio/*,.m4a,.mp3,.ogg,.wav' : '', media.video ? 'video/*' : ''].filter(Boolean).join(',')} hidden onChange={(e) => e.target.files?.[0] && file(e.target.files[0])} />
         </label>
-        <label className="btn" title="Foto aufnehmen (am Handy öffnet sich die Kamera)">
-          <Icon name="camera" size={15} /> Foto
-          <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && file(e.target.files[0])} />
-        </label>
+        <button type="button" className="btn" title="Blatt, Buchseite oder Tafelbild mit der Kamera aufnehmen: Ecken werden erkannt und entzerrt" onClick={() => setScan(true)}>
+          <Icon name="camera" size={15} /> Bild aufnehmen
+        </button>
         {media.audio && <Recorder video={false} onDone={(f) => pickImage(f, { ...draft, kind: 'audio' })} onError={setErr} />}
         {media.video && <Recorder video onDone={(f) => pickImage(f, { ...draft, kind: 'video' })} onError={setErr} />}
       </div>
+      {scan && (
+        <ScanDialog
+          onClose={() => setScan(false)}
+          onImage={(f) => {
+            setErr('');
+            // aufgenommenes Blatt: Notiz mit Bild und Text dazu (Art „Handschrift“), außer es ist schon eine Bildquelle
+            pickImage(f, { ...draft, kind: draft.kind === 'image' ? 'image' : 'hand' });
+          }}
+        />
+      )}
       {err && <span className="error">{err}</span>}
-      {(hasFile || (fk && NEEDS_FILE.includes(draft.kind))) && (
+      {(hasFile || (fk && NEEDS_FILE.includes(draft.kind))) && !pair && (
         <div className={c.imageEdit}>
           {draft.preview ? <Media src={draft.preview} mime={draft.mime} kind={draft.kind} /> : <span className="muted">{draft.kind === 'hand' ? 'Fotografiere deine handschriftliche Notiz.' : `Noch kein${draft.kind === 'audio' ? 'e Aufnahme' : ' Bild'}: oben wählen oder aufnehmen.`}</span>}
         </div>
@@ -450,37 +520,32 @@ function Editor({
         {showVis && <VisSelect small value={draft.visibility} onChange={(v) => setDraft({ ...draft, visibility: v })} allowed={visAllowed} />}
       </div>
       {draft.kind === 'data' && <TableEdit rows={draft.rows} set={(rows) => setDraft({ ...draft, rows })} />}
-      {draft.kind === 'hand' && (
+      {canRead && (
         <div className={c.row}>
-          <button type="button" className="btn" disabled title="Die Texterkennung kommt über Autogra.fi, sobald Collegare damit verbunden ist (Konzept 8d.4). Erkannter Text erscheint dann auch unter „Arbeitsprozess“.">
-            Text erkennen
+          <button type="button" className="btn" disabled={!ocr?.available || reading} title={ocr?.available ? 'Den Text auf dem Bild von der KI lesen lassen. Danach mit dem Bild vergleichen und verbessern.' : ocr?.reason} onClick={() => void read()}>
+            <Icon name="scan" size={15} /> {reading ? 'Text wird erkannt …' : draft.ocr ? 'Noch einmal erkennen' : 'Text erkennen'}
           </button>
-          <span className="muted">Bis dahin den Text unten selbst abtippen.</span>
+          {draft.ocr && draft.body !== draft.ocr && (
+            <button type="button" className="btn" onClick={() => setDraft({ ...draft, body: draft.ocr! })} title="Deine Änderungen am Text verwerfen">
+              Erkannten Text wiederherstellen
+            </button>
+          )}
+          {!ocr?.available && draft.kind === 'hand' && <span className="muted">Den Text unten selbst abtippen.</span>}
         </div>
       )}
-      <textarea
-        ref={body}
-        rows={draft.kind === 'data' ? 2 : 4}
-        value={draft.body}
-        maxLength={10_000}
-        placeholder={
-          draft.kind === 'source'
-            ? 'Zitat oder Zusammenfassung …'
-            : draft.kind === 'link'
-              ? 'Worum geht es auf der Seite?'
-              : draft.kind === 'hand'
-                ? 'Text der Notiz (abgetippt oder erkannt)'
-                : draft.kind === 'audio' || draft.kind === 'video'
-                  ? 'Worum geht es? Wichtige Stellen mit Zeit, z. B. 1:20 …'
-                  : draft.kind === 'data'
-                    ? 'Erklärung zur Tabelle (freiwillig)'
-                    : 'Gedanke, Frage, Absprache …'
-        }
-        onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-        onSelect={onSelect}
-        onPaste={guard.onPaste}
-        aria-label="Text"
-      />
+      {pair ? (
+        <div className={c.ocrPair}>
+          <a className={c.ocrImage} href={draft.preview} target="_blank" rel="noreferrer" title="Bild groß öffnen">
+            <img src={draft.preview} alt="Aufgenommenes Bild" />
+          </a>
+          <div className={c.ocrText}>
+            <span className="muted">Erkannter Text: mit dem Bild vergleichen und verbessern.</span>
+            {textArea}
+          </div>
+        </div>
+      ) : (
+        textArea
+      )}
       {sel && (
         <div className={c.row}>
           <button
@@ -602,6 +667,9 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
 
   const st = project.settings;
   const media = { audio: st.notesAudio !== false, video: st.notesVideo !== false, mb: st.notesMediaMb ?? 25 };
+  const [ocr, setOcr] = useState<OcrState | null>(null);
+  useEffect(() => void ocrState(id).then(setOcr, () => setOcr({ available: false, reason: 'Texterkennung gerade nicht erreichbar.' })), [id]);
+  const recognize = (src: string) => recognizeText(id, src);
   const rules: PasteRules | null = scope ? { projectId: id, scope, outside: st.pasteOutside, threshold: st.pasteThreshold, logAll: st.pasteLogAll !== false } : null;
   const placeOf = (d: Draft) => `Notiz „${(d.title || d.body.split('\n')[0] || 'Ohne Titel').slice(0, 120)}“`;
   const addGuard = usePasteGuard(rules, null, () => placeOf(draft));
@@ -740,7 +808,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     try {
       if (d.kind === 'audio' || d.kind === 'video') show('Wird hochgeladen …');
       const up = await uploadImage(id, scope, { file: f, art: d.kind === 'audio' ? 'audio' : undefined });
-      put({ ...d, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
+      put({ ...d, ocr: undefined, ocrNew: false, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
     } catch (e) {
       show(e instanceof Error ? e.message : 'Hochladen fehlgeschlagen');
     }
@@ -785,6 +853,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
       setBusy(false);
       if (r.ok) {
         if (r.id) addGuard.flush(`note:${r.id}`);
+        if (r.id && draft.ocrNew && draft.ocr) void logRecognised(id, r.id, draft.ocr);
         setDraft(empty('note', draft.visibility));
         setAdding(false);
       } else show(r.error ?? 'Speichern fehlgeschlagen');
@@ -795,6 +864,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     setBusy(true);
     sock.current?.emit('notes:update', { projectId: id, id: n.id, note: { ...payload(d), visibility: d.visibility } }, (r: Res) => {
       setBusy(false);
+      if (r.ok && d.ocrNew && d.ocr) void logRecognised(id, n.id, d.ocr);
       if (r.ok) done?.();
       else show(r.error ?? 'Speichern fehlgeschlagen');
     });
@@ -866,6 +936,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
         fromUrl={(u, d) => void fromUrl(u, d, putEdit(n))}
         guard={editGuard}
         media={media}
+        ocr={ocr}
+        recognize={recognize}
       />
     );
 
@@ -882,6 +954,8 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
       fromUrl={(u, d) => void fromUrl(u, d, setDraft)}
       guard={addGuard}
       media={media}
+      ocr={ocr}
+      recognize={recognize}
     />
   );
 

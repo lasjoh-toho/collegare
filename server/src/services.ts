@@ -30,6 +30,7 @@ import { FrameStore } from './projects/settings.js';
 import { Lti } from './lti/lti.js';
 import { ToolKeyStore } from './lti/toolKey.js';
 import { RateLimiter } from './security/rateLimiter.js';
+import { ModelCards } from './ai/modelCards.js';
 
 export interface Config {
   databaseUrl: string;
@@ -87,6 +88,12 @@ export interface Services {
   codeLimiter: RateLimiter;
   /** Abrufe fremder Bilder und Seiten je Person (Bilder aus dem Netz) */
   webLimiter: RateLimiter;
+  /** KI-Modellkarten der Verwaltung (Texterkennung) */
+  aiCards: ModelCards;
+  /** Texterkennungen je Person */
+  ocrLimiter: RateLimiter;
+  /** Abruf der KI-Dienste (Tests ersetzen ihn) */
+  aiFetch: typeof fetch;
 }
 
 export async function createServices(config: Config, now: () => number = Date.now, fetchFn: typeof fetch = fetch): Promise<Services> {
@@ -134,5 +141,8 @@ export async function createServices(config: Config, now: () => number = Date.no
     loginLimiter: new RateLimiter(10, 10 * 60_000, now),
     codeLimiter: new RateLimiter(10, 10 * 60_000, now),
     webLimiter: new RateLimiter(300, 10 * 60_000, now),
+    aiCards: new ModelCards(db),
+    ocrLimiter: new RateLimiter(40, 10 * 60_000, now),
+    aiFetch: fetchFn,
   };
 }

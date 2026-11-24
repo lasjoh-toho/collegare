@@ -5,7 +5,7 @@ import { requireSession, setSessionCookie } from '../http/auth.js';
 import { AccountError } from '../identity/accounts.js';
 import { FrameSchema } from '../projects/settings.js';
 
-async function requireAdmin(s: Services, req: FastifyRequest, reply: FastifyReply): Promise<number | null> {
+export async function requireAdmin(s: Services, req: FastifyRequest, reply: FastifyReply): Promise<number | null> {
   const sess = requireSession(req, reply);
   if (!sess) return null;
   if (sess.projectId !== null || !(await s.users.isSystemAdmin(sess.userId))) {

@@ -98,6 +98,8 @@ export interface ProjectSettings {
   notesAudio: boolean;
   notesVideo: boolean;
   notesMediaMb: number;
+  /** Texterkennung für aufgenommene Bilder in den Notizen */
+  notesOcr: boolean;
   logbookRequired: boolean;
   aiFeedback: boolean;
   aiDailyLimit: number;
@@ -141,6 +143,8 @@ export interface Frame {
   notesAudio: boolean;
   notesVideo: boolean;
   notesMediaMb: number;
+  /** Texterkennung (Bild aufnehmen) überhaupt erlauben */
+  ocr: boolean;
 }
 
 /** Mindmap (Phase Orientierung), wie vom Server verteilt (server/src/projects/maps.ts). */

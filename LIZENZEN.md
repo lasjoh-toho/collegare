@@ -7,6 +7,7 @@
 | OnlyOffice-Dateien in `web/public/v*/` (nicht im Repository, per Skript geholt) | AGPL-3.0 mit den Zusatzbedingungen von Ascensio System SIA | Hinweise und Logos von OnlyOffice bleiben unverändert erhalten |
 | Folien-Oberfläche aus [Bento](https://github.com/lasjoh-toho/bento) in `client/public/bento/` (nicht im Repository, per `scripts/bento-holen.sh` gebaut) | MIT, siehe `LICENSE-bento` dort | eigenständige Ein-Datei-App; der Kern lädt sie im iframe und spricht sie nur per `postMessage` und über `/api/documents/:id/bento` an |
 | PowerPoint-Import `bentoconvert.js` aus mod_bento (ebenda, nur der Umwandlungsteil) | nicht-kommerziell wie der Kern, siehe `LICENSE-bentoconvert.md` | gleicher Rechteinhaber |
+| Dokumentenscanner aus Autogra.fi in `client/public/scanner/` (Eckenerkennung, Entzerren, Unschärfe-Warnung) | nicht-kommerziell wie der Kern (Lizenz von Autogra.fi), Sortable.js MIT (`vendor/Sortable.LICENSE`) | gleicher Rechteinhaber; Dateien unverändert bis auf `options.js` (Schalter `dokumentfilter`) und `collegare.js` statt `device.js` |
 | Bibliotheken über npm (Fastify, socket.io, Kysely, zod, KaTeX, JSZip …) | jeweils eigene, freie Lizenz (MIT, Apache-2.0, BSD) | in `package.json` aufgeführt |
 
 ## Installation auf Servern
