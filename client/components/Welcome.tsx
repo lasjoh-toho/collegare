@@ -192,10 +192,12 @@ export function Welcome({ onLogin, showLogin = true, forApp = false }: { onLogin
         <h2 id="explainTitle">So funktioniert Collegare</h2>
         <div className={w.features}>
           {[
-            ['users', 'Gruppen finden', 'Ihr bildet Gruppen auf einem Board. Je nach Projekt teilt eure Lehrkraft ein oder ihr wählt selbst.'],
-            ['map', 'Ideen ordnen', 'In der Mindmap sammelt ihr Ideen und Fragen. Daraus wird die Gliederung eurer Arbeit.'],
-            ['doc', 'Gemeinsam schreiben', 'Jede Person schreibt ihre Abschnitte, alle sehen den Stand. Fertige Abschnitte meldet ihr „fertig“.'],
-            ['present', 'Präsentieren', 'Aus euren Abschnitten entstehen Präsentation und Handout. Eure Lehrkraft gibt Rückmeldung.'],
+            ['library', 'Einarbeiten', 'Zum Einstieg arbeitet ihr euch in das Material ein, das eure Lehrkraft bereitstellt. Was euch wichtig ist, haltet ihr in Notizen fest.'],
+            ['map', 'Ideen ordnen', 'In der Mindmap sammelt ihr Ideen und Fragen. Die Werkzeuge sind so gebaut, dass daraus die Gliederung eurer Arbeit entsteht.'],
+            ['users', 'Gruppen finden', 'Collegare hilft euch, Gruppen zu bilden, und unterstützt danach die Arbeit in der Gruppe. In einem eigenen Chat stimmt ihr euch ab und macht Notizen.'],
+            ['doc', 'Gemeinsam schreiben', 'Ihr verteilt die Aufgaben untereinander. Jede Person schreibt ihre Abschnitte, und alle in der Gruppe sehen den aktuellen Stand.'],
+            ['present', 'Präsentieren', 'Aus euren Abschnitten entstehen Präsentation und Handout. Eure Lehrkraft gibt euch Rückmeldung.'],
+            ['share', 'Publizieren', 'Die gesammelten Informationen könnt ihr zu einer Hausarbeit weiterverarbeiten.'],
           ].map(([icon, title, text]) => (
             <div key={title} className={w.feature}>
               <div className={w.fIcon}>
