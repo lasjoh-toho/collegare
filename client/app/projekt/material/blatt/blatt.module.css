@@ -309,3 +309,77 @@
 .host :global(.bl-live .ed-gloss) { border-bottom: 2px dotted #2563eb; cursor: pointer; }
 .host :global(.bl-live mark) { background: #fff176; color: inherit; }
 .atom { position: absolute; z-index: 9; width: 340px; }
+.host :global(.bl-block p) { margin-bottom: var(--ps, 0.5em); }
+.host :global(.bl-flow > [data-field='md']) { column-count: var(--flow, 2); column-gap: var(--gap, 6mm); }
+.host :global(.bl-flow > [data-field='md'] > *) { break-inside: avoid-column; }
+.host :global(.bl-wrap-left) { float: left; margin: 0 5mm 2mm 0; clear: both; }
+.host :global(.bl-wrap-right) { float: right; margin: 0 0 2mm 5mm; clear: both; }
+.host :global(.bl-page) { isolation: isolate; }
+.host :global(.bl-behind .bl-fig) { opacity: 0.9; }
+.host :global(.bl-sheet.bl-stack) { flex-direction: column; }
+.host :global(.bl-blank.bl-len-s) { width: 18mm; }
+.host :global(.bl-blank.bl-len-m) { width: 32mm; }
+.host :global(.bl-blank.bl-len-l) { width: 55mm; }
+.host :global(.bl-head-fields + .bl-head-fields) { margin-top: 2.5mm; }
+.host :global(.bl-head-box) { border: 0.3mm solid #444; padding: 2.5mm 3mm; border-radius: 1mm; }
+.host :global(.bl-head-none) { border-bottom: 0; padding-bottom: 0; }
+.host :global(.bl-ht-s .bl-head-title) { font-size: 1.1em; }
+.host :global(.bl-ht-l .bl-head-title) { font-size: 1.7em; }
+
+/* ---------- Runde 5: Klappmenüs im Menüband, Titel in der Kopfleiste, Format übertragen, Textfluss ---------- */
+.ribbon { position: relative; z-index: 12; }
+.drop { position: relative; display: inline-flex; }
+.dropLabel { display: inline-flex; align-items: baseline; gap: 4px; }
+.drop .rbBig { max-width: 116px; }
+.rbBig .dropLabel { white-space: nowrap; }
+.dropVal { font-style: normal; font-size: 11px; color: var(--fg-muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rbBig .dropVal { display: block; max-width: 110px; white-space: nowrap; }
+.caret { font-size: 9px; color: var(--fg-muted); }
+.menu { position: absolute; top: calc(100% + 3px); left: 0; z-index: 30; min-width: 190px; max-height: 70vh; overflow: auto; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 4px; display: flex; flex-direction: column; }
+.menuWide { min-width: 280px; }
+.mi { display: grid; grid-template-columns: 16px auto 1fr; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 6px; background: none; padding: 5px 8px; font: inherit; font-size: 13px; color: var(--fg); cursor: pointer; }
+.mi:not(:has(> .ico)) { grid-template-columns: 16px 1fr; }
+.mi small { grid-column: -2 / -1; color: var(--fg-muted); font-size: 11.5px; line-height: 1.3; }
+.mi:hover:not(:disabled) { background: color-mix(in srgb, var(--office-word, #2b579a) 10%, transparent); }
+.mi:disabled { opacity: 0.45; cursor: default; }
+.miOn { font-weight: 600; }
+.miCheck { color: var(--office-word, #2b579a); font-weight: 700; text-align: center; }
+.miLabel { min-width: 0; }
+.mh { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); padding: 8px 8px 3px; border-top: 1px solid var(--line); margin-top: 3px; }
+.mh:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+.miIn { padding: 3px 8px 6px 30px; }
+.miIn input { width: 100%; box-sizing: border-box; }
+.mini { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--fg-muted); }
+.crumbTitle { font: inherit; font-weight: 600; font-size: 14px; color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 3px 7px; min-width: 0; max-width: 46vw; }
+.crumbTitle:hover { border-color: var(--line); }
+.crumbTitle:focus { outline: none; border-color: var(--office-word, #2b579a); background: var(--bg-elev); }
+.host.painting :global(.bl-block) { cursor: copy; }
+.host.painting :global(.bl-block:hover) { outline: 0.5mm dashed var(--office-word, #2b579a); outline-offset: 0.8mm; }
+/* Ansicht Textfluss */
+.host.flowView :global(.bl-fl-frame) { outline: 0.3mm dashed #7c9cc9; outline-offset: 0.6mm; }
+.host :global(.bl-fl) { position: absolute; z-index: 4; font: 600 9px/1.3 system-ui, sans-serif; color: #fff; background: #2b579a; border-radius: 3px; padding: 0.4mm 1.4mm; pointer-events: none; white-space: nowrap; }
+.host :global(.bl-fl-no) { left: -6mm; top: 0; border-radius: 50%; width: 4.2mm; height: 4.2mm; padding: 0; display: grid; place-items: center; }
+.host :global(.bl-fl-next) { right: 0; bottom: -1.2mm; }
+.host :global(.bl-fl-prev) { right: 0; top: -2.6mm; }
+.host :global(.bl-fl-flags) { left: 0; top: -2.6mm; background: #6b7280; }
+.host :global(.bl-fl-link) { position: absolute; z-index: 5; left: 50%; bottom: -3.4mm; transform: translateX(-50%); font: 600 9px/1 system-ui, sans-serif; padding: 0.6mm 1.6mm; border: 0.25mm solid #7c9cc9; border-radius: 3mm; background: #fff; color: #2b579a; cursor: pointer; }
+.host :global(.bl-fl-link.on) { background: #2b579a; color: #fff; border-color: #2b579a; }
+.host.flowView :global(.bl-flow > [data-field='md']) { column-rule: 0.3mm dashed #7c9cc9; }
+.headDlgWide { width: min(860px, 96vw); }
+.segMini { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; vertical-align: middle; }
+.segMini button { border: 0; border-right: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); font: inherit; font-size: 12px; padding: 3px 7px; cursor: pointer; }
+.segMini button:last-child { border-right: 0; }
+.segMini button:disabled { opacity: 0.45; cursor: default; }
+.segMini button.segOn, .segMini .segOn { background: color-mix(in srgb, var(--office-word, #2b579a) 16%, var(--bg-elev)); font-weight: 600; }
+.ord { white-space: nowrap; }
+.ord button { border: 1px solid var(--line); background: var(--bg-elev); color: var(--fg); border-radius: 5px; width: 20px; height: 20px; padding: 0; font-size: 11px; cursor: pointer; margin-right: 2px; }
+.ord button:disabled { opacity: 0.35; cursor: default; }
+/* Typst-Code rechts */
+.wrap.codePanel { grid-template-columns: 250px minmax(0, 1fr) minmax(360px, 34vw); }
+.code { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+.codeArea { flex: 1; min-height: 300px; resize: none; font: 12.5px/1.5 ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace; tab-size: 2; white-space: pre; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--fg); }
+/* Text in Spalten: Zeilennummern zählen nicht über Spalten, Randbemerkungen stehen in Klammern im Text */
+.host :global(.bl-flow .bl-lno) { display: none; }
+.host :global(.bl-flow .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
+.host :global(.bl-flow .bl-mnote)::before { content: ' ('; }
+.host :global(.bl-flow .bl-mnote)::after { content: ')'; }

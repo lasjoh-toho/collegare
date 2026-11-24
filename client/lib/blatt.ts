@@ -85,6 +85,20 @@ export interface Block {
   nm?: number;
   /** Einzug links (mm) */
   ind?: number;
+  /** Schriftstärke (300 leicht … 700 fett), Laufweite in em, Abstand nach Absätzen in em */
+  fw?: number;
+  ls?: number;
+  ps?: number;
+  /** Text fließt durch n verbundene Spalten (Zeitungsspalten) */
+  flow?: number;
+  /** Spalten: Breite der Stege in mm */
+  gap?: number;
+  /** Bild und Diagramm: Umfluss (in der Zeile, links oder rechts umflossen, vor oder hinter dem Text) */
+  wrap?: 'inline' | 'left' | 'right' | 'front' | 'behind';
+  /** Textfluss: auf neuer Seite beginnen, nicht trennen, mit dem nächsten zusammenhalten */
+  breakBefore?: boolean;
+  keep?: boolean;
+  keepNext?: boolean;
 }
 
 /** Korrekturrand auf Schreiblinien und Karos (Wunsch Jo, 22. November 2026) */
@@ -105,12 +119,27 @@ export interface BlattDoc {
     pageNumbers: boolean;
     /** Leere Seiten der Broschüre */
     fill: Ruling;
-    header: { show: boolean; text: string; nameLine: boolean; date: boolean; qr: 'first' | 'all' | 'none'; fields?: HeadFields };
+    header: {
+      show: boolean;
+      text: string;
+      nameLine: boolean;
+      date: boolean;
+      qr: 'first' | 'all' | 'none';
+      fields?: HeadFields;
+      /** Gestaltung des Kopfs: Reihenfolge, Linie darunter, Kasten oder nichts, Größe des Titels */
+      order?: HeadKey[];
+      style?: 'line' | 'box' | 'none';
+      titleSize?: 's' | 'm' | 'l';
+    };
     korr: Korr;
     /** Teilaufgaben: a), b) … oder 1.1, 1.2 … */
     sub?: 'letter' | 'dot';
     /** Wasserzeichen quer über jeder Seite (z. B. ENTWURF) */
     watermark?: string;
+    /** Seitenränder, Querformat, zwei Seiten auf einem Blatt (1|2, 3|4) */
+    margin?: 'normal' | 'narrow' | 'wide';
+    landscape?: boolean;
+    nup?: boolean;
   };
   blocks: Block[];
 }
@@ -124,6 +153,10 @@ export interface HeadField {
   on: boolean;
   auto?: boolean;
   value?: string;
+  /** eigene Beschriftung statt „Klasse“ usw., Zeile im Kopf (1 oder 2), Länge der Linie */
+  label?: string;
+  row?: 1 | 2;
+  len?: 's' | 'm' | 'l';
 }
 export type HeadFields = Partial<Record<HeadKey, HeadField>>;
 export const HEAD_KEYS: { key: HeadKey; label: string; auto?: string }[] = [
@@ -178,6 +211,14 @@ export interface Copy {
 
 export const SIZES = { a4: [210, 297], a5: [148, 210] } as const;
 const MARGIN = { a4: 18, a5: 12 } as const;
+/** Größe einer Seite in mm (Querformat getauscht) und Rand */
+export function pageGeom(doc: BlattDoc): { w: number; h: number; m: number } {
+  const size = doc.page.size === 'a5' ? 'a5' : 'a4';
+  const [w0, h0] = SIZES[size];
+  const base = MARGIN[size];
+  const m = doc.page.margin === 'narrow' ? Math.round(base * 0.65) : doc.page.margin === 'wide' ? Math.round(base * 1.4) : base;
+  return doc.page.landscape ? { w: h0, h: w0, m } : { w: w0, h: h0, m };
+}
 const FONTS = {
   sans: "Carlito, Calibri, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
   serif: "'Linux Libertine', 'Libertinus Serif', Georgia, 'Times New Roman', serif",
@@ -649,7 +690,7 @@ export interface Template {
   id: string;
   label: string;
   /** Voreinstellungen; was man selbst ändert, gilt zusätzlich */
-  style?: Partial<Pick<Block, 'fs' | 'lh' | 'ta' | 'it' | 'bd' | 'nm' | 'ind'>>;
+  style?: Partial<Pick<Block, 'fs' | 'lh' | 'ta' | 'it' | 'bd' | 'nm' | 'ind' | 'fw' | 'ls' | 'ps' | 'flow'>>;
 }
 export const TEMPLATES: Partial<Record<BlockType, Template[]>> = {
   text: [
@@ -686,7 +727,7 @@ export const TEMPLATES: Partial<Record<BlockType, Template[]>> = {
     { id: 'zweispaltig', label: 'Zwei Spalten', style: { fs: 92 } },
   ],
 };
-export const STYLE_KEYS = ['fs', 'lh', 'ta', 'it', 'bd', 'nm', 'ind'] as const;
+export const STYLE_KEYS = ['fs', 'lh', 'ta', 'it', 'bd', 'nm', 'ind', 'fw', 'ls', 'ps', 'flow'] as const;
 /** Gestaltung eines Bausteins: Vorlage, darüber eigene Werte */
 export function styleOf(b: Block): Required<Template>['style'] {
   const t = TEMPLATES[b.type]?.find((x) => x.id === b.tpl) ?? TEMPLATES[b.type]?.[0];
@@ -921,6 +962,14 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
   if (st.it) box.style.fontStyle = 'italic';
   if (st.bd) box.style.fontWeight = '700';
   if (st.ind) box.style.paddingLeft = Math.max(0, Math.min(60, st.ind)) + 'mm';
+  if (st.fw) box.style.fontWeight = String(st.fw);
+  if (st.ls) box.style.letterSpacing = st.ls + 'em';
+  if (st.ps !== undefined) box.style.setProperty('--ps', st.ps + 'em');
+  if (st.flow && st.flow > 1) {
+    box.classList.add('bl-flow');
+    box.style.setProperty('--flow', String(Math.min(4, st.flow)));
+    if (b.gap) box.style.setProperty('--gap', Math.max(2, Math.min(20, b.gap)) + 'mm');
+  }
   const nm = st.nm || (hasMargin ? 30 : 0);
   if (nm) {
     box.classList.add('bl-hasnm');
@@ -992,11 +1041,19 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
         }
       } else fig.appendChild(el('div', 'bl-img-empty', '<span>Bild hierher ziehen<br>oder im Menüband auswählen</span>'));
       if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
-      if (b.free) {
-        // verschoben um dx/dy gegenüber seiner Stelle; sein Platz im Text bleibt frei, außer es liegt „vor dem Text“
+      // Umfluss: links oder rechts vom folgenden Text umflossen
+      if (b.wrap === 'left' || b.wrap === 'right') {
+        box.classList.add('bl-wrap-' + b.wrap);
+        box.style.width = pct + '%';
+        fig.style.width = '100%';
+      }
+      const overText = b.over || b.wrap === 'front' || b.wrap === 'behind';
+      if (b.free || b.wrap === 'front' || b.wrap === 'behind') {
+        // verschoben um dx/dy gegenüber seiner Stelle; sein Platz im Text bleibt frei, außer es liegt vor oder hinter dem Text
         const dx = Number(b.dx) || 0;
         const dy = Number(b.dy) || 0;
-        if (b.over) {
+        if (b.wrap === 'behind') box.classList.add('bl-behind');
+        if (overText) {
           box.classList.add('bl-free');
           fig.style.width = wMm + 'mm';
           const base = b.align === 'left' ? '0mm' : b.align === 'right' ? `(100% - ${wMm}mm)` : `((100% - ${wMm}mm) / 2)`;
@@ -1006,7 +1063,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
           fig.style.left = dx + 'mm';
         }
         fig.style.top = dy + 'mm';
-        fig.style.zIndex = '3';
+        fig.style.zIndex = b.wrap === 'behind' ? '-1' : '3';
       }
       box.appendChild(fig);
       break;
@@ -1040,6 +1097,8 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     case 'cols': {
       const ratio = (b.ratio ?? []).length === (b.cols ?? []).length ? b.ratio! : (b.cols ?? []).map(() => 1);
       box.style.gridTemplateColumns = ratio.map((r) => `minmax(0, ${r}fr)`).join(' ');
+      const gapMm = Math.max(2, Math.min(20, Number(b.gap) || 6));
+      box.style.columnGap = gapMm + 'mm';
       for (const [k, col] of (part.kids ?? []).entries()) {
         const c = el('div', 'bl-col');
         c.dataset.col = `${b.id}:${k}`;
@@ -1057,7 +1116,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
           g.dataset.gutter = `${b.id}:${k}`;
           g.title = 'Mittelsteg ziehen';
           // Lage: Anteil der Spaltenbreiten plus die Stege davor (6 mm je Steg)
-          g.style.left = `calc((100% - ${6 * (ratio.length - 1)}mm) * ${acc / sum} + ${6 * k + 3}mm)`;
+          g.style.left = `calc((100% - ${gapMm * (ratio.length - 1)}mm) * ${acc / sum} + ${gapMm * k + gapMm / 2}mm)`;
           box.appendChild(g);
         }
       }
@@ -1081,6 +1140,11 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       const wMm = (pct / 100) * ctx.widthMm;
       const fig = el('figure', 'bl-fig bl-chart bl-align-' + (b.align ?? 'center'));
       fig.style.width = pct + '%';
+      if (b.wrap === 'left' || b.wrap === 'right') {
+        box.classList.add('bl-wrap-' + b.wrap);
+        box.style.width = pct + '%';
+        fig.style.width = '100%';
+      }
       const rows = b.ref ? ctx.tables?.get(b.ref) : undefined;
       fig.innerHTML = rows ? chartSvg(rows, b.kind ?? 'col', wMm, Math.max(25, Math.min(200, Number(b.hMm) || 60)), !!b.gray) : `<div class="bl-img-empty" style="height:${Number(b.hMm) || 60}mm"><span>${b.ref ? 'Die Tabelle fehlt.' : 'Noch keine Tabelle gewählt.'}<br>Im Reiter „Diagramm“ eine Tabelle wählen.</span></div>`;
       if (b.caption || ctx.editing) fig.appendChild(field('figcaption', '', 'caption', esc(b.caption) || '<span class="bl-ph">Bildunterschrift</span>'));
@@ -1184,8 +1248,7 @@ export function totalPoints(doc: BlattDoc): number | null {
 function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, headCtx?: HeadCtx, editing?: boolean): Pg {
   const P = doc.page;
   const size = P.size === 'a5' ? 'a5' : 'a4';
-  const [w, h] = SIZES[size];
-  const m = MARGIN[size];
+  const { w, h, m } = pageGeom(doc);
   const page = el('div', `bl-page bl-${size}`);
   page.style.width = w + 'mm';
   page.style.height = h + 'mm';
@@ -1208,29 +1271,37 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
     const title = F.title.on ? val('title', headCtx?.title ?? '') : '';
     if (title) left.appendChild(el('div', 'bl-head-title', title));
     else if (F.title.on && editing) left.appendChild(el('div', 'bl-head-title', '<span class="bl-ph">Titel</span>'));
-    const fields = el('div', 'bl-head-fields');
-    const add = (label: string, inner: string, cls = '') => fields.appendChild(el('span', 'bl-field ' + cls, `${label}: ${inner}`));
-    if (F.name.on) {
-      // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
-      const numbered = !!copy?.name && isNumberedSeat(copy.name);
-      const line =
-        F.name.auto !== false && copy?.name && copy.printName && !numbered
-          ? `<span class="bl-filled">${esc(copy.name)}</span>`
-          : numbered
-            ? `<span class="bl-blank bl-labelled"><span class="bl-under">${esc(copy!.name!)}</span></span>`
-            : blank('');
-      add('Name', line, 'bl-f-name');
+    // Felder in der gewählten Reihenfolge, auf eine oder zwei Zeilen verteilt
+    const rows = [el('div', 'bl-head-fields'), el('div', 'bl-head-fields')];
+    const defLen: Record<HeadKey, 's' | 'm' | 'l'> = { title: 'l', subject: 'm', klasse: 's', teacher: 'm', date: 'm', name: 'l', points: 's', grade: 's' };
+    const lenCls = (k: HeadKey) => 'bl-len-' + (F[k].len ?? defLen[k]);
+    const labelOf = (k: HeadKey) => F[k].label?.trim() || HEAD_KEYS.find((x) => x.key === k)!.label;
+    const order = [...(H.order ?? []), ...HEAD_KEYS.map((x) => x.key)].filter((k, i, a) => a.indexOf(k) === i && k !== 'title');
+    for (const k of order) {
+      const f = F[k];
+      if (!f.on) continue;
+      let inner = '';
+      if (k === 'name') {
+        // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
+        const numbered = !!copy?.name && isNumberedSeat(copy.name);
+        inner =
+          f.auto !== false && copy?.name && copy.printName && !numbered
+            ? `<span class="bl-filled">${esc(copy.name)}</span>`
+            : numbered
+              ? `<span class="bl-blank bl-labelled ${lenCls(k)}"><span class="bl-under">${esc(copy!.name!)}</span></span>`
+              : blank(lenCls(k));
+      } else if (k === 'points') {
+        const sum = f.auto !== false ? totalPoints(doc) : null;
+        inner = sum !== null ? `${blank('bl-len-s')} / ${String(sum).replace('.', ',')}` : val('points') || blank(lenCls(k));
+      } else if (k === 'grade') inner = blank(lenCls(k));
+      else {
+        const auto = k === 'klasse' ? (copy?.klasse ?? headCtx?.course ?? '') : k === 'teacher' ? (headCtx?.teacher ?? '') : k === 'date' ? new Date().toLocaleDateString('de-DE') : undefined;
+        inner = val(k, auto) || blank(lenCls(k));
+      }
+      rows[(f.row ?? (k === 'points' || k === 'grade' ? 2 : 1)) - 1].appendChild(el('span', `bl-field bl-f-${k}`, `${esc(labelOf(k))}: ${inner}`));
     }
-    if (F.klasse.on) add('Klasse', val('klasse', copy?.klasse ?? headCtx?.course ?? '') || blank());
-    if (F.subject.on) add('Fach', val('subject') || blank());
-    if (F.teacher.on) add('Lehrkraft', val('teacher', headCtx?.teacher ?? '') || blank());
-    if (F.date.on) add('Datum', val('date', new Date().toLocaleDateString('de-DE')) || blank());
-    if (F.points.on) {
-      const sum = F.points.auto !== false ? totalPoints(doc) : null;
-      add('Punkte', sum !== null ? `${blank('bl-tiny')} / ${String(sum).replace('.', ',')}` : val('points') || blank());
-    }
-    if (F.grade.on) add('Note', blank('bl-tiny'));
-    if (fields.children.length) left.appendChild(fields);
+    for (const r of rows) if (r.children.length) left.appendChild(r);
+    head.classList.add('bl-head-' + (H.style ?? 'line'), 'bl-ht-' + (H.titleSize ?? 'm'));
     head.appendChild(left);
     if (qrHere) {
       const q = el('div', 'bl-qr');
@@ -1284,10 +1355,11 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   /** neue Seite, weil der nächste Baustein nicht mehr passt: eine Überschrift unten auf der Seite geht mit */
   const nextKeep = () => {
     const last = pg.body.lastElementChild as HTMLElement | null;
-    const keep = last?.classList.contains('bl-heading') && pg.body.children.length > 1 ? last : null;
+    const keep = (last?.classList.contains('bl-heading') || (last?.dataset.bid && keepNextIds.has(last.dataset.bid))) && pg.body.children.length > 1 ? last : null;
     next();
     if (keep) pg.body.appendChild(keep);
   };
+  const keepNextIds = new Set(walk(doc.blocks).filter((b) => b.keepNext).map((b) => b.id));
   let matNo = 0;
   const labels = taskLabels(doc);
   const gloss = walk(doc.blocks).find((b) => b.type === 'glossary');
@@ -1328,6 +1400,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
       if (pg.body.children.length) next();
       continue;
     }
+    if (b.breakBefore && pg.body.children.length) next();
     const ctx = mkCtx();
     number(b, ctx);
     if (b.type === 'cols') {
@@ -1335,7 +1408,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
       const n = Math.max(1, (b.cols ?? []).length);
       const ratio = (b.ratio ?? []).length === n ? b.ratio! : Array(n).fill(1);
       const sum = ratio.reduce((x, y) => x + y, 0);
-      const gap = 6;
+      const gap = Math.max(2, Math.min(20, Number(b.gap) || 6));
       const kids = (b.cols ?? []).map((col, k) =>
         col.map((kb) => {
           const kc = mkCtx({ widthMm: ((pg.widthMm - gap * (n - 1)) * ratio[k]) / sum });
@@ -1368,7 +1441,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
 
     const prep = prepare(b, ctx);
     const paras = prep.paras ?? [];
-    const splittable = b.type === 'text' || b.type === 'material' || b.type === 'quote' || b.type === 'box' || b.type === 'glossary';
+    const splittable = !b.keep && (b.type === 'text' || b.type === 'material' || b.type === 'quote' || b.type === 'box' || b.type === 'glossary');
     if (!splittable || paras.length <= 1) {
       let p = place(b, ctx, prep);
       if (over(pg) && pg.body.children.length > 1) {
@@ -1448,11 +1521,19 @@ export function impose(n: number): { front: [number, number]; back: [number, num
   return sheets;
 }
 
-/** Papier, auf das gedruckt wird: Broschüre aus A5 auf A4 quer, aus A4 auf A3 quer. */
+/** Papier, auf das gedruckt wird: Broschüre oder zwei Seiten je Blatt aus A5 auf A4 quer, aus A4 auf A3 quer. */
 export function sheetSize(doc: BlattDoc): { name: string; w: number; h: number } {
   const size = doc.page.size === 'a5' ? 'a5' : 'a4';
-  if (!doc.page.booklet) return { name: size.toUpperCase(), w: SIZES[size][0], h: SIZES[size][1] };
-  return size === 'a5' ? { name: 'A4 quer', w: 297, h: 210 } : { name: 'A3 quer', w: 420, h: 297 };
+  const g = pageGeom(doc);
+  const name = (w: number, h: number) => {
+    const [a, b] = [Math.min(w, h), Math.max(w, h)];
+    const n = a === 148 && b === 210 ? 'A5' : a === 210 && b === 297 ? 'A4' : a === 297 && b === 420 ? 'A3' : `${w}×${h} mm`;
+    return n + (w > h ? ' quer' : '');
+  };
+  if (!doc.page.booklet && !doc.page.nup) return { name: name(g.w, g.h), w: g.w, h: g.h };
+  void size;
+  // zwei Seiten nebeneinander: Hochformat → doppelt so breit; Querformat → übereinander
+  return g.w <= g.h ? { name: name(2 * g.w, g.h), w: 2 * g.w, h: g.h } : { name: name(g.w, 2 * g.h), w: g.w, h: 2 * g.h };
 }
 
 /**
@@ -1468,8 +1549,18 @@ export function toSheets(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement)
     host.appendChild(sh);
     return sh;
   };
-  if (!doc.page.booklet) {
+  if (!doc.page.booklet && !doc.page.nup) {
     for (const p of pages) mk('bl-single').appendChild(p);
+    return;
+  }
+  if (!doc.page.booklet) {
+    // zwei Seiten auf einem Blatt in Lesereihenfolge: 1|2, 3|4 …
+    for (let i = 0; i < pages.length; i += 2) {
+      const sh = mk('bl-spread' + (pageGeom(doc).w > pageGeom(doc).h ? ' bl-stack' : ''));
+      sh.dataset.label = pages[i + 1] ? `Blatt ${i / 2 + 1}: Seiten ${i + 1} und ${i + 2}` : `Blatt ${i / 2 + 1}: Seite ${i + 1}`;
+      sh.appendChild(pages[i].cloneNode(true));
+      if (pages[i + 1]) sh.appendChild(pages[i + 1].cloneNode(true));
+    }
     return;
   }
   for (const [k, sheet] of impose(pages.length).entries()) {
@@ -1486,8 +1577,7 @@ export function toSheets(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement)
  * So lässt sich prüfen, was am Mittelschnitt (Falz) steht.
  */
 export function toSpreads(doc: BlattDoc, pages: HTMLElement[], host: HTMLElement) {
-  const size = doc.page.size === 'a5' ? 'a5' : 'a4';
-  const [w, h] = SIZES[size];
+  const { w, h } = pageGeom(doc);
   const mk = (label: string) => {
     const sh = el('div', 'bl-sheet bl-spread bl-reading');
     sh.style.width = 2 * w + 'mm';

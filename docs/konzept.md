@@ -1395,6 +1395,46 @@ Wünsche von Jo nach dem Ausprobieren von 0.7.18:
   Diagramm mit.
 - **Wasserzeichen** (ENTWURF, MUSTER, LÖSUNG oder eigener Text).
 
+### 8j.9 Schreiben im Text, Menüband „Aufgabe“, Textfluss, Typst (Stufe 5, 24. November 2026)
+
+Wünsche von Jo nach dem Ausprobieren von 0.7.19 („noch nicht wirklich WYSIWYG“, „zu wenig Möglichkeiten und zugleich
+zu komplex“):
+
+- **Echtes WYSIWYG:** Kein Eingabefeld mehr über dem Text. Das gesetzte Feld auf der Seite wird selbst bearbeitbar
+  (gleiche Schrift, gleicher Umbruch). Beim Tippen wird nicht neu gesetzt; nach gut einer Sekunde Pause wird neu
+  umbrochen, die Schreibmarke bleibt (Absatz und Zeichen). Läuft ein Baustein über Seiten, wird nur das Stück auf der
+  angeklickten Seite bearbeitet (`data-r`, `paraSpans`). Fußnoten, Randbemerkungen und Glossar-Wörter stehen im Text
+  als kleine Marken; ein Klick öffnet sie zum Ändern.
+- **Einstieg mit „Einfügen“**, der Name des Blatts steht als Eingabe in der Kopfleiste (nicht mehr links).
+- **Klappmenüs statt breiter Auswahlfelder** (wie in OnlyOffice): Der Knopf zeigt die aktuelle Wahl, das Menü die
+  Möglichkeiten mit Häkchen und kurzen Erklärungen.
+- **Reiter „Aufgabe“** sammelt, was in „Entwurf“ fehl am Platz war: Nummern der Teilaufgaben, die gewählte Aufgabe
+  (Teilaufgabe, Nummer, Punkte, Antwortzeilen), Rahmendaten, QR-Code, Korrekturrand, Wasserzeichen und die Summe der
+  Punkte. Der Kontextreiter erscheint nur noch für Bausteine mit eigenen Einstellungen (Bild, Tabelle, Diagramm …).
+- **Rahmendaten gestaltbar:** Reihenfolge, Zeile 1 oder 2, eigene Beschriftung, Länge der Linie; Kopf mit Linie, im
+  Kasten oder schlicht; Titel klein, mittel oder groß.
+- **Mehr Optionen:** Ränder (schmal, normal, breit), Hoch-/Querformat, Schriftstärke, Laufweite, Zeilen- und
+  Absatzabstand, Umfluss für Bild und Diagramm (in der Zeile, links/rechts umflossen, vor/hinter dem Text), Ausrichten.
+- **Umbrüche:** Seitenumbruch einfügen; je Baustein „beginnt auf neuer Seite“, „nicht teilen“, „mit dem nächsten
+  zusammenhalten“.
+- **Spalten:** Text fließt durch zwei oder drei verbundene Spalten (Zeitungsspalten) und über Seiten weiter;
+  Stegbreite einstellbar, auch für nebeneinander gesetzte Bausteine. In Textspalten entfallen Zeilennummern, und
+  Randbemerkungen stehen in Klammern im Text.
+- **Seitenfolge** als Menü: Einzelseiten, zwei Seiten je Blatt (1|2, 3|4) oder Broschüre, dazu die Füllung leerer
+  Seiten.
+- **Textrahmen verbinden** (Entscheidung: im Fluss bleiben, keine freien Rahmen wie in InDesign; Jo hat nicht
+  widersprochen, die Empfehlung gilt): Die Ansicht „Textfluss“ zeigt jeden Baustein als Rahmen, nummeriert die Stücke
+  eines Textes über Seiten („weiter auf Seite 3 →“) und hat zwischen zwei Bausteinen einen Kettenknopf, der sie
+  verbindet (bleiben auf einer Seite) oder trennt.
+- **Format übertragen** wie in Bento: Vorlage und eigene Gestaltung des gewählten Bausteins auf den nächsten
+  angeklickten; Doppelklick für mehrere, Esc beendet.
+- **Typst-Code** für Fortgeschrittene (Entwurf → „Typst-Code“, danach auch als Reiter „Code“ rechts): das ganze Blatt
+  als Typst-Quelltext (`client/lib/blattTypst.ts`), änderbar und mit „Übernehmen“ zurück aufs Blatt; Fehler mit
+  Zeilenangabe, das Blatt bleibt dann unverändert. Jeder Baustein ist ein Aufruf wie
+  `#aufgabe(punkte: "4", zeilen: 6)[…]`, Text in Typst-Auszeichnung (`*fett*`, `_kursiv_`, `#footnote[…]`,
+  `#rand[…]`, `#begriff[Wort][Erklärung]`). Bilder stehen nur als Verweis `#bild("id")` im Code. Zum Setzen mit Typst
+  selbst fehlt noch die Vorlage mit diesen Funktionen (nächste Stufe).
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).
@@ -1404,6 +1444,7 @@ Wünsche von Jo nach dem Ausprobieren von 0.7.18:
 4. Abgabe digital: dasselbe Blatt auch in der Ausarbeitung; Aufgaben einzeln als Teilaufgaben übernehmen, Bilder
    mitschicken.
 5. Ausarbeitung und Lernseite als Broschüre über denselben Satz (8i.3), Druck über Typst nur „für Fortgeschrittene“.
+6. Typst-Vorlage `blatt.typ` mit den Funktionen aus 8j.9, damit der Code auch mit Typst selbst ein PDF ergibt.
 
 ## 9. Umsetzungsplan
 

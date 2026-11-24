@@ -13,6 +13,7 @@ import { Topbar } from '@/components/Topbar';
 import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { fileUrl, type Material } from '@/components/Materials';
 import { colibre } from '@/lib/colibre';
+import { fromTypst, toTypst } from '@/lib/blattTypst';
 import { ApiError, get, href, patch } from '@/lib/api';
 import {
   BLOCK_LABEL,
@@ -28,6 +29,7 @@ import {
   listOf,
   mapLists,
   newBlock,
+  pageGeom,
   paginate,
   parseDoc,
   plainMd,
@@ -35,6 +37,7 @@ import {
   setTerm,
   sheetSize,
   styleOf,
+  STYLE_KEYS,
   taskLabels,
   TEMPLATES,
   toCriteria,
@@ -76,13 +79,19 @@ const MAX = 4_000_000;
 
 const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken. Du schreibst direkt auf der Seite wie in Word: Klick in einen Text und tipp los. Ein Klick ins Leere unter dem letzten Baustein schreibt dort weiter; ein neuer Textbaustein öffnet sich gleich zum Schreiben. Esc beendet das Schreiben.
 
-Das Menüband ist geordnet wie in Word. „Start“: Schrift, Absatz, Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Einfügen“: Textbausteine, Aufgaben und Teilaufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar sowie Rahmendaten, QR-Code und Seitenzahl. „Entwurf“: Schriftart und Grundschrift, Rahmendaten, QR-Code, Wasserzeichen und Korrekturrand. „Layout“: Format, Seitenzahlen, Broschüre, Spalten und die Zählweise der Teilaufgaben. Der Reiter mit dem Namen des gewählten Bausteins (z. B. „Aufgabe“, „Tabelle“ oder „Bild“) hat dessen Einstellungen.
+Den Namen des Blatts änderst du oben in der Kopfleiste. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
 
-Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+Format übertragen: Baustein wählen, „Format übertragen“, dann auf einen anderen Baustein klicken. Doppelklick auf den Knopf überträgt auf mehrere nacheinander; Esc beendet.
 
-Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (unter „Layout“). Eine eigene Nummer wie „1 b)“ trägst du im Reiter „Aufgabe“ ein.
+Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden Baustein. Läuft ein Text über mehrere Seiten, tragen seine Stücke Nummern und sagen, wo es weitergeht. Der Kettenknopf zwischen zwei Bausteinen verbindet sie: verbundene Bausteine bleiben auf derselben Seite. Unter Layout → Umbrüche: „beginnt auf neuer Seite“ und „nicht über Seiten teilen“. Layout → Spalten lässt einen Text durch zwei oder drei verbundene Spalten fließen; die Stegbreite stellst du dort ein.
 
-Spalten: unter „Einfügen“ oder „Layout“ anlegen und die Zahl der Spalten wählen. Die Mittelstege ziehst du auf der Seite mit der Maus; „Gleichmäßig“ macht alle Spalten wieder gleich breit. In eine leere Spalte klicken, dann einen Baustein einfügen. Oder einen Baustein wählen und „neben den nächsten“.
+Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
+
+Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+
+Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (Reiter „Aufgabe“ → Nummern). Eine eigene Nummer wie „1 b)“ trägst du dort ein, wenn die Aufgabe gewählt ist.
+
+Bausteine nebeneinander: unter „Einfügen“ oder Layout → Spalten anlegen und die Zahl der Spalten wählen. Die Mittelstege ziehst du auf der Seite mit der Maus; „Gleichmäßig“ macht alle Spalten wieder gleich breit. In eine leere Spalte klicken, dann einen Baustein einfügen. Oder einen Baustein wählen und „neben den nächsten“.
 
 Tabelle: in die Zellen schreiben, Tab springt in die nächste Zelle (am Ende kommt eine Zeile dazu). Aus Excel oder Calc Kopiertes verteilt sich auf die Zellen. „Diagramm daraus“ zeichnet Säulen, Balken, Linie oder Kreis: erste Zeile = Namen der Reihen, erste Spalte = Kategorien.
 
@@ -145,7 +154,16 @@ export default function BlattPage() {
   const [printing, setPrinting] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('start');
+  const [tab, setTab] = useState<Tab>('insert');
+  /** Format übertragen: Gestaltung, die beim nächsten Klick auf einen Baustein übernommen wird */
+  const [painter, setPainter] = useState<{ type: BlockType; style: Partial<Block>; sticky: boolean } | null>(null);
+  const [flowView, setFlowView] = useState(false);
+  const [pro, setPro] = useState(false);
+  useEffect(() => {
+    try {
+      setPro(localStorage.getItem('collegare.blatt.code') === '1');
+    } catch {}
+  }, []);
   const [panel, setPanel] = useState<Panel | null>(null);
   /** links: Seitenminiaturen, Gliederung oder alle Elemente */
   const [leftTab, setLeftTab] = useState<'thumbs' | 'outline' | 'blocks'>('blocks');
@@ -251,6 +269,8 @@ export default function BlattPage() {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      } else if (e.key === 'Escape' && painter) {
+        setPainter(null);
       } else if (!inField && sel && e.key === 'Delete') {
         e.preventDefault();
         remove(sel);
@@ -468,9 +488,10 @@ export default function BlattPage() {
     // Auswahl markieren und das bearbeitete Feld wiederfinden (es kann durch den Umbruch gewandert sein)
     h.querySelectorAll(`[data-bid="${sel}"]`).forEach((e) => e.classList.add('bl-sel'));
     if (selCol) h.querySelector(`[data-col="${selCol.id}:${selCol.k}"]`)?.classList.add('bl-col-sel');
+    if (flowView && view !== 'sheets') decorateFlow(h, doc);
     if (edit && canEdit && view !== 'sheets') activate(h, edit, doc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, view, canEdit, sel, selCol, edit, zoom, leftTab, title, project, me, tick]);
+  }, [doc, view, canEdit, sel, selCol, edit, zoom, leftTab, title, project, me, tick, flowView]);
   useEffect(() => {
     setAtom(null);
     if (!edit && idle.current) clearTimeout(idle.current);
@@ -480,7 +501,7 @@ export default function BlattPage() {
     const c = center.current;
     if (!c || !doc) return;
     const fit = () => {
-      const pw = doc.page.size === 'a5' ? 148 : 210;
+      const pw = pageGeom(doc).w;
       const sz = view === 'sheets' ? sheetSize(doc).w : view === 'spreads' ? 2 * pw : pw;
       const px = sz * 3.7795 + 40;
       setZoom(Math.min(1, Math.max(0.3, (c.clientWidth - 8) / px)));
@@ -586,12 +607,52 @@ export default function BlattPage() {
     setSelCol(null);
     const b = bid && doc ? findBlock(doc.blocks, bid) : null;
     if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart')) setTab('block');
+    else if (b?.type === 'task' && tab === 'block') setTab('task');
+    else if (b && tab === 'block' && !CTX_TYPES.includes(b.type)) setTab('start');
+  }
+  /** Format übertragen (wie in Bento): Vorlage und eigene Gestaltung des gewählten Bausteins */
+  function startPainter(sticky: boolean) {
+    if (painter && !sticky) return setPainter(null);
+    const b = selBlock;
+    if (!b) return;
+    const style: Partial<Block> = { tpl: b.tpl };
+    for (const k of [...STYLE_KEYS, 'gap', 'wrap', 'align', 'width', 'keep', 'keepNext'] as const) (style as Record<string, unknown>)[k] = b[k];
+    setPainter({ type: b.type, style, sticky });
+    setEdit(null);
+  }
+  function applyPainter(bid: string) {
+    if (!painter || !doc) return;
+    const t = findBlock(doc.blocks, bid);
+    if (!t) return;
+    const p: Partial<Block> = {};
+    for (const [k, v] of Object.entries(painter.style)) {
+      if (k === 'tpl' && t.type !== painter.type) continue;
+      if ((k === 'wrap' || k === 'align' || k === 'width') && !(t.type === 'image' || t.type === 'chart')) continue;
+      if (k === 'gap' && !(t.type === 'cols' || TEXT_TYPES.includes(t.type))) continue;
+      (p as Record<string, unknown>)[k] = v;
+    }
+    setBlock(bid, p);
+    setSel(bid);
+    if (!painter.sticky) setPainter(null);
   }
 
   // Klick, Ziehen und Einsetzen auf den Seiten
   function onPagesClick(e: React.MouseEvent) {
     if (!canEdit || !doc) return;
     const t = e.target as HTMLElement;
+    // Ansicht Textfluss: Bausteine verbinden (zusammenhalten) oder trennen
+    const link = t.closest<HTMLElement>('[data-link]');
+    if (link?.dataset.link) {
+      const lb = findBlock(doc.blocks, link.dataset.link);
+      if (lb) setBlock(lb.id, { keepNext: !lb.keepNext || undefined });
+      return;
+    }
+    if (painter) {
+      const pb = t.closest<HTMLElement>('[data-bid]')?.dataset.bid;
+      if (pb) applyPainter(pb);
+      else setPainter(null);
+      return;
+    }
     // im Text, der gerade bearbeitet wird, setzt der Browser die Schreibmarke selbst
     if (t.closest('.bl-live') || t.closest('[data-atom]') || t.closest('.bl-gutter')) return;
     // Kopf der Seite: Rahmendaten
@@ -805,7 +866,15 @@ export default function BlattPage() {
       where="Material"
       fill
       info={{ key: 'blatt', title: 'Arbeitsblatt und Klassenarbeit', text: INFO }}
-      crumbs={page ? <span className="muted">{title || page.title}</span> : null}
+      crumbs={
+        page ? (
+          canEdit ? (
+            <input className={st.crumbTitle} value={title} onChange={(e) => (setTitle(e.target.value), setSaved('dirty'))} placeholder="Name des Blatts" aria-label="Name des Blatts" size={Math.max(12, Math.min(48, title.length + 2))} />
+          ) : (
+            <span className="muted">{title || page.title}</span>
+          )
+        ) : null
+      }
       actions={
         <>
           <a className="btn" href={href(project.werkstatt ? '/materialien/' : `/projekt/material/?id=${id}`)}>
@@ -859,6 +928,11 @@ export default function BlattPage() {
               onImage={(f) => void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null)}
               ensureGlossary={() => change((d) => (walk(d.blocks).some((x) => x.type === 'glossary') ? d : { ...d, blocks: [...d.blocks, newBlock('glossary')] }))}
               onError={setError}
+              painter={painter}
+              startPainter={startPainter}
+              flowView={flowView}
+              setFlowView={setFlowView}
+              pro={pro || panel === 'typst'}
             />
           )}
           {headOpen && editing && (
@@ -866,7 +940,7 @@ export default function BlattPage() {
               <HeadDialog doc={doc} title={title} course={project.course.title} teacher={me.name} setHeader={setHeader} onClose={() => setHeadOpen(false)} />
             </div>
           )}
-          <div className={`${st.wrap} ${editing ? '' : st.read} ${panel ? '' : st.noPanel}`}>
+          <div className={`${st.wrap} ${editing ? '' : st.read} ${panel ? '' : st.noPanel} ${panel === 'typst' ? st.codePanel : ''}`}>
             <aside className={st.side}>
               <div className="seg" role="group" aria-label="Ansicht">
                 <button className={`btn ${view === 'pages' ? 'on' : ''}`} onClick={() => setView('pages')} title="Seiten untereinander; hier schreibst du">
@@ -884,7 +958,6 @@ export default function BlattPage() {
                 {doc.page.booklet ? `, ${pageCount / 4} ${pageCount / 4 === 1 ? 'Bogen' : 'Bögen'} ${sheetSize(doc).name}` : ''}
               </div>
               {problems.length > 0 && <div className={st.warn}>{problems.length === 1 ? 'Ein Baustein passt' : `${problems.length} Bausteine passen`} nicht auf eine Seite</div>}
-              {editing && <input className={st.titleIn} value={title} onChange={(e) => (setTitle(e.target.value), setSaved('dirty'))} placeholder="Name des Blatts" aria-label="Name des Blatts" />}
               <div className={st.leftTabs} role="tablist" aria-label="Linke Leiste">
                 {(
                   [
@@ -958,7 +1031,7 @@ export default function BlattPage() {
             <div className={st.center} ref={center}>
               <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragOver={(e) => canEdit && e.preventDefault()} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
-                  <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''}`} />
+                  <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''} ${painter ? st.painting : ''} ${flowView ? st.flowView : ''}`} />
                   {atom && atom.el.isConnected && (
                     <div data-atom>
                       <AtomForm atom={atom} setAtom={setAtom} onSave={saveAtom} />
@@ -970,6 +1043,16 @@ export default function BlattPage() {
 
             {panel && (
               <aside className={`${st.side} ${st.right}`}>
+                {panel === 'typst' ? (
+                  <TypstPanel
+                    doc={doc}
+                    onClose={() => setPanel(null)}
+                    onApply={(d) => {
+                      setEdit(null);
+                      change(() => d);
+                    }}
+                  />
+                ) : (
                 <SidePanel
                   panel={panel}
                   setPanel={setPanel}
@@ -983,6 +1066,7 @@ export default function BlattPage() {
                   }}
                   onTerm={(w, e) => change((d) => setTerm(d, w, e))}
                 />
+                )}
               </aside>
             )}
           </div>
@@ -994,8 +1078,10 @@ export default function BlattPage() {
 }
 
 // ---------- Bearbeiten direkt auf der Seite ----------
-type Tab = 'start' | 'insert' | 'design' | 'layout' | 'block';
-type Panel = 'search' | 'material' | 'glossary';
+type Tab = 'start' | 'insert' | 'task' | 'design' | 'layout' | 'block';
+/** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
+const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak'];
+type Panel = 'search' | 'material' | 'glossary' | 'typst';
 type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | `cell:${number}:${number}`;
 interface EditTarget {
   bid: string;
@@ -1230,7 +1316,100 @@ type RibbonProps = {
   onImage: (f: Blob) => void;
   ensureGlossary: () => void;
   onError: (m: string) => void;
+  /** Format übertragen läuft (sticky: auf mehrere Bausteine) */
+  painter: { sticky: boolean } | null;
+  startPainter: (sticky: boolean) => void;
+  flowView: boolean;
+  setFlowView: (v: boolean) => void;
+  /** Typst-Code anbieten (für Fortgeschrittene) */
+  pro: boolean;
 };
+
+/** Klappmenü im Menüband: Knopf mit der aktuellen Wahl, darunter die Möglichkeiten mit Häkchen (wie in OnlyOffice) */
+function Drop({ icon, iconEl, label, value, big, disabled, title, children, wide }: { icon?: string; iconEl?: React.ReactNode; label: string; value?: string; big?: boolean; disabled?: boolean; title?: string; children: React.ReactNode; wide?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  return (
+    <div className={st.drop} ref={ref}>
+      <button type="button" className={`${st.rb} ${big ? st.rbBig : ''} ${open ? st.rbOn : ''}`} disabled={disabled} onClick={() => setOpen(!open)} aria-haspopup="menu" aria-expanded={open} aria-label={label} title={title ?? (value ? `${label}: ${value}` : label)}>
+        {iconEl ?? <Ico n={icon ?? ''} size={big ? 24 : 16} />}
+        {big ? (
+          <>
+            <span className={st.dropLabel}>{label}</span>
+            <em className={st.dropVal}>
+              {value ?? ''}
+              <span className={st.caret}> ▾</span>
+            </em>
+          </>
+        ) : (
+          <span className={st.dropLabel}>
+            {label}
+            {value !== undefined && <em className={st.dropVal}>{value}</em>}
+            <span className={st.caret}>▾</span>
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className={`${st.menu} ${wide ? st.menuWide : ''}`} role="menu" onClick={(e) => (e.target as Element).closest('[data-close]') && setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+/** Eintrag im Klappmenü; mit `on` als Auswahl (Häkchen) */
+function MI({ label, on, onClick, icon, hint, disabled, stay }: { label: string; on?: boolean; onClick: () => void; icon?: string; hint?: string; disabled?: boolean; stay?: boolean }) {
+  return (
+    <button type="button" role={on === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={on} className={`${st.mi} ${on ? st.miOn : ''}`} disabled={disabled} onClick={onClick} data-close={stay ? undefined : ''}>
+      <span className={st.miCheck}>{on ? '✓' : ''}</span>
+      {icon && <Ico n={icon} size={16} />}
+      <span className={st.miLabel}>{label}</span>
+      {hint && <small>{hint}</small>}
+    </button>
+  );
+}
+/** Überschrift im Klappmenü */
+const MH = ({ children }: { children: React.ReactNode }) => <div className={st.mh}>{children}</div>;
+
+const cm = (mm: number) => `${String(mm / 10).replace('.', ',')} cm`;
+const de = (n: number) => String(n).replace('.', ',');
+const WEIGHTS = [
+  [300, 'Leicht'],
+  [400, 'Normal'],
+  [500, 'Halbfett (leicht)'],
+  [600, 'Halbfett'],
+  [700, 'Fett'],
+] as const;
+const SPACING = [
+  [-0.02, 'Eng'],
+  [0, 'Normal'],
+  [0.03, 'Weit'],
+  [0.08, 'Sehr weit'],
+] as const;
+const WRAPS = [
+  ['inline', 'wrapoff', 'Mit Text in Zeile', 'eigene Zeile, Text darüber und darunter'],
+  ['left', 'wrapright', 'Links, Text rechts daneben', 'Text umfließt das Bild'],
+  ['right', 'wrapleft', 'Rechts, Text links daneben', 'Text umfließt das Bild'],
+  ['front', 'bringtofront', 'Vor dem Text', 'frei verschieben, deckt Text ab'],
+  ['behind', 'sendtoback', 'Hinter dem Text', 'frei verschieben, Text liegt darüber'],
+] as const;
+const KORR_LINE = [
+  ['thin', 'dünne Linie'],
+  ['medium', 'mittlere Linie'],
+  ['thick', 'dicke Linie'],
+  ['end', 'nur Zeilen enden'],
+] as const;
 
 function Ribbon(props: RibbonProps) {
   const { tab, setTab, doc, b, inline, set } = props;
@@ -1251,10 +1430,20 @@ function Ribbon(props: RibbonProps) {
     return inline.current && sel?.rangeCount && inline.current.el.contains(sel.anchorNode) ? sel.toString() : '';
   };
   const keep = (e: React.MouseEvent) => (e.target as Element).closest('button') && e.preventDefault();
-  const blockTab = b ? (b.type === 'cols' ? 'Spalten' : BLOCK_LABEL[b.type]) : null;
+  const ctx = b && CTX_TYPES.includes(b.type) ? (b.type === 'cols' ? 'Spalten' : BLOCK_LABEL[b.type]) : null;
   const P = doc.page;
+  const H = P.header;
   const rich = props.editingText && !!inline.current?.rich;
   const fs = s.fs ?? 100;
+  const lh = s.lh ?? 1.35;
+  const ps = s.ps ?? 0.5;
+  const floating = !!b && (b.type === 'image' || b.type === 'chart');
+  const wrapOf = (x: Block) => x.wrap ?? (x.free ? (x.over ? 'front' : 'behind') : 'inline');
+  const order = P.booklet ? 'booklet' : P.nup ? 'nup' : 'single';
+  const marks = ['', 'ENTWURF', 'MUSTER', 'LÖSUNG'];
+  const labels = taskLabels(doc);
+  const task = b?.type === 'task' ? b : null;
+  const total = totalPoints(doc);
   return (
     <div className={st.ribbon} onMouseDown={keep}>
       <div className={st.tabs} role="tablist">
@@ -1262,6 +1451,7 @@ function Ribbon(props: RibbonProps) {
           [
             ['start', 'Start'],
             ['insert', 'Einfügen'],
+            ['task', 'Aufgabe'],
             ['design', 'Entwurf'],
             ['layout', 'Layout'],
           ] as const
@@ -1270,9 +1460,9 @@ function Ribbon(props: RibbonProps) {
             {l}
           </button>
         ))}
-        {blockTab && (
+        {ctx && (
           <button role="tab" aria-selected={tab === 'block'} className={`${st.tab} ${st.tabCtx} ${tab === 'block' ? st.tabOn : ''}`} onClick={() => setTab('block')}>
-            {blockTab}
+            {ctx}
           </button>
         )}
         <span className="grow" />
@@ -1281,9 +1471,10 @@ function Ribbon(props: RibbonProps) {
             ['search', 'Suchen', 'recsearch'],
             ['material', 'Material', 'gallery'],
             ['glossary', 'Glossar', 'insertmultiindex'],
+            ...(props.pro ? ([['typst', 'Code', 'basicideappear']] as const) : []),
           ] as const
         ).map(([k, l, i]) => (
-          <button key={k} className={`${st.tab} ${st.tabSide} ${props.panel === k ? st.tabOn : ''}`} onClick={() => props.setPanel(props.panel === k ? null : k)} title="Seitenleiste rechts ein- und ausblenden">
+          <button key={k} className={`${st.tab} ${st.tabSide} ${props.panel === k ? st.tabOn : ''}`} onClick={() => props.setPanel(props.panel === k ? null : k)} title={k === 'typst' ? 'Das ganze Blatt als Typst-Code: lesen und ändern' : 'Seitenleiste rechts ein- und ausblenden'}>
             <Ico n={i} size={16} />
             {l}
           </button>
@@ -1292,6 +1483,21 @@ function Ribbon(props: RibbonProps) {
       <div className={st.groups}>
         {tab === 'start' && (
           <>
+            <Group label="Format">
+              <button
+                type="button"
+                className={`${st.rb} ${st.rbBig} ${props.painter ? st.rbOn : ''}`}
+                disabled={!b && !props.painter}
+                onClick={() => props.startPainter(false)}
+                onDoubleClick={() => props.startPainter(true)}
+                aria-label="Format übertragen"
+                title="Format übertragen: Gestaltung des gewählten Bausteins auf den nächsten Baustein übertragen, auf den du klickst. Doppelklick: auf mehrere nacheinander, Esc beendet."
+                aria-pressed={!!props.painter}
+              >
+                <Ico n="formatpaintbrush" />
+                <span>Format übertragen</span>
+              </button>
+            </Group>
             <Group label="Schrift">
               <div className={st.rows}>
                 <div className={st.row}>
@@ -1304,6 +1510,12 @@ function Ribbon(props: RibbonProps) {
                   </select>
                   <RB icon="grow" label="Größer" hideLabel disabled={!textBlock} onClick={() => set({ fs: Math.min(200, fs + 10) })} title="Schrift größer" />
                   <RB icon="shrink" label="Kleiner" hideLabel disabled={!textBlock} onClick={() => set({ fs: Math.max(60, fs - 10) })} title="Schrift kleiner" />
+                  <Drop icon="strongemphasischarstyle" label="Stärke" value={WEIGHTS.find(([w]) => w === (s.fw ?? 400))?.[1]} disabled={!textBlock} title="Schriftstärke des Bausteins">
+                    <MH>Schriftstärke</MH>
+                    {WEIGHTS.map(([w, l]) => (
+                      <MI key={w} label={l} on={(s.fw ?? 400) === w} onClick={() => set({ fw: w === 400 ? undefined : w })} />
+                    ))}
+                  </Drop>
                 </div>
                 <div className={st.row}>
                   <RB icon="bold" label="Fett" hideLabel on={!!s.bd} disabled={!textBlock} onClick={() => exec('bold') || set({ bd: !s.bd })} title="Fett (Strg+B); ohne Markierung der ganze Baustein" />
@@ -1329,6 +1541,12 @@ function Ribbon(props: RibbonProps) {
                       })
                     }
                   />
+                  <Drop icon="spacing" label="Laufweite" value={SPACING.find(([v]) => v === (s.ls ?? 0))?.[1] ?? `${de(s.ls ?? 0)} em`} disabled={!textBlock} title="Abstand zwischen den Buchstaben">
+                    <MH>Laufweite</MH>
+                    {SPACING.map(([v, l]) => (
+                      <MI key={v} label={l} on={(s.ls ?? 0) === v} onClick={() => set({ ls: v === 0 ? undefined : v })} />
+                    ))}
+                  </Drop>
                 </div>
               </div>
             </Group>
@@ -1351,16 +1569,16 @@ function Ribbon(props: RibbonProps) {
                   ).map(([v, i, l]) => (
                     <RB key={v} icon={i} label={l} hideLabel on={textBlock && (s.ta ?? 'left') === v} disabled={!textBlock} onClick={() => set({ ta: v })} />
                   ))}
-                  <span className={st.icoSel} title="Zeilenabstand">
-                    <Ico n="spacepara15" size={16} />
-                    <select value={s.lh ?? 1.35} disabled={!textBlock} onChange={(e) => set({ lh: Number(e.target.value) })} aria-label="Zeilenabstand">
-                      {withValue([1.15, 1.25, 1.35, 1.45, 1.6, 1.8, 2, 2.4], s.lh ?? 1.35).map((v) => (
-                        <option key={v} value={v}>
-                          {String(v).replace('.', ',')}
-                        </option>
-                      ))}
-                    </select>
-                  </span>
+                  <Drop icon="spacepara15" label="Abstand" value={de(lh)} disabled={!textBlock} title="Zeilen- und Absatzabstand">
+                    <MH>Zeilenabstand</MH>
+                    {withValue([1, 1.15, 1.25, 1.35, 1.5, 1.8, 2], lh).map((v) => (
+                      <MI key={v} label={v === 1.35 ? '1,35 (Standard)' : de(v)} on={lh === v} onClick={() => set({ lh: v })} />
+                    ))}
+                    <MH>Abstand nach jedem Absatz</MH>
+                    {withValue([0, 0.25, 0.5, 0.8, 1.2], ps).map((v) => (
+                      <MI key={v} label={v === 0 ? 'kein' : v === 0.5 ? 'eine halbe Zeile (Standard)' : `${de(v)} Zeilen`} on={ps === v} onClick={() => set({ ps: v === 0.5 ? undefined : v })} />
+                    ))}
+                  </Drop>
                 </div>
               </div>
             </Group>
@@ -1382,15 +1600,12 @@ function Ribbon(props: RibbonProps) {
                   <RB icon="resetattributes" label="Wie Vorlage" hideLabel disabled={!textBlock} onClick={() => set({ ...STYLE_RESET, ...(b?.type === 'material' ? { justify: undefined } : {}) })} title="Eigene Gestaltung entfernen (wie Vorlage)" />
                 </div>
                 <div className={st.row}>
-                  <Ico n="pagemargin" size={16} />
-                  <select value={s.nm ?? 0} disabled={!textBlock} onChange={(e) => set({ nm: Number(e.target.value) })} title="Freier Rand rechts für Notizen; Randbemerkungen stehen dort" aria-label="Rand für Notizen">
-                    <option value={0}>kein Rand für Notizen</option>
+                  <Drop icon="pagemargin" label="Rand für Notizen" value={s.nm ? cm(s.nm) : 'kein'} disabled={!textBlock} title="Freier Rand rechts für Notizen; Randbemerkungen stehen dort">
+                    <MI label="kein Rand" on={!s.nm} onClick={() => set({ nm: 0 })} />
                     {withValue([20, 30, 40, 50], s.nm || undefined).map((v) => (
-                      <option key={v} value={v}>
-                        Rand für Notizen {String(v / 10).replace('.', ',')} cm
-                      </option>
+                      <MI key={v} label={cm(v)} on={s.nm === v} onClick={() => set({ nm: v })} />
                     ))}
-                  </select>
+                  </Drop>
                 </div>
               </div>
             </Group>
@@ -1418,7 +1633,7 @@ function Ribbon(props: RibbonProps) {
         {tab === 'insert' && (
           <>
             <Group label="Text">
-              {(['text', 'material', 'quote', 'box', 'heading'] as const).map((t) => (
+              {(['text', 'heading', 'material', 'quote', 'box'] as const).map((t) => (
                 <RB key={t} icon={BICON[t]} label={BLOCK_LABEL[t]} big onClick={() => props.add(t)} title={`${BLOCK_LABEL[t]} einfügen (${props.selCol ? 'in die gewählte Spalte' : b ? 'nach dem gewählten Baustein' : 'am Ende'})`} />
               ))}
             </Group>
@@ -1442,153 +1657,292 @@ function Ribbon(props: RibbonProps) {
               />
             </Group>
             <Group label="Seiten">
-              <RB icon={BICON.cols} label="Spalten" big onClick={() => props.add('cols')} title="Zwei Spalten; die Zahl stellst du im Reiter „Spalten“ ein" />
+              <RB icon={BICON.cols} label="Spalten" big onClick={() => props.add('cols')} title="Bausteine nebeneinander; Zahl und Stege stellst du unter „Layout“ ein" />
               <RB icon={BICON.pagebreak} label="Seitenumbruch" big onClick={() => props.add('pagebreak')} />
+              <RB icon={BICON.glossary} label="Glossar" big onClick={() => props.add('glossary')} title="Verzeichnis der Begriffe" />
             </Group>
-            <Group label="Verzeichnisse">
-              <RB icon={BICON.glossary} label="Glossar" big onClick={() => props.add('glossary')} />
+          </>
+        )}
+        {tab === 'task' && (
+          <>
+            <Group label="Neu">
+              <RB icon={BICON.task} label="Aufgabe" big onClick={() => props.add('task')} />
+              <RB icon="hangingindent" label="Teilaufgabe" big onClick={() => props.add('task', { subtask: true })} />
+              <Drop icon="numberformatstandard" label="Nummern" value={(P.sub ?? 'letter') === 'letter' ? 'a), b)' : '1.1, 1.2'} big title="So werden Teilaufgaben nummeriert">
+                <MH>Teilaufgaben nummerieren</MH>
+                <MI label="a), b), c) …" on={(P.sub ?? 'letter') === 'letter'} onClick={() => props.setPageOpt({ sub: 'letter' })} />
+                <MI label="1.1, 1.2, 1.3 …" on={P.sub === 'dot'} onClick={() => props.setPageOpt({ sub: 'dot' })} />
+              </Drop>
             </Group>
-            <Group label="Kopf und Fuß">
-              <RB icon="insertheader" label="Rahmendaten" big onClick={props.openHead} title="Titel, Klasse, Datum, Name, Punkte …" />
-              <RB icon="qr" label="QR-Code" big on={P.header.qr !== 'none'} onClick={() => props.setHeader({ qr: P.header.qr === 'none' ? 'first' : 'none', show: true })} title="Persönlicher QR-Code aus Autogra.fi auf Seite 1" />
-              <RB icon="insertpagenumberfield" label="Seitenzahl" big on={P.pageNumbers} onClick={() => props.setPageOpt({ pageNumbers: !P.pageNumbers })} />
+            <Group label={task ? `Aufgabe ${labels.get(task.id) ?? ''}` : 'Gewählte Aufgabe'}>
+              {task ? (
+                <>
+                  <RB icon="hangingindent" label="Ist Teilaufgabe" big on={!!task.subtask} onClick={() => set({ subtask: !task.subtask })} title="Eingerückt, a), b) … oder 1.1, 1.2 …" />
+                  <div className={st.rows}>
+                    <label className={st.mini}>
+                      Nummer
+                      <input className={st.rIn} value={task.num ?? ''} onChange={(e) => set({ num: e.target.value })} placeholder={labels.get(task.id) ?? 'auto'} title="Eigene Nummer, z. B. 1.2 oder 1 b); leer = automatisch" style={{ width: 70 }} />
+                    </label>
+                    <label className={st.mini}>
+                      Punkte
+                      <input className={st.rIn} value={task.points ?? ''} onChange={(e) => set({ points: e.target.value })} placeholder="z. B. 4" title="Punkte oder Anteil, z. B. 12 P. oder 50%" style={{ width: 70 }} />
+                    </label>
+                  </div>
+                  <Drop icon="togglegridhorizontal" label="Antwort" value={(task.lines ?? 0) ? `${task.lines} ${task.lineStyle === 'grid' ? 'Karos' : 'Zeilen'}` : 'keine'} big title="Platz für die Antwort unter der Aufgabe">
+                    <MH>Zeilen für die Antwort</MH>
+                    {withValue([0, 3, 5, 8, 10, 15], task.lines ?? 0).map((v) => (
+                      <MI key={v} label={v ? `${v} Zeilen` : 'keine'} on={(task.lines ?? 0) === v} onClick={() => set({ lines: v })} />
+                    ))}
+                    <MH>Art</MH>
+                    <MI label="Schreiblinien" on={(task.lineStyle ?? 'lines') === 'lines'} onClick={() => set({ lineStyle: 'lines' })} />
+                    <MI label="Karos (Mathe)" on={task.lineStyle === 'grid'} onClick={() => set({ lineStyle: 'grid' })} />
+                  </Drop>
+                </>
+              ) : (
+                <span className={st.hint}>
+                  Klick auf eine Aufgabe:
+                  <br />
+                  Nummer, Punkte, Antwort.
+                </span>
+              )}
+            </Group>
+            <Group label="Kopf">
+              <RB icon="insertheader" label="Rahmendaten" big on={H.show !== false} onClick={props.openHead} title="Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note: was steht wo und wie" />
+              <Drop icon="qr" label="QR-Code" value={H.qr === 'none' ? 'aus' : H.qr === 'all' ? 'jede Seite' : 'Seite 1'} big title="Persönlicher QR-Code aus Autogra.fi: die Abgabe wird beim Scannen gleich zugeordnet">
+                <MH>Persönlicher QR-Code aus Autogra.fi</MH>
+                <MI label="kein QR-Code" on={H.qr === 'none'} onClick={() => props.setHeader({ qr: 'none' })} />
+                <MI label="auf Seite 1" on={H.qr === 'first'} onClick={() => props.setHeader({ qr: 'first', show: true })} />
+                <MI label="auf jeder Seite" on={H.qr === 'all'} onClick={() => props.setHeader({ qr: 'all', show: true })} hint="hilft, wenn Seiten getrennt gescannt werden" />
+              </Drop>
+            </Group>
+            <Group label="Korrektur">
+              <Drop icon="pagemargin" label="Korrekturrand" value={P.korr.side === 'none' ? 'aus' : `${P.korr.side === 'right' ? 'rechts' : 'links'} ${cm(P.korr.width)}`} big title="Freier Rand für die Korrektur neben Linien und Antworten">
+                <MH>Seite</MH>
+                <MI label="kein Korrekturrand" on={P.korr.side === 'none'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'none' } })} />
+                <MI label="rechts" on={P.korr.side === 'right'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'right' } })} />
+                <MI label="links" on={P.korr.side === 'left'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'left' } })} />
+                {P.korr.side !== 'none' && (
+                  <>
+                    <MH>Breite</MH>
+                    {[20, 25, 30, 40, 50].map((v) => (
+                      <MI key={v} label={cm(v)} on={P.korr.width === v} onClick={() => props.setPageOpt({ korr: { ...P.korr, width: v } })} stay />
+                    ))}
+                    <MH>Linie</MH>
+                    {KORR_LINE.map(([v, l]) => (
+                      <MI key={v} label={l} on={P.korr.style === v} onClick={() => props.setPageOpt({ korr: { ...P.korr, style: v } })} stay />
+                    ))}
+                  </>
+                )}
+              </Drop>
+              <Drop icon="watermark" label="Wasserzeichen" value={P.watermark ? P.watermark : 'aus'} big title="Schriftzug quer über jeder Seite">
+                {marks.map((m) => (
+                  <MI key={m} label={m || 'kein Wasserzeichen'} on={(P.watermark ?? '') === m} onClick={() => props.setPageOpt({ watermark: m })} />
+                ))}
+                <MH>Eigener Text</MH>
+                <div className={st.miIn}>
+                  <input className={st.rIn} value={marks.includes(P.watermark ?? '') ? '' : (P.watermark ?? '')} onChange={(e) => props.setPageOpt({ watermark: e.target.value })} placeholder="z. B. NACHSCHRIFT" aria-label="Eigener Text des Wasserzeichens" />
+                </div>
+              </Drop>
+              <span className={st.hint} title="Summe der Punkte aller Aufgaben">
+                {total !== null ? (
+                  <>
+                    zusammen
+                    <br />
+                    <strong>{de(total)} Punkte</strong>
+                  </>
+                ) : (
+                  <>
+                    Punkte: nicht bei
+                    <br />
+                    allen Aufgaben
+                  </>
+                )}
+              </span>
             </Group>
           </>
         )}
         {tab === 'design' && (
           <>
-            <Group label="Dokumentformatierung">
-              <div className={st.rows}>
-                <div className={st.row}>
-                  <Ico n="charfontname" size={16} />
-                  <select value={P.font} onChange={(e) => props.setPageOpt({ font: e.target.value as 'sans' | 'serif' })} aria-label="Schriftart">
-                    <option value="sans">Ohne Serifen (Carlito)</option>
-                    <option value="serif">Mit Serifen (Libertine)</option>
-                  </select>
-                </div>
-                <div className={st.row}>
-                  <Ico n="grow" size={16} />
-                  <select value={P.fontSize} onChange={(e) => props.setPageOpt({ fontSize: Number(e.target.value) })} aria-label="Grundschrift">
-                    {[10, 10.5, 11, 12, 13].map((z) => (
-                      <option key={z} value={z}>
-                        {String(z).replace('.', ',')} pt
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            <Group label="Schrift des Blatts">
+              <Drop icon="charfontname" label="Schriftart" value={P.font === 'serif' ? 'Mit Serifen' : 'Ohne Serifen'} big>
+                <MI label="Ohne Serifen (Carlito)" on={P.font !== 'serif'} onClick={() => props.setPageOpt({ font: 'sans' })} />
+                <MI label="Mit Serifen (Libertine)" on={P.font === 'serif'} onClick={() => props.setPageOpt({ font: 'serif' })} />
+              </Drop>
+              <Drop icon="grow" label="Grundschrift" value={`${de(P.fontSize)} pt`} big>
+                {[10, 10.5, 11, 12, 13].map((z) => (
+                  <MI key={z} label={`${de(z)} pt`} on={P.fontSize === z} onClick={() => props.setPageOpt({ fontSize: z })} />
+                ))}
+              </Drop>
             </Group>
-            <Group label="Kopf">
-              <RB icon="insertheader" label="Rahmendaten" big onClick={props.openHead} title="Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note" />
-              <RB icon="qr" label="QR-Code" big on={P.header.qr !== 'none'} onClick={() => props.setHeader({ qr: P.header.qr === 'none' ? 'first' : 'none', show: true })} />
-              {P.header.qr !== 'none' && (
-                <select value={P.header.qr} onChange={(e) => props.setHeader({ qr: e.target.value as 'first' | 'all' })} aria-label="QR-Code auf">
-                  <option value="first">auf Seite 1</option>
-                  <option value="all">auf jeder Seite</option>
-                </select>
-              )}
+            <Group label="Kopf der Seite">
+              <Drop icon="insertheader" label="Kopfzeile" value={H.style === 'box' ? 'Kasten' : H.style === 'none' ? 'schlicht' : 'Linie'} big>
+                <MH>Rahmendaten abgrenzen</MH>
+                <MI label="Linie darunter" on={(H.style ?? 'line') === 'line'} onClick={() => props.setHeader({ style: 'line' })} />
+                <MI label="im Kasten" on={H.style === 'box'} onClick={() => props.setHeader({ style: 'box' })} />
+                <MI label="schlicht, ohne Linie" on={H.style === 'none'} onClick={() => props.setHeader({ style: 'none' })} />
+                <MH>Größe des Titels</MH>
+                {(
+                  [
+                    ['s', 'klein'],
+                    ['m', 'mittel'],
+                    ['l', 'groß'],
+                  ] as const
+                ).map(([v, l]) => (
+                  <MI key={v} label={l} on={(H.titleSize ?? 'm') === v} onClick={() => props.setHeader({ titleSize: v })} stay />
+                ))}
+              </Drop>
             </Group>
-            <Group label="Seitenhintergrund">
-              <div className={st.rows}>
-                <div className={st.row}>
-                  <Ico n="watermark" size={16} />
-                  <select
-                    value={['', 'ENTWURF', 'MUSTER', 'LÖSUNG'].includes(P.watermark ?? '') ? (P.watermark ?? '') : '*'}
-                    onChange={(e) => props.setPageOpt({ watermark: e.target.value === '*' ? P.watermark || 'Eigener Text' : e.target.value })}
-                    aria-label="Wasserzeichen"
-                  >
-                    <option value="">kein Wasserzeichen</option>
-                    <option value="ENTWURF">ENTWURF</option>
-                    <option value="MUSTER">MUSTER</option>
-                    <option value="LÖSUNG">LÖSUNG</option>
-                    <option value="*">eigener Text …</option>
-                  </select>
-                  {!!P.watermark && !['ENTWURF', 'MUSTER', 'LÖSUNG'].includes(P.watermark) && <input className={st.rIn} value={P.watermark} onChange={(e) => props.setPageOpt({ watermark: e.target.value })} aria-label="Text des Wasserzeichens" style={{ width: 110 }} />}
-                </div>
-                <div className={st.row}>
-                  <Ico n="pagemargin" size={16} />
-                  <select value={P.korr.side} onChange={(e) => props.setPageOpt({ korr: { ...P.korr, side: e.target.value as Korr['side'] } })} aria-label="Korrekturrand">
-                    <option value="none">kein Korrekturrand</option>
-                    <option value="right">Korrekturrand rechts</option>
-                    <option value="left">Korrekturrand links</option>
-                  </select>
-                  {P.korr.side !== 'none' && (
-                    <>
-                      <select value={P.korr.width} onChange={(e) => props.setPageOpt({ korr: { ...P.korr, width: Number(e.target.value) } })} aria-label="Breite des Korrekturrands">
-                        {[20, 25, 30, 40, 50].map((v) => (
-                          <option key={v} value={v}>
-                            {String(v / 10).replace('.', ',')} cm
-                          </option>
-                        ))}
-                      </select>
-                      <select value={P.korr.style} onChange={(e) => props.setPageOpt({ korr: { ...P.korr, style: e.target.value as Korr['style'] } })} aria-label="Linie des Korrekturrands">
-                        <option value="thin">dünne Linie</option>
-                        <option value="medium">mittlere Linie</option>
-                        <option value="thick">dicke Linie</option>
-                        <option value="end">Zeilen enden</option>
-                      </select>
-                    </>
-                  )}
-                </div>
-              </div>
+            <Group label="Ansicht">
+              <RB icon="controlcodes" label="Textfluss zeigen" big on={props.flowView} onClick={() => props.setFlowView(!props.flowView)} title="Zeigt, wie der Text über Seiten und Spalten weiterläuft und wo Bausteine zusammengehalten werden" />
+              <RB
+                icon="basicideappear"
+                label="Typst-Code"
+                big
+                on={props.panel === 'typst'}
+                onClick={() => {
+                  props.setPanel(props.panel === 'typst' ? null : 'typst');
+                  try {
+                    localStorage.setItem('collegare.blatt.code', '1');
+                  } catch {}
+                }}
+                title="Für Fortgeschrittene: das ganze Blatt als Typst-Code rechts lesen und ändern"
+              />
             </Group>
           </>
         )}
         {tab === 'layout' && (
           <>
             <Group label="Seite einrichten">
+              <Drop icon="pagemargin" label="Ränder" value={P.margin === 'narrow' ? 'Schmal' : P.margin === 'wide' ? 'Breit' : 'Normal'} big>
+                {(
+                  [
+                    ['narrow', 'Schmal'],
+                    ['normal', 'Normal'],
+                    ['wide', 'Breit'],
+                  ] as const
+                ).map(([v, l]) => (
+                  <MI key={v} label={l} hint={`${pageGeom({ ...doc, page: { ...P, margin: v } }).m} mm`} on={(P.margin ?? 'normal') === v} onClick={() => props.setPageOpt({ margin: v })} />
+                ))}
+              </Drop>
+              <Drop icon="orientation" label="Ausrichtung" value={P.landscape ? 'Quer' : 'Hoch'} big>
+                <MI label="Hochformat" on={!P.landscape} onClick={() => props.setPageOpt({ landscape: false })} />
+                <MI label="Querformat" on={!!P.landscape} onClick={() => props.setPageOpt({ landscape: true, booklet: false })} />
+              </Drop>
+              <Drop icon="attributepagesize" label="Format" value={P.size.toUpperCase()} big>
+                <MI label="A4" hint="21 × 29,7 cm" on={P.size === 'a4'} onClick={() => props.setPageOpt({ size: 'a4' })} />
+                <MI label="A5" hint="14,8 × 21 cm" on={P.size === 'a5'} onClick={() => props.setPageOpt({ size: 'a5' })} />
+              </Drop>
               <div className={st.rows}>
-                <div className={st.row}>
-                  <Ico n="attributepagesize" size={16} />
-                  <select value={P.size} onChange={(e) => props.setPageOpt({ size: e.target.value as 'a4' | 'a5' })} aria-label="Format">
-                    <option value="a4">A4</option>
-                    <option value="a5">A5</option>
-                  </select>
-                </div>
-                <div className={st.row}>
-                  <RB icon="insertpagenumberfield" label="Seitenzahlen" on={P.pageNumbers} onClick={() => props.setPageOpt({ pageNumbers: !P.pageNumbers })} />
-                </div>
+                <RB icon="insertpagenumberfield" label="Seitenzahlen" on={P.pageNumbers} onClick={() => props.setPageOpt({ pageNumbers: !P.pageNumbers })} />
               </div>
-              <RB icon="insertpagebreak" label="Umbruch" big onClick={() => props.add('pagebreak')} title="Seitenumbruch nach dem gewählten Baustein" />
             </Group>
-            <Group label="Broschüre">
-              <RB icon="printpreview" label="Broschüre" big on={P.booklet} onClick={() => props.setPageOpt({ booklet: !P.booklet })} title={`Als Broschüre drucken (${P.size === 'a5' ? 'A4 quer' : 'A3 quer'}): Seite 1 steht neben der letzten`} />
-              {P.booklet && (
-                <div className={st.rows}>
-                  <span className={st.hint}>leere Seiten füllen mit</span>
-                  <select value={P.fill} onChange={(e) => props.setPageOpt({ fill: e.target.value as Ruling })} aria-label="Leere Seiten füllen mit">
-                    <option value="lines">Schreiblinien</option>
-                    <option value="grid">Karos</option>
-                    <option value="empty">nichts</option>
-                  </select>
-                </div>
-              )}
+            <Group label="Umbrüche">
+              <Drop icon="insertbreak" label="Umbrüche" big title="Seitenumbruch einfügen; festlegen, wo der Text über die Seite weiterläuft">
+                <MI label="Seitenumbruch einfügen" icon="insertpagebreak" onClick={() => props.add('pagebreak')} hint="nach dem gewählten Baustein" />
+                <MH>{b ? `Gewählter Baustein (${BLOCK_LABEL[b.type]})` : 'Gewählter Baustein'}</MH>
+                <MI label="beginnt auf neuer Seite" on={!!b?.breakBefore} disabled={!b} onClick={() => set({ breakBefore: !b?.breakBefore || undefined })} stay />
+                <MI label="nicht über Seiten teilen" on={!!b?.keep} disabled={!b} onClick={() => set({ keep: !b?.keep || undefined })} stay />
+                <MI label="mit dem nächsten zusammenhalten" on={!!b?.keepNext} disabled={!b} onClick={() => set({ keepNext: !b?.keepNext || undefined })} stay hint="z. B. Aufgabe und Material" />
+              </Drop>
             </Group>
             <Group label="Spalten">
-              {[1, 2, 3, 4].map((n) => (
-                <button
-                  key={n}
-                  className={`${st.rb} ${st.rbBig} ${b?.type === 'cols' && (b.cols ?? []).length === n ? st.rbOn : ''}`}
-                  onClick={() => (b?.type === 'cols' ? props.setColCount(b.id, n) : n > 1 ? props.add('cols', { cols: Array.from({ length: n }, () => []), ratio: Array(n).fill(1) }) : null)}
-                  disabled={n === 1 && b?.type !== 'cols'}
-                  title={b?.type === 'cols' ? `${n === 1 ? 'Spalten auflösen' : `${n} Spalten`}` : `${n} Spalten einfügen`}
-                >
-                  <ColsIcon n={n} />
-                  <span>{n === 1 ? 'Eine' : n === 2 ? 'Zwei' : n === 3 ? 'Drei' : 'Vier'}</span>
-                </button>
-              ))}
-              <RB icon="distributecolumns" label="Gleichmäßig" big disabled={b?.type !== 'cols'} onClick={() => set({ ratio: (b?.cols ?? []).map(() => 1) })} title="Mittelstege zurücksetzen: alle Spalten gleich breit" />
+              <Drop
+                iconEl={<ColsIcon n={b?.type === 'cols' ? (b.cols ?? []).length : textBlock && (s.flow ?? 1) > 1 ? s.flow! : 2} />}
+                label="Spalten"
+                value={b?.type === 'cols' ? `${(b.cols ?? []).length} nebeneinander` : textBlock && (s.flow ?? 1) > 1 ? `Text in ${s.flow}` : undefined}
+                big
+                wide
+                title="Text in Spalten fließen lassen oder Bausteine nebeneinander setzen"
+              >
+                {textBlock && b?.type !== 'table' && (
+                  <>
+                    <MH>Text fließt durch verbundene Spalten</MH>
+                    {[1, 2, 3].map((n) => (
+                      <MI key={n} label={n === 1 ? 'eine Spalte' : `${n} Spalten`} on={(s.flow ?? 1) === n} onClick={() => set({ flow: n === 1 ? undefined : n })} hint={n > 1 ? 'läuft von Spalte zu Spalte und über Seiten weiter' : undefined} />
+                    ))}
+                  </>
+                )}
+                {b?.type === 'cols' ? (
+                  <>
+                    <MH>Bausteine nebeneinander</MH>
+                    {[1, 2, 3, 4].map((n) => (
+                      <MI key={n} label={n === 1 ? 'Spalten auflösen' : `${n} Spalten`} on={n > 1 && (b.cols ?? []).length === n} onClick={() => props.setColCount(b.id, n)} />
+                    ))}
+                    <MI label="alle gleich breit" icon="distributecolumns" onClick={() => set({ ratio: (b.cols ?? []).map(() => 1) })} hint="Mittelstege auf der Seite ziehen" />
+                  </>
+                ) : (
+                  <>
+                    <MH>Bausteine nebeneinander einfügen</MH>
+                    {[2, 3, 4].map((n) => (
+                      <MI key={n} label={`${n} Spalten`} onClick={() => props.add('cols', { cols: Array.from({ length: n }, () => []), ratio: Array(n).fill(1) })} />
+                    ))}
+                  </>
+                )}
+                {(b?.type === 'cols' || (textBlock && (s.flow ?? 1) > 1)) && (
+                  <>
+                    <MH>Breite der Stege</MH>
+                    {[3, 4, 6, 8, 10, 12].map((g) => (
+                      <MI key={g} label={`${g} mm`} on={(b?.gap ?? 6) === g} onClick={() => set({ gap: g === 6 ? undefined : g })} hint={g === 6 ? 'Standard' : undefined} stay />
+                    ))}
+                  </>
+                )}
+              </Drop>
             </Group>
-            <Group label="Nummerierung">
-              <div className={st.rows}>
-                <span className={st.hint}>Teilaufgaben</span>
-                <select value={P.sub ?? 'letter'} onChange={(e) => props.setPageOpt({ sub: e.target.value as 'letter' | 'dot' })} aria-label="Nummern der Teilaufgaben">
-                  <option value="letter">a), b), c) …</option>
-                  <option value="dot">1.1, 1.2, 1.3 …</option>
-                </select>
-              </div>
+            <Group label="Druck">
+              <Drop icon="printpreview" label="Seitenfolge" value={order === 'booklet' ? 'Broschüre' : order === 'nup' ? '2 je Blatt' : 'Einzeln'} big wide title="Wie die Seiten aufs Papier kommen">
+                <MI label="Einzelseiten" hint={`jede Seite auf ein Blatt ${P.size.toUpperCase()}`} on={order === 'single'} onClick={() => props.setPageOpt({ booklet: false, nup: false })} />
+                <MI label="Zwei Seiten je Blatt" hint={`1 | 2, 3 | 4 … auf ${P.size === 'a5' ? 'A4' : 'A3'} quer`} on={order === 'nup'} onClick={() => props.setPageOpt({ booklet: false, nup: true })} />
+                <MI label="Broschüre" hint={`falten und heften, ${P.size === 'a5' ? 'A4' : 'A3'} quer, Seite 1 neben der letzten`} on={order === 'booklet'} onClick={() => props.setPageOpt({ booklet: true, nup: false, landscape: false })} />
+                {order === 'booklet' && (
+                  <>
+                    <MH>Leere Seiten am Ende füllen mit</MH>
+                    {(
+                      [
+                        ['lines', 'Schreiblinien'],
+                        ['grid', 'Karos'],
+                        ['empty', 'nichts'],
+                      ] as const
+                    ).map(([v, l]) => (
+                      <MI key={v} label={l} on={P.fill === v} onClick={() => props.setPageOpt({ fill: v })} stay />
+                    ))}
+                  </>
+                )}
+              </Drop>
             </Group>
-            {b && <Arrange {...props} b={b} />}
+            <Group label="Anordnen">
+              <Drop icon={floating && b ? (WRAPS.find(([w]) => w === wrapOf(b))?.[1] ?? 'wrapoff') : 'wrapoff'} label="Umfluss" value={floating && b ? WRAPS.find(([w]) => w === wrapOf(b))?.[2] : undefined} big wide disabled={!floating} title="Wie der Text um Bild oder Diagramm fließt">
+                {WRAPS.map(([w, i, l, h]) => (
+                  <MI
+                    key={w}
+                    icon={i}
+                    label={l}
+                    hint={h}
+                    on={!!b && wrapOf(b) === w}
+                    onClick={() => set(w === 'inline' ? { wrap: undefined, free: false, over: false, dx: undefined, dy: undefined } : w === 'left' || w === 'right' ? { wrap: w, free: false, over: false, dx: undefined, dy: undefined, width: Math.min(b?.width ?? 100, 50) } : { wrap: w, free: true, over: w === 'front' })}
+                  />
+                ))}
+              </Drop>
+              <Drop icon="objectalignleft" label="Ausrichten" value={floating && b ? ({ left: 'links', center: 'Mitte', right: 'rechts' } as const)[b.align ?? 'center'] : undefined} big disabled={!floating || !!b?.free || b?.wrap === 'left' || b?.wrap === 'right'}>
+                {(
+                  [
+                    ['left', 'objectalignleft', 'links'],
+                    ['center', 'alignmiddle', 'Mitte'],
+                    ['right', 'objectalignright', 'rechts'],
+                  ] as const
+                ).map(([v, i, l]) => (
+                  <MI key={v} icon={i} label={l} on={(b?.align ?? 'center') === v} onClick={() => set({ align: v })} />
+                ))}
+              </Drop>
+              {b ? (
+                <ArrangeRows {...props} b={b} />
+              ) : (
+                <span className={st.hint}>
+                  Klick auf einen
+                  <br />
+                  Baustein.
+                </span>
+              )}
+            </Group>
           </>
         )}
         {tab === 'block' && b && <BlockTab {...props} b={b} />}
@@ -1596,6 +1950,60 @@ function Ribbon(props: RibbonProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Ansicht „Textfluss“ (Wunsch Jo, 24. November 2026): wie die Bausteine als verbundene Rahmen durch Spalten und über
+ * Seiten laufen. Jedes Stück eines geteilten Bausteins trägt seine Nummer in der Kette und sagt, wo es weitergeht;
+ * zwischen zwei Bausteinen verbindet oder trennt ein Kettenknopf (zusammenhalten = auf derselben Seite).
+ */
+function decorateFlow(h: HTMLElement, doc: BlattDoc) {
+  const pages = [...h.querySelectorAll<HTMLElement>('.bl-page')];
+  const pieces = new Map<string, { el: HTMLElement; page: number }[]>();
+  pages.forEach((pg, i) =>
+    pg.querySelectorAll<HTMLElement>('.bl-body [data-bid]').forEach((el) => {
+      const id = el.dataset.bid!;
+      if (!pieces.has(id)) pieces.set(id, []);
+      pieces.get(id)!.push({ el, page: i + 1 });
+    }),
+  );
+  const tag = (el: HTMLElement, cls: string, text: string, title?: string) => {
+    const t = document.createElement('span');
+    t.className = `bl-fl ${cls}`;
+    t.textContent = text;
+    if (title) t.title = title;
+    el.appendChild(t);
+    return t;
+  };
+  for (const [id, list] of pieces) {
+    const b = findBlock(doc.blocks, id);
+    if (!b) continue;
+    list.forEach(({ el }) => el.classList.add('bl-fl-frame'));
+    if (list.length > 1)
+      list.forEach(({ el }, k) => {
+        tag(el, 'bl-fl-no', String(k + 1), `Rahmen ${k + 1} von ${list.length}`);
+        if (k < list.length - 1) tag(el, 'bl-fl-next', `weiter auf Seite ${list[k + 1].page} →`);
+        if (k > 0) tag(el, 'bl-fl-prev', `← von Seite ${list[k - 1].page}`);
+      });
+    const flags = [b.breakBefore && 'neue Seite', b.keep && 'nicht teilen', (b.flow ?? 0) > 1 && `fließt durch ${b.flow} Spalten`].filter(Boolean) as string[];
+    if (flags.length) tag(list[0].el, 'bl-fl-flags', flags.join(' · '));
+  }
+  // Kettenknöpfe zwischen aufeinanderfolgenden Bausteinen der obersten Ebene
+  const order = doc.blocks.map((b) => b.id);
+  order.forEach((id, k) => {
+    if (k === order.length - 1) return;
+    const list = pieces.get(id);
+    const last = list?.[list.length - 1]?.el;
+    if (!last || last.parentElement?.closest('[data-bid]')) return;
+    const b = doc.blocks[k];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `bl-fl-link ${b.keepNext ? 'on' : ''}`;
+    btn.dataset.link = id;
+    btn.textContent = b.keepNext ? '⛓ verbunden' : '⛓';
+    btn.title = b.keepNext ? 'Verbunden: bleibt mit dem nächsten Baustein auf einer Seite. Klick trennt.' : 'Mit dem nächsten Baustein verbinden: beide bleiben auf einer Seite';
+    last.appendChild(btn);
+  });
 }
 
 /** Spalten-Icon mit n Spalten (für „Eine“ bis „Vier“) */
@@ -1626,23 +2034,28 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** Anordnen: im Reiter des Bausteins und unter „Layout“ */
-function Arrange(props: RibbonProps & { b: Block }) {
+/** Anordnen: nach oben/unten, verdoppeln, neben den nächsten, entfernen */
+function ArrangeRows(props: RibbonProps & { b: Block }) {
   const { b, doc } = props;
   const inCols = !!listOf(doc.blocks, b.id)?.parent;
   return (
-    <Group label="Anordnen">
-      <div className={st.rows}>
-        <div className={st.row}>
-          <RB icon="moveup" label="Nach oben" hideLabel onClick={() => props.move(b.id, -1)} />
-          <RB icon="movedown" label="Nach unten" hideLabel onClick={() => props.move(b.id, 1)} />
-          <RB icon="duplicatepage" label="Verdoppeln" hideLabel onClick={() => props.duplicate(b.id)} />
-        </div>
-        <div className={st.row}>
-          {b.type !== 'cols' && !inCols && <RB icon="formatcolumns" label="Neben den nächsten" hideLabel onClick={() => props.toColumns(b.id)} title="Diesen und den nächsten Baustein nebeneinander setzen" />}
-          <RB icon="delete" label="Entfernen" hideLabel onClick={() => props.remove(b.id)} title="Entfernen (Entf)" />
-        </div>
+    <div className={st.rows}>
+      <div className={st.row}>
+        <RB icon="moveup" label="Nach oben" hideLabel onClick={() => props.move(b.id, -1)} />
+        <RB icon="movedown" label="Nach unten" hideLabel onClick={() => props.move(b.id, 1)} />
+        <RB icon="duplicatepage" label="Verdoppeln" hideLabel onClick={() => props.duplicate(b.id)} />
       </div>
+      <div className={st.row}>
+        {b.type !== 'cols' && !inCols && <RB icon="formatcolumns" label="Neben den nächsten" hideLabel onClick={() => props.toColumns(b.id)} title="Diesen und den nächsten Baustein nebeneinander setzen" />}
+        <RB icon="delete" label="Entfernen" hideLabel onClick={() => props.remove(b.id)} title="Entfernen (Entf)" />
+      </div>
+    </div>
+  );
+}
+function Arrange(props: RibbonProps & { b: Block }) {
+  return (
+    <Group label="Anordnen">
+      <ArrangeRows {...props} />
     </Group>
   );
 }
@@ -1735,29 +2148,6 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           </div>
           <RB icon="linenumberingdialog" label="Zeilen zählen" big on={b.lineNumbers !== false} onClick={() => set({ lineNumbers: b.lineNumbers === false })} title="Zeilennummern alle fünf Zeilen" />
         </Group>
-      )}
-      {b.type === 'task' && (
-        <>
-          <Group label="Nummer">
-            <RB icon="hangingindent" label="Teilaufgabe" big on={!!b.subtask} onClick={() => set({ subtask: !b.subtask })} title="Eingerückt, a), b) … oder 1.1, 1.2 …" />
-            <div className={st.rows}>
-              <span className={st.hint}>eigene Nummer</span>
-              <input className={st.rIn} value={b.num ?? ''} onChange={(e) => set({ num: e.target.value })} placeholder={`automatisch: ${labels.get(b.id) ?? ''}`} aria-label="Eigene Nummer" title="Eigene Nummer, z. B. 1.2 oder 1 b); leer = automatisch" style={{ width: 130 }} />
-            </div>
-          </Group>
-          <Group label="Bewertung">
-            <div className={st.rows}>
-              <span className={st.hint}>Punkte oder Anteil</span>
-              <input className={st.rIn} value={b.points ?? ''} onChange={(e) => set({ points: e.target.value })} placeholder="z. B. 12 P. oder 50%" aria-label="Punkte oder Anteil" style={{ width: 130 }} />
-            </div>
-          </Group>
-          <Group label="Antwortzeilen">
-            <div className={st.rows}>
-              <input className={st.rIn} type="number" min={0} max={40} value={b.lines ?? 0} onChange={(e) => set({ lines: Math.max(0, Math.min(40, Number(e.target.value) || 0)) })} aria-label="Antwortzeilen" style={{ width: 64 }} />
-              {(b.lines ?? 0) > 0 && ruling(b.lineStyle, (r) => set({ lineStyle: r }), false)}
-            </div>
-          </Group>
-        </>
       )}
       {b.type === 'image' && (
         <>
@@ -1984,21 +2374,78 @@ function ChartIcon({ kind }: { kind: 'col' | 'bar' | 'line' | 'pie' }) {
   );
 }
 
-/** Rahmendaten: jedes Feld an oder aus, automatisch oder frei (eigener Text oder Linie zum Ausfüllen) */
+/** Rahmendaten: jedes Feld an oder aus, automatisch oder frei; Reihenfolge, Zeile, Beschriftung und Länge der Linie */
 function HeadDialog({ doc, title, course, teacher, setHeader, onClose }: { doc: BlattDoc; title: string; course: string; teacher: string; setHeader: (p: Partial<BlattDoc['page']['header']>) => void; onClose: () => void }) {
   const F = headFields(doc);
   const H = doc.page.header;
   const put = (k: HeadKey, p: Partial<HeadField>) => setHeader({ fields: { ...F, [k]: { ...F[k], ...p } }, show: true });
+  const order = [...(H.order ?? []), ...HEAD_KEYS.map((x) => x.key)].filter((k, i, a) => a.indexOf(k) === i && k !== 'title');
+  const moveKey = (k: HeadKey, dir: -1 | 1) => {
+    const o = [...order];
+    const i = o.indexOf(k);
+    const j = i + dir;
+    if (j < 0 || j >= o.length) return;
+    [o[i], o[j]] = [o[j], o[i]];
+    setHeader({ order: o });
+  };
+  const defRow = (k: HeadKey) => (k === 'points' || k === 'grade' ? 2 : 1);
+  const defLen: Record<HeadKey, 's' | 'm' | 'l'> = { title: 'l', subject: 'm', klasse: 's', teacher: 'm', date: 'm', name: 'l', points: 's', grade: 's' };
   const autoText: Partial<Record<HeadKey, string>> = {
     title: title || '(Name des Blatts)',
-    klasse: course ? `${course}; beim Druck mit QR-Code die Klasse aus Autogra.fi` : 'beim Druck mit QR-Code die Klasse aus Autogra.fi',
+    klasse: course ? `${course}; mit QR-Code die Klasse aus Autogra.fi` : 'mit QR-Code die Klasse aus Autogra.fi',
     teacher: teacher,
     date: `Tag des Drucks (heute ${new Date().toLocaleDateString('de-DE')})`,
-    name: 'beim Druck mit QR-Code aus der Klassenliste, sonst Linie',
-    points: totalPoints(doc) !== null ? `___ / ${String(totalPoints(doc)).replace('.', ',')} (Summe der Aufgaben)` : 'Summe der Aufgaben (alle Aufgaben brauchen eine Punktzahl)',
+    name: 'mit QR-Code aus der Klassenliste, sonst Linie',
+    points: totalPoints(doc) !== null ? `___ / ${String(totalPoints(doc)).replace('.', ',')} (Summe der Aufgaben)` : 'Summe der Aufgaben (alle brauchen Punkte)',
+  };
+  const seg = <T extends string | number>(value: T, opts: readonly (readonly [T, string])[], onChange: (v: T) => void, label: string, disabled?: boolean) => (
+    <span className={st.segMini} role="group" aria-label={label}>
+      {opts.map(([v, l]) => (
+        <button key={String(v)} type="button" className={value === v ? st.segOn : ''} disabled={disabled} onClick={() => onChange(v)}>
+          {l}
+        </button>
+      ))}
+    </span>
+  );
+  const row = (key: HeadKey, idx: number | null) => {
+    const def = HEAD_KEYS.find((x) => x.key === key)!;
+    const f = F[key];
+    const isAuto = !!def.auto && f.auto === true;
+    return (
+      <tr key={key} className={f.on ? '' : st.off}>
+        <td className={st.ord}>
+          {idx !== null && (
+            <>
+              <button type="button" disabled={idx === 0} onClick={() => moveKey(key, -1)} aria-label={`${def.label} nach vorn`} title="weiter nach vorn">
+                ↑
+              </button>
+              <button type="button" disabled={idx === order.length - 1} onClick={() => moveKey(key, 1)} aria-label={`${def.label} nach hinten`} title="weiter nach hinten">
+                ↓
+              </button>
+            </>
+          )}
+        </td>
+        <td>
+          <input type="checkbox" checked={f.on} onChange={(e) => put(key, { on: e.target.checked })} aria-label={`${def.label} zeigen`} />
+        </td>
+        <td>{key === 'title' ? <strong>Titel</strong> : <input className={st.rIn} value={f.label ?? ''} placeholder={def.label} disabled={!f.on} onChange={(e) => put(key, { label: e.target.value || undefined })} aria-label={`Beschriftung für ${def.label}`} style={{ width: 92 }} />}</td>
+        <td>{key === 'title' ? <span className={st.hint}>oben</span> : seg(f.row ?? defRow(key), [[1, '1'], [2, '2']] as const, (v) => put(key, { row: v }), `Zeile für ${def.label}`, !f.on)}</td>
+        <td>{key === 'title' ? null : seg(f.len ?? defLen[key], [['s', 'kurz'], ['m', 'mittel'], ['l', 'lang']] as const, (v) => put(key, { len: v }), `Länge der Linie für ${def.label}`, !f.on)}</td>
+        <td>{def.auto ? <input type="checkbox" checked={isAuto} disabled={!f.on} onChange={(e) => put(key, { auto: e.target.checked })} aria-label={`${def.label} automatisch`} /> : <span className={st.hint}>–</span>}</td>
+        <td>
+          {isAuto ? (
+            <span className={st.hint}>{autoText[key] ?? def.auto}</span>
+          ) : key === 'grade' || key === 'name' ? (
+            <span className={st.hint}>Linie zum Ausfüllen</span>
+          ) : (
+            <input className={st.rIn} value={f.value ?? ''} disabled={!f.on} onChange={(e) => put(key, { value: e.target.value })} placeholder="leer = Linie" aria-label={def.label} style={{ width: '100%' }} />
+          )}
+        </td>
+      </tr>
+    );
   };
   return (
-    <div className={st.headDlg} role="dialog" aria-label="Rahmendaten" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={`${st.headDlg} ${st.headDlgWide}`} role="dialog" aria-label="Rahmendaten" onMouseDown={(e) => e.stopPropagation()}>
       <div className="row">
         <strong>Rahmendaten</strong>
         <span className="grow" />
@@ -2009,57 +2456,97 @@ function HeadDialog({ doc, title, course, teacher, setHeader, onClose }: { doc: 
           ✕
         </button>
       </div>
+      <div className="row" style={{ gap: 14, flexWrap: 'wrap' }}>
+        <span className={st.mini}>
+          Abgrenzung {seg(H.style ?? 'line', [['line', 'Linie'], ['box', 'Kasten'], ['none', 'ohne']] as const, (v) => setHeader({ style: v }), 'Abgrenzung des Kopfs')}
+        </span>
+        <span className={st.mini}>
+          Titel {seg(H.titleSize ?? 'm', [['s', 'klein'], ['m', 'mittel'], ['l', 'groß']] as const, (v) => setHeader({ titleSize: v }), 'Größe des Titels')}
+        </span>
+        <span className={st.mini}>
+          QR-Code {seg(H.qr, [['none', 'aus'], ['first', 'Seite 1'], ['all', 'jede Seite']] as const, (v) => setHeader({ qr: v, show: true }), 'QR-Code')}
+        </span>
+      </div>
       <table className={st.headTable}>
         <thead>
           <tr>
-            <th>zeigen</th>
             <th />
-            <th>automatisch</th>
-            <th>sonst frei: eigener Text, leer = Linie zum Ausfüllen</th>
+            <th>zeigen</th>
+            <th>Beschriftung</th>
+            <th>Zeile</th>
+            <th>Linie</th>
+            <th>auto</th>
+            <th>sonst: eigener Text, leer = Linie zum Ausfüllen</th>
           </tr>
         </thead>
         <tbody>
-          {HEAD_KEYS.map(({ key, label, auto }) => {
-            const f = F[key];
-            const isAuto = !!auto && f.auto === true;
-            return (
-              <tr key={key} className={f.on ? '' : st.off}>
-                <td>
-                  <input type="checkbox" checked={f.on} onChange={(e) => put(key, { on: e.target.checked })} aria-label={`${label} zeigen`} />
-                </td>
-                <td>{label}</td>
-                <td>{auto ? <input type="checkbox" checked={isAuto} disabled={!f.on} onChange={(e) => put(key, { auto: e.target.checked })} aria-label={`${label} automatisch`} /> : <span className={st.hint}>–</span>}</td>
-                <td>
-                  {isAuto ? (
-                    <span className={st.hint}>{autoText[key] ?? auto}</span>
-                  ) : key === 'grade' ? (
-                    <span className={st.hint}>Linie zum Eintragen</span>
-                  ) : key === 'name' ? (
-                    <span className={st.hint}>Linie zum Ausfüllen</span>
-                  ) : (
-                    <input className={st.rIn} value={f.value ?? ''} disabled={!f.on} onChange={(e) => put(key, { value: e.target.value })} placeholder="leer = Linie" aria-label={label} style={{ width: '100%' }} />
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          <tr>
-            <td>
-              <input type="checkbox" checked={H.qr !== 'none'} onChange={(e) => setHeader({ qr: e.target.checked ? 'first' : 'none', show: true })} aria-label="QR-Code zeigen" />
-            </td>
-            <td>QR-Code</td>
-            <td>
-              <input type="checkbox" checked disabled aria-label="QR-Code automatisch" />
-            </td>
-            <td>
-              <select value={H.qr === 'all' ? 'all' : 'first'} disabled={H.qr === 'none'} onChange={(e) => setHeader({ qr: e.target.value as 'first' | 'all' })} aria-label="QR-Code auf">
-                <option value="first">persönlich aus Autogra.fi, auf Seite 1</option>
-                <option value="all">persönlich aus Autogra.fi, auf jeder Seite</option>
-              </select>
-            </td>
-          </tr>
+          {row('title', null)}
+          {order.map((k, i) => row(k, i))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------- Seitenleiste rechts: das Blatt als Typst-Code (für Fortgeschrittene) ----------
+function TypstPanel({ doc, onApply, onClose }: { doc: BlattDoc; onApply: (d: BlattDoc) => void; onClose: () => void }) {
+  const fresh = useMemo(() => toTypst(doc), [doc]);
+  const [code, setCode] = useState(fresh);
+  const [dirty, setDirty] = useState(false);
+  const [err, setErr] = useState('');
+  // Änderungen auf der Seite erscheinen im Code, solange hier nichts Ungespeichertes steht
+  useEffect(() => {
+    if (!dirty) setCode(fresh);
+  }, [fresh, dirty]);
+  const apply = () => {
+    try {
+      const d = fromTypst(code, doc);
+      setErr('');
+      setDirty(false);
+      onApply(d);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className={st.code}>
+      <div className="row">
+        <strong>Typst-Code</strong>
+        <span className="grow" />
+        <button className="btn" onClick={onClose} title="Schließen">
+          ✕
+        </button>
+      </div>
+      <textarea
+        className={st.codeArea}
+        value={code}
+        spellCheck={false}
+        aria-label="Typst-Code des Blatts"
+        onChange={(e) => (setCode(e.target.value), setDirty(true))}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            apply();
+          } else if (e.key === 'Tab') {
+            e.preventDefault();
+            const t = e.currentTarget;
+            const a = t.selectionStart;
+            setCode(code.slice(0, a) + '  ' + code.slice(t.selectionEnd));
+            setDirty(true);
+            requestAnimationFrame(() => t.setSelectionRange(a + 2, a + 2));
+          }
+        }}
+      />
+      {err && <div className="error">{err}</div>}
+      <div className="row">
+        <button className="btn" disabled={!dirty} onClick={() => (setCode(fresh), setDirty(false), setErr(''))} title="Änderungen im Code verwerfen">
+          Verwerfen
+        </button>
+        <span className="grow" />
+        <button className="btn primary" disabled={!dirty} onClick={apply} title="Code aufs Blatt übernehmen (Strg+Enter)">
+          Übernehmen
+        </button>
+      </div>
     </div>
   );
 }
