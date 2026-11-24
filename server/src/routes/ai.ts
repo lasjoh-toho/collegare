@@ -221,7 +221,7 @@ export function aiRoutes(app: FastifyInstance, s: Services) {
       const r = await recognize(card, data, mime, s.aiFetch);
       // wie das AiGateway in Autogra.fi: protokolliert wird, dass erkannt wurde, nicht was
       await s.audit.append({ actorId: a.userId, action: 'ai.ocr', projectId: a.projectId, data: { ...meta, ok: true, ms: r.ms, tokens_in: r.tokensIn, tokens_out: r.tokensOut, chars: r.text.length } });
-      return { text: r.text };
+      return { text: r.text, script: r.script };
     } catch (e) {
       if (!(e instanceof OcrError)) throw e;
       await s.audit.append({ actorId: a.userId, action: 'ai.ocr', projectId: a.projectId, data: { ...meta, ok: false, error: e.message.slice(0, 300) } });

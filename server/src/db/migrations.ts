@@ -555,6 +555,13 @@ migrations['0024_chat_image'] = {
   },
 };
 
+migrations['0025_note_scan'] = {
+  async up(db) {
+    // Notiz vermerkt, dass ihr Text aus einem Scan erkannt wurde, und welche Schrift (Wunsch Jo vom 24. November 2026)
+    await db.schema.alterTable('notes').addColumn('scan', 'varchar(5)').execute();
+  },
+};
+
 class InCodeProvider implements MigrationProvider {
   async getMigrations() {
     return migrations;

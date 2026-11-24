@@ -346,6 +346,8 @@ export interface NotesTable {
   visibility: Generated<string>;
   /** Art „data“: {rows: string[][]}, erste Zeile = Kopfzeile */
   data_json: string | null;
+  /** Text aus einem Scan erkannt: 'hand' = Handschrift, 'print' = Druckschrift */
+  scan: string | null;
   created_at: Ms;
   updated_at: Ms;
 }

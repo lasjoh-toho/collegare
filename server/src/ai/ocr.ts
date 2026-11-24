@@ -5,13 +5,17 @@
  */
 import type { ModelCard } from './modelCards.js';
 
-/** Wortgleich aus Autogra.fi; Druckschrift ist mitgemeint (Kopien, Tafelbilder) */
+/** Aus Autogra.fi; dazu die Schriftart, damit die Notiz „Scan – Handschrift“ oder „Scan – Druckschrift“ vermerkt
+ * (Wunsch Jo, 24. November 2026) */
 export const OCR_SYSTEM =
   'Transkribiere den handgeschriebenen oder gedruckten Text auf dem Bild vollständig und exakt, einschließlich aller Fehler. ' +
   'Korrigiere nichts, ergänze nichts, gib keine Kommentare. Unleserliche Stellen markierst du mit [?]. ' +
   'Achte genau auf Umlaute und Akzente (ä, ö, ü, ß, é, è, ç …): Punkte und Striche über einem Buchstaben gehören dazu. ' +
   'Behalte die Zeilenumbrüche des Blattes bei: eine geschriebene Zeile ist eine Zeile im Text. ' +
-  'Antworte ausschließlich als JSON: {"text": "<Transkription>"}';
+  'Gib außerdem an, ob der Text überwiegend von Hand geschrieben (hand) oder gedruckt bzw. getippt (druck) ist. ' +
+  'Antworte ausschließlich als JSON: {"text": "<Transkription>", "schrift": "hand" | "druck"}';
+
+export type Script = 'hand' | 'print';
 
 export class OcrError extends Error {
   constructor(
@@ -24,6 +28,8 @@ export class OcrError extends Error {
 
 export interface OcrResult {
   text: string;
+  /** Schriftart laut KI; ohne Angabe Handschrift (der häufigere Fall bei „Bild aufnehmen“) */
+  script: Script;
   tokensIn: number;
   tokensOut: number;
   ms: number;
@@ -121,6 +127,7 @@ export async function recognize(card: ModelCard, image: Buffer, mime: string, fe
   if (text === null) throw new OcrError('Der KI-Dienst hat keinen Text geliefert. Bitte noch einmal versuchen oder den Text selbst abtippen.');
   return {
     text: text.replace(/\r\n?/g, '\n').trim(),
+    script: /^(druck|print)/i.test(String(json?.schrift ?? json?.script ?? '')) ? 'print' : 'hand',
     tokensIn: Number(card.type === 'ollama' ? r?.prompt_eval_count : r?.usage?.prompt_tokens) || 0,
     tokensOut: Number(card.type === 'ollama' ? r?.eval_count : r?.usage?.completion_tokens) || 0,
     ms: Date.now() - started,

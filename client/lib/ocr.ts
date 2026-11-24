@@ -88,7 +88,11 @@ export async function prepareForOcr(src: string): Promise<Blob> {
   return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Bild ließ sich nicht aufbereiten.'))), 'image/jpeg', 0.88));
 }
 
-export async function recognizeText(projectId: number, src: string): Promise<string> {
+/** hand = Handschrift, print = Druckschrift (schätzt die KI; die Notiz vermerkt „Scan – …“) */
+export type Script = 'hand' | 'print';
+export const SCRIPT_LABEL: Record<Script, string> = { hand: 'Handschrift', print: 'Druckschrift' };
+
+export async function recognizeText(projectId: number, src: string): Promise<{ text: string; script: Script }> {
   const blob = await prepareForOcr(src);
   const res = await fetch(API_URL + BASE_PATH + `/api/projects/${projectId}/notizen/erkennen`, {
     method: 'POST',
@@ -96,10 +100,10 @@ export async function recognizeText(projectId: number, src: string): Promise<str
     headers: { 'content-type': 'application/octet-stream' },
     body: blob,
   });
-  const j = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+  const j = (await res.json().catch(() => ({}))) as { text?: string; script?: string; error?: string };
   if (!res.ok) throw new Error(j.error ?? `Fehler ${res.status}`);
-  return j.text ?? '';
+  return { text: j.text ?? '', script: j.script === 'print' ? 'print' : 'hand' };
 }
 
 /** Erkannten Text zur gespeicherten Notiz ins Einfüge-Protokoll (Herkunft „Handschrift“ statt „von außen“) */
-export const logRecognised = (projectId: number, noteId: number, text: string) => post(`/api/projects/${projectId}/notizen/${noteId}/erkannt`, { text, script: 'hand' }).catch(() => {});
+export const logRecognised = (projectId: number, noteId: number, text: string, script: Script = 'hand') => post(`/api/projects/${projectId}/notizen/${noteId}/erkannt`, { text, script }).catch(() => {});

@@ -41,6 +41,8 @@ export const NoteInput = z.object({
   file: z.string().max(400).nullable().optional(),
   visibility: z.enum(VISIBILITIES).optional(),
   rows: Rows.optional(),
+  /** Text aus dem Bild erkannt (Handschrift/Druckschrift); beim Ändern weglassen = bleibt, null = Vermerk entfernen */
+  scan: z.enum(['hand', 'print']).nullable().optional(),
 });
 export type NoteInput = z.infer<typeof NoteInput>;
 
@@ -67,6 +69,8 @@ export interface Note {
   file: { mime: string; size: number } | null;
   visibility: Visibility;
   rows: string[][] | null;
+  /** Text aus einem Scan erkannt: Handschrift oder Druckschrift */
+  scan: 'hand' | 'print' | null;
   at: number;
   updatedAt: number;
 }
@@ -129,7 +133,7 @@ const NEEDS_FILE: Record<string, string> = { image: 'Bild fehlt', hand: 'Foto de
 
 const COLS = [
   'n.id', 'n.project_id', 'n.scope', 'n.user_id', 'u.name', 'n.kind', 'n.title', 'n.body', 'n.source', 'n.url', 'n.credit', 'n.license', 'n.origin',
-  'n.file_path', 'n.file_mime', 'n.file_size', 'n.visibility', 'n.data_json', 'n.created_at', 'n.updated_at',
+  'n.file_path', 'n.file_mime', 'n.file_size', 'n.visibility', 'n.data_json', 'n.scan', 'n.created_at', 'n.updated_at',
 ] as const;
 const NO_FILE = { file_path: null, file_mime: null, file_size: null };
 
@@ -191,7 +195,7 @@ export class Notes {
     const at = this.now();
     const r = await this.db
       .insertInto('notes')
-      .values({ project_id: projectId, scope, user_id: userId, ...n, ...f, visibility: input.visibility ?? visibility, created_at: at, updated_at: at })
+      .values({ project_id: projectId, scope, user_id: userId, ...n, ...f, scan: f.file_path ? (input.scan ?? null) : null, visibility: input.visibility ?? visibility, created_at: at, updated_at: at })
       .executeTakeFirst();
     return (await this.get(Number(r.insertId)))!;
   }
@@ -208,7 +212,9 @@ export class Notes {
     if (NEEDS_FILE[n.kind] && !path) throw new NoteError(NEEDS_FILE[n.kind]);
     if (n.kind === 'video' && !path && !n.url) throw new NoteError('Video oder Link fehlt');
     if (mime && !fileFits(n.kind, mime)) throw new NoteError('Die Datei passt nicht zu dieser Art');
-    await this.db.updateTable('notes').set({ ...n, ...(f ?? {}), visibility, updated_at: this.now() }).where('id', '=', id).execute();
+    // ohne Bild kein Scan-Vermerk
+    const scan = !path ? { scan: null } : input.scan !== undefined ? { scan: input.scan } : {};
+    await this.db.updateTable('notes').set({ ...n, ...(f ?? {}), ...scan, visibility, updated_at: this.now() }).where('id', '=', id).execute();
     if (f && old.filePath && f.file_path !== old.filePath) await this.files?.remove(old.filePath);
     return (await this.get(id))!;
   }
@@ -347,6 +353,7 @@ export class Notes {
       file: r.file_path && r.file_mime ? { mime: r.file_mime, size: Number(r.file_size ?? 0) } : null,
       visibility: (VISIBILITIES as readonly string[]).includes(r.visibility) ? (r.visibility as Visibility) : 'group',
       rows,
+      scan: r.scan === 'hand' || r.scan === 'print' ? r.scan : null,
       at: Number(r.created_at),
       updatedAt: Number(r.updated_at),
     };
@@ -372,6 +379,7 @@ interface RawRow {
   file_size: number | null;
   visibility: string;
   data_json: string | null;
+  scan: string | null;
   created_at: number;
   updated_at: number;
 }

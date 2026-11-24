@@ -151,7 +151,7 @@ export function ChatPanel({ me, project, panel = false, onClose, wanted = null }
   async function read(m: Msg) {
     setReading(m.id);
     try {
-      const text = (await recognizeText(id, imageUrl(id, m.id))).trim();
+      const text = (await recognizeText(id, imageUrl(id, m.id))).text.trim();
       if (!text) return show('Auf dem Bild wurde kein Text gefunden.');
       setDraft((d) => (d.trim() ? d.trimEnd() + '\n' + text : text));
     } catch (e) {

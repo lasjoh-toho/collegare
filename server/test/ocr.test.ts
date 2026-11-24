@@ -111,10 +111,15 @@ describe('KI-Modellkarten und Texterkennung', () => {
     await call('POST', '/api/admin/ki-karten', at, { name: 'Mistral', type: 'openai', url: 'https://api.mistral.ai/v1/chat/completions', model: 'pixtral', apiKey: 'k1', uses: ['ocr'] });
     expect((await call('GET', `/api/projects/${project}/texterkennung`, anna)).json).toEqual({ available: true });
     const r = await call('POST', `/api/projects/${project}/notizen/erkennen`, anna, undefined, JPEG);
-    expect(r).toMatchObject({ status: 200, json: { text: 'Liebe Tante,\nwie geht es dir?' } });
+    expect(r).toMatchObject({ status: 200, json: { text: 'Liebe Tante,\nwie geht es dir?', script: 'hand' } });
     expect(calls[0].url).toBe('https://api.mistral.ai/v1/chat/completions');
     expect(calls[0].auth).toBe('Bearer k1');
     expect(calls[0].body.messages[1].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
+    // Schriftart aus der Antwort: Druckschrift
+    const prev = answer;
+    answer = () => new Response(JSON.stringify({ choices: [{ message: { content: '{"text":"Reichsbank","schrift":"druck"}' } }] }));
+    expect((await call('POST', `/api/projects/${project}/notizen/erkennen`, anna, undefined, JPEG)).json).toEqual({ text: 'Reichsbank', script: 'print' });
+    answer = prev;
     // kein Bild
     expect((await call('POST', `/api/projects/${project}/notizen/erkennen`, anna, undefined, Buffer.from('hallo'))).status).toBe(415);
 
@@ -129,6 +134,15 @@ describe('KI-Modellkarten und Texterkennung', () => {
     expect((await call('POST', `/api/projects/${project}/notizen/${note.id}/erkannt`, anna, { text: 'Liebe Tante,\nwie geht es dir?' })).status).toBe(200);
     const spur = (await call('GET', `/api/projects/${project}/einfuegen/spur?ziel=note:${note.id}`, t)).json;
     expect(spur.pastes).toMatchObject([{ origin: 'hand', text: 'Liebe Tante,\nwie geht es dir?' }]);
+    // Notiz mit Bild vermerkt „Scan – Druckschrift“; ohne Bild kein Vermerk; weglassen beim Ändern = bleibt
+    const uid = (await s.sessions.resolve(anna))!.userId;
+    const file = await s.notes.files!.store(project, scope, 'scan.jpg', JPEG);
+    const base0 = { title: 'Zeitung', body: 'Reichsbank', source: '', url: null, credit: '', license: '', origin: null };
+    const scanned = await s.notes.add(project, scope, uid, { ...base0, kind: 'hand', file, scan: 'print' } as any);
+    expect(scanned.scan).toBe('print');
+    expect((await s.notes.update(scanned.id, { ...base0, kind: 'hand', body: 'Reichsbank 1923' } as any, 'group')).scan).toBe('print');
+    expect((await s.notes.update(scanned.id, { ...base0, kind: 'hand', scan: 'hand' } as any, 'group')).scan).toBe('hand');
+    expect((await s.notes.add(project, scope, uid, { ...base0, kind: 'note', scan: 'hand' } as any)).scan).toBeNull();
     // fremde Notiz: nein
     expect((await call('POST', `/api/projects/${project}/notizen/${note.id}/erkannt`, t, { text: 'x' })).status).toBe(404);
 

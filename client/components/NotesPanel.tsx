@@ -27,7 +27,7 @@ import { ImageImport } from './ImageImport';
 import { NoteSplit, type SplitNoteInput } from './NoteSplit';
 import { PasteNotes } from './PasteNotes';
 import { ScanDialog } from './ScanDialog';
-import { logRecognised, ocrState, recognizeText, type OcrState } from '@/lib/ocr';
+import { logRecognised, ocrState, recognizeText, SCRIPT_LABEL, type OcrState, type Script } from '@/lib/ocr';
 import type { Me, ProjectView } from '@/lib/types';
 
 /** Wo eine Notiz schon verbaut ist (GET …/notizen-verwendung) */
@@ -60,6 +60,8 @@ export interface Note {
   file?: { mime: string; size: number } | null;
   visibility: Visibility;
   rows: string[][] | null;
+  /** Text aus einem Scan erkannt: Handschrift oder Druckschrift */
+  scan?: Script | null;
   at: number;
   updatedAt: number;
   /** Bereich der Notiz (nur unter „Allgemein“ gesetzt, dort aus verschiedenen Gruppen) */
@@ -95,6 +97,8 @@ interface Draft {
   /** zuletzt erkannter Text (Texterkennung); ocrNew: noch nicht ins Einfüge-Protokoll geschrieben */
   ocr?: string;
   ocrNew?: boolean;
+  /** Vermerk „Scan – Handschrift/Druckschrift“ (undefined = bleibt wie gespeichert) */
+  scan?: Script | null;
 }
 type Res = { ok: boolean; error?: string; id?: number };
 
@@ -324,7 +328,7 @@ function Editor({
   /** Texterkennung im Projekt verfügbar? (null = noch unbekannt) */
   ocr: OcrState | null;
   /** Text im Bild des Entwurfs erkennen */
-  recognize: (src: string) => Promise<string>;
+  recognize: (src: string) => Promise<{ text: string; script: Script }>;
 }) {
   const fk = FILE_KINDS[draft.kind];
   const hasFile = !!(draft.file || draft.preview);
@@ -392,11 +396,11 @@ function Editor({
     setErr('');
     setReading(true);
     try {
-      const text = await recognize(draft.preview);
+      const { text, script } = await recognize(draft.preview);
       if (!text.trim()) return setErr('Auf dem Bild wurde kein Text gefunden.');
       const keep = draft.body.trim() && draft.body !== draft.ocr;
-      // eigener Text bleibt stehen, der erkannte kommt darunter
-      setDraft({ ...draft, body: keep ? draft.body.trimEnd() + '\n\n' + text : text, ocr: text, ocrNew: true });
+      // eigener Text bleibt stehen, der erkannte kommt darunter; die Notiz vermerkt „Scan – Handschrift/Druckschrift“
+      setDraft({ ...draft, body: keep ? draft.body.trimEnd() + '\n\n' + text : text, ocr: text, ocrNew: true, scan: script });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -529,6 +533,15 @@ function Editor({
             <button type="button" className="btn" onClick={() => setDraft({ ...draft, body: draft.ocr! })} title="Deine Änderungen am Text verwerfen">
               Erkannten Text wiederherstellen
             </button>
+          )}
+          {draft.scan && (
+            <label className="muted" title="Die KI schätzt die Schrift. Stimmt es nicht, hier umstellen.">
+              Vermerk: Scan –{' '}
+              <select value={draft.scan} onChange={(e) => setDraft({ ...draft, scan: e.target.value as Script })} aria-label="Schrift des erkannten Texts">
+                <option value="hand">Handschrift</option>
+                <option value="print">Druckschrift</option>
+              </select>
+            </label>
           )}
           {!ocr?.available && draft.kind === 'hand' && <span className="muted">Den Text unten selbst abtippen.</span>}
         </div>
@@ -769,6 +782,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     visibility: shared ? 'all' : d.visibility,
     ...(d.kind === 'image' ? { credit: d.credit, license: d.license, origin: d.origin.trim(), url: d.url.trim() } : {}),
     ...(FILE_KINDS[d.kind] && d.file ? { file: d.file } : {}),
+    ...(d.scan !== undefined ? { scan: d.scan } : {}),
   });
 
   /** neue Notizen aus Bildern bekommen die Stufe, die gerade im Filter steht */
@@ -808,7 +822,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     try {
       if (d.kind === 'audio' || d.kind === 'video') show('Wird hochgeladen …');
       const up = await uploadImage(id, scope, { file: f, art: d.kind === 'audio' ? 'audio' : undefined });
-      put({ ...d, ocr: undefined, ocrNew: false, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
+      put({ ...d, ocr: undefined, ocrNew: false, scan: null, file: up.file, mime: up.mime, preview: URL.createObjectURL(f), title: d.title || (d.kind === 'image' ? f.name.replace(/\.[a-z0-9]+$/i, '') : '') });
     } catch (e) {
       show(e instanceof Error ? e.message : 'Hochladen fehlgeschlagen');
     }
@@ -853,7 +867,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
       setBusy(false);
       if (r.ok) {
         if (r.id) addGuard.flush(`note:${r.id}`);
-        if (r.id && draft.ocrNew && draft.ocr) void logRecognised(id, r.id, draft.ocr);
+        if (r.id && draft.ocrNew && draft.ocr) void logRecognised(id, r.id, draft.ocr, draft.scan ?? 'hand');
         setDraft(empty('note', draft.visibility));
         setAdding(false);
       } else show(r.error ?? 'Speichern fehlgeschlagen');
@@ -864,7 +878,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     setBusy(true);
     sock.current?.emit('notes:update', { projectId: id, id: n.id, note: { ...payload(d), visibility: d.visibility } }, (r: Res) => {
       setBusy(false);
-      if (r.ok && d.ocrNew && d.ocr) void logRecognised(id, n.id, d.ocr);
+      if (r.ok && d.ocrNew && d.ocr) void logRecognised(id, n.id, d.ocr, d.scan ?? 'hand');
       if (r.ok) done?.();
       else show(r.error ?? 'Speichern fehlgeschlagen');
     });
@@ -883,6 +897,7 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
     origin: n.origin ?? '',
     preview: n.file ? noteFileUrl(id, n.id, n.updatedAt) : undefined,
     mime: n.file?.mime,
+    scan: n.scan ?? null,
   });
 
   function save() {
@@ -1203,6 +1218,11 @@ export function NotesPanel({ me, project, panel = false, onClose, wanted = null 
                     </p>
                   )}
                   {n.rows && n.rows.length > 0 && <Table rows={n.rows} />}
+                  {n.scan && n.body && (
+                    <p className={c.scanMark} title="Der Text wurde mit der Texterkennung aus dem Bild gelesen und danach überarbeitet.">
+                      <Icon name="scan" size={13} /> Scan – {SCRIPT_LABEL[n.scan]}
+                    </p>
+                  )}
                   {n.body && <p className={c.body}>{n.body}</p>}
                   {n.source && <p className={c.place}>{n.kind === 'data' ? 'Quelle' : 'Fundstelle'}: {n.source}</p>}
                   {n.url && n.kind !== 'image' && (
