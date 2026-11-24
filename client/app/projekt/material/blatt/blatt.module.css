@@ -506,3 +506,9 @@
 .host :global(.bl-look-book .bl-quote-src:not(:empty))::before { content: '— '; }
 .host :global(.bl-look-book .bl-task-title), .host :global(.bl-look-book .bl-mat-title) { font-weight: 600; }
 .host :global(.bl-mnote.bl-side sup) { font-size: 0.75em; line-height: 0; }
+
+/* Definitionen (z. B. Operatoren): Begriff links, Erklärung rechts */
+.host :global(.bl-def) { display: grid; grid-template-columns: var(--dt, 30mm) minmax(0, 1fr); column-gap: 4mm; }
+.host :global(.bl-def + .bl-def) { border-top: 0.15mm solid #ddd; padding-top: 1mm; }
+.host :global(.bl-dt) { font-weight: 700; }
+.host :global(.bl-tpl-definitionen .bl-def > .bl-dt::after) { content: ''; }

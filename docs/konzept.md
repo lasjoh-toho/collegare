@@ -1481,7 +1481,7 @@ zu komplex“):
 `{Lehrkraft}`, `{Datum}`, `{Punkte}` erscheinen beim Schreiben als Marken, `___` wird zur Linie. Ohne `corners` (ältere
 Blätter) ergeben sich die Ecken aus den alten Feldern. Reiter „Kopf“ als Kontext-Reiter mit Einsetzen, Muster,
 Abgrenzung, QR-Code und Löschen. Dazu die Blattvorlage „Buchsatz mit Randspalte“ (`page.look = 'book'`,
-`page.sidenotes`) nach dem Vorbild von tufte-css; in der Oberfläche heißt sie nicht nach Tufte.
+`page.sidenotes`) nach dem Vorbild von tufte-css; in der Oberfläche heißt sie nicht nach Tufte. Aufteilen (`splitBlock`/`splitBlockAt`: Schreibmarke, Nummern, Absätze, Überschriften) für alle Textbausteine, Punkte aus „(6 P.)“ ins Punktefeld; Vorlage `definitionen` (Absatz „Begriff: Erklärung“ als zweispaltige Zeile) mit Operatoren-Beispiel.
 
 ### 8j.5 Nächste Stufen
 

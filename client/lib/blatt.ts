@@ -417,6 +417,100 @@ export const CONVERTIBLE: BlockType[] = ['heading', 'text', 'material', 'quote',
  * Text (eine Zeile je Absatz) wandern mit. Wird aus mehrzeiligem Text eine Überschrift, folgt der Rest als Erklärtext.
  * Gemeinsame Einstellungen (Umbrüche, Zusammenhalten) bleiben, die Vorlage beginnt neu.
  */
+/**
+ * Eingefügten Text in mehrere Bausteine teilen (Wunsch Jo, 24. November 2026), für alle Bausteine mit Text (Erklärtext,
+ * Material, Kasten, Zitat, Aufgabe). „Nummern“: eine neue Einheit beginnt bei jeder Zeile mit Nummer am Anfang („1.“,
+ * „2)“, „Aufgabe 3:“, „a)“). Bei Aufgaben fällt die Nummer weg (das Blatt nummeriert selbst), „a)“ wird Teilaufgabe,
+ * Punkte am Zeilenende („(6 P.)“, „8 Punkte“, „4 BE“) wandern ins Punktefeld. „Absätze“: jeder Absatz für sich.
+ * „Überschriften“: Zeilen mit # werden Überschrift-Bausteine, der Text dazwischen bleibt, was er war.
+ */
+export const SPLITTABLE: BlockType[] = ['text', 'material', 'box', 'quote', 'task'];
+const NUM_START = /^\s*(?:\*\*)?(?:(?:Aufgabe|Nr\.?)\s*(\d+[a-z]?)\s*[:.)]?|(\d{1,2})\s*[.)]|([a-h])\s*\))(?:\*\*)?\s+(?=\S)/i;
+const POINTS_END = /\s*[([]?\s*(\d+(?:[,.]\d+)?)\s*(?:P\.?|Pkt\.?|Punkte?|BE|VP)\s*[)\]]?\s*$/i;
+const linesOf = (b: Block) => (b.md ?? '').replace(/\r\n?/g, '\n').split('\n');
+/** neuer Baustein gleicher Art mit den Einstellungen des alten (ohne Titel, Quelle, eigene Nummer) */
+function sibling(b: Block, md: string): Block {
+  const n = newBlock(b.type);
+  for (const k of ['tpl', 'lines', 'lineStyle', 'subtask', 'fs', 'lh', 'ta', 'it', 'bd', 'nm', 'ind', 'fw', 'ls', 'ps', 'korrOff'] as const) if (b[k] !== undefined) (n as unknown as Record<string, unknown>)[k] = b[k];
+  n.md = md;
+  return n;
+}
+/** Wie viele Bausteine entstünden? (0 = geht nicht) */
+export function splitCount(b: Block, mode: 'numbers' | 'paras' | 'headings'): number {
+  if (!SPLITTABLE.includes(b.type)) return 0;
+  const n = mode === 'numbers' ? linesOf(b).filter((l) => NUM_START.test(l)).length + (NUM_START.test(linesOf(b).find((l) => l.trim()) ?? '') ? 0 : 1) : mode === 'paras' ? paraSpans(b.md).length : linesOf(b).filter((l) => /^#{1,3}\s+\S/.test(l)).length;
+  return n >= 2 || (mode === 'headings' && n >= 1) ? n : 0;
+}
+export function splitBlock(b: Block, mode: 'numbers' | 'paras' | 'headings'): Block[] {
+  if (!SPLITTABLE.includes(b.type)) return [b];
+  const lines = linesOf(b);
+  if (mode === 'paras') {
+    const sp = paraSpans(b.md);
+    if (sp.length < 2) return [b];
+    return sp.map(([x, y], i) => (i === 0 ? { ...b, md: lines.slice(x, y).join('\n') } : sibling(b, lines.slice(x, y).join('\n'))));
+  }
+  if (mode === 'headings') {
+    const out: Block[] = [];
+    let cur: string[] = [];
+    let first = true;
+    const flush = () => {
+      const md = cur.join('\n').trim();
+      if (md) out.push(first ? { ...b, md } : sibling(b, md));
+      if (md) first = false;
+      cur = [];
+    };
+    for (const ln of lines) {
+      const h = /^(#{1,3})\s+(.*\S)\s*$/.exec(ln);
+      if (!h) {
+        cur.push(ln);
+        continue;
+      }
+      flush();
+      const hb = newBlock('heading');
+      hb.text = plainMd(h[2]);
+      hb.level = h[1].length <= 1 ? 1 : 2;
+      out.push(hb);
+    }
+    flush();
+    if (!out.some((x) => x.id === b.id)) out[0] = { ...out[0], id: b.id };
+    return out.length > 1 ? out : [b];
+  }
+  const task = b.type === 'task';
+  const parts: { lines: string[]; sub: boolean }[] = [];
+  for (const ln of lines) {
+    const m = NUM_START.exec(ln);
+    if (m) parts.push({ lines: [task ? ln.slice(m[0].length) : ln], sub: !!m[3] });
+    else if (parts.length) parts[parts.length - 1].lines.push(ln);
+    else if (ln.trim()) parts.push({ lines: [ln], sub: !!b.subtask });
+  }
+  if (parts.length < 2) return [b];
+  return parts.map((p, i) => {
+    let md = p.lines.join('\n').trim();
+    const n: Block = i === 0 ? { ...b } : sibling(b, md);
+    if (task) {
+      const pm = POINTS_END.exec(md);
+      if (pm && md.slice(0, pm.index).trim()) {
+        md = md.slice(0, pm.index).trim();
+        n.points = `${pm[1].replace('.', ',')} P.`;
+      } else if (i > 0) n.points = '';
+      n.subtask = p.sub || undefined;
+      if (i > 0) delete n.num;
+    }
+    n.md = md;
+    return n;
+  });
+}
+/** Baustein vor der Zeile `line` teilen (Schreibmarke) */
+export function splitBlockAt(b: Block, line: number): Block[] {
+  const lines = linesOf(b);
+  const a = lines.slice(0, line).join('\n').trim();
+  const z = lines.slice(line).join('\n').trim();
+  if (!SPLITTABLE.includes(b.type) || !a || !z) return [b];
+  const n = sibling(b, z);
+  if (b.type === 'task') n.points = '';
+  return [{ ...b, md: a }, n];
+}
+
 export function convertBlock(b: Block, to: BlockType): Block[] {
   if (b.type === to || !CONVERTIBLE.includes(b.type) || !CONVERTIBLE.includes(to)) return [b];
   const title = (b.type === 'heading' ? b.text : b.type === 'material' ? b.title : b.type === 'box' ? b.text : '')?.trim() ?? '';
@@ -876,6 +970,7 @@ export const TEMPLATES: Partial<Record<BlockType, Template[]>> = {
     { id: 'hinweis', label: 'Hinweis, grau hinterlegt' },
     { id: 'klein', label: 'Kleingedrucktes', style: { fs: 85 } },
     { id: 'einleitung', label: 'Einleitung, kursiv', style: { it: true, lh: 1.5 } },
+    { id: 'definitionen', label: 'Definitionen: Begriff links, Erklärung rechts' },
   ],
   material: [
     { id: 'standard', label: 'Standard: Zeilen gezählt, Blocksatz', style: { ta: 'justify', lh: 1.45 } },
@@ -898,6 +993,7 @@ export const TEMPLATES: Partial<Record<BlockType, Template[]>> = {
     { id: 'grau', label: 'Grau hinterlegt' },
     { id: 'merksatz', label: 'Merksatz mit Balken' },
     { id: 'gestrichelt', label: 'Gestrichelt' },
+    { id: 'definitionen', label: 'Definitionen im Kasten' },
   ],
   glossary: [
     { id: 'liste', label: 'Liste' },
@@ -1182,10 +1278,33 @@ function field(tag: string, cls: string, name: string, html: string, range?: [nu
   return e;
 }
 
+/**
+ * Definitionen (Wunsch Jo, 24. November 2026, z. B. Operatoren): jeder Absatz „Begriff: Erklärung“ (auch „–“) wird zu
+ * Begriff links in fester Spalte und Erklärung rechts daneben. Absätze ohne Doppelpunkt bleiben, wie sie sind.
+ */
+function defPara(p: string): string {
+  const m = /^<p>([\s\S]*)<\/p>$/.exec(p);
+  if (!m) return p;
+  const inner = m[1];
+  let depth = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === '<') depth++;
+    else if (c === '>') depth--;
+    else if (depth === 0 && ((c === ':' && /\s/.test(inner[i + 1] ?? '')) || ((c === '–' || c === '—') && inner[i - 1] === ' ' && inner[i + 1] === ' '))) {
+      const term = inner.slice(0, i).trim().replace(/<\/?strong>/g, '');
+      const rest = inner.slice(i + 1).trim();
+      if (!term || term.replace(/<[^>]+>/g, '').length > 40) return p;
+      return `<p class="bl-def"><span class="bl-dt">${term}</span><span class="bl-dd">${rest}</span></p>`;
+    }
+  }
+  return p;
+}
+
 function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
   const box = el('div', 'bl-block bl-' + b.type);
   box.dataset.bid = b.id;
-  const paras = part.paras ?? [];
+  const paras = (part.paras ?? []).map((x) => (b.tpl === 'definitionen' && (b.type === 'text' || b.type === 'box') ? defPara(x) : x));
   const html = paras.join('');
   const first = part.first !== false;
   switch (b.type) {

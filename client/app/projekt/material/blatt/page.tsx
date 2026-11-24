@@ -35,6 +35,10 @@ import {
   mapLists,
   CONVERTIBLE,
   convertBlock,
+  SPLITTABLE,
+  splitBlock,
+  splitBlockAt,
+  splitCount,
   newBlock,
   pageGeom,
   paginate,
@@ -101,7 +105,7 @@ Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht d
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-„Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -648,6 +652,31 @@ export default function BlattPage() {
     setSel(bid);
     setEdit(null);
   }
+  /** Baustein aufteilen (Wunsch Jo, 24. November 2026): an der Schreibmarke, nach Nummern, Absätzen oder Überschriften */
+  function split(bid: string, mode: SplitMode) {
+    if (!doc) return;
+    const b = findBlock(doc.blocks, bid);
+    if (!b) return;
+    let parts: Block[];
+    if (mode === 'caret') {
+      const c = caret.current;
+      if (!c || c.key !== `${bid}|md`) return setError('Erst in den Text klicken, wo geteilt werden soll, dann „Aufteilen“.');
+      const sp = paraSpans(b.md);
+      const at = sp[c.para];
+      parts = at ? splitBlockAt(b, c.off === 0 ? at[0] : at[1]) : [b];
+    } else parts = splitBlock(b, mode);
+    if (parts.length < 2) return setError('Hier gibt es nichts zu teilen.');
+    setError('');
+    change((d) => ({
+      ...d,
+      blocks: mapLists(d.blocks, (l) => {
+        const i = l.findIndex((x) => x.id === bid);
+        return i < 0 ? l : [...l.slice(0, i), ...parts, ...l.slice(i + 1)];
+      }),
+    }));
+    setEdit(null);
+    setSel(parts[0].id);
+  }
   const openConv = (e: React.MouseEvent, b: Block) => {
     if (!editing) return;
     e.preventDefault();
@@ -1048,6 +1077,7 @@ export default function BlattPage() {
               editingText={!!edit}
               cell={edit && selBlock?.type === 'table' && edit.bid === selBlock.id && edit.field.startsWith('cell:') ? { r: Number(edit.field.split(':')[1]), c: Number(edit.field.split(':')[2]) } : null}
               head={headSel}
+              split={(m) => selBlock && split(selBlock.id, m)}
               openHead={(k = 'tl') => (setSel(null), setHeadSel(true), setTab('block'), setHeader({ show: true }), setEdit({ bid: '__head', field: `head:${k}`, idx: 0 }))}
               setColCount={setColCount}
               panel={panel}
@@ -1163,6 +1193,7 @@ export default function BlattPage() {
                   conv={conv}
                   b={doc ? findBlock(doc.blocks, conv.bid) : null}
                   onPick={(to) => (transform(conv.bid, to), setConv(null))}
+                  onSplit={(m) => (split(conv.bid, m), setConv(null))}
                   onDelete={() => (remove(conv.bid), setConv(null))}
                   onClose={() => setConv(null)}
                 />
@@ -1673,7 +1704,7 @@ function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<H
 }
 
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
-function ConvMenu({ conv, b, head, onPick, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onDelete: () => void; onClose: () => void }) {
+function ConvMenu({ conv, b, head, onPick, onSplit, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onDelete: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
@@ -1698,9 +1729,52 @@ function ConvMenu({ conv, b, head, onPick, onDelete, onClose }: { conv: { x: num
           ))}
         </>
       )}
+      {!head && onSplit && SPLITTABLE.includes(b.type) && <SplitItems b={b} split={onSplit} caret={false} />}
       <div className={st.mh}>{head ? 'Kopf' : BLOCK_LABEL[b.type]}</div>
       <MI icon="delete" label="Löschen" onClick={onDelete} />
     </div>
+  );
+}
+
+/** Beispiel für Operatoren; jede Zeile „Operator: Erklärung“, Zeilen ohne Doppelpunkt sind Zwischenüberschriften */
+const OPERATOREN = [
+  '**Anforderungsbereich I**',
+  'nennen: Informationen ohne Erläuterung aufzählen',
+  'beschreiben: Sachverhalte strukturiert und fachsprachlich angemessen wiedergeben',
+  'zusammenfassen: wesentliche Aussagen knapp und geordnet wiedergeben',
+  '**Anforderungsbereich II**',
+  'erklären: Sachverhalte in einen Zusammenhang einordnen und begründen',
+  'analysieren: Material gezielt untersuchen und auswerten',
+  'vergleichen: Gemeinsamkeiten und Unterschiede nach Kriterien darstellen',
+  '**Anforderungsbereich III**',
+  'beurteilen: Aussagen prüfen und ein begründetes Sachurteil fällen',
+  'bewerten: wie beurteilen, dazu ein begründetes Werturteil mit offengelegten Maßstäben',
+  'erörtern: Pro und Contra abwägen und zu einem begründeten Urteil kommen',
+].join('\n');
+type SplitMode = 'caret' | 'numbers' | 'paras' | 'headings';
+/** Einträge „Aufteilen“: wie viele Bausteine entstünden, steht dahinter */
+function SplitItems({ b, split, caret }: { b: Block; split: (m: SplitMode) => void; caret: boolean }) {
+  const unit = b.type === 'task' ? 'Aufgaben' : 'Bausteine';
+  const n = splitCount(b, 'numbers');
+  const p = splitCount(b, 'paras');
+  const h = splitCount(b, 'headings');
+  return (
+    <>
+      <div className={st.mh}>Aufteilen</div>
+      {caret && <MI label="an der Schreibmarke" onClick={() => split('caret')} hint="vor dem Absatz mit der Schreibmarke (am Absatzende: danach)" />}
+      <MI label={`nach Nummern${n ? ` (${n} ${unit})` : ''}`} disabled={!n} onClick={() => split('numbers')} hint={b.type === 'task' ? '1., 2), Aufgabe 3: … neue Aufgabe; a) Teilaufgabe; Punkte am Zeilenende ins Punktefeld' : 'jede Zeile mit 1., 2), a) … beginnt einen neuen Baustein'} />
+      <MI label={`jeden Absatz einzeln${p ? ` (${p})` : ''}`} disabled={!p} onClick={() => split('paras')} />
+      <MI label={`an Überschriften${h ? ` (${h})` : ''}`} disabled={!h} onClick={() => split('headings')} hint="Zeilen mit # werden Überschriften" />
+    </>
+  );
+}
+function SplitDrop({ b, split }: { b: Block | null; split: (m: SplitMode) => void }) {
+  const ok = !!b && SPLITTABLE.includes(b.type);
+  const n = ok ? splitCount(b!, 'numbers') : 0;
+  return (
+    <Drop icon="distributecolumns" label="Aufteilen" value={n ? `${n} erkannt` : undefined} big disabled={!ok} title="Eingefügten Text in mehrere Bausteine teilen">
+      {ok && <SplitItems b={b!} split={split} caret />}
+    </Drop>
   );
 }
 
@@ -1795,6 +1869,7 @@ type RibbonProps = {
   /** Kopf gewählt: Reiter „Kopf“ statt Baustein */
   head: boolean;
   openHead: (corner?: CornerKey) => void;
+  split: (m: SplitMode) => void;
   add: (t: BlockType, extra?: Partial<Block>) => void;
   move: (id: string, dir: -1 | 1) => void;
   remove: (id: string) => void;
@@ -2347,6 +2422,7 @@ function Ribbon(props: RibbonProps) {
                   props.ensureGlossary();
                 }}
               />
+              <SplitDrop b={b} split={props.split} />
             </Group>
           </>
         )}
@@ -2356,6 +2432,13 @@ function Ribbon(props: RibbonProps) {
               {(['text', 'heading', 'material', 'quote', 'box'] as const).map((t) => (
                 <RB key={t} icon={BICON[t]} label={BLOCK_LABEL[t]} big onClick={() => props.add(t)} title={`${BLOCK_LABEL[t]} einfügen (${props.selCol ? 'in die gewählte Spalte' : b ? 'nach dem gewählten Baustein' : 'am Ende'})`} />
               ))}
+            </Group>
+            <Group label="Definitionen">
+              <Drop icon="insertmultiindex" label="Definitionen" big title="Begriff links, Erklärung rechts: jede Zeile „Begriff: Erklärung“">
+                <MI label="leer" onClick={() => props.add('box', { tpl: 'definitionen', text: 'Definitionen', md: 'Begriff: Erklärung' })} hint="Kasten; jede Zeile „Begriff: Erklärung“" />
+                <MI label="Operatoren (Anforderungsbereiche I–III)" onClick={() => props.add('box', { tpl: 'definitionen', text: 'Operatoren', md: OPERATOREN })} hint="Beispiel zum Anpassen an dein Fach" />
+                <MI label="als Text ohne Kasten" onClick={() => props.add('text', { tpl: 'definitionen', md: 'Begriff: Erklärung' })} />
+              </Drop>
             </Group>
             <Group label="Aufgaben">
               <RB icon={BICON.task} label="Aufgabe" big onClick={() => props.add('task')} />
@@ -2418,6 +2501,7 @@ function Ribbon(props: RibbonProps) {
                     <MI label="Schreiblinien" on={(task.lineStyle ?? 'lines') === 'lines'} onClick={() => set({ lineStyle: 'lines' })} />
                     <MI label="Karos (Mathe)" on={task.lineStyle === 'grid'} onClick={() => set({ lineStyle: 'grid' })} />
                   </Drop>
+                  <SplitDrop b={task} split={props.split} />
                 </>
               ) : (
                 <span className={st.hint}>
