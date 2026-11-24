@@ -400,8 +400,9 @@
 .host :global(.bl-flow .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
 .host :global(.bl-flow .bl-mnote)::before { content: ' ('; }
 .host :global(.bl-flow .bl-mnote)::after { content: ')'; }
-.tabFile { color: #fff; background: var(--office-word, #2b579a); margin-right: 4px; }
-.tabFile:hover { color: #fff; background: color-mix(in srgb, var(--office-word, #2b579a) 85%, #000); }
+/* „Datei“ im Hintergrund nur zart getönt (Jo, 24. November 2026), damit der offene Reiter das stärkste Element bleibt */
+.tabFile { color: var(--office-word, #2b579a); background: color-mix(in srgb, var(--office-word, #2b579a) 13%, transparent); margin-right: 4px; font-weight: 600; }
+.tabFile:hover { color: #fff; background: var(--office-word, #2b579a); }
 .tabFile.tabOn { color: var(--office-word, #2b579a); background: var(--bg-elev); }
 /* Bewertung: Felder für erreichte Punkte und Notenkasten */
 .host :global(.bl-score) { flex: none; display: inline-flex; align-items: flex-end; gap: 1.2mm; margin-left: 3mm; white-space: nowrap; font-size: 0.95em; }
