@@ -24,8 +24,11 @@ import {
   fromEditMd,
   glossaryTerms,
   paraSpans,
-  HEAD_KEYS,
-  headFields,
+  CORNERS,
+  DEFAULT_CORNERS,
+  HEAD_TOKENS,
+  headCorners,
+  type CornerKey,
   insertAfter,
   insertIntoCol,
   listOf,
@@ -62,8 +65,6 @@ import {
   type Block,
   type BlockType,
   type Copy,
-  type HeadField,
-  type HeadKey,
   type HeadCtx,
   type Korr,
   type Problem,
@@ -98,9 +99,9 @@ Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden
 
 Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
 
-Rahmendaten: Klick in den Kopf der ersten Seite oder auf „Rahmendaten“. Jedes Feld (Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note) lässt sich zeigen oder weglassen, mit ↑↓ umstellen, in Zeile 1 oder 2 setzen, anders beschriften und mit kurzer, mittlerer oder langer Linie versehen; der Kopf ist mit Linie, im Kasten oder schlicht abgegrenzt. „Automatisch“ füllt es aus dem Blatt bzw. beim Druck aus Autogra.fi (Titel = Name des Blatts, Punkte = Summe der Aufgaben, Datum = Tag des Drucks); sonst steht dein eigener Text da, oder eine Linie zum Ausfüllen.
+Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-„Vorlagen“: Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+„Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -193,7 +194,8 @@ export default function BlattPage() {
   const [panel, setPanel] = useState<Panel | null>(null);
   /** links: Seitenminiaturen, Gliederung oder alle Elemente */
   const [leftTab, setLeftTab] = useState<'thumbs' | 'outline' | 'blocks'>('blocks');
-  const [headOpen, setHeadOpen] = useState(false);
+  /** Kopf gewählt: Reiter „Kopf“ */
+  const [headSel, setHeadSel] = useState(false);
   const thumbs = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLElement[]>([]);
   /** Feld, das gerade auf der Seite bearbeitet wird */
@@ -339,6 +341,18 @@ export default function BlattPage() {
   function emitLive() {
     const L = live.current;
     if (!L) return;
+    if (L.t.bid === '__head') {
+      // Eckfeld im Kopf: Text mit Platzhaltern zurücklesen
+      const k = L.t.field.slice(5) as CornerKey;
+      const v = headFromEdit(L.el);
+      L.value = v;
+      rememberCaret();
+      skipRender.current = performance.now();
+      change((d) => ({ ...d, page: { ...d.page, header: { ...d.page.header, corners: { ...headCorners(d), [k]: v } } } }));
+      if (idle.current) clearTimeout(idle.current);
+      idle.current = setTimeout(() => setTick((x) => x + 1), 1100);
+      return;
+    }
     let v = L.rich ? (MULTI.includes(L.t.field) ? keepBlank(fromEditMd(editToTufte(markBlank(L.el)))) : fromEditMd(editToTufte(L.el))) : (L.el.textContent ?? '').replace(/\s+/g, ' ').trim();
     if (!MULTI.includes(L.t.field)) v = v.replace(/\n+/g, ' ');
     let full = v;
@@ -364,8 +378,9 @@ export default function BlattPage() {
   }
 
   function activate(h: HTMLElement, t: EditTarget, d: BlattDoc) {
-    const b = findBlock(d.blocks, t.bid);
-    if (!b) return;
+    const isHead = t.bid === '__head';
+    const b = isHead ? null : findBlock(d.blocks, t.bid);
+    if (!b && !isHead) return;
     const all = [...h.querySelectorAll<HTMLElement>(`[data-bid="${t.bid}"] [data-field="${t.field}"]`)].filter((x) => x.closest('[data-bid]')?.getAttribute('data-bid') === t.bid);
     if (!all.length) return;
     const rangeOf = (x: HTMLElement) => (x.dataset.r ? (x.dataset.r.split(':').map(Number) as [number, number]) : null);
@@ -378,7 +393,7 @@ export default function BlattPage() {
       });
       if (k >= 0) f = all[k];
     }
-    const value = fieldValue(b, t.field);
+    const value = isHead ? headCorners(d)[t.field.slice(5) as CornerKey] : fieldValue(b, t.field);
     const rich = RICH(t.field);
     const spans = paraSpans(value);
     const range = t.field === 'md' ? rangeOf(f) : null;
@@ -393,7 +408,7 @@ export default function BlattPage() {
       const pos = (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(t.at.x, t.at.y);
       if (pos && f.contains(pos.startContainer) && !(pos.startContainer.parentElement?.closest('.bl-ph'))) click = caretIn(f, pos.startContainer, pos.startOffset);
     }
-    f.innerHTML = rich ? tufteToEdit(toEditMd(slice)) : escHtml(slice);
+    f.innerHTML = isHead ? headToEdit(slice) : rich ? tufteToEdit(toEditMd(slice)) : escHtml(slice);
     if (getComputedStyle(f).display === 'inline') f.style.display = 'inline-block';
     f.contentEditable = 'true';
     f.spellcheck = true;
@@ -414,7 +429,7 @@ export default function BlattPage() {
         }
       },
     };
-    const multi = MULTI.includes(t.field);
+    const multi = MULTI.includes(t.field) || isHead;
     f.oninput = () => emitLive();
     f.onkeydown = (e) => {
       if (e.key === 'Escape') {
@@ -490,7 +505,7 @@ export default function BlattPage() {
       const firstPage = new Map<string, number>();
       const marks = new Map<string, { page: number; cont: boolean }[]>();
       r.pages.forEach((p, k) => {
-        const ids = [...p.querySelectorAll<HTMLElement>('[data-bid]')].map((e) => e.dataset.bid!);
+        const ids = [...p.querySelectorAll<HTMLElement>('[data-bid]')].map((e) => e.dataset.bid!).filter((x) => x !== '__head');
         if (k > 0 && ids[0]) {
           const cont = firstPage.has(ids[0]);
           marks.set(ids[0], [...(marks.get(ids[0]) ?? []), { page: k + 1, cont }]);
@@ -667,6 +682,7 @@ export default function BlattPage() {
   }
   function select(bid: string | null) {
     setSel(bid);
+    if (bid) setHeadSel(false);
     setSelCol(null);
     const b = bid && doc ? findBlock(doc.blocks, bid) : null;
     if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart' || b.type === 'grade')) setTab('block');
@@ -770,10 +786,15 @@ export default function BlattPage() {
     if (t.closest('.bl-live') || t.closest('[data-atom]') || t.closest('.bl-gutter')) return;
     // Kopf der Seite: Rahmendaten
     if (t.closest('[data-head]') && view !== 'sheets') {
-      setEdit(null);
-      setHeadOpen(true);
+      // Kopf: in die angeklickte Ecke schreiben (sonst die nächste Ecke)
+      setSel(null);
+      setHeadSel(true);
+      setTab('block');
+      const f = t.closest<HTMLElement>('[data-field^="head:"]');
+      setEdit({ bid: '__head', field: (f?.dataset.field ?? 'head:tl') as FieldName, idx: 0, at: f ? { x: e.clientX, y: e.clientY } : undefined });
       return;
     }
+    setHeadSel(false);
     const col = t.closest<HTMLElement>('.bl-col-empty')?.parentElement;
     if (col?.dataset.col) {
       const [cid, k] = col.dataset.col.split(':');
@@ -1026,7 +1047,8 @@ export default function BlattPage() {
               inline={inline}
               editingText={!!edit}
               cell={edit && selBlock?.type === 'table' && edit.bid === selBlock.id && edit.field.startsWith('cell:') ? { r: Number(edit.field.split(':')[1]), c: Number(edit.field.split(':')[2]) } : null}
-              openHead={() => (setEdit(null), setHeadOpen(true))}
+              head={headSel}
+              openHead={(k = 'tl') => (setSel(null), setHeadSel(true), setTab('block'), setHeader({ show: true }), setEdit({ bid: '__head', field: `head:${k}`, idx: 0 }))}
               setColCount={setColCount}
               panel={panel}
               setPanel={setPanel}
@@ -1072,11 +1094,6 @@ export default function BlattPage() {
                 }
               }}
             />
-          )}
-          {headOpen && editing && (
-            <div className={st.headAnchor}>
-              <HeadDialog doc={doc} title={title} course={project.course.title} teacher={me.name} setHeader={setHeader} onClose={() => setHeadOpen(false)} />
-            </div>
           )}
           <div className={`${st.wrap} ${editing ? '' : st.read} ${panel ? '' : st.noPanel} ${panel === 'typst' ? st.codePanel : ''}`}>
             <aside className={st.side}>
@@ -1156,8 +1173,8 @@ export default function BlattPage() {
                   <div className={st.list} onDragOver={(e) => dragId && e.preventDefault()} onDrop={() => dragId && (moveTo(dragId, dropAt), setDragId(null), setDropAt(null))}>
                     {doc.page.header.show !== false ? (
                       <div
-                        className={`${st.item} ${headOpen ? st.sel : ''}`}
-                        onClick={() => (setEdit(null), setHeadOpen(true), host.current?.querySelector('[data-head]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
+                        className={`${st.item} ${headSel ? st.sel : ''}`}
+                        onClick={() => (setSel(null), setHeadSel(true), setTab('block'), editing && setEdit({ bid: '__head', field: 'head:tl', idx: 0 }), host.current?.querySelector('[data-head]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
                         onContextMenu={(e) => editing && (e.preventDefault(), setConv({ bid: '__head', x: e.clientX, y: e.clientY }))}
                         title="Kopf der Klausur: Titel, Name, Datum, QR-Code … Klick zum Bearbeiten, Rechtsklick zum Löschen"
                       >
@@ -1166,7 +1183,7 @@ export default function BlattPage() {
                         </span>
                         <span className={st.itemText}>
                           Kopf
-                          <small>Rahmendaten{doc.page.header.qr !== 'none' ? ', QR-Code' : ''}</small>
+                          <small>vier Ecken{doc.page.header.qr !== 'none' ? ', QR-Code' : ''}</small>
                         </span>
                         {editing && (
                           <button type="button" className={st.convBtn} title="Kopf entfernen" aria-label="Kopf entfernen" onClick={(e) => (e.stopPropagation(), setHeader({ show: false }))}>
@@ -1296,7 +1313,7 @@ type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' |
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
 const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade'];
 type Panel = 'search' | 'material' | 'glossary' | 'typst';
-type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | `cell:${number}:${number}`;
+type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | `cell:${number}:${number}` | `head:${CornerKey}`;
 interface EditTarget {
   bid: string;
   field: FieldName;
@@ -1322,6 +1339,33 @@ function fieldValue(b: Block | null, f: FieldName): string {
 }
 const RICH = (f: FieldName) => f === 'md' || f === 'title' || f === 'text' || f.startsWith('cell:');
 const MULTI: FieldName[] = ['md'];
+
+// ---------- Eckfelder im Kopf ----------
+const TOKEN_KEYS = new Set(HEAD_TOKENS.map((t) => t.key).concat('Kurs'));
+/** Platzhalter als Marke im Text, die man als Ganzes löscht */
+const tokHtml = (k: string) => `<span class="bl-tok" contenteditable="false" data-tok="${k}">${k}</span>`;
+/** Eckfeld zum Bearbeiten: eine Zeile je Absatz, Platzhalter als Marken, Unterstriche bleiben sichtbar */
+function headToEdit(v: string): string {
+  const lines = v ? v.split('\n') : [''];
+  return lines.map((ln) => `<p>${ln.split(/(\{[A-Za-zÄÖÜäöüß]+\})/).map((x) => { const m = /^\{(.+)\}$/.exec(x); return m && TOKEN_KEYS.has(m[1]) ? tokHtml(m[1]) : escHtml(x); }).join('') || '<br>'}</p>`).join('');
+}
+/** Eckfeld zurücklesen: Absätze und Zeilenumbrüche werden zu Zeilen, Marken zu {Platzhaltern} */
+function headFromEdit(el: HTMLElement): string {
+  const lines: string[] = [''];
+  const walkN = (n: Node) => {
+    if (n.nodeType === 3) return void (lines[lines.length - 1] += (n.textContent ?? '').replace(/\u200b/g, '').replace(/\u00a0/g, ' '));
+    if (!(n instanceof HTMLElement)) return;
+    if (n.dataset.tok) return void (lines[lines.length - 1] += `{${n.dataset.tok}}`);
+    if (n.tagName === 'BR') return void (n.nextSibling || n.parentElement === el ? lines.push('') : undefined);
+    const block = /^(P|DIV|LI)$/.test(n.tagName);
+    if (block && lines[lines.length - 1] !== '') lines.push('');
+    n.childNodes.forEach(walkN);
+    if (block) lines.push('');
+  };
+  el.childNodes.forEach(walkN);
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.map((l) => l.replace(/\s+$/, '')).join('\n');
+}
 
 // ---------- Schreibmarke im Text auf der Seite ----------
 /** Absätze des bearbeiteten Felds (Zeilennummern und Platzhalter zählen nicht) */
@@ -1748,7 +1792,9 @@ type RibbonProps = {
   set: (p: Partial<Block>) => void;
   setPageOpt: (p: Partial<BlattDoc['page']>) => void;
   setHeader: (p: Partial<BlattDoc['page']['header']>) => void;
-  openHead: () => void;
+  /** Kopf gewählt: Reiter „Kopf“ statt Baustein */
+  head: boolean;
+  openHead: (corner?: CornerKey) => void;
   add: (t: BlockType, extra?: Partial<Block>) => void;
   move: (id: string, dir: -1 | 1) => void;
   remove: (id: string) => void;
@@ -1872,8 +1918,11 @@ function StylesTab(props: {
   selectedText: () => string;
   onError: (m: string) => void;
   ensureGlossary: () => void;
+  add: (t: BlockType, extra?: Partial<Block>) => void;
 }) {
   const { doc, b, textBlock, rich, set, exec } = props;
+  const P = doc.page;
+  const book = P.look === 'book';
   const [name, setName] = useState('');
   const own = doc.page.styles ?? [];
   const cur = b ? styleOf(b) : {};
@@ -1891,6 +1940,15 @@ function StylesTab(props: {
   };
   return (
     <>
+      <Group label="Blatt">
+        <Drop icon="editstyle" label="Blattvorlage" value={book ? 'Buchsatz' : 'Standard'} big title="Gestaltung des ganzen Blatts">
+          <MI label="Standard" on={!book} onClick={() => props.setPageOpt({ look: undefined, sidenotes: undefined, font: 'sans' })} hint="serifenlose Schrift, Fußnoten unten auf der Seite" />
+          <MI label="Buchsatz mit Randspalte" on={book} onClick={() => props.setPageOpt({ look: 'book', sidenotes: true, font: 'serif' })} hint="Serifenschrift, breite Randspalte für Notizen, Fußnoten neben der Zeile, Überschriften kursiv" />
+          <MH>Einzeln</MH>
+          <MI label="Fußnoten in den Rand" on={!!P.sidenotes} onClick={() => props.setPageOpt({ sidenotes: !P.sidenotes || undefined })} hint="nummeriert neben der Zeile statt unten auf der Seite" stay />
+        </Drop>
+        <RB icon="quoteparastyle" label="Motto" big onClick={() => props.add('quote', { md: '', source: '' })} title="Leitspruch mit Quelle, z. B. über einem Kapitel" />
+      </Group>
       <Group label={b ? `Absatzvorlagen für: ${BLOCK_LABEL[b.type]}` : 'Absatzvorlagen'}>
         <div className={st.presets}>
           {PARA_PRESETS.map((p) => (
@@ -2062,7 +2120,7 @@ function Ribbon(props: RibbonProps) {
     return inline.current && sel?.rangeCount && inline.current.el.contains(sel.anchorNode) ? sel.toString() : '';
   };
   const keep = (e: React.MouseEvent) => (e.target as Element).closest('button') && e.preventDefault();
-  const ctx = b && CTX_TYPES.includes(b.type) ? (b.type === 'cols' ? 'Spalten' : BLOCK_LABEL[b.type]) : null;
+  const ctx = props.head ? 'Kopf' : b && CTX_TYPES.includes(b.type) ? (b.type === 'cols' ? 'Spalten' : BLOCK_LABEL[b.type]) : null;
   const P = doc.page;
   const H = P.header;
   const rich = props.editingText && !!inline.current?.rich;
@@ -2370,7 +2428,7 @@ function Ribbon(props: RibbonProps) {
               )}
             </Group>
             <Group label="Kopf">
-              <RB icon="insertheader" label="Rahmendaten" big on={H.show !== false} onClick={props.openHead} title="Titel, Fach, Klasse, Lehrkraft, Datum, Name, Punkte, Note: was steht wo und wie" />
+              <RB icon="insertheader" label="Rahmendaten" big on={H.show !== false} onClick={() => props.openHead()} title="Kopf mit vier Feldern in den Ecken: direkt auf der Seite ausfüllen" />
               <Drop icon="qr" label="QR-Code" value={H.qr === 'none' ? 'aus' : H.qr === 'all' ? 'jede Seite' : 'Seite 1'} big title="Persönlicher QR-Code aus Autogra.fi: die Abgabe wird beim Scannen gleich zugeordnet">
                 <MH>Persönlicher QR-Code aus Autogra.fi</MH>
                 <MI label="kein QR-Code" on={H.qr === 'none'} onClick={() => props.setHeader({ qr: 'none' })} />
@@ -2448,6 +2506,7 @@ function Ribbon(props: RibbonProps) {
         )}
         {tab === 'styles' && (
           <StylesTab
+            add={props.add}
             doc={doc}
             b={b}
             textBlock={textBlock}
@@ -2647,8 +2706,9 @@ function Ribbon(props: RibbonProps) {
             </Group>
           </>
         )}
-        {tab === 'block' && b && <BlockTab {...props} b={b} />}
-        {tab === 'block' && !b && <span className={st.hint}>Klick auf einen Baustein auf der Seite.</span>}
+        {tab === 'block' && props.head && <HeadTab {...props} />}
+        {tab === 'block' && !props.head && b && <BlockTab {...props} b={b} />}
+        {tab === 'block' && !props.head && !b && <span className={st.hint}>Klick auf einen Baustein auf der Seite.</span>}
       </div>
     </div>
   );
@@ -2759,6 +2819,86 @@ function Arrange(props: RibbonProps & { b: Block }) {
     <Group label="Anordnen">
       <ArrangeRows {...props} noDelete />
     </Group>
+  );
+}
+
+/** Muster für die vier Ecken des Kopfs */
+const CORNER_SETS: { label: string; c: Record<CornerKey, string> }[] = [
+  { label: 'Standard', c: DEFAULT_CORNERS },
+  { label: 'Klassenarbeit', c: { tl: '{Titel}\n{Klasse} · {Lehrkraft}', tr: 'Datum: {Datum}', bl: 'Name: {Name}', br: 'Punkte: {Punkte}   Note: ______' } },
+  { label: 'Arbeitsblatt', c: { tl: '{Titel}', tr: '{Klasse}', bl: 'Name: {Name}', br: 'Datum: __________' } },
+  { label: 'nur Titel', c: { tl: '{Titel}', tr: '', bl: '', br: '' } },
+  { label: 'leer', c: { tl: '', tr: '', bl: '', br: '' } },
+];
+/** Reiter „Kopf“: Platzhalter und Linien in die Ecke setzen, Muster, Abgrenzung, QR-Code */
+function HeadTab(props: RibbonProps) {
+  const H = props.doc.page.header;
+  const C = headCorners(props.doc);
+  const inHead = () => !!props.inline.current?.el.closest('[data-bid="__head"]');
+  const insert = (html: string) => {
+    const api = props.inline.current;
+    if (!api || !inHead()) return props.openHead();
+    api.restore();
+    // von Hand einsetzen: insertHTML setzt eine Marke am Zeilenende sonst hinter den Absatz
+    const sel = getSelection();
+    if (!sel?.rangeCount || !api.el.contains(sel.anchorNode)) return;
+    const r = sel.getRangeAt(0);
+    r.deleteContents();
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const last = tpl.content.lastChild;
+    r.insertNode(tpl.content);
+    if (last) {
+      r.setStartAfter(last);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    api.emit();
+  };
+  return (
+    <>
+      <Group label="Einsetzen">
+        {HEAD_TOKENS.map((t) => (
+          <RB key={t.key} icon={t.key === 'Datum' ? 'datefield' : t.key === 'Name' ? 'edit' : t.key === 'Punkte' ? 'checkbox' : t.key === 'Titel' ? 'inserttitlefield' : 'text'} label={t.label} onClick={() => insert(tokHtml(t.key) + '&nbsp;')} title={`Platzhalter „${t.label}“: ${t.hint}`} />
+        ))}
+        <RB icon="line" label="Linie" onClick={() => insert('__________')} title="Linie zum Ausfüllen (so lang wie die Unterstriche)" />
+      </Group>
+      <Group label="Ecken">
+        <Drop icon="insertheader" label="Muster" big title="Alle vier Ecken auf einmal füllen">
+          {CORNER_SETS.map((m) => (
+            <MI key={m.label} label={m.label} on={CORNERS.every(({ key }) => (C[key] ?? '') === m.c[key])} onClick={() => props.setHeader({ corners: { ...m.c }, show: true })} hint={[m.c.tl, m.c.tr, m.c.bl, m.c.br].filter(Boolean).join(' · ').replace(/\n/g, ' ') || 'alle Ecken leer'} />
+          ))}
+        </Drop>
+      </Group>
+      <Group label="Gestaltung">
+        <Drop icon="insertheader" label="Abgrenzung" value={H.style === 'box' ? 'Kasten' : H.style === 'none' ? 'schlicht' : 'Linie'} big>
+          <MH>Kopf abgrenzen</MH>
+          <MI label="Linie darunter" on={(H.style ?? 'line') === 'line'} onClick={() => props.setHeader({ style: 'line' })} />
+          <MI label="im Kasten" on={H.style === 'box'} onClick={() => props.setHeader({ style: 'box' })} />
+          <MI label="schlicht, ohne Linie" on={H.style === 'none'} onClick={() => props.setHeader({ style: 'none' })} />
+          <MH>Größe des Titels (erste Zeile oben links)</MH>
+          {(
+            [
+              ['s', 'klein'],
+              ['m', 'mittel'],
+              ['l', 'groß'],
+            ] as const
+          ).map(([v, l]) => (
+            <MI key={v} label={l} on={(H.titleSize ?? 'm') === v} onClick={() => props.setHeader({ titleSize: v })} stay />
+          ))}
+        </Drop>
+        <Drop icon="qr" label="QR-Code" value={H.qr === 'none' ? 'aus' : H.qr === 'all' ? 'jede Seite' : 'Seite 1'} big title="Persönlicher QR-Code aus Autogra.fi">
+          <MI label="kein QR-Code" on={H.qr === 'none'} onClick={() => props.setHeader({ qr: 'none' })} />
+          <MI label="auf Seite 1" on={H.qr === 'first'} onClick={() => props.setHeader({ qr: 'first', show: true })} />
+          <MI label="auf jeder Seite" on={H.qr === 'all'} onClick={() => props.setHeader({ qr: 'all', show: true })} hint="hilft, wenn Seiten getrennt gescannt werden" />
+        </Drop>
+      </Group>
+      <span className={st.groupGap} />
+      <Group label="Kopf">
+        <RB icon="delete" label="Löschen" big onClick={() => props.setHeader({ show: false })} title="Kopf ausblenden (Aufgabe → Rahmendaten holt ihn zurück)" />
+      </Group>
+    </>
   );
 }
 
@@ -3099,120 +3239,6 @@ function ChartIcon({ kind }: { kind: 'col' | 'bar' | 'line' | 'pie' }) {
         {kind !== 'pie' && <path d="M2 2v20h20" fill="none" stroke={c[2]} strokeWidth={1} />}
       </svg>
     </span>
-  );
-}
-
-/** Rahmendaten: jedes Feld an oder aus, automatisch oder frei; Reihenfolge, Zeile, Beschriftung und Länge der Linie */
-function HeadDialog({ doc, title, course, teacher, setHeader, onClose }: { doc: BlattDoc; title: string; course: string; teacher: string; setHeader: (p: Partial<BlattDoc['page']['header']>) => void; onClose: () => void }) {
-  const F = headFields(doc);
-  const H = doc.page.header;
-  const put = (k: HeadKey, p: Partial<HeadField>) => setHeader({ fields: { ...F, [k]: { ...F[k], ...p } }, show: true });
-  const order = [...(H.order ?? []), ...HEAD_KEYS.map((x) => x.key)].filter((k, i, a) => a.indexOf(k) === i && k !== 'title');
-  const moveKey = (k: HeadKey, dir: -1 | 1) => {
-    const o = [...order];
-    const i = o.indexOf(k);
-    const j = i + dir;
-    if (j < 0 || j >= o.length) return;
-    [o[i], o[j]] = [o[j], o[i]];
-    setHeader({ order: o });
-  };
-  const defRow = (k: HeadKey) => (k === 'points' || k === 'grade' ? 2 : 1);
-  const defLen: Record<HeadKey, 's' | 'm' | 'l'> = { title: 'l', subject: 'm', klasse: 's', teacher: 'm', date: 'm', name: 'l', points: 's', grade: 's' };
-  const autoText: Partial<Record<HeadKey, string>> = {
-    title: title || '(Name des Blatts)',
-    klasse: course ? `${course}; mit QR-Code die Klasse aus Autogra.fi` : 'mit QR-Code die Klasse aus Autogra.fi',
-    teacher: teacher,
-    date: `Tag des Drucks (heute ${new Date().toLocaleDateString('de-DE')})`,
-    name: 'mit QR-Code aus der Klassenliste, sonst Linie',
-    points: totalPoints(doc) !== null ? `___ / ${String(totalPoints(doc)).replace('.', ',')} (Summe der Aufgaben)` : 'Summe der Aufgaben (alle brauchen Punkte)',
-  };
-  const seg = <T extends string | number>(value: T, opts: readonly (readonly [T, string])[], onChange: (v: T) => void, label: string, disabled?: boolean) => (
-    <span className={st.segMini} role="group" aria-label={label}>
-      {opts.map(([v, l]) => (
-        <button key={String(v)} type="button" className={value === v ? st.segOn : ''} disabled={disabled} onClick={() => onChange(v)}>
-          {l}
-        </button>
-      ))}
-    </span>
-  );
-  const row = (key: HeadKey, idx: number | null) => {
-    const def = HEAD_KEYS.find((x) => x.key === key)!;
-    const f = F[key];
-    const isAuto = !!def.auto && f.auto === true;
-    return (
-      <tr key={key} className={f.on ? '' : st.off}>
-        <td className={st.ord}>
-          {idx !== null && (
-            <>
-              <button type="button" disabled={idx === 0} onClick={() => moveKey(key, -1)} aria-label={`${def.label} nach vorn`} title="weiter nach vorn">
-                ↑
-              </button>
-              <button type="button" disabled={idx === order.length - 1} onClick={() => moveKey(key, 1)} aria-label={`${def.label} nach hinten`} title="weiter nach hinten">
-                ↓
-              </button>
-            </>
-          )}
-        </td>
-        <td>
-          <input type="checkbox" checked={f.on} onChange={(e) => put(key, { on: e.target.checked })} aria-label={`${def.label} zeigen`} />
-        </td>
-        <td>{key === 'title' ? <strong>Titel</strong> : <input className={st.rIn} value={f.label ?? ''} placeholder={def.label} disabled={!f.on} onChange={(e) => put(key, { label: e.target.value || undefined })} aria-label={`Beschriftung für ${def.label}`} style={{ width: 92 }} />}</td>
-        <td>{key === 'title' ? <span className={st.hint}>oben</span> : seg(f.row ?? defRow(key), [[1, '1'], [2, '2']] as const, (v) => put(key, { row: v }), `Zeile für ${def.label}`, !f.on)}</td>
-        <td>{key === 'title' ? null : seg(f.len ?? defLen[key], [['s', 'kurz'], ['m', 'mittel'], ['l', 'lang']] as const, (v) => put(key, { len: v }), `Länge der Linie für ${def.label}`, !f.on)}</td>
-        <td>{def.auto ? <input type="checkbox" checked={isAuto} disabled={!f.on} onChange={(e) => put(key, { auto: e.target.checked })} aria-label={`${def.label} automatisch`} /> : <span className={st.hint}>–</span>}</td>
-        <td>
-          {isAuto ? (
-            <span className={st.hint}>{autoText[key] ?? def.auto}</span>
-          ) : key === 'grade' || key === 'name' ? (
-            <span className={st.hint}>Linie zum Ausfüllen</span>
-          ) : (
-            <input className={st.rIn} value={f.value ?? ''} disabled={!f.on} onChange={(e) => put(key, { value: e.target.value })} placeholder="leer = Linie" aria-label={def.label} style={{ width: '100%' }} />
-          )}
-        </td>
-      </tr>
-    );
-  };
-  return (
-    <div className={`${st.headDlg} ${st.headDlgWide}`} role="dialog" aria-label="Rahmendaten" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="row">
-        <strong>Rahmendaten</strong>
-        <span className="grow" />
-        <label className={st.check}>
-          <input type="checkbox" checked={H.show !== false} onChange={(e) => setHeader({ show: e.target.checked })} /> Kopf zeigen
-        </label>
-        <button className="btn" onClick={onClose} title="Schließen">
-          ✕
-        </button>
-      </div>
-      <div className="row" style={{ gap: 14, flexWrap: 'wrap' }}>
-        <span className={st.mini}>
-          Abgrenzung {seg(H.style ?? 'line', [['line', 'Linie'], ['box', 'Kasten'], ['none', 'ohne']] as const, (v) => setHeader({ style: v }), 'Abgrenzung des Kopfs')}
-        </span>
-        <span className={st.mini}>
-          Titel {seg(H.titleSize ?? 'm', [['s', 'klein'], ['m', 'mittel'], ['l', 'groß']] as const, (v) => setHeader({ titleSize: v }), 'Größe des Titels')}
-        </span>
-        <span className={st.mini}>
-          QR-Code {seg(H.qr, [['none', 'aus'], ['first', 'Seite 1'], ['all', 'jede Seite']] as const, (v) => setHeader({ qr: v, show: true }), 'QR-Code')}
-        </span>
-      </div>
-      <table className={st.headTable}>
-        <thead>
-          <tr>
-            <th />
-            <th>zeigen</th>
-            <th>Beschriftung</th>
-            <th>Zeile</th>
-            <th>Linie</th>
-            <th>auto</th>
-            <th>sonst: eigener Text, leer = Linie zum Ausfüllen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {row('title', null)}
-          {order.map((k, i) => row(k, i))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

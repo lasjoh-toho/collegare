@@ -471,3 +471,38 @@
 .preset:disabled { opacity: 0.5; cursor: default; }
 .presetOn { border-color: var(--office-word, #2b579a); background: color-mix(in srgb, var(--office-word, #2b579a) 10%, var(--bg-elev)); }
 .presetOwn { border-style: dashed; }
+
+/* Kopf mit vier Eckfeldern (Wunsch Jo, 24. November 2026) */
+.host :global(.bl-corners) { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'tl tr' 'bl br'; column-gap: 8mm; row-gap: 3mm; align-items: end; }
+.host :global(.bl-c-tl) { grid-area: tl; align-self: start; }
+.host :global(.bl-c-tr) { grid-area: tr; align-self: start; text-align: right; }
+.host :global(.bl-c-bl) { grid-area: bl; }
+.host :global(.bl-c-br) { grid-area: br; text-align: right; }
+.host :global(.bl-corner) { min-height: 1.2em; line-height: 1.45; white-space: pre-wrap; }
+.host :global(.bl-corner .bl-cl + .bl-cl) { margin-top: 0.6mm; }
+.host :global(.bl-corner .bl-blank) { height: 0.95em; vertical-align: baseline; }
+.host :global(.bl-c-tl .bl-cl:first-child) { font-size: 1.35em; font-weight: 700; line-height: 1.2; }
+.host :global(.bl-ht-s .bl-c-tl .bl-cl:first-child) { font-size: 1.1em; }
+.host :global(.bl-ht-l .bl-c-tl .bl-cl:first-child) { font-size: 1.7em; }
+.host :global(.bl-corner.bl-live p) { margin: 0; }
+.host :global(.bl-c-tl.bl-live p:first-child) { font-size: 1.35em; font-weight: 700; line-height: 1.2; }
+.host :global(.bl-ht-s .bl-c-tl.bl-live p:first-child) { font-size: 1.1em; }
+.host :global(.bl-ht-l .bl-c-tl.bl-live p:first-child) { font-size: 1.7em; }
+.host :global(.bl-corner.bl-live) { display: block !important; }
+.host :global(.bl-tok) { display: inline-block; padding: 0 0.45em; border-radius: 0.7em; background: #e8f0fe; color: #1e3a8a; font-size: 0.82em; line-height: 1.35; font-weight: 500; vertical-align: 0.08em; user-select: all; }
+.host.editing :global(.bl-corner:not(.bl-live):hover) { outline: 1px dotted color-mix(in srgb, var(--ui-accent, #2563eb) 60%, transparent); outline-offset: 0.8mm; }
+.host.editing :global(.bl-head:hover) { outline: none; }
+
+/* Blattvorlage Buchsatz mit Randspalte (nach dem Vorbild von tufte-css, Wunsch Jo, 24. November 2026) */
+.host :global(.bl-look-book) { color: #111; }
+.host :global(.bl-look-book .bl-heading h2) { font-weight: 400; font-style: italic; font-size: 1.55em; }
+.host :global(.bl-look-book .bl-heading h3) { font-weight: 400; font-style: italic; font-size: 1.2em; text-decoration: none; }
+.host :global(.bl-look-book .bl-c-tl .bl-cl:first-child), .host :global(.bl-look-book .bl-c-tl.bl-live p:first-child) { font-weight: 400; font-style: italic; font-size: 1.8em; }
+.host :global(.bl-look-book .bl-head) { border-bottom-width: 0.15mm; }
+.host :global(.bl-look-book .bl-mnote) { font-style: normal; font-size: 0.8em; line-height: 1.3; color: #111; }
+.host :global(.bl-look-book .bl-quote) { margin-left: 0; margin-right: 0; }
+.host :global(.bl-look-book .bl-quote-text) { border-left: 0; padding-left: 0; font-size: 1.1em; }
+.host :global(.bl-look-book .bl-quote-src) { font-style: normal; font-size: 0.9em; }
+.host :global(.bl-look-book .bl-quote-src:not(:empty))::before { content: '— '; }
+.host :global(.bl-look-book .bl-task-title), .host :global(.bl-look-book .bl-mat-title) { font-weight: 600; }
+.host :global(.bl-mnote.bl-side sup) { font-size: 0.75em; line-height: 0; }

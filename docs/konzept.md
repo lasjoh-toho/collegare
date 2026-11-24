@@ -1476,6 +1476,13 @@ zu komplex“):
   Ausrichtung, grau, Abb./Tab.-Nummern). Fehler: Fokus im Punkte-Feld blieb nicht (Neusetzen holte ihn auf die Seite),
   leere Absätze verschwanden (jetzt Zeile mit U+200B).
 
+**Nachtrag (Jo, 24. November 2026, abends):** Der Dialog „Rahmendaten“ half nicht. Der Kopf hat jetzt vier Eckfelder
+(`page.header.corners`: tl, tr, bl, br), die man auf der Seite schreibt; Platzhalter `{Titel}`, `{Name}`, `{Klasse}`,
+`{Lehrkraft}`, `{Datum}`, `{Punkte}` erscheinen beim Schreiben als Marken, `___` wird zur Linie. Ohne `corners` (ältere
+Blätter) ergeben sich die Ecken aus den alten Feldern. Reiter „Kopf“ als Kontext-Reiter mit Einsetzen, Muster,
+Abgrenzung, QR-Code und Löschen. Dazu die Blattvorlage „Buchsatz mit Randspalte“ (`page.look = 'book'`,
+`page.sidenotes`) nach dem Vorbild von tufte-css; in der Oberfläche heißt sie nicht nach Tufte.
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).

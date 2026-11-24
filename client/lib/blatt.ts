@@ -171,6 +171,8 @@ export interface BlattDoc {
       order?: HeadKey[];
       style?: 'line' | 'box' | 'none';
       titleSize?: 's' | 'm' | 'l';
+      /** vier Felder in den Ecken des Kopfs, direkt auf der Seite beschrieben (Wunsch Jo, 24. November 2026) */
+      corners?: HeadCorners;
     };
     korr: Korr;
     /** Teilaufgaben: a), b) … oder 1.1, 1.2 … */
@@ -187,6 +189,12 @@ export interface BlattDoc {
     earnedMax?: boolean;
     /** Bild- und Tabellenunterschriften (Wunsch Jo, 24. November 2026) */
     caption?: CaptionStyle;
+    /**
+     * Blattvorlage (Wunsch Jo, 24. November 2026, nach dem Vorbild von tufte-css): „book“ = Buchsatz mit breiter
+     * Randspalte, Überschriften kursiv statt fett, Zitate als Motto. Fußnoten auf Wunsch als nummerierte Randnoten.
+     */
+    look?: 'book';
+    sidenotes?: boolean;
     /** eigene Absatzvorlagen, aus dem Format eines Bausteins gemerkt */
     styles?: { name: string; style: Partial<Pick<Block, 'fs' | 'lh' | 'ta' | 'it' | 'bd' | 'nm' | 'ind' | 'fw' | 'ls' | 'ps' | 'flow'>> }[];
   };
@@ -235,6 +243,71 @@ export function headFields(doc: BlattDoc): Record<HeadKey, HeadField> {
   const out = {} as Record<HeadKey, HeadField>;
   for (const { key } of HEAD_KEYS) out[key] = { ...old[key], ...(f[key] ?? {}) };
   return out;
+}
+/**
+ * Kopf mit vier Eckfeldern (Wunsch Jo, 24. November 2026): oben links, oben rechts, unten links, unten rechts. Jedes Feld
+ * ist freier Text, eine Zeile je Absatz; die erste Zeile oben links ist der Titel. „___“ (drei oder mehr Unterstriche)
+ * wird zur Linie zum Ausfüllen, so lang wie getippt. Platzhalter in geschweiften Klammern setzt das Blatt selbst ein.
+ */
+export type CornerKey = 'tl' | 'tr' | 'bl' | 'br';
+export type HeadCorners = Partial<Record<CornerKey, string>>;
+export const CORNERS: { key: CornerKey; label: string }[] = [
+  { key: 'tl', label: 'oben links' },
+  { key: 'tr', label: 'oben rechts' },
+  { key: 'bl', label: 'unten links' },
+  { key: 'br', label: 'unten rechts' },
+];
+export const HEAD_TOKENS: { key: string; label: string; hint: string }[] = [
+  { key: 'Titel', label: 'Titel', hint: 'Name des Blatts' },
+  { key: 'Name', label: 'Name', hint: 'beim Druck aus der Klassenliste, sonst eine Linie' },
+  { key: 'Klasse', label: 'Klasse', hint: 'Kurs, beim Druck die Klasse aus Autogra.fi' },
+  { key: 'Lehrkraft', label: 'Lehrkraft', hint: 'dein Name' },
+  { key: 'Datum', label: 'Datum', hint: 'Tag des Drucks' },
+  { key: 'Punkte', label: 'Punkte', hint: 'Linie und Summe der Aufgaben, z. B. ___ / 24' },
+];
+export const DEFAULT_CORNERS: Required<HeadCorners> = { tl: '{Titel}', tr: 'Datum: __________', bl: 'Name: {Name}', br: 'Punkte: {Punkte}   Note: ______' };
+/** Eckfelder lesen; ältere Blätter (Rahmendaten mit einzelnen Feldern) werden in die Ecken übertragen */
+export function headCorners(doc: BlattDoc): Required<HeadCorners> {
+  const H = doc.page.header;
+  if (H.corners) return { tl: H.corners.tl ?? '', tr: H.corners.tr ?? '', bl: H.corners.bl ?? '', br: H.corners.br ?? '' };
+  const F = headFields(doc);
+  const TOK: Partial<Record<HeadKey, string>> = { klasse: 'Klasse', teacher: 'Lehrkraft', date: 'Datum', name: 'Name', points: 'Punkte' };
+  const line = (k: HeadKey) => {
+    const f = F[k];
+    const len = f.len === 'l' ? 24 : f.len === 's' ? 6 : 12;
+    const v = f.auto && TOK[k] ? `{${TOK[k]}}` : f.value?.trim() || '_'.repeat(len);
+    return `${f.label?.trim() || HEAD_KEYS.find((x) => x.key === k)!.label}: ${v}`;
+  };
+  const on = (ks: HeadKey[]) => ks.filter((k) => F[k].on).map(line).join('\n');
+  return {
+    tl: F.title.on ? (F.title.auto ? '{Titel}' : F.title.value?.trim() ?? '') : '',
+    tr: on(['subject', 'klasse', 'teacher', 'date']),
+    bl: on(['name']),
+    br: on(['points', 'grade']).replace(/\n/g, '   '),
+  };
+}
+/** Platzhalter und Linien eines Eckfelds einsetzen; tok liefert fertiges HTML (oder null: Platzhalter bleibt stehen) */
+export function cornerHtml(text: string, tok: (k: string) => string | null): string {
+  return text
+    .split('\n')
+    .map((ln) => {
+      let out = '';
+      const re = /\{([A-Za-zÄÖÜäöüß]+)\}|_{3,}/g;
+      let i = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(ln))) {
+        out += esc(ln.slice(i, m.index));
+        if (m[1]) out += tok(m[1]) ?? esc(m[0]);
+        else out += `<span class="bl-blank" style="width:${Math.min(80, m[0].length * 2.2).toFixed(1)}mm"></span>`;
+        i = m.index + m[0].length;
+      }
+      return `<div class="bl-cl">${out + esc(ln.slice(i)) || '&#8203;'}</div>`;
+    })
+    .join('');
+}
+/** Eckfeld als schlichter Text (Word, Text-Export) */
+export function cornerText(text: string, tok: (k: string) => string | null): string {
+  return text.replace(/\{([A-Za-zÄÖÜäöüß]+)\}/g, (m, k) => tok(k) ?? m);
 }
 /** Werte, die der Kopf automatisch einsetzt */
 export interface HeadCtx {
@@ -293,7 +366,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
 export function blankDoc(title = ''): BlattDoc {
   return {
     format: 'ag-blatt/1',
-    page: { size: 'a4', booklet: false, font: 'sans', fontSize: 11, pageNumbers: true, fill: 'lines', header: { show: true, text: '', nameLine: true, date: false, qr: 'none', fields: { title: { on: true, auto: true }, name: { on: true, auto: true }, date: { on: false, auto: false } } }, korr: { side: 'none', width: 30, style: 'thin' } },
+    page: { size: 'a4', booklet: false, font: 'sans', fontSize: 11, pageNumbers: true, fill: 'lines', header: { show: true, text: '', nameLine: true, date: false, qr: 'none', fields: { title: { on: true, auto: true }, name: { on: true, auto: true }, date: { on: false, auto: false } }, corners: { ...DEFAULT_CORNERS } }, korr: { side: 'none', width: 30, style: 'thin' } },
     blocks: [],
   };
 }
@@ -307,7 +380,7 @@ export function parseDoc(body: string, title = ''): BlattDoc {
     // ältere Blätter: Korrekturrand hing am einzelnen Linien-Baustein (rechts, etwa 4 cm)
     const korr = j.page?.korr ?? (blocks.some((b) => b.type === 'lines' && b.rand) ? { side: 'right' as const, width: 40, style: 'thin' as const } : d.page.korr);
     if (!j.page?.korr) for (const b of blocks) if (b.type === 'lines' && !b.rand && korr.side !== 'none') b.korrOff = true;
-    return { ...d, ...j, format: 'ag-blatt/1', page: { ...d.page, ...(j.page ?? {}), header: { ...d.page.header, ...(j.page?.header ? { fields: undefined, ...j.page.header } : {}) }, korr: { ...d.page.korr, ...korr } }, blocks };
+    return { ...d, ...j, format: 'ag-blatt/1', page: { ...d.page, ...(j.page ?? {}), header: { ...d.page.header, ...(j.page?.header ? { fields: undefined, corners: undefined, ...j.page.header } : {}) }, korr: { ...d.page.korr, ...korr } }, blocks };
   } catch {
     return d;
   }
@@ -508,8 +581,10 @@ export interface TextCtx {
   fn: number;
   notes: Map<number, string>;
   mark: NonNullable<Block['mark']>;
+  /** Fußnoten als nummerierte Randnoten neben der Zeile */
+  side?: boolean;
 }
-const newTextCtx = (mark: TextCtx['mark'] = 'star'): TextCtx => ({ fn: 0, notes: new Map(), mark });
+const newTextCtx = (mark: TextCtx['mark'] = 'star', side = false): TextCtx => ({ fn: 0, notes: new Map(), mark, side });
 
 function closing(s: string, i: number, open: string, close: string): number {
   let depth = 0;
@@ -549,7 +624,10 @@ function inline(s: string, ctx: TextCtx | null, notes = true): string {
       if (end > 0) {
         const body = inline(s.slice(start + 1, end), ctx, false);
         if (margin) out += `<span class="bl-mnote">${body}</span>`;
-        else if (ctx) {
+        else if (ctx?.side) {
+          const n = ++ctx.fn;
+          out += `<sup class="bl-fn" data-fn="${n}">${n}</sup><span class="bl-mnote bl-side"><sup>${n}</sup> ${body}</span>`;
+        } else if (ctx) {
           const n = ++ctx.fn;
           ctx.notes.set(n, body);
           out += `<sup class="bl-fn" data-fn="${n}">${n}</sup>`;
@@ -1021,6 +1099,8 @@ export function chartSvg(rows: string[][], kind: 'col' | 'bar' | 'line' | 'pie',
 
 interface Ctx {
   widthMm: number;
+  /** Buchsatz: alle Textbausteine mit Randspalte */
+  book?: boolean;
   number?: number;
   label?: string;
   korr: Korr | null;
@@ -1057,7 +1137,7 @@ interface Part {
 }
 
 /** Vorlage und eigene Gestaltung auf den Baustein anwenden */
-function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
+function applyStyle(box: HTMLElement, b: Block, margin: number) {
   const st = styleOf(b);
   const tpl = TEMPLATES[b.type]?.find((x) => x.id === b.tpl)?.id ?? TEMPLATES[b.type]?.[0]?.id;
   if (tpl) box.classList.add('bl-tpl-' + tpl);
@@ -1079,7 +1159,7 @@ function applyStyle(box: HTMLElement, b: Block, hasMargin: boolean) {
     box.style.setProperty('--flow', String(Math.min(4, st.flow)));
     if (b.gap) box.style.setProperty('--gap', Math.max(2, Math.min(20, b.gap)) + 'mm');
   }
-  const nm = st.nm || (hasMargin ? 30 : 0);
+  const nm = st.nm || margin;
   if (nm) {
     box.classList.add('bl-hasnm');
     box.style.setProperty('--nm', Math.max(10, Math.min(70, nm)) + 'mm');
@@ -1328,7 +1408,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     default:
       break;
   }
-  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart') applyStyle(box, b, /bl-mnote/.test(html));
+  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart') applyStyle(box, b, ctx.book && b.type !== 'table' && b.type !== 'grade' ? 42 : /bl-mnote/.test(html) ? 30 : 0);
   // im Editor: X zum Löschen hinten am Baustein (Wunsch Jo, 24. November 2026); sichtbar beim Darüberfahren und gewählt
   if (ctx.editing && first) {
     const x = el('button', 'bl-x', '×');
@@ -1422,7 +1502,7 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
   const P = doc.page;
   const size = P.size === 'a5' ? 'a5' : 'a4';
   const { w, h, m } = pageGeom(doc);
-  const page = el('div', `bl-page bl-${size}`);
+  const page = el('div', `bl-page bl-${size}${P.look === 'book' ? ' bl-look-book' : ''}`);
   page.style.width = w + 'mm';
   page.style.height = h + 'mm';
   page.style.padding = `${m}mm ${m}mm ${m * 0.8}mm`;
@@ -1438,50 +1518,43 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
   }
   const H = P.header;
   const qrHere = H.qr === 'all' || (H.qr === 'first' && index === 0);
-  const F = headFields(doc);
   if (H.show !== false && (index === 0 || qrHere)) {
     const head = el('div', 'bl-head');
     head.dataset.head = '1';
-    const left = el('div', 'bl-head-left');
+    const left = el('div', 'bl-head-left bl-corners');
     const blank = (cls = 'bl-short') => `<span class="bl-blank ${cls}"></span>`;
-    const val = (k: HeadKey, auto?: string) => {
-      const f = F[k];
-      const v = f.auto && auto !== undefined ? auto : f.value;
-      return v?.trim() ? esc(v.trim()) : '';
-    };
-    const title = F.title.on ? val('title', headCtx?.title ?? '') : '';
-    if (title) left.appendChild(el('div', 'bl-head-title', title));
-    else if (F.title.on && editing) left.appendChild(el('div', 'bl-head-title', '<span class="bl-ph">Titel</span>'));
-    // Felder in der gewählten Reihenfolge, auf eine oder zwei Zeilen verteilt
-    const rows = [el('div', 'bl-head-fields'), el('div', 'bl-head-fields')];
-    const defLen: Record<HeadKey, 's' | 'm' | 'l'> = { title: 'l', subject: 'm', klasse: 's', teacher: 'm', date: 'm', name: 'l', points: 's', grade: 's' };
-    const lenCls = (k: HeadKey) => 'bl-len-' + (F[k].len ?? defLen[k]);
-    const labelOf = (k: HeadKey) => F[k].label?.trim() || HEAD_KEYS.find((x) => x.key === k)!.label;
-    const order = [...(H.order ?? []), ...HEAD_KEYS.map((x) => x.key)].filter((k, i, a) => a.indexOf(k) === i && k !== 'title');
-    for (const k of order) {
-      const f = F[k];
-      if (!f.on) continue;
-      let inner = '';
-      if (k === 'name') {
-        // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
-        const numbered = !!copy?.name && isNumberedSeat(copy.name);
-        inner =
-          f.auto !== false && copy?.name && copy.printName && !numbered
-            ? `<span class="bl-filled">${esc(copy.name)}</span>`
-            : numbered
-              ? `<span class="bl-blank bl-labelled ${lenCls(k)}"><span class="bl-under">${esc(copy!.name!)}</span></span>`
-              : blank(lenCls(k));
-      } else if (k === 'points') {
-        const sum = f.auto !== false ? totalPoints(doc) : null;
-        inner = sum !== null ? `${blank('bl-len-s')} / ${String(sum).replace('.', ',')}` : val('points') || blank(lenCls(k));
-      } else if (k === 'grade') inner = blank(lenCls(k));
-      else {
-        const auto = k === 'klasse' ? (copy?.klasse ?? headCtx?.course ?? '') : k === 'teacher' ? (headCtx?.teacher ?? '') : k === 'date' ? new Date().toLocaleDateString('de-DE') : undefined;
-        inner = val(k, auto) || blank(lenCls(k));
+    const C = headCorners(doc);
+    const sum = totalPoints(doc);
+    const tok = (k: string): string | null => {
+      switch (k) {
+        case 'Titel':
+          return headCtx?.title?.trim() ? esc(headCtx.title.trim()) : editing ? '<span class="bl-ph">Titel</span>' : '';
+        case 'Name': {
+          // Nummerierte Plätze („Abgabe 3“) sind kein Name: Linie frei lassen, Nummer klein darunter.
+          const numbered = !!copy?.name && isNumberedSeat(copy.name);
+          return copy?.name && copy.printName && !numbered ? `<span class="bl-filled">${esc(copy.name)}</span>` : numbered ? `<span class="bl-blank bl-labelled bl-len-l"><span class="bl-under">${esc(copy!.name!)}</span></span>` : blank('bl-len-l');
+        }
+        case 'Klasse':
+        case 'Kurs': {
+          const v = copy?.klasse ?? headCtx?.course ?? '';
+          return v.trim() ? esc(v.trim()) : blank('bl-len-s');
+        }
+        case 'Lehrkraft':
+          return headCtx?.teacher?.trim() ? esc(headCtx.teacher.trim()) : blank('bl-len-m');
+        case 'Datum':
+          return esc(new Date().toLocaleDateString('de-DE'));
+        case 'Punkte':
+          return sum !== null ? `${blank('bl-len-s')} / ${String(sum).replace('.', ',')}` : blank('bl-len-s');
       }
-      rows[(f.row ?? (k === 'points' || k === 'grade' ? 2 : 1)) - 1].appendChild(el('span', `bl-field bl-f-${k}`, `${esc(labelOf(k))}: ${inner}`));
+      return null;
+    };
+    for (const { key, label } of CORNERS) {
+      const v = C[key];
+      const f = field('div', `bl-corner bl-c-${key}`, 'head:' + key, v.trim() ? cornerHtml(v, tok) : editing ? `<span class="bl-ph">${label}</span>` : '');
+      left.appendChild(f);
     }
-    for (const r of rows) if (r.children.length) left.appendChild(r);
+    left.dataset.bid = '__head';
+    if (!editing && !Object.values(C).some((v) => v.trim())) left.replaceChildren();
     head.classList.add('bl-head-' + (H.style ?? 'line'), 'bl-ht-' + (H.titleSize ?? 'm'));
     head.appendChild(left);
     if (qrHere) {
@@ -1554,7 +1627,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   let tabNo = 0;
   const labels = taskLabels(doc);
   const gloss = walk(doc.blocks).find((b) => b.type === 'glossary');
-  const text = newTextCtx(gloss?.mark ?? 'star');
+  const text = newTextCtx(gloss?.mark ?? 'star', !!doc.page.sidenotes);
   const terms = glossaryTerms(doc);
   const korr = doc.page.korr?.side && doc.page.korr.side !== 'none' ? doc.page.korr : null;
   const tables = new Map(walk(doc.blocks).filter((b) => b.type === 'table').map((b) => [b.id, b.rows ?? []] as const));
@@ -1563,7 +1636,7 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   const scores = walk(doc.blocks)
     .filter((b) => b.type === 'task' && b.points?.trim() && !/%/.test(b.points))
     .map((b) => ({ label: labels.get(b.id) ?? '', max: b.points!.trim() }));
-  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, korr, text, terms, editing: opts.editing, tables, earned, earnedMax: doc.page.earnedMax, scores, qr, ...extra });
+  const mkCtx = (extra: Partial<Ctx> = {}): Ctx => ({ widthMm: pg.widthMm, book: doc.page.look === 'book', korr, text, terms, editing: opts.editing, tables, earned, earnedMax: doc.page.earnedMax, scores, qr, ...extra });
   /** Nummer bzw. Bezeichnung eines Bausteins (in Lesereihenfolge, auch in Spalten) */
   const number = (b: Block, ctx: Ctx) => {
     if (b.type === 'task') ctx.label = labels.get(b.id);

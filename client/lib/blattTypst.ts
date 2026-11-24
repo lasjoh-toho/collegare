@@ -13,7 +13,7 @@
  *
  * Ohne Abhängigkeiten, ohne React.
  */
-import { type BlattDoc, type Block, type BlockType, type HeadKey, type HeadField, HEAD_KEYS, blankDoc, headFields, newBlock, walk } from './blatt';
+import { type BlattDoc, type Block, type BlockType, type HeadKey, type HeadField, HEAD_KEYS, type CornerKey, blankDoc, headCorners, headFields, newBlock, walk } from './blatt';
 
 // ---------- Text: kleines Markdown ↔ Typst-Auszeichnung ----------
 
@@ -599,28 +599,25 @@ function blockCode(b: Block, ind: string): string {
   return `${head}[${body.includes('\n') ? `\n${body.replace(/^/gm, (m) => m + ind + '  ').replace(/^\s+$/gm, '')}\n${ind}` : body}]`;
 }
 
+const ECKEN: [CornerKey, string][] = [
+  ['tl', 'oben-links'],
+  ['tr', 'oben-rechts'],
+  ['bl', 'unten-links'],
+  ['br', 'unten-rechts'],
+];
 const ORDER_OF = (d: BlattDoc) => (d.page.booklet ? 'broschuere' : d.page.nup ? 'zwei-je-blatt' : 'einzeln');
 export function toTypst(doc: BlattDoc): string {
   const P = doc.page;
   const H = P.header;
-  const F = headFields(doc);
   const out: string[] = [];
   out.push('// Arbeitsblatt als Typst-Code. Ändern und „Übernehmen“; Bilder verweisen auf ihre Nummer im Blatt.');
   out.push(
-    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n${P.earnedMax === false ? '  sollpunktzahl: false,\n' : ''}  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
+    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n${P.earnedMax === false ? '  sollpunktzahl: false,\n' : ''}${P.look === 'book' ? '  vorlage: "buchsatz",\n' : ''}${P.sidenotes ? '  randnoten: true,\n' : ''}  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
   );
-  const fieldCode = (k: HeadKey) => {
-    const f = F[k];
-    const parts = [`an: ${f.on ? 'true' : 'false'}`];
-    if (f.auto !== undefined) parts.push(`auto: ${f.auto ? 'true' : 'false'}`);
-    if (f.value) parts.push(`text: ${tyStr(f.value)}`);
-    if (f.label) parts.push(`beschriftung: ${tyStr(f.label)}`);
-    if (f.row) parts.push(`zeile: ${f.row}`);
-    if (f.len) parts.push(`linie: ${tyStr(f.len)}`);
-    return `    ${k}: (${parts.join(', ')}),`;
-  };
+  const C = headCorners(doc);
+
   out.push(
-    `#kopf(\n  zeigen: ${H.show !== false ? 'true' : 'false'},\n  qr: ${tyStr(H.qr)},\n  stil: ${tyStr(H.style ?? 'line')},\n  titelgroesse: ${tyStr(H.titleSize ?? 'm')},\n${H.order?.length ? `  reihenfolge: (${H.order.map(tyStr).join(', ')}${H.order.length === 1 ? ',' : ''}),\n` : ''}  felder: (\n${HEAD_KEYS.map(({ key }) => fieldCode(key)).join('\n')}\n  ),\n)`,
+    `#kopf(\n  zeigen: ${H.show !== false ? 'true' : 'false'},\n  qr: ${tyStr(H.qr)},\n  stil: ${tyStr(H.style ?? 'line')},\n  titelgroesse: ${tyStr(H.titleSize ?? 'm')},\n${H.order?.length ? `  reihenfolge: (${H.order.map(tyStr).join(', ')}${H.order.length === 1 ? ',' : ''}),\n` : ''}  ecken: (\n${ECKEN.map(([k, n]) => `    ${n}: ${tyStr(C[k])},`).join('\n')}\n  ),\n)`,
   );
   out.push('');
   for (const b of doc.blocks) out.push(blockCode(b, ''), '');
@@ -768,6 +765,9 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
       if (g('schriftgroesse') !== undefined) page.fontSize = read(g('schriftgroesse')!, 'num', 'schriftgroesse', c.line) as number;
       const pf = str('punktefelder', ['none', 'box', 'line']);
       if (pf) page.earned = pf as 'box';
+      const vl = str('vorlage', ['standard', 'buchsatz']);
+      page.look = vl === 'buchsatz' ? 'book' : undefined;
+      page.sidenotes = bool('randnoten') ? true : undefined;
       const sp = bool('sollpunktzahl');
       page.earnedMax = sp === false ? false : undefined;
       const pn = bool('seitenzahlen');
@@ -803,6 +803,17 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
       if (ts) H.titleSize = ts as 'm';
       const ro = g('reihenfolge');
       if (Array.isArray(ro)) H.order = ro.filter((x): x is HeadKey => typeof x === 'string' && HEAD_KEYS.some((h) => h.key === x));
+      const ec = g('ecken');
+      if (ec !== undefined) {
+        if (!isDict(ec)) throw new SyntaxError(`Zeile ${c.line}: ecken: (oben-links: "{Titel}", oben-rechts: "Datum: ___", unten-links: "Name: {Name}", unten-rechts: "Punkte: {Punkte}").`);
+        const corners = { ...headCorners({ ...prev, page }) };
+        for (const [n, v] of Object.entries(ec.dict)) {
+          const k = ECKEN.find((x) => x[1] === n)?.[0];
+          if (!k) throw new SyntaxError(`Zeile ${c.line}: Ecke „${n}“ gibt es nicht (${ECKEN.map((x) => x[1]).join(', ')}).`);
+          corners[k] = typeof v === 'string' ? v : '';
+        }
+        H.corners = corners;
+      }
       const fe = g('felder');
       if (isDict(fe)) {
         const F = headFields({ ...prev, page });
@@ -819,6 +830,8 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
           F[k as HeadKey] = f;
         }
         H.fields = F;
+        // alte Rahmendaten ohne Ecken: die Ecken ergeben sich aus den Feldern
+        if (ec === undefined) H.corners = undefined;
       }
     }
   }

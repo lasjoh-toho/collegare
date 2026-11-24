@@ -6,7 +6,7 @@
  * (als PNG), Glossar. Fußnoten sind echte Word-Fußnoten; Randbemerkungen stehen kursiv in Klammern im Text.
  * Der Seitensatz (Umbruch, Spalten, Broschüre) bleibt Sache von Word. Ohne Abhängigkeiten außer dem kleinen ZIP.
  */
-import { type BlattDoc, type Block, type HeadCtx, chartSvg, glossaryTerms, headFields, LINE_MM, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
+import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
 import { imageFilter } from './blattImage';
 
@@ -346,32 +346,26 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
 function headXml(doc: BlattDoc, head: HeadCtx, ctx: Ctx): string {
   const H = doc.page.header;
   if (H.show === false) return '';
-  const F = headFields(doc);
-  const out: string[] = [];
-  const title = F.title.on ? (F.title.auto ? head.title : F.title.value) : '';
-  if (title?.trim()) out.push(para(runs(title), ctx, { style: "Title" }));
-  const order = [...(H.order ?? []), ...(['subject', 'klasse', 'teacher', 'date', 'name', 'points', 'grade'] as const)].filter((k, i, a) => a.indexOf(k) === i);
-  const LABEL: Record<string, string> = { subject: 'Fach', klasse: 'Klasse', teacher: 'Lehrkraft', date: 'Datum', name: 'Name', points: 'Punkte', grade: 'Note' };
-  const rows: Run[][] = [[], []];
-  const blank = (len?: string) => '_'.repeat(len === 'l' ? 28 : len === 's' ? 8 : 16);
-  for (const k of order) {
-    const f = F[k];
-    if (!f?.on) continue;
-    let v = '';
-    if (k === 'points') {
-      const sum = f.auto !== false ? totalPoints(doc) : null;
-      v = sum !== null ? `${blank('s')} / ${String(sum).replace('.', ',')}` : f.value?.trim() || blank(f.len ?? 's');
-    } else if (k === 'name' || k === 'grade') v = blank(f.len ?? (k === 'name' ? 'l' : 's'));
-    else {
-      const auto = k === 'klasse' ? head.course : k === 'teacher' ? head.teacher : k === 'date' ? new Date().toLocaleDateString('de-DE') : '';
-      v = (f.auto ? auto : f.value)?.trim() || blank(f.len);
-    }
-    const row = rows[(f.row ?? (k === 'points' || k === 'grade' ? 2 : 1)) - 1];
-    if (row.length) row.push({ t: '     ' });
-    row.push({ t: `${f.label?.trim() || LABEL[k]}: ` }, { t: v });
-  }
-  rows.filter((r) => r.length).forEach((r, i, a) => out.push(para(r, ctx, { border: i === a.length - 1 && H.style !== 'none', after: 120 })));
-  return out.join('');
+  // vier Eckfelder als randlose Tabelle: links Titel und Name, rechts Datum und Punkte
+  const C = headCorners(doc);
+  const sum = totalPoints(doc);
+  const tok = (k: string): string | null =>
+    k === 'Titel' ? head.title ?? '' : k === 'Name' ? '_'.repeat(28) : k === 'Klasse' || k === 'Kurs' ? head.course || '_'.repeat(8) : k === 'Lehrkraft' ? head.teacher || '_'.repeat(16) : k === 'Datum' ? new Date().toLocaleDateString('de-DE') : k === 'Punkte' ? `${'_'.repeat(8)}${sum !== null ? ' / ' + String(sum).replace('.', ',') : ''}` : null;
+  const cell = (k: 'tl' | 'tr' | 'bl' | 'br', w: number) => {
+    const lines = cornerText(C[k], tok).split('\n').filter((l, i, a) => l.trim() || a.length === 1);
+    const ps = lines.map((l, i) => (k === 'tl' && i === 0 && l.trim() ? para(runs(l), ctx, { style: 'Title' }) : para(runs(l), ctx, { align: k.endsWith('r') ? 'right' : undefined, after: 40 }))).join('') || '<w:p/>';
+    return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/><w:vAlign w:val="${k.startsWith('t') ? 'top' : 'bottom'}"/></w:tcPr>${ps}</w:tc>`;
+  };
+  const W = Math.round(ctx.width * TW);
+  const wl = Math.round(W * 0.6);
+  const wr = W - wl;
+  const bottom = H.style === 'none' ? 'nil' : 'single';
+  const box = H.style === 'box' ? 'single' : 'nil';
+  return (
+    `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/><w:tblBorders><w:top w:val="${box}" w:sz="6"/><w:left w:val="${box}" w:sz="6"/><w:bottom w:val="${bottom}" w:sz="6"/><w:right w:val="${box}" w:sz="6"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${wl}"/><w:gridCol w:w="${wr}"/></w:tblGrid>` +
+    `<w:tr>${cell('tl', wl)}${cell('tr', wr)}</w:tr><w:tr>${cell('bl', wl)}${cell('br', wr)}</w:tr></w:tbl>` +
+    para([], ctx, { after: 120 })
+  );
 }
 
 const STYLES = (font: string, size: number) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
