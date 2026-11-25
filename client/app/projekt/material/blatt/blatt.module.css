@@ -483,6 +483,16 @@
 .host :global(.bl-c-br) { grid-area: br; text-align: right; }
 .host :global(.bl-corner) { min-height: 1.2em; line-height: 1.45; white-space: pre-wrap; }
 .host :global(.bl-corner .bl-cl + .bl-cl) { margin-top: 0.6mm; }
+.host :global(.bl-cl[data-ln]) { position: relative; }
+.host :global(.bl-cl-tools) { position: absolute; top: 50%; transform: translateY(-50%); left: -11mm; display: none; gap: 1px; font-size: 11pt; font-weight: 400; font-style: normal; line-height: 1; user-select: none; }
+.host :global(.bl-cl[data-ln]:hover .bl-cl-tools) { display: inline-flex; }
+.host :global(.bl-cl-grip), .host :global(.bl-cl-x) { display: inline-grid; place-items: center; width: 5mm; height: 5mm; border-radius: 4px; color: #667; background: #eef1f6; }
+.host :global(.bl-cl-grip) { cursor: grab; }
+.host :global(.bl-cl-x) { cursor: pointer; }
+.host :global(.bl-cl-x:hover) { background: #fbe3e3; color: #b42318; }
+.host :global(.bl-cl.bl-cl-drop-before) { box-shadow: 0 -2px 0 var(--accent, #2e6da4); }
+.host :global(.bl-cl.bl-cl-drop-after) { box-shadow: 0 2px 0 var(--accent, #2e6da4); }
+.host :global(.bl-corner.bl-corner-drop) { outline: 1.5px dashed var(--accent, #2e6da4); outline-offset: 1mm; }
 .host :global(.bl-corner .bl-blank) { height: 0.95em; vertical-align: baseline; }
 .host :global(.bl-c-tl .bl-cl:first-child) { font-size: 1.35em; font-weight: 700; line-height: 1.2; }
 .host :global(.bl-ht-s .bl-c-tl .bl-cl:first-child) { font-size: 1.1em; }
@@ -515,3 +525,9 @@
 .host :global(.bl-def + .bl-def) { border-top: 0.15mm solid #ddd; padding-top: 1mm; }
 .host :global(.bl-dt) { font-weight: 700; text-align: right; }
 .host :global(.bl-tpl-definitionen .bl-def > .bl-dt::after) { content: ''; }
+.ptsTable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ptsTable th, .ptsTable td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.ptsTable th:last-child, .ptsTable td:last-child { white-space: nowrap; width: 1%; }
+.ptsTable td:first-child { white-space: nowrap; width: 1%; color: var(--fg-muted, #667); }
+.ptsTable tfoot td { border-bottom: 0; font-weight: 600; }
+.ptsSub td:nth-child(2) { padding-left: 22px; }

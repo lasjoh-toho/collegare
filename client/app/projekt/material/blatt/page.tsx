@@ -44,6 +44,7 @@ import {
   paginate,
   parseDoc,
   plainMd,
+  shownBlocks,
   removeBlock,
   setTerm,
   sheetSize,
@@ -105,11 +106,11 @@ Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht d
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
-Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte. Mit „Sollpunktzahl zeigen“ steht die mögliche Punktzahl gleich im Feld (z. B. [    / 6 P.]), sonst bleibt sie im Text der Aufgabe. „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (abschaltbar). Die Stärke der Rahmenlinien wählst du bei Kästen unter „Start“ → Formatvorlagen → „Linie“ (Haarlinie bis kräftig), beim Notenkasten auch in seinem Reiter.
+Bewertung (Reiter „Aufgabe“): „Punktefelder“ setzt hinter jede Aufgabe ein Kästchen oder eine Linie für die erreichten Punkte. Mit „Sollpunktzahl zeigen“ steht die mögliche Punktzahl gleich im Feld (z. B. [    / 6 P.]), sonst bleibt sie im Text der Aufgabe. Die Sollpunktzahl schreibst du direkt ins Punktefeld auf der Seite (oder unter „Aufgabe“ → Punkte). „Punktetabelle“ zeigt alle Aufgaben mit ihren Punkten und der Summe zum Abstimmen und überträgt sie als Kriterien in eine Aufgabe von Autogra.fi (ersetzt dort die Kriterien der ersten Teilaufgabe). „Notenkasten“ fügt einen Kasten ein mit den Punkten je Aufgabe, der Summe und einem Feld für die Note; auf Wunsch mit Bemerkung und Unterschrift. Hat das Blatt einen QR-Code aus Autogra.fi, steht unten im Notenkasten „Scannen Sie für ein genaues Feedback erneut den QR-Code.“ (abschaltbar). Die Stärke der Rahmenlinien wählst du bei Kästen unter „Start“ → Formatvorlagen → „Linie“ (Haarlinie bis kräftig), beim Notenkasten auch in seinem Reiter.
 
 Aufgaben werden von selbst nummeriert; Teilaufgaben heißen a), b) … oder 1.1, 1.2 … (Reiter „Aufgabe“ → Nummern). Eine eigene Nummer wie „1 b)“ trägst du dort ein, wenn die Aufgabe gewählt ist.
 
@@ -174,6 +175,7 @@ export default function BlattPage() {
   const [pageCount, setPageCount] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [printing, setPrinting] = useState(false);
+  const [pointsOpen, setPointsOpen] = useState(false);
   /** „Bild aufnehmen“ mit dem Scanner aus Autogra.fi (Wunsch Jo, 24. November 2026) */
   const [scan, setScan] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -823,6 +825,15 @@ export default function BlattPage() {
       else setPainter(null);
       return;
     }
+    // Kopf: Zeile löschen (×) oder nur gegriffen
+    const lx = t.closest<HTMLElement>('.bl-cl-x');
+    if (lx) {
+      const ln = lx.closest<HTMLElement>('.bl-cl');
+      const k = ln?.closest<HTMLElement>('[data-field^="head:"]')?.dataset.field?.slice(5) as CornerKey | undefined;
+      if (ln?.dataset.ln && k) moveHeadLine(k, Number(ln.dataset.ln), null, 0);
+      return;
+    }
+    if (t.closest('.bl-cl-grip')) return;
     // im Text, der gerade bearbeitet wird, setzt der Browser die Schreibmarke selbst
     if (t.closest('.bl-live') || t.closest('[data-atom]') || t.closest('.bl-gutter')) return;
     // Kopf der Seite: Rahmendaten
@@ -889,8 +900,73 @@ export default function BlattPage() {
       setEdit({ bid, field: f.dataset.field as FieldName, idx: Math.max(0, all.indexOf(f)), at });
     } else setEdit(null);
   }
+  /** Zeile eines Eckfelds im Kopf verschieben (to = Ziel-Ecke, at = Zeile davor einsetzen) oder löschen (to = null) */
+  function moveHeadLine(from: CornerKey, ln: number, to: CornerKey | null, at: number) {
+    setEdit(null);
+    change((d) => {
+      const C = { ...headCorners(d) };
+      const src = (C[from] ?? '').split('\n');
+      const [line] = src.splice(ln, 1);
+      if (line === undefined) return d;
+      if (to === from) src.splice(at > ln ? at - 1 : at, 0, line);
+      C[from] = src.join('\n').replace(/^\n+|\n+$/g, '');
+      if (to && to !== from) {
+        const dst = C[to]?.trim() ? C[to].split('\n') : [];
+        dst.splice(Math.min(at, dst.length), 0, line);
+        C[to] = dst.join('\n');
+      }
+      return { ...d, page: { ...d.page, header: { ...d.page.header, corners: C } } };
+    });
+  }
+  const headDrag = useRef<{ k: CornerKey; ln: number } | null>(null);
+  function headDropTarget(e: React.DragEvent): { k: CornerKey; at: number; el: HTMLElement; ln: HTMLElement | null; after: boolean } | null {
+    const t = e.target as HTMLElement;
+    const c = t.closest<HTMLElement>('[data-field^="head:"]');
+    if (!c) return null;
+    const k = c.dataset.field!.slice(5) as CornerKey;
+    const lines = [...c.querySelectorAll<HTMLElement>('.bl-cl[data-ln]')];
+    for (const l of lines) {
+      const r = l.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) return { k, at: Number(l.dataset.ln), el: c, ln: l, after: false };
+    }
+    const last = lines[lines.length - 1] ?? null;
+    return { k, at: lines.length, el: c, ln: last, after: true };
+  }
+  function clearHeadDrop() {
+    host.current?.querySelectorAll('.bl-cl-drop-before, .bl-cl-drop-after, .bl-corner-drop').forEach((x) => x.classList.remove('bl-cl-drop-before', 'bl-cl-drop-after', 'bl-corner-drop'));
+  }
+  function onPagesDragStart(e: React.DragEvent) {
+    const g = (e.target as HTMLElement).closest?.('.bl-cl-grip');
+    if (!g) return;
+    const ln = g.closest<HTMLElement>('.bl-cl');
+    const k = ln?.closest<HTMLElement>('[data-field^="head:"]')?.dataset.field?.slice(5) as CornerKey | undefined;
+    if (!ln?.dataset.ln || !k) return;
+    headDrag.current = { k, ln: Number(ln.dataset.ln) };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ln.textContent ?? '');
+    e.dataTransfer.setDragImage(ln, 10, 10);
+  }
+  function onPagesDragOver(e: React.DragEvent) {
+    if (!canEdit) return;
+    e.preventDefault();
+    if (!headDrag.current) return;
+    clearHeadDrop();
+    const d = headDropTarget(e);
+    if (!d) return;
+    d.el.classList.add('bl-corner-drop');
+    d.ln?.classList.add(d.after ? 'bl-cl-drop-after' : 'bl-cl-drop-before');
+  }
   function onPagesDrop(e: React.DragEvent) {
     if (!canEdit) return;
+    if (headDrag.current) {
+      e.preventDefault();
+      const src = headDrag.current;
+      headDrag.current = null;
+      clearHeadDrop();
+      const d = headDropTarget(e);
+      if (d) moveHeadLine(src.k, src.ln, d.k, d.at);
+      return;
+    }
     const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/'));
     if (!f) return;
     e.preventDefault();
@@ -1100,6 +1176,7 @@ export default function BlattPage() {
               add={add}
               move={move}
               remove={remove}
+              openPoints={() => setPointsOpen(true)}
               toggleHidden={toggleHidden}
               duplicate={duplicate}
               toColumns={toColumns}
@@ -1303,7 +1380,7 @@ export default function BlattPage() {
             </aside>
 
             <div className={st.center} ref={center}>
-              <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragOver={(e) => canEdit && e.preventDefault()} onDrop={onPagesDrop}>
+              <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragStart={onPagesDragStart} onDragOver={onPagesDragOver} onDragEnd={() => ((headDrag.current = null), clearHeadDrop())} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
                   <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''} ${painter ? st.painting : ''} ${flowView ? st.flowView : ''}`} />
                   {atom && atom.el.isConnected && (
@@ -1347,6 +1424,7 @@ export default function BlattPage() {
         </div>
       )}
       {scan && <ScanDialog onClose={() => setScan(false)} onImage={(f) => void imageInto(f, selBlock?.type === 'image' ? selBlock.id : null)} />}
+      {pointsOpen && doc && <PointsDialog doc={doc} title={title} setPoints={(id, v) => setBlock(id, { points: v || undefined })} onClose={() => setPointsOpen(false)} />}
       {printing && doc && <PrintDialog doc={doc} title={title} head={{ title: title.trim(), course: project.course.title, teacher: me.name }} onClose={() => setPrinting(false)} />}
     </ProjectShell>
   );
@@ -1358,7 +1436,7 @@ type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' |
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
 const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade'];
 type Panel = 'search' | 'material' | 'glossary' | 'typst';
-type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | `cell:${number}:${number}` | `head:${CornerKey}`;
+type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | 'points' | `cell:${number}:${number}` | `head:${CornerKey}`;
 interface EditTarget {
   bid: string;
   field: FieldName;
@@ -1872,6 +1950,7 @@ const BICON: Record<BlockType, string> = {
 };
 
 type RibbonProps = {
+  openPoints: () => void;
   tab: Tab;
   setTab: (t: Tab) => void;
   doc: BlattDoc;
@@ -2563,6 +2642,7 @@ function Ribbon(props: RibbonProps) {
                 }}
                 title="Kasten für die Bewertung: Punkte je Aufgabe, Summe und ein Feld für die Note (meist am Ende)"
               />
+              <RB icon="inserttable" label="Punkte­tabelle" big onClick={props.openPoints} title="Punkte aller Aufgaben in einer Tabelle abstimmen und nach Autogra.fi übertragen" />
             </Group>
             <Group label="Korrektur">
               <Drop icon="pagemargin" label="Korrekturrand" value={P.korr.side === 'none' ? 'aus' : `${P.korr.side === 'right' ? 'rechts' : 'links'} ${cm(P.korr.width)}`} big title="Freier Rand für die Korrektur neben Linien und Antworten">
@@ -3617,6 +3697,151 @@ async function ag<T>(base: string, method: string, path: string, body?: unknown)
   const j = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
   if (!res.ok) throw new ApiError(j.error?.message ?? `Autogra.fi antwortet mit Fehler ${res.status}`, res.status);
   return j as T;
+}
+
+/** Punkte als Zahl und Einheit („6 P.“ → 6, „P.“) */
+function splitPoints(v: string | undefined): { n: string; unit: string } {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(v ?? '');
+  return m ? { n: m[1], unit: m[2].trim() } : { n: '', unit: (v ?? '').trim() };
+}
+
+/**
+ * Punktetabelle (Wunsch Jo, 25. November 2026): Punkte aller Aufgaben untereinander abstimmen, Summe sehen und als
+ * Kriterien in die Aufgabe von Autogra.fi übertragen.
+ */
+function PointsDialog({ doc, title, setPoints, onClose }: { doc: BlattDoc; title: string; setPoints: (id: string, v: string) => void; onClose: () => void }) {
+  const tasks = walk(shownBlocks(doc.blocks)).filter((b) => b.type === 'task');
+  const labels = taskLabels(doc);
+  const total = totalPoints(doc);
+  const crit = toCriteria(doc);
+  const [agUrl, setAgUrl] = useState('');
+  const [list, setList] = useState<AgAssessment[] | null>(null);
+  const [aid, setAid] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let stored = '';
+    try {
+      stored = localStorage.getItem('collegare-autografi-url') ?? '';
+    } catch {}
+    get<{ url: string | null }>('/api/autografi').then(
+      (r) => setAgUrl(stored || r.url || `${location.origin}/autografi`),
+      () => setAgUrl(stored || `${location.origin}/autografi`),
+    );
+  }, []);
+  const base = agUrl.replace(/\/+$/, '');
+  async function load() {
+    setMsg('');
+    try {
+      const r = await ag<{ teacher: boolean; assessments: AgAssessment[] }>(base, 'GET', '/api/v1/portal');
+      if (!r.teacher) return setMsg('In Autogra.fi bist du nicht als Lehrkraft angemeldet.');
+      setList(r.assessments);
+      const same = r.assessments.find((a) => a.title.trim() === title.trim());
+      setAid(same?.id ?? r.assessments[0]?.id ?? null);
+    } catch (e) {
+      setMsg(e instanceof ApiError && e.status === 401 ? 'Bitte melde dich in Autogra.fi an (neuer Tab) und versuch es dann noch einmal.' : 'Autogra.fi ist nicht zu erreichen.');
+    }
+  }
+  async function send() {
+    if (!aid) return;
+    setBusy(true);
+    setMsg('');
+    try {
+      const st = await ag<{ assessment: { revision: number; items: { task_id: number; title: string; body_md: string; horizon_md: string; criteria: { key: string; label: string; max_points: number }[]; scored: boolean }[] } }>(base, 'GET', `/api/v1/assessments/${aid}/settings`);
+      const items = st.assessment.items.map((it) => ({ task_id: it.task_id, title: it.title, body_md: it.body_md, horizon_md: it.horizon_md, criteria: it.criteria, scored: it.scored }));
+      if (!items.length) throw new Error('Die Aufgabe in Autogra.fi hat keine Teilaufgabe.');
+      items[0] = { ...items[0], criteria: crit };
+      await ag(base, 'PATCH', `/api/v1/assessments/${aid}`, { revision: st.assessment.revision, items });
+      setMsg(`Übertragen: ${crit.length} Kriterien, zusammen ${String(crit.reduce((a, c) => a + c.max_points, 0)).replace('.', ',')} Punkte.`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`modal ${st.dialog}`} role="dialog" aria-label="Punktetabelle">
+        <h2>Punktetabelle</h2>
+        {tasks.length ? (
+          <table className={st.ptsTable}>
+            <thead>
+              <tr>
+                <th>Nr.</th>
+                <th>Aufgabe</th>
+                <th>Punkte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((b) => {
+                const { n, unit } = splitPoints(b.points);
+                return (
+                  <tr key={b.id} className={b.subtask ? st.ptsSub : undefined}>
+                    <td>{labels.get(b.id) ?? ''}</td>
+                    <td>{plainMd(b.md ?? '').slice(0, 90) || '…'}</td>
+                    <td>
+                      <input
+                        className={st.rIn}
+                        inputMode="decimal"
+                        value={n}
+                        style={{ width: 64 }}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^\d.,]/g, '');
+                          setPoints(b.id, v ? `${v} ${unit || 'P.'}` : '');
+                        }}
+                        aria-label={`Punkte für Aufgabe ${labels.get(b.id) ?? ''}`}
+                      />{' '}
+                      <small>{unit || 'P.'}</small>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td />
+                <td>zusammen</td>
+                <td>
+                  <b>{total !== null ? String(total).replace('.', ',') : '–'}</b> P.
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        ) : (
+          <p className="muted">Das Blatt hat noch keine Aufgaben.</p>
+        )}
+        <h3>Nach Autogra.fi</h3>
+        {list === null ? (
+          <div className="row">
+            <button className="btn" onClick={() => void load()} disabled={!base}>
+              Aufgaben aus Autogra.fi holen
+            </button>
+          </div>
+        ) : (
+          <div className="row">
+            <select value={aid ?? ''} onChange={(e) => setAid(Number(e.target.value) || null)}>
+              {list.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.class ? `${a.class} · ` : ''}
+                  {a.title}
+                </option>
+              ))}
+            </select>
+            <button className="btn primary" onClick={() => void send()} disabled={!aid || busy || !crit.length} title="Je Aufgabe ein Kriterium mit ihrer Punktzahl; ersetzt die Kriterien der ersten Teilaufgabe in Autogra.fi">
+              Punkte übertragen
+            </button>
+          </div>
+        )}
+        {!crit.length && tasks.length > 0 && <p className="muted">Zum Übertragen braucht jede Aufgabe eine Punktzahl.</p>}
+        {msg && <p className="muted">{msg}</p>}
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>
+            Fertig
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: string; head: HeadCtx; onClose: () => void }) {

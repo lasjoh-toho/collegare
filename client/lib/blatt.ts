@@ -289,10 +289,12 @@ export function headCorners(doc: BlattDoc): Required<HeadCorners> {
   };
 }
 /** Platzhalter und Linien eines Eckfelds einsetzen; tok liefert fertiges HTML (oder null: Platzhalter bleibt stehen) */
-export function cornerHtml(text: string, tok: (k: string) => string | null): string {
+export function cornerHtml(text: string, tok: (k: string) => string | null, tools = false): string {
+  // tools: im Editor je Zeile Griff zum Verschieben und × zum Löschen (Wunsch Jo, 25. November 2026)
+  const T = '<span class="bl-cl-tools" contenteditable="false"><span class="bl-cl-grip" draggable="true" title="Ziehen: in eine andere Ecke oder Zeile verschieben">⠿</span><span class="bl-cl-x" title="Zeile löschen">×</span></span>';
   return text
     .split('\n')
-    .map((ln) => {
+    .map((ln, n) => {
       let out = '';
       const re = /\{([A-Za-zÄÖÜäöüß]+)\}|_{3,}/g;
       let i = 0;
@@ -303,7 +305,7 @@ export function cornerHtml(text: string, tok: (k: string) => string | null): str
         else out += `<span class="bl-blank" style="width:${Math.min(80, m[0].length * 2.2).toFixed(1)}mm"></span>`;
         i = m.index + m[0].length;
       }
-      return `<div class="bl-cl">${out + esc(ln.slice(i)) || '&#8203;'}</div>`;
+      return `<div class="bl-cl"${tools ? ` data-ln="${n}"` : ''}>${(out + esc(ln.slice(i)) || '&#8203;') + (tools ? T : '')}</div>`;
     })
     .join('');
 }
@@ -1401,13 +1403,24 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       row.appendChild(el('span', 'bl-task-no', esc(ctx.label ?? `${ctx.number}.`)));
       const text = el('div', 'bl-task-text');
       text.appendChild(field('span', 'bl-task-t', 'md', part.title || '<span class="bl-ph">Aufgabenstellung …</span>'));
-      const showMax = ctx.earned && ctx.earnedMax !== false && !!b.points?.trim();
-      if (b.points && (!ctx.earned || (ctx.earnedMax === false))) text.appendChild(el('span', 'bl-pts', ' ' + esc(b.points)));
+      // Punkte direkt auf der Seite schreiben (Wunsch Jo, 25. November 2026): Feld „points“, im Editor leer mit Platzhalter
+      const ptsPh = '<span class="bl-ph">P.</span>';
+      const showMax = ctx.earned && ctx.earnedMax !== false && (!!b.points?.trim() || !!ctx.editing);
+      if (!ctx.earned || ctx.earnedMax === false) {
+        if (b.points?.trim() || ctx.editing) {
+          text.appendChild(document.createTextNode(' '));
+          text.appendChild(field('span', 'bl-pts', 'points', esc(b.points?.trim() ?? '') || ptsPh));
+        }
+      }
       row.appendChild(text);
       if (ctx.earned) {
         // Feld für die erreichten Punkte rechts: [     / 6 P.] bzw. ____ / 6 P.
         const sc = el('span', 'bl-score');
-        const max = showMax ? el('span', 'bl-emax', '/ ' + esc(b.points!.trim())) : null;
+        let max: HTMLElement | null = null;
+        if (showMax) {
+          max = el('span', 'bl-emax', '/ ');
+          max.appendChild(field('span', 'bl-emax-v', 'points', esc(b.points?.trim() ?? '') || ptsPh));
+        }
         if (ctx.earned === 'box') {
           const bx = el('span', 'bl-ebox' + (max ? ' bl-ebox-max' : ''));
           if (max) bx.appendChild(max);
@@ -1680,7 +1693,7 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
     };
     for (const { key, label } of CORNERS) {
       const v = C[key];
-      const f = field('div', `bl-corner bl-c-${key}`, 'head:' + key, v.trim() ? cornerHtml(v, tok) : editing ? `<span class="bl-ph">${label}</span>` : '');
+      const f = field('div', `bl-corner bl-c-${key}`, 'head:' + key, v.trim() ? cornerHtml(v, tok, !!editing) : editing ? `<span class="bl-ph">${label}</span>` : '');
       left.appendChild(f);
     }
     left.dataset.bid = '__head';
@@ -2069,7 +2082,7 @@ export function toMarkdown(doc: BlattDoc): string {
 
 /** Aufgaben mit Punktzahl (z. B. „12 P.“) als Teilaufgaben für Autogra.fi; Prozentangaben zählen nicht als Punkte. */
 export function toCriteria(doc: BlattDoc): { key: string; label: string; max_points: number }[] {
-  const tasks = walk(doc.blocks).filter((b) => b.type === 'task');
+  const tasks = walk(shownBlocks(doc.blocks)).filter((b) => b.type === 'task');
   const labels = taskLabels(doc);
   const out = tasks.map((b, i) => {
     const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:p\.?|pkt\.?|punkte?|be)?\s*$/i.exec(b.points ?? '');

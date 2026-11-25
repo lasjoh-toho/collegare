@@ -1488,6 +1488,8 @@ Abgrenzung, QR-Code und Löschen. Dazu die Blattvorlage „Buchsatz mit Randspal
 durchgestrichen; Umschalter im Reiter des Bausteins, unter „Aufgabe“ und im Kontextmenü, das nach dem Zeichnen gemessen
 wird und nicht mehr unten herausragt. QR-Hinweis im Notenkasten im Editor blass, wenn das Blatt keinen QR-Code hat.
 Markierter Text wechselt in den Reiter „Start“. Bildunterschrift bis 140 %.
+Dazu (0.7.30): Feld `points` auf der Seite (Punktefeld schreibbar), Punktetabelle mit Übertragen der Kriterien
+(`toCriteria`) in die erste Teilaufgabe von Autogra.fi, Zeilen der Kopf-Ecken mit Griff und × (`cornerHtml(…, tools)`).
 
 ### 8j.5 Nächste Stufen
 
