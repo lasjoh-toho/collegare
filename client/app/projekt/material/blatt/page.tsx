@@ -14,7 +14,7 @@ import { editToTufte, glossHtml, noteHtml, tufteToEdit } from '@/lib/tufteEdit';
 import { fileUrl, type Material } from '@/components/Materials';
 import { colibre } from '@/lib/colibre';
 import { fromTypst, toTypst } from '@/lib/blattTypst';
-import { ApiError, get, href, patch, post } from '@/lib/api';
+import { ApiError, BASE_PATH, get, href, patch, post } from '@/lib/api';
 import { toDocx, docxName } from '@/lib/blattDocx';
 import { download, pickFile } from '@/lib/bentoFiles';
 import {
@@ -77,6 +77,10 @@ import {
   SHAPE_LABEL,
   WA_LABEL,
 } from '@/lib/blatt';
+
+/** Editor der Pinnwand (WordArt, Formen-Editor, Formel), wie in den Folien; bid: vorhandener Baustein */
+type PwEdit = { kind: 'wordart' | 'shape' | 'formula'; bid?: string; data: string; text?: string };
+const PW_TITLE = { wordart: 'WordArt', shape: 'Formen-Editor', formula: 'Formel' } as const;
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
 import { type Crop, cropImage, kb, loadImage, removeBackground, shrinkImage, srcBytes } from '@/lib/blattImage';
@@ -108,7 +112,7 @@ Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts st
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel (LaTeX). Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -274,6 +278,30 @@ export default function BlattPage() {
     setSaved('dirty');
   };
   const setBlock = useCallback((bid: string, p: Partial<Block>) => change((d) => ({ ...d, blocks: updateBlock(d.blocks, bid, p) })), [change]);
+  // Editor der Pinnwand für WordArt, Formen und Formeln (Wunsch Jo, 25. November 2026: die vorhandenen Editoren nehmen)
+  const [pw, setPw] = useState<PwEdit | null>(null);
+  const pwFrame = useRef<HTMLIFrameElement>(null);
+  const openPw = (kind: PwEdit['kind'], b?: Block) => setPw({ kind, bid: b?.id, data: b ? (kind === 'formula' ? (b.text ?? '') : (b.pdata ?? '')) : '', text: b?.type === 'wordart' && !b.pdata ? b.text : undefined });
+  const pwDone = useRef<(m: { svg?: string; data?: string; tex?: string }) => void>(() => {});
+  pwDone.current = (m) => {
+    if (!pw) return;
+    const p: Partial<Block> = pw.kind === 'formula' ? { text: typeof m.tex === 'string' ? m.tex : '' } : typeof m.svg === 'string' && m.svg.trimStart().startsWith('<svg') ? { svg: m.svg, pdata: m.data ?? '' } : {};
+    if (pw.bid) setBlock(pw.bid, p);
+    else if (Object.keys(p).length) add(pw.kind, pw.kind === 'formula' ? p : { ...p, width: pw.kind === 'wordart' ? 60 : 40 });
+    setPw(null);
+  };
+  useEffect(() => {
+    if (!pw) return;
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== location.origin || ev.source !== pwFrame.current?.contentWindow) return;
+      const m = ev.data as { pinnwandEditor?: string; svg?: string; data?: string; tex?: string };
+      if (m?.pinnwandEditor === 'ready') pwFrame.current?.contentWindow?.postMessage({ pinnwandEditor: 'init', kind: pw.kind, data: pw.data, text: pw.text ?? '', teacher: true }, location.origin);
+      else if (m?.pinnwandEditor === 'done') pwDone.current(m);
+      else if (m?.pinnwandEditor === 'cancel') setPw(null);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [pw]);
   const setPageOpt = (p: Partial<BlattDoc['page']>) => change((d) => ({ ...d, page: { ...d.page, ...p } }));
   const setHeader = (p: Partial<BlattDoc['page']['header']>) => change((d) => ({ ...d, page: { ...d.page, header: { ...d.page.header, ...p } } }));
 
@@ -1192,6 +1220,7 @@ export default function BlattPage() {
               move={move}
               remove={remove}
               openPoints={() => setPointsOpen(true)}
+              openPw={openPw}
               problems={problems}
               spell={spell}
               setSpell={(v) => {
@@ -1426,7 +1455,11 @@ export default function BlattPage() {
                   </button>
                 )}
               </div>
-              <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragStart={onPagesDragStart} onDragOver={onPagesDragOver} onDragEnd={() => ((headDrag.current = null), clearHeadDrop())} onDrop={onPagesDrop}>
+              <div className={st.pagesOuter} onClick={onPagesClick} onDoubleClick={(e) => {
+                const id = (e.target as HTMLElement).closest<HTMLElement>('[data-bid]')?.dataset.bid;
+                const x = id && doc ? findBlock(doc.blocks, id) : null;
+                if (x && canEdit && (x.type === 'formula' || (x.type === 'wordart' && x.svg) || (x.type === 'shape' && x.svg))) openPw(x.type, x);
+              }} onPointerDown={onPointerDown} onDragStart={onPagesDragStart} onDragOver={onPagesDragOver} onDragEnd={() => ((headDrag.current = null), clearHeadDrop())} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
                   <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''} ${painter ? st.painting : ''} ${flowView ? st.flowView : ''}`} />
                   {atom && atom.el.isConnected && (
@@ -1466,6 +1499,13 @@ export default function BlattPage() {
                 )}
               </aside>
             )}
+          </div>
+        </div>
+      )}
+      {pw && (
+        <div className={st.pwBack} onClick={(e) => e.target === e.currentTarget && setPw(null)}>
+          <div className={`panel ${st.pwBox} ${pw.kind === 'formula' ? st.pwFormula : ''}`} role="dialog" aria-label={PW_TITLE[pw.kind]}>
+            <iframe ref={pwFrame} className={st.pwFrame} src={`${BASE_PATH}/pinnwand/editor.html`} title={PW_TITLE[pw.kind]} />
           </div>
         </div>
       )}
@@ -2001,6 +2041,8 @@ const BICON: Record<BlockType, string> = {
 
 type RibbonProps = {
   openPoints: () => void;
+  /** WordArt, Form oder Formel im Editor der Pinnwand anlegen oder (mit Baustein) bearbeiten */
+  openPw: (kind: PwEdit['kind'], b?: Block) => void;
   problems: Problem[];
   spell: boolean;
   setSpell: (v: boolean) => void;
@@ -2619,19 +2661,17 @@ function Ribbon(props: RibbonProps) {
                 }}
                 title="Diagramm aus einer Tabelle des Blatts"
               />
-              <RB icon={BICON.shape} label="Form" big onClick={() => props.add('shape')} title="Rechteck, Ellipse, Pfeil, Sprechblase oder Stern, auch mit Text" />
+              <Drop icon={BICON.shape} label="Form" big title="Formen mit Farbe, Linie und Text">
+                <MI label="Formen-Editor …" hint="viele Formen, Farben, Verläufe und Text (wie in Pinnwand und Folien)" onClick={() => props.openPw('shape')} />
+                <MH>Einfache Form</MH>
+                {(Object.keys(SHAPE_LABEL) as NonNullable<Block['shape']>[]).map((k) => (
+                  <MI key={k} label={SHAPE_LABEL[k]} onClick={() => props.add('shape', { shape: k })} />
+                ))}
+              </Drop>
             </Group>
             <Group label="Text-Objekte">
-              <Drop icon={BICON.wordart} label="WordArt" big title="Schmuckschrift für Titel und Plakate">
-                {(Object.keys(WA_LABEL) as NonNullable<Block['wa']>[]).map((k) => (
-                  <MI key={k} label={WA_LABEL[k]} onClick={() => props.add('wordart', { wa: k })} />
-                ))}
-              </Drop>
-              <Drop icon={BICON.formula} label="Formel" big title="Formel in LaTeX-Schreibweise">
-                {FORMULAS.map(([l, tex]) => (
-                  <MI key={l} label={l} hint={tex} onClick={() => props.add('formula', { text: tex })} />
-                ))}
-              </Drop>
+              <RB icon={BICON.wordart} label="WordArt" big onClick={() => props.openPw('wordart')} title="Schmuckschrift für Titel und Plakate (Editor wie in Pinnwand und Folien)" />
+              <RB icon={BICON.formula} label="Formel" big onClick={() => props.openPw('formula')} title="Formel-Editor wie in Pinnwand und Folien" />
             </Group>
             <Group label="Seiten">
               <RB icon={BICON.cols} label="Spalten" big onClick={() => props.add('cols')} title="Bausteine nebeneinander; Zahl und Stege stellst du unter „Layout“ ein" />
@@ -3527,23 +3567,30 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       )}
       {b.type === 'formula' && (
         <>
-          <Group label="Formel (LaTeX)">
-            <textarea className={st.texIn} value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} rows={2} spellCheck={false} aria-label="Formel in LaTeX" placeholder={String.raw`z. B. \frac{1}{2}`} />
-          </Group>
-          <Group label="Zeichen">
-            <div className={st.texKeys}>
-              {TEX_KEYS.map(([l, t]) => (
-                <button key={l} type="button" className={st.texKey} title={t} onClick={() => set({ text: (b.text ?? '') + t })}>
-                  {l}
-                </button>
-              ))}
-            </div>
+          <Group label="Formel">
+            <RB icon="insertmath" label="Bearbeiten" big onClick={() => props.openPw('formula', b)} title="Im Formel-Editor öffnen (auch Doppelklick auf die Formel)" />
           </Group>
           <Group label="Lage">{alignRow}</Group>
         </>
       )}
-      {b.type === 'wordart' && (
+      {b.type === 'wordart' && b.svg && (
         <>
+          <Group label="WordArt">
+            <RB icon="fontworkgalleryfloater" label="Bearbeiten" big onClick={() => props.openPw('wordart', b)} title="Im WordArt-Editor öffnen (auch Doppelklick)" />
+          </Group>
+          <Group label="Größe">
+            <div className={st.rows}>
+              <div className={st.row}>{size(b)}</div>
+              <div className={st.row}>{alignRow}</div>
+            </div>
+          </Group>
+        </>
+      )}
+      {b.type === 'wordart' && !b.svg && (
+        <>
+          <Group label="WordArt">
+            <RB icon="fontworkgalleryfloater" label="Im Editor" big onClick={() => props.openPw('wordart', b)} title="Im WordArt-Editor weiter gestalten" />
+          </Group>
           <Group label="Stil">
             {(Object.keys(WA_LABEL) as NonNullable<Block['wa']>[]).map((k) => (
               <button key={k} type="button" className={`${st.rb} ${st.rbBig} ${(b.wa ?? 'verlauf') === k ? st.rbOn : ''}`} onClick={() => set({ wa: k })} aria-pressed={(b.wa ?? 'verlauf') === k}>
@@ -3563,9 +3610,34 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           <Group label="Lage">{alignRow}</Group>
         </>
       )}
-      {b.type === 'shape' && (
+      {b.type === 'shape' && b.svg && (
         <>
           <Group label="Form">
+            <RB icon="rect_unfilled" label="Bearbeiten" big onClick={() => props.openPw('shape', b)} title="Im Formen-Editor öffnen (auch Doppelklick)" />
+          </Group>
+          <Group label="Größe">
+            <div className={st.rows}>
+              <div className={st.row}>{size(b)}</div>
+              <div className={st.row}>{alignRow}</div>
+            </div>
+          </Group>
+          <Group label="Umfluss">
+            {(
+              [
+                [undefined, 'wrapoff', 'keiner'],
+                ['left', 'wrapleft', 'links'],
+                ['right', 'wrapright', 'rechts'],
+              ] as const
+            ).map(([v, i, l]) => (
+              <RB key={l} icon={i} label={l} on={b.wrap === v} onClick={() => set({ wrap: v })} />
+            ))}
+          </Group>
+        </>
+      )}
+      {b.type === 'shape' && !b.svg && (
+        <>
+          <Group label="Form">
+            <RB icon="rect_unfilled" label="Formen-Editor" big onClick={() => props.openPw('shape')} title="Neue Form im Formen-Editor gestalten" />
             {(Object.keys(SHAPE_LABEL) as NonNullable<Block['shape']>[]).map((k) => (
               <button key={k} type="button" className={`${st.rb} ${st.rbBig} ${(b.shape ?? 'round') === k ? st.rbOn : ''}`} onClick={() => set({ shape: k })} aria-pressed={(b.shape ?? 'round') === k}>
                 <ShapeIcon kind={k} />
@@ -3629,39 +3701,6 @@ function BlockTab(props: RibbonProps & { b: Block }) {
     </>
   );
 }
-
-/** Formelbeispiele zum Einfügen */
-const FORMULAS: [string, string][] = [
-  ['Bruch', String.raw`\frac{a}{b}`],
-  ['Wurzel', String.raw`\sqrt{x}`],
-  ['Potenz', 'x^{2}'],
-  ['Summe', String.raw`\sum_{i=1}^{n} x_i`],
-  ['Integral', String.raw`\int_{a}^{b} f(x)\,dx`],
-  ['Mitternachtsformel', String.raw`x_{1,2} = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`],
-  ['Reaktionspfeil', String.raw`\mathrm{2H_2 + O_2 \rightarrow 2H_2O}`],
-  ['leer', ''],
-];
-/** Zeichen-Knöpfe im Reiter „Formel“: Beschriftung, angehängter LaTeX-Text */
-const TEX_KEYS: [string, string][] = [
-  ['a/b', String.raw`\frac{}{}`],
-  ['√', String.raw`\sqrt{}`],
-  ['x²', '^{2}'],
-  ['xₙ', '_{n}'],
-  ['·', String.raw`\cdot `],
-  ['×', String.raw`\times `],
-  ['±', String.raw`\pm `],
-  ['≤', String.raw`\le `],
-  ['≥', String.raw`\ge `],
-  ['≠', String.raw`\neq `],
-  ['≈', String.raw`\approx `],
-  ['∞', String.raw`\infty `],
-  ['π', String.raw`\pi `],
-  ['α', String.raw`\alpha `],
-  ['Δ', String.raw`\Delta `],
-  ['→', String.raw`\rightarrow `],
-  ['∑', String.raw`\sum_{}^{} `],
-  ['∫', String.raw`\int_{}^{} `],
-];
 
 function ColorRow({ value, onChange, colors }: { value: string; onChange: (c: string) => void; colors: string[] }) {
   return (

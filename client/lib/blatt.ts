@@ -123,6 +123,10 @@ export interface Block {
   shape?: 'rect' | 'round' | 'ellipse' | 'arrow' | 'speech' | 'star';
   /** WordArt und Form: Farbe (#rrggbb) */
   color?: string;
+  /** WordArt und Form aus dem Editor der Pinnwand (Wunsch Jo, 25. November 2026): fertiges SVG mit eingebetteten Schriften */
+  svg?: string;
+  /** dazu der Stand des Editors (JSON), um später weiter zu bearbeiten */
+  pdata?: string;
   /** unten auf der Seite festhalten: steht am Fuß der Seite, auf der er landet */
   bottom?: boolean;
   /** vorübergehend ausgeblendet (Wunsch Jo, 25. November 2026): bleibt in „Elemente“ ausgegraut, fehlt auf dem Blatt, im Druck und in der Ausgabe */
@@ -1324,6 +1328,20 @@ export function formulaHtml(tex: string): string {
   }
 }
 
+/** SVG aus dem Pinnwand-Editor als Bild (data-URL: kein Skript, Schriften sind eingebettet) */
+export function svgSrc(svg: string): string {
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.includes('xmlns=') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'));
+}
+function pwImg(b: Block, def: number): HTMLElement {
+  const wrap = el('div', 'bl-pw bl-align-' + (b.align ?? 'center'));
+  const img = el('img') as HTMLImageElement;
+  img.src = svgSrc(b.svg ?? '');
+  img.alt = b.text ?? '';
+  img.style.width = Math.max(10, Math.min(100, Number(b.width) || def)) + '%';
+  wrap.appendChild(img);
+  return wrap;
+}
+
 function shapeSvg(kind: NonNullable<Block['shape']>, fill: string, line: string): string {
   const sw = line === 'hair' ? 0.6 : line === 'thick' ? 2.4 : line === 'medium' ? 1.6 : 1;
   const a = `fill="${fill}" stroke="#333" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
@@ -1615,6 +1633,10 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       break;
     }
     case 'wordart': {
+      if (b.svg) {
+        box.appendChild(pwImg(b, 60));
+        break;
+      }
       const wa = b.wa ?? 'verlauf';
       const color = safeColor(b.color, '#2f6db5');
       const wrap = el('div', 'bl-wa-wrap bl-align-' + (b.align ?? 'center'));
@@ -1628,6 +1650,15 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       break;
     }
     case 'shape': {
+      if (b.svg) {
+        box.appendChild(pwImg(b, 40));
+        if (b.wrap === 'left' || b.wrap === 'right') {
+          box.classList.add('bl-wrap-' + b.wrap);
+          box.style.width = Math.max(10, Math.min(100, Number(b.width) || 40)) + '%';
+          (box.firstChild as HTMLElement).querySelector('img')!.style.width = '100%';
+        }
+        break;
+      }
       const pct = Math.max(10, Math.min(100, Number(b.width) || 40));
       const h = Math.max(8, Math.min(250, Number(b.hMm) || 25));
       const sh = el('div', 'bl-shape bl-align-' + (b.align ?? 'center'));

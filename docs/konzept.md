@@ -1498,6 +1498,8 @@ Stile) und `shape` (sechs Formen, SVG). Entwurf = Aussehen (Blattvorlage Standar
 Kopf, Wasserzeichen), Layout = Seite und Platz. Neue Reiter „Referenzen“ (Fußnoten, Randbemerkung, Glossar,
 Beschriftungen, Definitionen) und „Überprüfen“ (Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, Ausgeblendet,
 Punkte, Textfluss, Typst). Zoom unten rechts (30–200 %, Klick auf die Zahl: 100 % ↔ eingepasst).
+Dazu (0.7.33, Jo): WordArt, Formel und Formen-Editor kommen aus dem Einzel-Editor der Pinnwand (`/pinnwand/editor.html`, wie
+Folien); `Block.svg` (als data-URL-Bild) und `Block.pdata` (Stand des Editors), Formel als LaTeX in `text`.
 
 ### 8j.5 Nächste Stufen
 

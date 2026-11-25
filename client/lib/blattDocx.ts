@@ -6,7 +6,7 @@
  * (als PNG), Glossar. Fußnoten sind echte Word-Fußnoten; Randbemerkungen stehen kursiv in Klammern im Text.
  * Der Seitensatz (Umbruch, Spalten, Broschüre) bleibt Sache von Word. Ohne Abhängigkeiten außer dem kleinen ZIP.
  */
-import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, shownBlocks, taskLabels, totalPoints, walk } from './blatt';
+import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, shownBlocks, svgSrc, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
 import { imageFilter } from './blattImage';
 
@@ -229,6 +229,14 @@ function answerLines(n: number, ctx: Ctx, mm = 8, ind = 0): string {
   return p.repeat(Math.max(0, n));
 }
 
+/** WordArt/Form aus dem Pinnwand-Editor als Bild */
+async function svgPara(b: Block, ctx: Ctx, def: number): Promise<string> {
+  const w = (ctx.width * Math.max(10, Math.min(100, b.width ?? def))) / 100;
+  const img = await toPng(svgSrc(b.svg ?? ''), Math.round(w * 8));
+  if (!img) return '';
+  return `<w:p>${pPr({ align: b.align ?? 'center' })}${drawing(ctx, img.data, img.ext, w, w * img.ar)}</w:p>`;
+}
+
 async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; labels: Map<string, string> }): Promise<string> {
   const al = b.ta ? ALIGN[b.ta] : undefined;
   const base: Omit<Run, 't'> = { b: b.bd || undefined, i: b.it || undefined };
@@ -311,8 +319,10 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
     case 'formula':
       return b.text?.trim() ? para([{ t: b.text.trim(), i: true }], ctx, { align: b.align ?? 'center' }) : '';
     case 'wordart':
+      if (b.svg) return svgPara(b, ctx, 60);
       return b.text?.trim() ? para([{ t: b.text.trim(), b: true }], ctx, { style: 'Title', align: b.align ?? 'center' }) : '';
     case 'shape':
+      if (b.svg) return svgPara(b, ctx, 40);
       return b.text?.trim() ? para(runs(b.text), ctx, { shade: (b.color ?? '#e8f0fb').replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6), align: 'center' }) : '';
     case 'grade': {
       const scores = walk(doc.blocks).filter((x) => x.type === 'task' && x.points?.trim() && !/%/.test(x.points));

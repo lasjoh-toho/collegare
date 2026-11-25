@@ -491,8 +491,8 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
   ],
   cols: [['ratio', 'verhaeltnis', 'nums']],
   formula: [['text', 'latex', 'str'], ['align', 'lage', 'str']],
-  wordart: [['text', 'text', 'str'], ['wa', 'stil', 'str'], ['color', 'farbe', 'str'], ['align', 'lage', 'str']],
-  shape: [['text', 'text', 'str'], ['shape', 'form', 'str'], ['color', 'farbe', 'str'], ['width', 'breite', 'pct'], ['hMm', 'hoehe', 'mm'], ['align', 'lage', 'str'], ['wrap', 'umfluss', 'str'], ['line', 'linie', 'str'], ['hidden', 'ausgeblendet', 'bool'], ['bottom', 'unten-fest', 'bool']],
+  wordart: [['text', 'text', 'str'], ['wa', 'stil', 'str'], ['color', 'farbe', 'str'], ['align', 'lage', 'str'], ['width', 'breite', 'pct'], ['svg', 'svg', 'str'], ['pdata', 'editor', 'str']],
+  shape: [['text', 'text', 'str'], ['shape', 'form', 'str'], ['color', 'farbe', 'str'], ['width', 'breite', 'pct'], ['hMm', 'hoehe', 'mm'], ['align', 'lage', 'str'], ['wrap', 'umfluss', 'str'], ['line', 'linie', 'str'], ['hidden', 'ausgeblendet', 'bool'], ['bottom', 'unten-fest', 'bool'], ['svg', 'svg', 'str'], ['pdata', 'editor', 'str']],
   grade: [
     ['text', 'beschriftung', 'str'],
     ['scoreTable', 'punktetabelle', 'bool'],
