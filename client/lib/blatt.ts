@@ -114,6 +114,8 @@ export interface Block {
   remark?: boolean;
   /** Bewertung: Hinweis „Scannen Sie für ein genaues Feedback erneut den QR-Code“, wenn das Blatt einen QR-Code hat (Standard an) */
   qrHint?: boolean;
+  /** vorübergehend ausgeblendet (Wunsch Jo, 25. November 2026): bleibt in „Elemente“ ausgegraut, fehlt auf dem Blatt, im Druck und in der Ausgabe */
+  hidden?: boolean;
   /** Kästen (Kasten, Aufgabe im Kasten, Glossar im Kasten, Bewertung): Linienstärke (Wunsch Jo, 24. November 2026) */
   line?: LineWeight;
 }
@@ -618,6 +620,10 @@ export function listOf(blocks: Block[], id: string): { list: Block[]; i: number;
 export function mapLists(blocks: Block[], fn: (list: Block[]) => Block[]): Block[] {
   return fn(blocks).map((b) => (b.type === 'cols' ? { ...b, cols: (b.cols ?? []).map((c) => mapLists(c, fn)) } : b));
 }
+/** nur die sichtbaren Bausteine, auch in Spalten (ausgeblendete fallen weg) */
+export function shownBlocks(blocks: Block[]): Block[] {
+  return blocks.filter((b) => !b.hidden).map((b) => (b.type === 'cols' ? { ...b, cols: (b.cols ?? []).map(shownBlocks) } : b));
+}
 export const updateBlock = (blocks: Block[], id: string, p: Partial<Block>) => mapLists(blocks, (l) => l.map((b) => (b.id === id ? { ...b, ...p } : b)));
 export const removeBlock = (blocks: Block[], id: string) => mapLists(blocks, (l) => l.filter((b) => b.id !== id));
 /** nach dem Baustein after einfügen (in dieselbe Spalte), ohne after am Ende */
@@ -637,7 +643,7 @@ export function taskLabels(doc: BlattDoc): Map<string, string> {
   const out = new Map<string, string>();
   let m = 0;
   let s = 0;
-  for (const b of walk(doc.blocks)) {
+  for (const b of walk(shownBlocks(doc.blocks))) {
     if (b.type !== 'task') continue;
     if (b.subtask) {
       s++;
@@ -1521,7 +1527,12 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       if (b.remark) foot.appendChild(el('span', 'bl-grade-line bl-grade-remark', 'Bemerkung: <span class="bl-blank"></span>'));
       if (b.sign) foot.appendChild(el('span', 'bl-grade-line', 'Unterschrift: <span class="bl-blank"></span>'));
       box.appendChild(foot);
-      if (ctx.qr && b.qrHint !== false) box.appendChild(el('p', 'bl-grade-qr', 'Scannen Sie für ein genaues Feedback erneut den QR-Code.'));
+      // Im Editor bleibt der Hinweis sichtbar, auch wenn das Blatt (noch) keinen QR-Code hat: dann blass; gedruckt wird er nur mit QR-Code
+      if (b.qrHint !== false && (ctx.qr || ctx.editing)) {
+        const q = el('p', ctx.qr ? 'bl-grade-qr' : 'bl-grade-qr bl-grade-qr-off', 'Scannen Sie für ein genaues Feedback erneut den QR-Code.');
+        if (!ctx.qr) q.title = 'Erscheint im Druck, sobald das Blatt einen QR-Code hat (Kopf → QR-Code oder Drucken mit Autogra.fi)';
+        box.appendChild(q);
+      }
       break;
     }
     default:
@@ -1606,7 +1617,7 @@ interface Pg {
 
 /** Summe der Punkte aller Aufgaben („6 P.“), oder null, wenn eine Aufgabe keine Punktzahl hat */
 export function totalPoints(doc: BlattDoc): number | null {
-  const tasks = walk(doc.blocks).filter((b) => b.type === 'task');
+  const tasks = walk(shownBlocks(doc.blocks)).filter((b) => b.type === 'task');
   if (!tasks.length) return null;
   let sum = 0;
   for (const b of tasks) {
@@ -1629,7 +1640,7 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
   page.style.fontSize = (Number(P.fontSize) || 11) + 'pt';
   const C = P.caption;
   if (C) {
-    if (C.size) page.style.setProperty('--cap-fs', Math.max(60, Math.min(120, C.size)) / 100 + 'em');
+    if (C.size) page.style.setProperty('--cap-fs', Math.max(60, Math.min(160, C.size)) / 100 + 'em');
     if (C.style === 'italic' || C.style === 'bolditalic') page.style.setProperty('--cap-it', 'italic');
     if (C.style === 'bold' || C.style === 'bolditalic') page.style.setProperty('--cap-fw', '700');
     if (C.align) page.style.setProperty('--cap-ta', C.align);
@@ -1724,6 +1735,7 @@ export interface Problem {
  * Liefert die Seiten in Lesereihenfolge und Hinweise auf Bausteine, die nicht auf eine Seite passen.
  */
 export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { editing?: boolean; head?: HeadCtx } = {}): { pages: HTMLElement[]; problems: Problem[] } {
+  doc = { ...doc, blocks: shownBlocks(doc.blocks) };
   host.replaceChildren();
   const pages: Pg[] = [];
   const problems: Problem[] = [];

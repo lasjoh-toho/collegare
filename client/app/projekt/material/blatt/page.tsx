@@ -105,7 +105,7 @@ Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht d
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -324,6 +324,7 @@ export default function BlattPage() {
   /** Schreibmarke über das Neusetzen hinweg: Absatz im ganzen Feld und Zeichen darin */
   const caret = useRef<{ key: string; para: number; off: number } | null>(null);
   const savedRange = useRef<Range | null>(null);
+  const wasRanged = useRef(false);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tick, setTick] = useState(0);
   const [atom, setAtom] = useState<AtomState | null>(null);
@@ -334,6 +335,11 @@ export default function BlattPage() {
     const s = getSelection();
     if (!L || !s?.rangeCount || !L.el.contains(s.anchorNode)) return;
     savedRange.current = s.getRangeAt(0).cloneRange();
+    // Text markiert: Reiter „Start“ zum Formatieren (Wunsch Jo, 25. November 2026), nur beim Übergang zu einer Markierung,
+    // damit ein danach gewählter Reiter bleibt
+    const ranged = !s.isCollapsed && !!s.toString().trim();
+    if (ranged && !wasRanged.current && tab !== 'start') setTab('start');
+    wasRanged.current = ranged;
     const c = caretIn(L.el, s.focusNode!, s.focusOffset);
     if (c) caret.current = { key: editKey(L.t), para: (L.range?.[0] ?? 0) + c.k, off: c.off };
   }
@@ -623,6 +629,12 @@ export default function BlattPage() {
           return i < 0 ? l : [...l.slice(0, i), b, ...l.slice(i)];
         }),
       };
+    });
+  }
+  function toggleHidden(bid: string) {
+    change((d) => {
+      const b = findBlock(d.blocks, bid);
+      return b ? { ...d, blocks: updateBlock(d.blocks, bid, { hidden: b.hidden ? undefined : true }) } : d;
     });
   }
   function remove(bid: string) {
@@ -1088,6 +1100,7 @@ export default function BlattPage() {
               add={add}
               move={move}
               remove={remove}
+              toggleHidden={toggleHidden}
               duplicate={duplicate}
               toColumns={toColumns}
               unColumns={unColumns}
@@ -1194,6 +1207,7 @@ export default function BlattPage() {
                   b={doc ? findBlock(doc.blocks, conv.bid) : null}
                   onPick={(to) => (transform(conv.bid, to), setConv(null))}
                   onSplit={(m) => (split(conv.bid, m), setConv(null))}
+                  onHide={() => (toggleHidden(conv.bid), setConv(null))}
                   onDelete={() => (remove(conv.bid), setConv(null))}
                   onClose={() => setConv(null)}
                 />
@@ -1238,7 +1252,7 @@ export default function BlattPage() {
                       ))}
                       <div
                         key={b.id}
-                        className={`${st.item} ${sel === b.id ? st.sel : ''} ${bad.has(b.id) ? st.bad : ''} ${dragId === b.id ? st.drag : ''} ${dropAt === b.id && dragId !== b.id ? st.dropAbove : ''}`}
+                        className={`${st.item} ${sel === b.id ? st.sel : ''} ${bad.has(b.id) ? st.bad : ''} ${dragId === b.id ? st.drag : ''} ${dropAt === b.id && dragId !== b.id ? st.dropAbove : ''} ${b.hidden ? st.hiddenItem : ''}`}
                         style={{ marginLeft: depth * 14 }}
                         onClick={() => (select(b.id), setEdit(null), host.current?.querySelector(`[data-bid="${b.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
                         draggable={editing}
@@ -1253,7 +1267,7 @@ export default function BlattPage() {
                         </span>
                         <span className={st.itemText}>
                           {BLOCK_LABEL[b.type]}
-                          <small>{blockSummary(b)}</small>
+                          <small>{b.hidden ? 'ausgeblendet · ' : ''}{blockSummary(b)}</small>
                         </span>
                         {editing && sel === b.id && (
                           <button
@@ -1704,8 +1718,14 @@ function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<H
 }
 
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
-function ConvMenu({ conv, b, head, onPick, onSplit, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onDelete: () => void; onClose: () => void }) {
+function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onHide?: () => void; onDelete: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
+  // nicht unten über den Rand: nach dem Zeichnen messen und nach oben schieben, notfalls mit Bildlauf
+  const [top, setTop] = useState(conv.y);
+  useLayoutEffect(() => {
+    const h = box.current?.offsetHeight ?? 0;
+    setTop(Math.max(8, Math.min(conv.y, innerHeight - h - 8)));
+  }, [conv.y, b?.id, b?.type]);
   useEffect(() => {
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -1718,9 +1738,8 @@ function ConvMenu({ conv, b, head, onPick, onSplit, onDelete, onClose }: { conv:
   }, [onClose]);
   if (!b) return null;
   const left = Math.min(conv.x, innerWidth - 240);
-  const top = Math.min(conv.y, innerHeight - 300);
   return (
-    <div ref={box} className={`${st.menu} ${st.convMenu}`} style={{ left, top }} role="menu">
+    <div ref={box} className={`${st.menu} ${st.convMenu}`} style={{ left, top, maxHeight: innerHeight - 16, overflowY: 'auto' }} role="menu">
       {!head && CONVERTIBLE.includes(b.type) && (
         <>
           <div className={st.mh}>Umwandeln in</div>
@@ -1731,6 +1750,7 @@ function ConvMenu({ conv, b, head, onPick, onSplit, onDelete, onClose }: { conv:
       )}
       {!head && onSplit && SPLITTABLE.includes(b.type) && <SplitItems b={b} split={onSplit} caret={false} />}
       <div className={st.mh}>{head ? 'Kopf' : BLOCK_LABEL[b.type]}</div>
+      {onHide && <MI icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} hint={b.hidden ? undefined : 'vorübergehend, bleibt in „Elemente“'} onClick={onHide} />}
       <MI icon="delete" label="Löschen" onClick={onDelete} />
     </div>
   );
@@ -1873,6 +1893,7 @@ type RibbonProps = {
   add: (t: BlockType, extra?: Partial<Block>) => void;
   move: (id: string, dir: -1 | 1) => void;
   remove: (id: string) => void;
+  toggleHidden: (id: string) => void;
   duplicate: (id: string) => void;
   toColumns: (id: string) => void;
   unColumns: (id: string) => void;
@@ -2106,7 +2127,7 @@ function CaptionDrop({ doc, setPageOpt, big }: { doc: BlattDoc; setPageOpt: (p: 
   return (
     <Drop icon="insertcaptiondialog" label="Bildunterschrift" value={`${size} %, ${STYLE[style]}`} big={big} title="Schrift der Unterschriften unter Bildern, Diagrammen und Tabellen (für das ganze Blatt)">
       <MH>Größe</MH>
-      {[70, 80, 85, 90, 100].map((v) => (
+      {[70, 80, 85, 90, 100, 110, 120, 140].map((v) => (
         <MI key={v} label={`${v} %${v === 85 ? ' (Standard)' : ''}`} on={size === v} stay onClick={() => setC({ size: v === 85 ? undefined : v })} />
       ))}
       <MH>Schnitt</MH>
@@ -2502,6 +2523,7 @@ function Ribbon(props: RibbonProps) {
                     <MI label="Karos (Mathe)" on={task.lineStyle === 'grid'} onClick={() => set({ lineStyle: 'grid' })} />
                   </Drop>
                   <SplitDrop b={task} split={props.split} />
+                  <RB icon={task.hidden ? 'showslide' : 'hideslide'} label={task.hidden ? 'Einblenden' : 'Ausblenden'} big on={!!task.hidden} onClick={() => props.toggleHidden(task.id)} title={task.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
                 </>
               ) : (
                 <span className={st.hint}>
@@ -2893,6 +2915,7 @@ function ArrangeRows(props: RibbonProps & { b: Block; noDelete?: boolean }) {
       </div>
       <div className={st.row}>
         {b.type !== 'cols' && !inCols && <RB icon="formatcolumns" label="Neben den nächsten" hideLabel onClick={() => props.toColumns(b.id)} title="Diesen und den nächsten Baustein nebeneinander setzen" />}
+        {!props.noDelete && <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} hideLabel on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />}
         {!props.noDelete && <RB icon="delete" label="Entfernen" hideLabel onClick={() => props.remove(b.id)} title="Entfernen (Entf)" />}
       </div>
     </div>
@@ -3300,6 +3323,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <Arrange {...props} />
       <span className={st.groupGap} />
       <Group label="Baustein">
+        <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} big on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
         <RB icon="delete" label="Löschen" big onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
       </Group>
     </>

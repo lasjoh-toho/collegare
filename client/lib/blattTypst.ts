@@ -436,6 +436,7 @@ const COMMON: [keyof Block, string, Kind][] = [
   ['breakBefore', 'neue-seite', 'bool'],
   ['keep', 'nicht-teilen', 'bool'],
   ['keepNext', 'mit-naechstem', 'bool'],
+  ['hidden', 'ausgeblendet', 'bool'],
 ];
 const PLACE: [keyof Block, string, Kind][] = [
   ['width', 'breite', 'pct'],

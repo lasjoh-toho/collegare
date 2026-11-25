@@ -6,7 +6,7 @@
  * (als PNG), Glossar. Fußnoten sind echte Word-Fußnoten; Randbemerkungen stehen kursiv in Klammern im Text.
  * Der Seitensatz (Umbruch, Spalten, Broschüre) bleibt Sache von Word. Ohne Abhängigkeiten außer dem kleinen ZIP.
  */
-import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, taskLabels, totalPoints, walk } from './blatt';
+import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, shownBlocks, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
 import { imageFilter } from './blattImage';
 
@@ -373,6 +373,7 @@ const STYLES = (font: string, size: number) => `<?xml version="1.0" encoding="UT
 
 /** Blatt als .docx-Datei */
 export async function toDocx(doc: BlattDoc, head: HeadCtx): Promise<Blob> {
+  doc = { ...doc, blocks: shownBlocks(doc.blocks) };
   const g = pageGeom(doc);
   const ctx: Ctx = { fns: [], media: [], rels: [], width: g.w - 2 * g.m };
   const st = { mat: 0, labels: taskLabels(doc) };

@@ -1483,6 +1483,12 @@ Blätter) ergeben sich die Ecken aus den alten Feldern. Reiter „Kopf“ als Ko
 Abgrenzung, QR-Code und Löschen. Dazu die Blattvorlage „Buchsatz mit Randspalte“ (`page.look = 'book'`,
 `page.sidenotes`) nach dem Vorbild von tufte-css; in der Oberfläche heißt sie nicht nach Tufte. Aufteilen (`splitBlock`/`splitBlockAt`: Schreibmarke, Nummern, Absätze, Überschriften) für alle Textbausteine, Punkte aus „(6 P.)“ ins Punktefeld; Vorlage `definitionen` (Absatz „Begriff: Erklärung“ als zweispaltige Zeile) mit Operatoren-Beispiel.
 
+**Nachtrag (Jo, 25. November 2026):** `Block.hidden` blendet einen Baustein vorübergehend aus (`shownBlocks` vor
+`paginate`, `toDocx`, `taskLabels`, `totalPoints`; Typst `ausgeblendet: true`). In „Elemente“ ausgegraut und
+durchgestrichen; Umschalter im Reiter des Bausteins, unter „Aufgabe“ und im Kontextmenü, das nach dem Zeichnen gemessen
+wird und nicht mehr unten herausragt. QR-Hinweis im Notenkasten im Editor blass, wenn das Blatt keinen QR-Code hat.
+Markierter Text wechselt in den Reiter „Start“. Bildunterschrift bis 140 %.
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).
