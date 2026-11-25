@@ -162,6 +162,8 @@ export interface BlattDoc {
     pageNumbers: boolean;
     /** Leere Seiten der Broschüre */
     fill: Ruling;
+    /** Seitenzahl: mindestens so viele Seiten, leere Seiten am Ende wie bei der Broschüre gefüllt */
+    minPages?: number;
     header: {
       show: boolean;
       text: string;
@@ -1906,10 +1908,12 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     }
   }
 
-  // Broschüre: auf ein Vielfaches von vier Seiten auffüllen (Linien, Karos oder leer)
-  if (doc.page.booklet) {
+  // Broschüre: auf ein Vielfaches von vier Seiten auffüllen; feste Seitenzahl (Wunsch Jo, 25. November 2026): bis
+  // dahin auffüllen (Linien, Karos oder leer)
+  const minPages = Math.max(0, Math.min(64, Number(doc.page.minPages) || 0));
+  if (doc.page.booklet || minPages > pages.length) {
     const fill = doc.page.fill ?? 'lines';
-    while (pages.length % 4) {
+    while (pages.length < minPages || (doc.page.booklet && pages.length % 4)) {
       next();
       pg.page.classList.add('bl-filler');
       if (fill !== 'empty') {

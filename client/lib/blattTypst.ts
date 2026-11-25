@@ -613,7 +613,7 @@ export function toTypst(doc: BlattDoc): string {
   const out: string[] = [];
   out.push('// Arbeitsblatt als Typst-Code. Ändern und „Übernehmen“; Bilder verweisen auf ihre Nummer im Blatt.');
   out.push(
-    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n${P.earnedMax === false ? '  sollpunktzahl: false,\n' : ''}${P.look === 'book' ? '  vorlage: "buchsatz",\n' : ''}${P.sidenotes ? '  randnoten: true,\n' : ''}  seitenfolge: ${tyStr(ORDER_OF(doc))},\n  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
+    `#blatt(\n  format: ${tyStr(P.size)},\n  quer: ${P.landscape ? 'true' : 'false'},\n  raender: ${tyStr(P.margin ?? 'normal')},\n  schrift: ${tyStr(P.font)},\n  schriftgroesse: ${num(P.fontSize)}pt,\n  seitenzahlen: ${P.pageNumbers ? 'true' : 'false'},\n  punktefelder: ${tyStr(P.earned ?? 'none')},\n${P.earnedMax === false ? '  sollpunktzahl: false,\n' : ''}${P.look === 'book' ? '  vorlage: "buchsatz",\n' : ''}${P.sidenotes ? '  randnoten: true,\n' : ''}  seitenfolge: ${tyStr(ORDER_OF(doc))},\n${P.minPages ? `  seiten: ${P.minPages},\n` : ''}  leere-seiten: ${tyStr(P.fill)},\n  teilaufgaben: ${tyStr(P.sub ?? 'letter')},\n  wasserzeichen: ${tyStr(P.watermark ?? '')},\n  korrekturrand: (seite: ${tyStr(P.korr.side)}, breite: ${num(P.korr.width)}mm, linie: ${tyStr(P.korr.style)}),\n)`,
   );
   const C = headCorners(doc);
 
@@ -778,6 +778,7 @@ export function fromTypst(code: string, prev: BlattDoc): BlattDoc {
         page.booklet = o === 'broschuere';
         page.nup = o === 'zwei-je-blatt';
       }
+      if (g('seiten') !== undefined) page.minPages = Math.max(0, Math.round(read(g('seiten')!, 'num', 'seiten', c.line) as number)) || undefined;
       const fill = str('leere-seiten', ['lines', 'grid', 'empty']);
       if (fill) page.fill = fill as 'lines';
       const sub = str('teilaufgaben', ['letter', 'dot']);

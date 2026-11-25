@@ -96,7 +96,7 @@ const MAX = 4_000_000;
 
 const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken. Du schreibst direkt auf der Seite wie in Word: Klick in einen Text und tipp los. Ein Klick ins Leere unter dem letzten Baustein schreibt dort weiter; ein neuer Textbaustein öffnet sich gleich zum Schreiben. Esc beendet das Schreiben.
 
-Den Namen des Blatts änderst du oben in der Kopfleiste. „Datei“: speichern, Kopie anlegen (z. B. für Gruppe B), drucken oder als PDF speichern, als Word-Datei, Webseite oder Text exportieren und das Blatt als Blatt-Datei weitergeben oder öffnen. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
+Den Namen des Blatts änderst du oben in der Kopfleiste. „Datei“: speichern, Kopie anlegen (z. B. für Gruppe B), drucken oder als PDF speichern, als Word-Datei, Webseite oder Text exportieren und das Blatt als Blatt-Datei weitergeben oder öffnen. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) mit fester Seitenzahl (fehlende Seiten werden mit Linien, Karos oder leer aufgefüllt) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
 
 Format übertragen: Baustein wählen, „Format übertragen“, dann auf einen anderen Baustein klicken. Doppelklick auf den Knopf überträgt auf mehrere nacheinander; Esc beendet.
 
@@ -2836,11 +2836,15 @@ function Ribbon(props: RibbonProps) {
               </Drop>
             </Group>
             <Group label="Druck">
-              <Drop icon="printpreview" label="Seitenfolge" value={order === 'booklet' ? 'Broschüre' : order === 'nup' ? '2 je Blatt' : 'Einzeln'} big wide title="Wie die Seiten aufs Papier kommen">
+              <Drop icon="printpreview" label="Seitenfolge" value={(order === 'booklet' ? 'Broschüre' : order === 'nup' ? '2 je Blatt' : 'Einzeln') + (P.minPages ? `, ${P.minPages} S.` : '')} big wide title="Wie die Seiten aufs Papier kommen">
                 <MI label="Einzelseiten" hint={`jede Seite auf ein Blatt ${P.size.toUpperCase()}`} on={order === 'single'} onClick={() => props.setPageOpt({ booklet: false, nup: false })} />
                 <MI label="Zwei Seiten je Blatt" hint={`1 | 2, 3 | 4 … auf ${P.size === 'a5' ? 'A4' : 'A3'} quer`} on={order === 'nup'} onClick={() => props.setPageOpt({ booklet: false, nup: true })} />
                 <MI label="Broschüre" hint={`falten und heften, ${P.size === 'a5' ? 'A4' : 'A3'} quer, Seite 1 neben der letzten`} on={order === 'booklet'} onClick={() => props.setPageOpt({ booklet: true, nup: false, landscape: false })} />
-                {order === 'booklet' && (
+                <MH>Seitenzahl</MH>
+                {[0, 2, 4, 6, 8, 12, 16, 20, 24].filter((n) => !n || order !== 'booklet' || n % 4 === 0).map((n) => (
+                  <MI key={n} label={n ? `${n} Seiten` : 'so viele, wie der Inhalt braucht'} hint={n ? 'fehlende Seiten am Ende werden aufgefüllt' : order === 'booklet' ? 'auf ein Vielfaches von 4 aufgerundet' : undefined} on={(P.minPages ?? 0) === n} onClick={() => props.setPageOpt({ minPages: n || undefined })} stay />
+                ))}
+                {(order === 'booklet' || !!P.minPages) && (
                   <>
                     <MH>Leere Seiten am Ende füllen mit</MH>
                     {(
