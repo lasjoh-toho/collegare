@@ -2836,13 +2836,13 @@ function Ribbon(props: RibbonProps) {
               </Drop>
             </Group>
             <Group label="Druck">
-              <Drop icon="printpreview" label="Seitenfolge" value={(order === 'booklet' ? 'Broschüre' : order === 'nup' ? '2 je Blatt' : 'Einzeln') + (P.minPages ? `, ${P.minPages} S.` : '')} big wide title="Wie die Seiten aufs Papier kommen">
+              <Drop icon="printpreview" label="Seitenfolge" value={(order === 'booklet' ? 'Broschüre' : order === 'nup' ? '2 je Blatt' : 'Einzeln') + (P.minPages ? `, ${Math.ceil(P.minPages / pageStep(order)) * pageStep(order)} S.` : '')} big wide title="Wie die Seiten aufs Papier kommen">
                 <MI label="Einzelseiten" hint={`jede Seite auf ein Blatt ${P.size.toUpperCase()}`} on={order === 'single'} onClick={() => props.setPageOpt({ booklet: false, nup: false })} />
                 <MI label="Zwei Seiten je Blatt" hint={`1 | 2, 3 | 4 … auf ${P.size === 'a5' ? 'A4' : 'A3'} quer`} on={order === 'nup'} onClick={() => props.setPageOpt({ booklet: false, nup: true })} />
                 <MI label="Broschüre" hint={`falten und heften, ${P.size === 'a5' ? 'A4' : 'A3'} quer, Seite 1 neben der letzten`} on={order === 'booklet'} onClick={() => props.setPageOpt({ booklet: true, nup: false, landscape: false })} />
                 <MH>Seitenzahl</MH>
-                {[0, 2, 4, 6, 8, 12, 16, 20, 24].filter((n) => !n || order !== 'booklet' || n % 4 === 0).map((n) => (
-                  <MI key={n} label={n ? `${n} Seiten` : 'so viele, wie der Inhalt braucht'} hint={n ? 'fehlende Seiten am Ende werden aufgefüllt' : order === 'booklet' ? 'auf ein Vielfaches von 4 aufgerundet' : undefined} on={(P.minPages ?? 0) === n} onClick={() => props.setPageOpt({ minPages: n || undefined })} stay />
+                {[0, ...Array.from({ length: 24 }, (_, i) => i + 1)].filter((n) => !n || (n >= pageStep(order) && n % pageStep(order) === 0 && (order !== 'single' || n <= 12 || n % 4 === 0))).map((n) => (
+                  <MI key={n} label={n ? `${n} Seiten` : 'so viele, wie der Inhalt braucht'} hint={n ? undefined : order === 'booklet' ? 'aufgerundet auf 4, 8, 12 …' : order === 'nup' ? 'aufgerundet auf eine gerade Zahl' : undefined} on={Math.ceil((P.minPages ?? 0) / pageStep(order)) * pageStep(order) === n} onClick={() => props.setPageOpt({ minPages: n || undefined })} stay />
                 ))}
                 {(order === 'booklet' || !!P.minPages) && (
                   <>
@@ -2987,6 +2987,8 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Anordnen: nach oben/unten, verdoppeln, neben den nächsten, entfernen */
+/** Seitenzahl, die die Seitenfolge erlaubt: Broschüre in Schritten von 4, zwei je Blatt in Schritten von 2 */
+const pageStep = (order: 'single' | 'nup' | 'booklet') => (order === 'booklet' ? 4 : order === 'nup' ? 2 : 1);
 function ArrangeRows(props: RibbonProps & { b: Block; noDelete?: boolean }) {
   const { b, doc } = props;
   const inCols = !!listOf(doc.blocks, b.id)?.parent;

@@ -1910,7 +1910,10 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
 
   // Broschüre: auf ein Vielfaches von vier Seiten auffüllen; feste Seitenzahl (Wunsch Jo, 25. November 2026): bis
   // dahin auffüllen (Linien, Karos oder leer)
-  const minPages = Math.max(0, Math.min(64, Number(doc.page.minPages) || 0));
+  // Schritt der Seitenfolge: Broschüre 4, zwei je Blatt 2 (eine feste Zahl wird darauf aufgerundet)
+  const step = doc.page.booklet ? 4 : doc.page.nup ? 2 : 1;
+  const want = Math.max(0, Math.min(64, Number(doc.page.minPages) || 0));
+  const minPages = Math.ceil(want / step) * step;
   if (doc.page.booklet || minPages > pages.length) {
     const fill = doc.page.fill ?? 'lines';
     while (pages.length < minPages || (doc.page.booklet && pages.length % 4)) {
