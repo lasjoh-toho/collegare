@@ -233,3 +233,66 @@ export function effectCached(src: string, fx: Fx, onReady: (url: string) => void
   run.then(onReady).catch(() => {});
   return null;
 }
+
+// ---------- Pinsel: aufhellen, abdunkeln, verpixeln (Wunsch Jo, 25. November 2026) ----------
+export type BrushMode = 'light' | 'dark' | 'pixel';
+
+/** Leinwand zum Malen: das Bild mit seiner Drehung, höchstens 2400 Bildpunkte lang */
+export async function brushCanvas(src: string, rot: number): Promise<HTMLCanvasElement> {
+  const c = await rotated(src, rot);
+  const k = Math.min(1, 2400 / Math.max(c.width, c.height));
+  if (k >= 1) return c;
+  const s = document.createElement('canvas');
+  s.width = Math.round(c.width * k);
+  s.height = Math.round(c.height * k);
+  s.getContext('2d')!.drawImage(c, 0, 0, s.width, s.height);
+  return s;
+}
+
+/** einen Tupfer an (x, y) mit Radius r (Bildpunkte); strength 0–1; block: Kantenlänge der Pixel beim Verpixeln */
+export function brushDab(c: HTMLCanvasElement, x: number, y: number, r: number, mode: BrushMode, strength: number, block = 12) {
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  const x0 = Math.max(0, Math.floor(x - r));
+  const y0 = Math.max(0, Math.floor(y - r));
+  const x1 = Math.min(c.width, Math.ceil(x + r));
+  const y1 = Math.min(c.height, Math.ceil(y + r));
+  if (x1 <= x0 || y1 <= y0) return;
+  if (mode === 'pixel') {
+    // feste Kacheln über das ganze Bild, damit sich Tupfer nahtlos fügen
+    const bx0 = Math.floor(x0 / block) * block;
+    const by0 = Math.floor(y0 / block) * block;
+    for (let by = by0; by < y1; by += block)
+      for (let bx = bx0; bx < x1; bx += block) {
+        const cx = bx + block / 2;
+        const cy = by + block / 2;
+        if ((cx - x) ** 2 + (cy - y) ** 2 > r * r) continue;
+        const w = Math.min(block, c.width - bx);
+        const h = Math.min(block, c.height - by);
+        if (w <= 0 || h <= 0) continue;
+        const d = g.getImageData(bx, by, w, h);
+        let rr = 0, gg = 0, bb = 0, aa = 0;
+        const n = w * h;
+        for (let i = 0; i < d.data.length; i += 4) (rr += d.data[i]), (gg += d.data[i + 1]), (bb += d.data[i + 2]), (aa += d.data[i + 3]);
+        g.fillStyle = `rgba(${Math.round(rr / n)},${Math.round(gg / n)},${Math.round(bb / n)},${aa / n / 255})`;
+        g.clearRect(bx, by, w, h);
+        g.fillRect(bx, by, w, h);
+      }
+    return;
+  }
+  const d = g.getImageData(x0, y0, x1 - x0, y1 - y0);
+  const p = d.data;
+  const W = x1 - x0;
+  for (let j = 0; j < y1 - y0; j++)
+    for (let i = 0; i < W; i++) {
+      const dist = Math.hypot(x0 + i - x, y0 + j - y) / r;
+      if (dist >= 1) continue;
+      const w = strength * (1 - dist * dist);
+      const k = (j * W + i) * 4;
+      for (let ch = 0; ch < 3; ch++) p[k + ch] = mode === 'light' ? p[k + ch] + (255 - p[k + ch]) * w : p[k + ch] * (1 - w);
+    }
+  g.putImageData(d, x0, y0);
+}
+
+export function canvasImage(c: HTMLCanvasElement): { src: string; ar: number } {
+  return out(c, 0.9);
+}

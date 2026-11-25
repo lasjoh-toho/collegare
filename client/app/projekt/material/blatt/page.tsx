@@ -83,7 +83,7 @@ type PwEdit = { kind: 'wordart' | 'shape' | 'formula'; bid?: string; data: strin
 const PW_TITLE = { wordart: 'WordArt', shape: 'Formen-Editor', formula: 'Formel' } as const;
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
-import { type Crop, cropImage, kb, loadImage, removeBackground, shrinkImage, srcBytes } from '@/lib/blattImage';
+import { type BrushMode, type Crop, brushCanvas, brushDab, canvasImage, cropImage, imageFilter, kb, loadImage, removeBackground, shrinkImage, srcBytes } from '@/lib/blattImage';
 import { ScanDialog } from '@/components/ScanDialog';
 import st from './blatt.module.css';
 
@@ -112,7 +112,7 @@ Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts st
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering; Bearbeiten: Pinsel zum Aufhellen, Abdunkeln und Verpixeln (Enter übernimmt, Esc bricht ab, Strg+Z nimmt einen Strich zurück). Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -200,6 +200,8 @@ export default function BlattPage() {
   const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
   /** Bild, das gerade auf der Seite zugeschnitten wird */
   const [cropBid, setCropBid] = useState<string | null>(null);
+  /** Pinsel auf einem Bild (aufhellen, abdunkeln, verpixeln) */
+  const [brush, setBrush] = useState<{ bid: string; mode: BrushMode } | null>(null);
   /** wo die Seiten beginnen: vor welchem Baustein (oder mitten in ihm, wenn er weiterläuft) */
   const [pageMarks, setPageMarks] = useState<Map<string, { page: number; cont: boolean }[]>>(new Map());
   const [dropAt, setDropAt] = useState<string | null>(null);
@@ -1247,7 +1249,23 @@ export default function BlattPage() {
               select={(bid) => (select(bid), setEdit(null), setTab('block'), host.current?.querySelector(`[data-bid="${bid}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))}
               busy={busy}
               crop={cropBid}
+              brush={brush}
+              setBrush={setBrush}
               setCrop={setCropBid}
+            />
+          )}
+          {brush && selBlock?.id === brush.bid && selBlock.src && (
+            <BrushOverlay
+              host={host}
+              b={selBlock}
+              mode={brush.mode}
+              setMode={(m) => setBrush({ bid: brush.bid, mode: m })}
+              onCancel={() => setBrush(null)}
+              onApply={(r) => {
+                const b = selBlock;
+                setBrush(null);
+                setBlock(b.id, { src: r.src, ar: r.ar, rot: 0, orig: b.orig ?? b.src, origRot: b.orig ? b.origRot : b.rot });
+              }}
             />
           )}
           {cropBid && selBlock?.id === cropBid && selBlock.src && (
@@ -1710,7 +1728,7 @@ function cssObj(css: string): React.CSSProperties {
 }
 
 /** Reiter „Bild“: Anpassen (Helligkeit, Kontrast, Graustufen), Bearbeiten (Zuschneiden, Freistellen, Verkleinern), Rahmen */
-function ImageTools({ b, set, crop, setCrop, onError }: { b: Block; set: (p: Partial<Block>) => void; crop: string | null; setCrop: (bid: string | null) => void; onError: (m: string) => void }) {
+function ImageTools({ b, set, crop, setCrop, onError, brush, setBrush }: { b: Block; set: (p: Partial<Block>) => void; crop: string | null; setCrop: (bid: string | null) => void; onError: (m: string) => void; brush: RibbonProps['brush']; setBrush: RibbonProps['setBrush'] }) {
   const [work, setWork] = useState('');
   const rot = Number(b.rot) || 0;
   const keepOrig = () => ({ orig: b.orig ?? b.src, origRot: b.orig ? b.origRot : b.rot });
@@ -1803,9 +1821,172 @@ function ImageTools({ b, set, crop, setCrop, onError }: { b: Block; set: (p: Par
           <MI label="kleiner" hint="1000 Bildpunkte, für kleine Bilder" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 1000, 0.78))} />
           <MI label="sehr klein" hint="600 Bildpunkte, Symbole und Skizzen" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 600, 0.75))} />
         </Drop>
-        <RB icon="resetattributes" label="Original" disabled={!b.orig || !!work} onClick={() => void restore()} title="Zuschneiden, Freistellen und Verkleinern zurücknehmen" />
+        <RB icon="resetattributes" label="Original" disabled={!b.orig || !!work} onClick={() => void restore()} title="Zuschneiden, Freistellen, Verkleinern und Pinsel zurücknehmen" />
+        </div>
+        <div className={st.stack}>
+          {BRUSHES.map(([m, l, i, t]) => (
+            <RB key={m} icon={i} label={l} disabled={!b.src || !!work} on={brush?.bid === b.id && brush.mode === m} onClick={() => (setCrop(null), setBrush(brush?.bid === b.id && brush.mode === m ? null : { bid: b.id, mode: m }))} title={t} />
+          ))}
         </div>
       </Group>
+    </>
+  );
+}
+
+/** Pinsel: Art, Name, Icon, Erklärung */
+const BRUSHES: [BrushMode, string, string, string][] = [
+  ['light', 'Aufhellen', 'grow', 'Pinsel: Stellen im Bild heller malen (Abwedeln); Enter übernimmt, Esc bricht ab'],
+  ['dark', 'Abdunkeln', 'shrink', 'Pinsel: Stellen im Bild dunkler malen (Nachbelichten)'],
+  ['pixel', 'Verpixeln', 'gridvisible', 'Pinsel: Stellen unkenntlich machen, z. B. Gesichter oder Namen'],
+];
+
+/** Malen auf dem Bild: eine Leinwand liegt über dem Bild, der Pinsel ändert sie; „Übernehmen“ macht daraus das neue Bild */
+function BrushOverlay({ host, b, mode, setMode, onApply, onCancel }: { host: React.RefObject<HTMLDivElement | null>; b: Block; mode: BrushMode; setMode: (m: BrushMode) => void; onApply: (r: { src: string; ar: number }) => void; onCancel: () => void }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const work = useRef<HTMLCanvasElement | null>(null);
+  const view = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+  const [size, setSize] = useState(36);
+  const [strength, setStrength] = useState(30);
+  const [pix, setPix] = useState(10);
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const undo = useRef<ImageData[]>([]);
+  const [undoN, setUndoN] = useState(0);
+  const draw = () => {
+    const c = work.current;
+    const v = view.current;
+    if (!c || !v) return;
+    if (v.width !== c.width) v.width = c.width;
+    if (v.height !== c.height) v.height = c.height;
+    v.getContext('2d')!.clearRect(0, 0, v.width, v.height);
+    v.getContext('2d')!.drawImage(c, 0, 0);
+  };
+  useEffect(() => {
+    let off = false;
+    brushCanvas(b.src!, Number(b.rot) || 0).then((c) => {
+      if (off) return;
+      work.current = c;
+      setReady(true);
+    });
+    return () => {
+      off = true;
+    };
+  }, [b.src, b.rot]);
+  useEffect(() => {
+    if (ready) draw();
+  });
+  const apply = () => work.current && onApply(canvasImage(work.current));
+  const back = () => {
+    const d = undo.current.pop();
+    if (d && work.current) {
+      work.current.getContext('2d')!.putImageData(d, 0, 0);
+      draw();
+    }
+    setUndoN(undo.current.length);
+  };
+  const keys = useRef({ apply, back, onCancel });
+  keys.current = { apply, back, onCancel };
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const img = host.current?.querySelector<HTMLElement>(`[data-bid="${b.id}"] img`);
+      const r = img?.getBoundingClientRect() ?? null;
+      setRect((o) => (r && o && r.x === o.x && r.y === o.y && r.width === o.width && r.height === o.height ? o : r));
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') (e.preventDefault(), e.stopPropagation(), keys.current.onCancel());
+      if (e.key === 'Enter') (e.preventDefault(), e.stopPropagation(), keys.current.apply());
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) (e.preventDefault(), e.stopPropagation(), keys.current.back());
+    };
+    addEventListener('keydown', key, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener('keydown', key, true);
+    };
+  }, [host, b.id]);
+  if (!rect) return null;
+  const paint = (e: React.PointerEvent) => {
+    const c = work.current;
+    if (!c || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    undo.current.push(c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height));
+    if (undo.current.length > 8) undo.current.shift();
+    setUndoN(undo.current.length);
+    const k = c.width / rect.width;
+    const r = (size / 2) * k;
+    const blk = Math.max(2, Math.round(pix * k));
+    const at = (ev: { clientX: number; clientY: number }) => [(ev.clientX - rect.left) * k, (ev.clientY - rect.top) * k] as const;
+    let last = at(e);
+    brushDab(c, last[0], last[1], r, mode, strength / 100, blk);
+    let queued = false;
+    const flush = () => ((queued = false), draw());
+    const move = (ev: PointerEvent) => {
+      setCursor({ x: ev.clientX, y: ev.clientY });
+      const p = at(ev);
+      const dist = Math.hypot(p[0] - last[0], p[1] - last[1]);
+      const step = Math.max(1, r / 3);
+      for (let t = step; t <= dist; t += step) brushDab(c, last[0] + ((p[0] - last[0]) * t) / dist, last[1] + ((p[1] - last[1]) * t) / dist, r, mode, (strength / 100) * 0.5, blk);
+      if (dist >= step) last = p;
+      if (!queued) ((queued = true), requestAnimationFrame(flush));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      draw();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    draw();
+  };
+  const filter = imageFilter(b);
+  return (
+    <>
+      <canvas
+        ref={view}
+        className={st.brushView}
+        style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, filter: filter || undefined }}
+        onPointerDown={paint}
+        onPointerMove={(e) => setCursor({ x: e.clientX, y: e.clientY })}
+        onPointerLeave={() => setCursor(null)}
+      />
+      {cursor && <span className={st.brushCursor} style={{ left: cursor.x - size / 2, top: cursor.y - size / 2, width: size, height: size }} />}
+      <div className={st.cropBar} style={{ left: Math.max(8, rect.left), top: Math.min(innerHeight - 48, rect.bottom + 8) }} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="seg" role="group" aria-label="Pinsel">
+          {BRUSHES.map(([m, l]) => (
+            <button key={m} type="button" className={`btn ${mode === m ? 'on' : ''}`} onClick={() => setMode(m)}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <label className={st.brushIn} title="Größe des Pinsels">
+          Größe
+          <input type="range" min={8} max={160} value={size} onChange={(e) => setSize(Number(e.target.value))} />
+        </label>
+        {mode === 'pixel' ? (
+          <label className={st.brushIn} title="Größe der Pixel">
+            Pixel
+            <input type="range" min={3} max={40} value={pix} onChange={(e) => setPix(Number(e.target.value))} />
+          </label>
+        ) : (
+          <label className={st.brushIn} title="Wie stark ein Strich wirkt">
+            Stärke
+            <input type="range" min={5} max={100} value={strength} onChange={(e) => setStrength(Number(e.target.value))} />
+          </label>
+        )}
+        <button type="button" className="btn" onClick={back} disabled={!undoN} title="Letzten Strich zurücknehmen (Strg+Z)">
+          Zurück
+        </button>
+        <button type="button" className="btn" onClick={onCancel}>
+          Abbrechen
+        </button>
+        <button type="button" className="btn primary" onClick={apply} disabled={!ready}>
+          Übernehmen
+        </button>
+      </div>
     </>
   );
 }
@@ -2072,6 +2253,8 @@ const BICON: Record<BlockType, string> = {
 
 type RibbonProps = {
   openPoints: () => void;
+  brush: { bid: string; mode: BrushMode } | null;
+  setBrush: (v: { bid: string; mode: BrushMode } | null) => void;
   /** WordArt, Form oder Formel im Editor der Pinnwand anlegen oder (mit Baustein) bearbeiten */
   openPw: (kind: PwEdit['kind'], b?: Block) => void;
   problems: Problem[];
@@ -3435,7 +3618,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               </div>
             ) : null}
           </Group>
-          <ImageTools b={b} set={set} crop={props.crop} setCrop={props.setCrop} onError={props.onError} />
+          <ImageTools b={b} set={set} crop={props.crop} setCrop={props.setCrop} onError={props.onError} brush={props.brush} setBrush={props.setBrush} />
         </>
       )}
       {b.type === 'table' && (
