@@ -68,11 +68,58 @@
 .barOpen { background: color-mix(in srgb, var(--ui-accent) 22%, transparent); color: var(--ui-accent); cursor: crosshair; pointer-events: none; }
 .barRelease { background: transparent; border: 1.5px dashed var(--ui-accent); color: var(--ui-accent); cursor: ew-resize; white-space: nowrap; overflow: hidden; }
 .barText { pointer-events: none; overflow: hidden; white-space: nowrap; padding: 0 10px; }
-.handle { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; }
-.handle::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 3px; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--ui-accent-fg) 70%, transparent); }
-.hFrom { left: 0; }
-.hTo { right: 0; }
+.handle { position: absolute; top: 2px; bottom: 2px; width: 11px; margin-left: -5px; cursor: ew-resize; z-index: 3; }
+.handle::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 4px; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--ui-accent-fg) 75%, transparent); }
+.hFrom { margin-left: 0; }
+.hTo { margin-left: -11px; }
+/* Fuge zwischen Bearbeiten und Rückmeldung (Jo, 25. November 2026) */
+.hJoint::after { left: 3px; width: 5px; top: 3px; bottom: 3px; background: var(--ui-panel); border: 1.5px solid var(--attr); border-radius: 3px; }
+.hJointAdd { margin-left: -23px; }
+.hJointAdd::after { opacity: 0; transition: opacity .15s; }
+.gTrack:hover .hJointAdd::after { opacity: .6; }
+.gTrack .hJointAdd:hover::after { opacity: 1; }
+.barWork { justify-content: flex-start; }
+.barComment {
+  justify-content: flex-start; color: #fff;
+  background: repeating-linear-gradient(135deg, var(--attr) 0 7px, color-mix(in srgb, var(--attr) 82%, #000) 7px 14px);
+}
+.joinR { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.joinL { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.barNoEnd { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 46px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 46px), transparent); border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.noEndTag { position: absolute; right: 6px; top: 0; bottom: 0; display: grid; place-items: center; font-size: 10.5px; color: var(--ui-muted); pointer-events: none; z-index: 2; }
+.lockTag { position: absolute; top: 0; bottom: 0; display: grid; place-items: center; margin-left: 2px; font-size: 10px; pointer-events: none; z-index: 2; }
+.gWeekend { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--ui-text) 9%, transparent); pointer-events: none; }
+.gShow { position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; transform: rotate(45deg); background: var(--ui-panel); border: 2px solid var(--attr); z-index: 3; pointer-events: none; }
+.keyWork, .keyComment { display: inline-block; width: 18px; height: 9px; border-radius: 3px; vertical-align: 0; background: var(--ui-accent); }
+.keyComment { background: repeating-linear-gradient(135deg, var(--attr) 0 4px, color-mix(in srgb, var(--attr) 82%, #000) 4px 8px); }
+.cLabel { color: var(--attr); font-weight: 600; }
+.dates input.cInput { border-color: color-mix(in srgb, var(--attr) 55%, var(--ui-border)); }
+.noEnd { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--ui-muted); }
+.noEnd input { margin: 0; }
+
+/* Vorführtermine: gezoomter Zeitstrahl */
+.zNav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.zNav .btn { height: 28px; font-size: 12px; }
+.zScroll { overflow-x: auto; border-radius: 8px; border: 1px solid var(--ui-border); background: var(--ui-sunken); }
+.zStrip { position: relative; min-height: 66px; cursor: copy; user-select: none; touch-action: pan-x; }
+.zDay { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--ui-border); }
+.zWeekend { background: color-mix(in srgb, var(--ui-text) 9%, transparent); cursor: not-allowed; }
+.zDayHead { position: absolute; left: 5px; top: 2px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.zWeekend .zDayHead { left: 4px; font-weight: 400; color: var(--ui-muted); }
+.zHour { position: absolute; bottom: 0; top: 18px; border-left: 1px dashed color-mix(in srgb, var(--ui-border) 80%, transparent); font-size: 9.5px; color: var(--ui-faint); padding: 0 0 1px 2px; display: flex; align-items: flex-end; }
+.zShow {
+  position: absolute; height: 23px; padding: 0 5px; border-radius: 5px; border: 1.5px solid var(--attr); background: var(--ui-panel); color: var(--ui-text);
+  font: inherit; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; cursor: grab; z-index: 2;
+}
+.zShow span { font-weight: 650; color: var(--attr); }
+.zFree { border-style: dashed; }
+.zSel { background: var(--attr); color: #fff; }
+.zSel span { color: #fff; }
+.zEdit { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.zEdit input, .zEdit select { height: 30px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--ui-border); background: var(--ui-bg); color: var(--ui-text); font: inherit; font-size: 12.5px; color-scheme: light dark; }
+.zLabel { flex: 1; min-width: 140px; }
 @media (max-width: 560px) {
   .gGrid { grid-template-columns: 84px 1fr; }
   .stateRow, .tools, .release { padding-left: 0; }
+  .dates { flex-wrap: wrap; white-space: normal; }
 }

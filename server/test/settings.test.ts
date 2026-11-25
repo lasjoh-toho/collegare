@@ -144,8 +144,24 @@ describe('Schritte: Alternativen und Start nach Freigabe', () => {
     );
     expect(s.tools).toEqual({ cluster: false });
     expect(s.conceptReleased).toEqual([3, 7]);
-    expect(s.phases.presentation).toEqual({ state: 'release', from: null, to: 1_000 });
+    expect(s.phases.presentation).toEqual({ state: 'release', from: null, comment: null, to: 1_000 });
     expect(s.phases.drafting.state).toBe('on');
+  });
+
+  it('Zeitplan: Rückmeldung ab, kein Ende und Vorführtermine (Jo, 25. November 2026)', () => {
+    const old = parseSettings(JSON.stringify({ phases: { drafting: { state: 'scheduled', from: 10, to: 90 } } }));
+    expect(old.phases.drafting).toEqual({ state: 'scheduled', from: 10, comment: null, to: 90 });
+    expect(old.showings).toEqual([]);
+    const s = parseSettings(
+      JSON.stringify({
+        phases: { drafting: { state: 'scheduled', from: 10, comment: 50, to: null } },
+        showings: [{ id: 'a1', at: 1_000, min: 30, who: 4, label: 'Raum 204' }],
+      }),
+    );
+    expect(s.phases.drafting).toEqual({ state: 'scheduled', from: 10, comment: 50, to: null });
+    expect(s.showings).toEqual([{ id: 'a1', at: 1_000, min: 30, who: 4, label: 'Raum 204' }]);
+    // ungültige Termine fallen auf den Standard zurück
+    expect(parseSettings(JSON.stringify({ showings: [{ id: '', at: 1 }] })).showings).toEqual([]);
   });
 
   it('Zugangscodes „solange freigegeben“ zählen „nach Freigabe“ wie einen Zeitraum', () => {
