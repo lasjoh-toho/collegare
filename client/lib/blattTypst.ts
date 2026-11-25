@@ -431,12 +431,14 @@ const COMMON: [keyof Block, string, Kind][] = [
   ['it', 'kursiv', 'bool'],
   ['ind', 'einzug', 'mm'],
   ['nm', 'notizrand', 'mm'],
+  ['nmSide', 'notizrand-seite', 'str'],
   ['flow', 'textspalten', 'num'],
   ['gap', 'steg', 'mm'],
   ['breakBefore', 'neue-seite', 'bool'],
   ['keep', 'nicht-teilen', 'bool'],
   ['keepNext', 'mit-naechstem', 'bool'],
   ['hidden', 'ausgeblendet', 'bool'],
+  ['bottom', 'unten-fest', 'bool'],
 ];
 const PLACE: [keyof Block, string, Kind][] = [
   ['width', 'breite', 'pct'],
@@ -488,6 +490,9 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['korrOff', 'ohne-korrekturrand', 'bool'],
   ],
   cols: [['ratio', 'verhaeltnis', 'nums']],
+  formula: [['text', 'latex', 'str'], ['align', 'lage', 'str']],
+  wordart: [['text', 'text', 'str'], ['wa', 'stil', 'str'], ['color', 'farbe', 'str'], ['align', 'lage', 'str']],
+  shape: [['text', 'text', 'str'], ['shape', 'form', 'str'], ['color', 'farbe', 'str'], ['width', 'breite', 'pct'], ['hMm', 'hoehe', 'mm'], ['align', 'lage', 'str'], ['wrap', 'umfluss', 'str'], ['line', 'linie', 'str'], ['hidden', 'ausgeblendet', 'bool'], ['bottom', 'unten-fest', 'bool']],
   grade: [
     ['text', 'beschriftung', 'str'],
     ['scoreTable', 'punktetabelle', 'bool'],
@@ -512,6 +517,9 @@ const NAME: Record<BlockType, string> = {
   lines: 'linien',
   pagebreak: 'pagebreak',
   grade: 'bewertung',
+  formula: 'formel',
+  wordart: 'wordart',
+  shape: 'form',
 };
 const TYPE_OF = Object.fromEntries(Object.entries(NAME).map(([k, v]) => [v, k])) as Record<string, BlockType>;
 /** Bausteine, deren Haupttext im Inhalt [ … ] steht */
@@ -571,7 +579,7 @@ function blockCode(b: Block, ind: string): string {
   const name = NAME[b.type];
   const args: string[] = [];
   if (b.type === 'image' || b.type === 'table') args.push(tyStr(b.id));
-  for (const [k, n, kind] of [...(FIELDS[b.type] ?? []), ...(b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'image' || b.type === 'chart' ? [] : COMMON)]) {
+  for (const [k, n, kind] of [...(FIELDS[b.type] ?? []), ...(b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'image' || b.type === 'chart' || b.type === 'shape' ? [] : COMMON)]) {
     const v = b[k];
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) continue;
     if (b.type === 'cols' && k === 'ratio' && (v as number[]).every((x) => x === 1)) continue;
@@ -702,7 +710,7 @@ function toBlock(c: Call, prev: Map<string, Block>, prevSeq: Block[], counter: {
     }
   } else b = reuse(type);
   const known = new Set<string>(['leer', 'spalten']);
-  const list = [...(FIELDS[type] ?? []), ...(type === 'cols' || type === 'lines' || type === 'pagebreak' || type === 'image' || type === 'chart' ? [] : COMMON)];
+  const list = [...(FIELDS[type] ?? []), ...(type === 'cols' || type === 'lines' || type === 'pagebreak' || type === 'image' || type === 'chart' || type === 'shape' ? [] : COMMON)];
   if (type === 'cols') list.push(['gap', 'steg', 'mm']);
   for (const [k, n, kind] of list) {
     known.add(n);

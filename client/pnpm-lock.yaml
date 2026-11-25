@@ -26,6 +26,9 @@ importers:
       socket.io-client:
         specifier: ^4.8.1
         version: 4.8.4
+      temml:
+        specifier: 0.14.0
+        version: 0.14.0
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -536,6 +539,10 @@ packages:
       babel-plugin-macros:
         optional: true
 
+  temml@0.14.0:
+    resolution: {integrity: sha512-tz1LW/5IZpThK8c7ZpdTSH/n56eAj+ThirLieErtKxYC3EKCIiB4sKdRUehAgH+fQmvIKqMfP3gqTLBdLpy9zw==}
+    engines: {node: '>=18.13.0'}
+
   tslib@2.9.1:
     resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
 
@@ -1033,6 +1040,8 @@ snapshots:
     dependencies:
       client-only: 0.0.1
       react: 19.2.3
+
+  temml@0.14.0: {}
 
   tslib@2.9.1: {}
 

@@ -1491,6 +1491,14 @@ Markierter Text wechselt in den Reiter „Start“. Bildunterschrift bis 140 %.
 Dazu (0.7.30): Feld `points` auf der Seite (Punktefeld schreibbar), Punktetabelle mit Übertragen der Kriterien
 (`toCriteria`) in die erste Teilaufgabe von Autogra.fi, Zeilen der Kopf-Ecken mit Griff und × (`cornerHtml(…, tools)`).
 
+**Nachtrag (Jo, 25. November 2026, abends):** Korrekturrand und Notizrand (`Block.nmSide`) links, rechts, innen oder
+außen; innen/außen wechseln mit der Seite (`bl-recto`/`bl-verso`). `Block.bottom` hält einen Baustein am Fuß der Seite;
+Linien bis zum Seitenende davor lassen ihm Platz. Neue Bausteine `formula` (LaTeX, temml → MathML), `wordart` (fünf
+Stile) und `shape` (sechs Formen, SVG). Entwurf = Aussehen (Blattvorlage Standard/Buchsatz mit Randspalte, Schrift,
+Kopf, Wasserzeichen), Layout = Seite und Platz. Neue Reiter „Referenzen“ (Fußnoten, Randbemerkung, Glossar,
+Beschriftungen, Definitionen) und „Überprüfen“ (Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, Ausgeblendet,
+Punkte, Textfluss, Typst). Zoom unten rechts (30–200 %, Klick auf die Zahl: 100 % ↔ eingepasst).
+
 ### 8j.5 Nächste Stufen
 
 1. Randspalte für Kästen und Bilder neben dem Text (Spalten gibt es seit 8j.7).

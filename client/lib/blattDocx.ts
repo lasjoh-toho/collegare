@@ -307,6 +307,13 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
       return b.style === 'empty' ? '' : answerLines(b.fill ? 12 : (b.count ?? 8), ctx, b.spacing ?? 8);
     case 'pagebreak':
       return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+    // Formel als LaTeX-Text, WordArt fett und groß, Form als Kasten mit Text (Word-Formeln/-Formen später)
+    case 'formula':
+      return b.text?.trim() ? para([{ t: b.text.trim(), i: true }], ctx, { align: b.align ?? 'center' }) : '';
+    case 'wordart':
+      return b.text?.trim() ? para([{ t: b.text.trim(), b: true }], ctx, { style: 'Title', align: b.align ?? 'center' }) : '';
+    case 'shape':
+      return b.text?.trim() ? para(runs(b.text), ctx, { shade: (b.color ?? '#e8f0fb').replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6), align: 'center' }) : '';
     case 'grade': {
       const scores = walk(doc.blocks).filter((x) => x.type === 'task' && x.points?.trim() && !/%/.test(x.points));
       const out: string[] = [];

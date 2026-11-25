@@ -74,6 +74,8 @@ import {
   type Korr,
   type Problem,
   type Ruling,
+  SHAPE_LABEL,
+  WA_LABEL,
 } from '@/lib/blatt';
 import type { ProjectView } from '@/lib/types';
 import { useMe, useQuery } from '@/lib/useMe';
@@ -89,24 +91,24 @@ interface Page {
   body: string;
 }
 
-const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'table', 'chart', 'glossary', 'lines', 'pagebreak', 'grade'];
+const ADD: BlockType[] = ['material', 'image', 'task', 'text', 'quote', 'box', 'heading', 'table', 'chart', 'glossary', 'lines', 'pagebreak', 'grade', 'formula', 'wordart', 'shape'];
 /** Textbausteine und ihr Hauptfeld: ein Klick in den Baustein oder ein neuer Baustein öffnet es zum Schreiben */
-const MAIN_FIELD: Partial<Record<BlockType, FieldName>> = { text: 'md', material: 'md', quote: 'md', box: 'md', task: 'md', heading: 'text', glossary: 'text' };
+const MAIN_FIELD: Partial<Record<BlockType, FieldName>> = { text: 'md', material: 'md', quote: 'md', box: 'md', task: 'md', heading: 'text', glossary: 'text', wordart: 'text' };
 const MAX = 4_000_000;
 
 const INFO = `Hier entsteht ein Arbeitsblatt oder eine Klassenarbeit zum Ausdrucken. Du schreibst direkt auf der Seite wie in Word: Klick in einen Text und tipp los. Ein Klick ins Leere unter dem letzten Baustein schreibt dort weiter; ein neuer Textbaustein öffnet sich gleich zum Schreiben. Esc beendet das Schreiben.
 
-Den Namen des Blatts änderst du oben in der Kopfleiste. „Datei“: speichern, Kopie anlegen (z. B. für Gruppe B), drucken oder als PDF speichern, als Word-Datei, Webseite oder Text exportieren und das Blatt als Blatt-Datei weitergeben oder öffnen. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code, Korrekturrand und Wasserzeichen. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) mit fester Seitenzahl (fehlende Seiten werden mit Linien, Karos oder leer aufgefüllt) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
+Den Namen des Blatts änderst du oben in der Kopfleiste. „Datei“: speichern, Kopie anlegen (z. B. für Gruppe B), drucken oder als PDF speichern, als Word-Datei, Webseite oder Text exportieren und das Blatt als Blatt-Datei weitergeben oder öffnen. Das Menüband beginnt mit „Einfügen“ (Textbausteine, Aufgaben, Bild, Tabelle, Diagramm, Spalten, Seitenumbruch, Glossar). „Start“: Format übertragen, Schrift (Größe, Stärke, Laufweite, fett, kursiv, Textmarker), Absatz (Listen, Einzug, Ausrichtung, Zeilen- und Absatzabstand), Formatvorlagen und Rand für Notizen, im Text Fußnote, Randbemerkung und Glossar-Wort. Ohne Markierung gelten fett und kursiv für den ganzen Baustein. „Aufgabe“: neue Aufgaben, Nummern der Teilaufgaben, Nummer, Punkte und Antwortzeilen der gewählten Aufgabe, Rahmendaten, QR-Code und Korrekturrand. „Entwurf“: Schrift des Blatts, Kopfzeile, Textfluss und Typst-Code. „Layout“: Ränder, Hoch- oder Querformat, Format, Umbrüche, Spalten, Seitenfolge (einzeln, zwei Seiten je Blatt, Broschüre) mit fester Seitenzahl (fehlende Seiten werden mit Linien, Karos oder leer aufgefüllt) und Anordnen (Umfluss, Ausrichten, Reihenfolge). Die Klappmenüs zeigen unter dem Knopf, was gerade gewählt ist.
 
 Format übertragen: Baustein wählen, „Format übertragen“, dann auf einen anderen Baustein klicken. Doppelklick auf den Knopf überträgt auf mehrere nacheinander; Esc beendet.
 
-Textfluss (Entwurf → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden Baustein. Läuft ein Text über mehrere Seiten, tragen seine Stücke Nummern und sagen, wo es weitergeht. Der Kettenknopf zwischen zwei Bausteinen verbindet sie: verbundene Bausteine bleiben auf derselben Seite. Unter Layout → Umbrüche: „beginnt auf neuer Seite“ und „nicht über Seiten teilen“. Layout → Spalten lässt einen Text durch zwei oder drei verbundene Spalten fließen; die Stegbreite stellst du dort ein.
+Textfluss (Überprüfen → „Textfluss zeigen“): Gestrichelte Rahmen zeigen jeden Baustein. Läuft ein Text über mehrere Seiten, tragen seine Stücke Nummern und sagen, wo es weitergeht. Der Kettenknopf zwischen zwei Bausteinen verbindet sie: verbundene Bausteine bleiben auf derselben Seite. Unter Layout → Umbrüche: „beginnt auf neuer Seite“ und „nicht über Seiten teilen“. Layout → Spalten lässt einen Text durch zwei oder drei verbundene Spalten fließen; die Stegbreite stellst du dort ein.
 
-Typst-Code (Entwurf → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
+Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts steht das ganze Blatt als Typst-Code. Ändern und „Übernehmen“ (Strg+Enter); ein Fehler nennt die Zeile, das Blatt bleibt dann wie es war. Bilder stehen als Verweis #bild("…") im Code; neue Bilder fügst du über „Einfügen“ hinzu.
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Vorlagen“: Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Entwurf“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel (LaTeX). Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -172,8 +174,19 @@ export default function BlattPage() {
   const [saved, setSaved] = useState<'ok' | 'dirty' | 'saving'>('ok');
   const [view, setView] = useState<'pages' | 'spreads' | 'sheets'>('pages');
   const [problems, setProblems] = useState<Problem[]>([]);
+  /** Rechtschreibprüfung des Browsers beim Schreiben (Überprüfen → Rechtschreibung) */
+  const [spell, setSpell] = useState(true);
+  const spellRef = useRef(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('collegare.blatt.spell') === '0') (setSpell(false), (spellRef.current = false));
+    } catch {}
+  }, []);
   const [pageCount, setPageCount] = useState(0);
   const [zoom, setZoom] = useState(1);
+  /** eigene Vergrößerung (Wunsch Jo, 25. November 2026); null = auf die Breite einpassen */
+  const [zoomPick, setZoomPick] = useState<number | null>(null);
+  const [zoomFit, setZoomFit] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [pointsOpen, setPointsOpen] = useState(false);
   /** „Bild aufnehmen“ mit dem Scanner aus Autogra.fi (Wunsch Jo, 24. November 2026) */
@@ -423,7 +436,7 @@ export default function BlattPage() {
     f.innerHTML = isHead ? headToEdit(slice) : rich ? tufteToEdit(toEditMd(slice)) : escHtml(slice);
     if (getComputedStyle(f).display === 'inline') f.style.display = 'inline-block';
     f.contentEditable = 'true';
-    f.spellcheck = true;
+    f.spellcheck = spellRef.current;
     f.classList.add('bl-live');
     f.setAttribute('role', 'textbox');
     f.setAttribute('aria-label', 'Text auf der Seite');
@@ -574,13 +587,15 @@ export default function BlattPage() {
       const pw = pageGeom(doc).w;
       const sz = view === 'sheets' ? sheetSize(doc).w : view === 'spreads' ? 2 * pw : pw;
       const px = sz * 3.7795 + 40;
-      setZoom(Math.min(1, Math.max(0.3, (c.clientWidth - 8) / px)));
+      const f = Math.min(1, Math.max(0.3, (c.clientWidth - 8) / px));
+      setZoomFit(f);
+      setZoom(zoomPick ?? f);
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [doc?.page.size, doc?.page.booklet, view, doc]);
+  }, [doc?.page.size, doc?.page.booklet, view, doc, zoomPick]);
 
   // ---------- Bausteine ----------
   const selBlock = doc && sel ? findBlock(doc.blocks, sel) : null;
@@ -592,7 +607,7 @@ export default function BlattPage() {
     // neuer Textbaustein: gleich darin schreiben
     const f = MAIN_FIELD[type];
     setEdit(f && type !== 'glossary' ? { bid: b.id, field: f, idx: 0 } : type === 'table' ? { bid: b.id, field: 'cell:0:0', idx: 0 } : null);
-    if (type === 'image' || type === 'cols' || type === 'lines' || type === 'glossary' || type === 'table' || type === 'chart' || type === 'grade') setTab('block');
+    if (type === 'image' || type === 'cols' || type === 'lines' || type === 'glossary' || type === 'table' || type === 'chart' || type === 'grade' || type === 'formula' || type === 'wordart' || type === 'shape') setTab('block');
   }
   /** Zahl der Spalten ändern; überzählige Spalten wandern in die letzte, „1“ löst die Spalten auf */
   function setColCount(cid: string, n: number) {
@@ -728,7 +743,7 @@ export default function BlattPage() {
     if (bid) setHeadSel(false);
     setSelCol(null);
     const b = bid && doc ? findBlock(doc.blocks, bid) : null;
-    if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart' || b.type === 'grade')) setTab('block');
+    if (b && (b.type === 'image' || b.type === 'cols' || b.type === 'lines' || b.type === 'pagebreak' || b.type === 'glossary' || b.type === 'table' || b.type === 'chart' || b.type === 'grade' || b.type === 'formula' || b.type === 'wordart' || b.type === 'shape')) setTab('block');
     else if (b?.type === 'task' && tab === 'block') setTab('task');
     else if (b && tab === 'block' && !CTX_TYPES.includes(b.type)) setTab('start');
   }
@@ -1177,6 +1192,15 @@ export default function BlattPage() {
               move={move}
               remove={remove}
               openPoints={() => setPointsOpen(true)}
+              problems={problems}
+              spell={spell}
+              setSpell={(v) => {
+                setSpell(v);
+                spellRef.current = v;
+                try {
+                  localStorage.setItem('collegare.blatt.spell', v ? '1' : '0');
+                } catch {}
+              }}
               toggleHidden={toggleHidden}
               duplicate={duplicate}
               toColumns={toColumns}
@@ -1285,6 +1309,11 @@ export default function BlattPage() {
                   onPick={(to) => (transform(conv.bid, to), setConv(null))}
                   onSplit={(m) => (split(conv.bid, m), setConv(null))}
                   onHide={() => (toggleHidden(conv.bid), setConv(null))}
+                  onBottom={() => {
+                    const cb = doc ? findBlock(doc.blocks, conv.bid) : null;
+                    if (cb) setBlock(cb.id, { bottom: cb.bottom ? undefined : true });
+                    setConv(null);
+                  }}
                   onDelete={() => (remove(conv.bid), setConv(null))}
                   onClose={() => setConv(null)}
                 />
@@ -1344,7 +1373,7 @@ export default function BlattPage() {
                         </span>
                         <span className={st.itemText}>
                           {BLOCK_LABEL[b.type]}
-                          <small>{b.hidden ? 'ausgeblendet · ' : ''}{blockSummary(b)}</small>
+                          <small>{b.hidden ? 'ausgeblendet · ' : ''}{b.bottom ? 'unten fest · ' : ''}{blockSummary(b)}</small>
                         </span>
                         {editing && sel === b.id && (
                           <button
@@ -1380,6 +1409,23 @@ export default function BlattPage() {
             </aside>
 
             <div className={st.center} ref={center}>
+              <div className={st.zoomBar} role="group" aria-label="Zoom">
+                <button type="button" onClick={() => setZoomPick(Math.max(0.3, Math.round((zoom - 0.1) * 10) / 10))} title="Verkleinern" aria-label="Verkleinern">
+                  −
+                </button>
+                <input type="range" min={30} max={200} step={5} value={Math.round(zoom * 100)} onChange={(e) => setZoomPick(Number(e.target.value) / 100)} aria-label="Zoom" />
+                <button type="button" onClick={() => setZoomPick(Math.min(2, Math.round((zoom + 0.1) * 10) / 10))} title="Vergrößern" aria-label="Vergrößern">
+                  +
+                </button>
+                <button type="button" className={st.zoomPct} onClick={() => setZoomPick(zoomPick === null ? 1 : null)} title={zoomPick === null ? 'Auf 100 % stellen' : 'Auf die Breite einpassen'}>
+                  {Math.round(zoom * 100)} %{zoomPick === null ? ' (eingepasst)' : ''}
+                </button>
+                {zoomPick !== null && Math.abs(zoomFit - zoom) > 0.01 && (
+                  <button type="button" onClick={() => setZoomPick(null)} title="Auf die Breite einpassen" aria-label="Einpassen">
+                    <Ico n="zoomoptimal" size={14} />
+                  </button>
+                )}
+              </div>
               <div className={st.pagesOuter} onClick={onPagesClick} onPointerDown={onPointerDown} onDragStart={onPagesDragStart} onDragOver={onPagesDragOver} onDragEnd={() => ((headDrag.current = null), clearHeadDrop())} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
                   <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''} ${painter ? st.painting : ''} ${flowView ? st.flowView : ''}`} />
@@ -1431,10 +1477,10 @@ export default function BlattPage() {
 }
 
 // ---------- Bearbeiten direkt auf der Seite ----------
-type Tab = 'file' | 'start' | 'insert' | 'styles' | 'task' | 'design' | 'layout' | 'block';
+type Tab = 'file' | 'start' | 'insert' | 'styles' | 'task' | 'design' | 'layout' | 'refs' | 'review' | 'block';
 type FileAction = 'save' | 'copy' | 'print' | 'docx' | 'html' | 'md' | 'typst' | 'json' | 'open';
 /** Bausteine mit eigenem Reiter (Aufgaben stehen unter „Aufgabe“, Text unter „Start“) */
-const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade'];
+const CTX_TYPES: BlockType[] = ['heading', 'material', 'image', 'table', 'chart', 'glossary', 'cols', 'lines', 'pagebreak', 'grade', 'formula', 'wordart', 'shape'];
 type Panel = 'search' | 'material' | 'glossary' | 'typst';
 type FieldName = 'md' | 'title' | 'text' | 'source' | 'caption' | 'points' | `cell:${number}:${number}` | `head:${CornerKey}`;
 interface EditTarget {
@@ -1796,7 +1842,7 @@ function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<H
 }
 
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
-function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onHide?: () => void; onDelete: () => void; onClose: () => void }) {
+function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onBottom, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onHide?: () => void; onBottom?: () => void; onDelete: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   // nicht unten über den Rand: nach dem Zeichnen messen und nach oben schieben, notfalls mit Bildlauf
   const [top, setTop] = useState(conv.y);
@@ -1828,6 +1874,7 @@ function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onDelete, onClose }:
       )}
       {!head && onSplit && SPLITTABLE.includes(b.type) && <SplitItems b={b} split={onSplit} caret={false} />}
       <div className={st.mh}>{head ? 'Kopf' : BLOCK_LABEL[b.type]}</div>
+      {onBottom && b.type !== 'cols' && <MI icon="protect" label="Unten auf der Seite festhalten" on={!!b.bottom} hint="steht am Fuß der Seite; Linien bis zum Seitenende lassen ihm Platz" onClick={onBottom} />}
       {onHide && <MI icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} hint={b.hidden ? undefined : 'vorübergehend, bleibt in „Elemente“'} onClick={onHide} />}
       <MI icon="delete" label="Löschen" onClick={onDelete} />
     </div>
@@ -1947,10 +1994,16 @@ const BICON: Record<BlockType, string> = {
   lines: 'togglegridhorizontal',
   pagebreak: 'insertpagebreak',
   grade: 'checkbox',
+  formula: 'insertmath',
+  wordart: 'fontworkgalleryfloater',
+  shape: 'rect_unfilled',
 };
 
 type RibbonProps = {
   openPoints: () => void;
+  problems: Problem[];
+  spell: boolean;
+  setSpell: (v: boolean) => void;
   tab: Tab;
   setTab: (t: Tab) => void;
   doc: BlattDoc;
@@ -2323,6 +2376,8 @@ function Ribbon(props: RibbonProps) {
             ['task', 'Aufgabe'],
             ['design', 'Entwurf'],
             ['layout', 'Layout'],
+            ['refs', 'Referenzen'],
+            ['review', 'Überprüfen'],
           ] as const
         ).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`${st.tab} ${tab === k ? st.tabOn : ''}`} onClick={() => setTab(k)}>
@@ -2495,10 +2550,15 @@ function Ribbon(props: RibbonProps) {
                 </div>
                 <div className={st.row}>
                   <LineDrop b={b} set={set} />
-                  <Drop icon="pagemargin" label="Rand für Notizen" value={s.nm ? cm(s.nm) : 'kein'} disabled={!textBlock} title="Freier Rand rechts für Notizen; Randbemerkungen stehen dort">
+                  <Drop icon="pagemargin" label="Rand für Notizen" value={s.nm ? `${SIDE_LABEL[b?.nmSide ?? 'right']} ${cm(s.nm)}` : 'kein'} disabled={!textBlock} title="Freier Rand für Notizen; Randbemerkungen stehen dort">
+                    <MH>Breite</MH>
                     <MI label="kein Rand" on={!s.nm} onClick={() => set({ nm: 0 })} />
-                    {withValue([20, 30, 40, 50], s.nm || undefined).map((v) => (
-                      <MI key={v} label={cm(v)} on={s.nm === v} onClick={() => set({ nm: v })} />
+                    {withValue([15, 20, 25, 30, 40, 50, 60], s.nm || undefined).map((v) => (
+                      <MI key={v} label={cm(v)} on={s.nm === v} onClick={() => set({ nm: v })} stay />
+                    ))}
+                    <MH>Seite</MH>
+                    {(['right', 'left', 'inner', 'outer'] as const).map((v) => (
+                      <MI key={v} label={SIDE_LABEL[v]} hint={v === 'inner' ? 'zur Heftung hin, wechselt mit der Seite' : v === 'outer' ? 'vom Falz weg, wechselt mit der Seite' : undefined} on={(b?.nmSide ?? 'right') === v} onClick={() => set({ nmSide: v === 'right' ? undefined : v, nm: s.nm || 30 })} stay />
                     ))}
                   </Drop>
                 </div>
@@ -2559,6 +2619,19 @@ function Ribbon(props: RibbonProps) {
                 }}
                 title="Diagramm aus einer Tabelle des Blatts"
               />
+              <RB icon={BICON.shape} label="Form" big onClick={() => props.add('shape')} title="Rechteck, Ellipse, Pfeil, Sprechblase oder Stern, auch mit Text" />
+            </Group>
+            <Group label="Text-Objekte">
+              <Drop icon={BICON.wordart} label="WordArt" big title="Schmuckschrift für Titel und Plakate">
+                {(Object.keys(WA_LABEL) as NonNullable<Block['wa']>[]).map((k) => (
+                  <MI key={k} label={WA_LABEL[k]} onClick={() => props.add('wordart', { wa: k })} />
+                ))}
+              </Drop>
+              <Drop icon={BICON.formula} label="Formel" big title="Formel in LaTeX-Schreibweise">
+                {FORMULAS.map(([l, tex]) => (
+                  <MI key={l} label={l} hint={tex} onClick={() => props.add('formula', { text: tex })} />
+                ))}
+              </Drop>
             </Group>
             <Group label="Seiten">
               <RB icon={BICON.cols} label="Spalten" big onClick={() => props.add('cols')} title="Bausteine nebeneinander; Zahl und Stege stellst du unter „Layout“ ein" />
@@ -2645,11 +2718,13 @@ function Ribbon(props: RibbonProps) {
               <RB icon="inserttable" label="Punkte­tabelle" big onClick={props.openPoints} title="Punkte aller Aufgaben in einer Tabelle abstimmen und nach Autogra.fi übertragen" />
             </Group>
             <Group label="Korrektur">
-              <Drop icon="pagemargin" label="Korrekturrand" value={P.korr.side === 'none' ? 'aus' : `${P.korr.side === 'right' ? 'rechts' : 'links'} ${cm(P.korr.width)}`} big title="Freier Rand für die Korrektur neben Linien und Antworten">
+              <Drop icon="pagemargin" label="Korrekturrand" value={P.korr.side === 'none' ? 'aus' : `${SIDE_LABEL[P.korr.side]} ${cm(P.korr.width)}`} big title="Freier Rand für die Korrektur neben Linien und Antworten">
                 <MH>Seite</MH>
                 <MI label="kein Korrekturrand" on={P.korr.side === 'none'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'none' } })} />
                 <MI label="rechts" on={P.korr.side === 'right'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'right' } })} />
                 <MI label="links" on={P.korr.side === 'left'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'left' } })} />
+                <MI label="innen" hint="zur Heftung hin: auf Seite 1 links, auf Seite 2 rechts" on={P.korr.side === 'inner'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'inner' } })} />
+                <MI label="außen" hint="vom Falz weg: auf Seite 1 rechts, auf Seite 2 links" on={P.korr.side === 'outer'} onClick={() => props.setPageOpt({ korr: { ...P.korr, side: 'outer' } })} />
                 {P.korr.side !== 'none' && (
                   <>
                     <MH>Breite</MH>
@@ -2662,15 +2737,6 @@ function Ribbon(props: RibbonProps) {
                     ))}
                   </>
                 )}
-              </Drop>
-              <Drop icon="watermark" label="Wasserzeichen" value={P.watermark ? P.watermark : 'aus'} big title="Schriftzug quer über jeder Seite">
-                {marks.map((m) => (
-                  <MI key={m} label={m || 'kein Wasserzeichen'} on={(P.watermark ?? '') === m} onClick={() => props.setPageOpt({ watermark: m })} />
-                ))}
-                <MH>Eigener Text</MH>
-                <div className={st.miIn}>
-                  <input className={st.rIn} value={marks.includes(P.watermark ?? '') ? '' : (P.watermark ?? '')} onChange={(e) => props.setPageOpt({ watermark: e.target.value })} placeholder="z. B. NACHSCHRIFT" aria-label="Eigener Text des Wasserzeichens" />
-                </div>
               </Drop>
               <span className={st.hint} title="Summe der Punkte aller Aufgaben">
                 {total !== null ? (
@@ -2690,6 +2756,51 @@ function Ribbon(props: RibbonProps) {
             </Group>
           </>
         )}
+        {tab === 'refs' && (
+          <>
+            <Group label="Fußnoten">
+              <RB icon="insertfootnote" label="Fußnote" big disabled={!rich} onClick={() => exec('insertHTML', noteHtml('note', 'Fußnote'))} title={rich ? 'Nummerierte Fußnote an der Schreibmarke; antippen zum Ändern' : 'Erst in einen Text klicken'} />
+              <RB icon="pagemargin" label="Fußnoten in den Rand" big on={!!P.sidenotes} onClick={() => props.setPageOpt({ sidenotes: !P.sidenotes || undefined })} title="Fußnoten nummeriert neben der Zeile statt unten auf der Seite" />
+            </Group>
+            <Group label="Rand">
+              <RB icon="insertannotation" label="Randbemerkung" big disabled={!rich} onClick={() => exec('insertHTML', noteHtml('margin', 'Bemerkung'))} title={rich ? 'Bemerkung im Rand neben der Zeile' : 'Erst in einen Text klicken'} />
+            </Group>
+            <Group label="Glossar">
+              <RB
+                icon="insertindexesentry"
+                label="Begriff markieren"
+                big
+                disabled={!rich}
+                title="Markiertes Wort ins Glossar"
+                onClick={() => {
+                  const w = selectedText().trim();
+                  if (!w) return props.onError('Erst im Text ein Wort markieren, dann „Begriff markieren“.');
+                  props.onError('');
+                  const known = glossaryTerms(doc).find((t) => t.word.toLowerCase() === w.toLowerCase());
+                  exec('insertHTML', glossHtml(w, known?.explain ?? ''));
+                  props.ensureGlossary();
+                }}
+              />
+              <RB icon="insertmultiindex" label="Glossar einfügen" big on={walk(doc.blocks).some((x) => x.type === 'glossary')} onClick={() => {
+                const g = walk(doc.blocks).find((x) => x.type === 'glossary');
+                if (g) props.select(g.id);
+                else props.add('glossary');
+              }} title="Verzeichnis aller markierten Begriffe mit Erklärung" />
+              <span className={st.hint}>{glossaryTerms(doc).length} Begriffe</span>
+            </Group>
+            <Group label="Beschriftungen">
+              <CaptionDrop doc={doc} setPageOpt={props.setPageOpt} big />
+            </Group>
+            <Group label="Definitionen">
+              <Drop icon="insertauthoritiesentry" label="Definitionen" big title="Begriff links, Erklärung rechts: jede Zeile „Begriff: Erklärung“">
+                <MI label="leer" onClick={() => props.add('box', { tpl: 'definitionen', text: 'Definitionen', md: 'Begriff: Erklärung' })} hint="Kasten; jede Zeile „Begriff: Erklärung“" />
+                <MI label="Operatoren (Anforderungsbereiche I–III)" onClick={() => props.add('box', { tpl: 'definitionen', text: 'Operatoren', md: OPERATOREN })} hint="Beispiel zum Anpassen an dein Fach" />
+                <MI label="als Text ohne Kasten" onClick={() => props.add('text', { tpl: 'definitionen', md: 'Begriff: Erklärung' })} />
+              </Drop>
+            </Group>
+          </>
+        )}
+        {tab === 'review' && <ReviewTab {...props} />}
         {tab === 'styles' && (
           <StylesTab
             add={props.add}
@@ -2707,6 +2818,16 @@ function Ribbon(props: RibbonProps) {
         )}
         {tab === 'design' && (
           <>
+            <Group label="Blattvorlage">
+              <button type="button" className={`${st.rb} ${st.rbBig} ${st.lookBtn} ${P.look !== 'book' ? st.rbOn : ''}`} onClick={() => props.setPageOpt({ look: undefined, sidenotes: undefined, font: 'sans' })} title="Serifenlose Schrift, Fußnoten unten auf der Seite" aria-pressed={P.look !== 'book'}>
+                <LookIcon book={false} />
+                <span>Standard</span>
+              </button>
+              <button type="button" className={`${st.rb} ${st.rbBig} ${st.lookBtn} ${P.look === 'book' ? st.rbOn : ''}`} onClick={() => props.setPageOpt({ look: 'book', sidenotes: true, font: 'serif' })} title="Serifenschrift, breite Randspalte rechts für Notizen, Begriffe und Bilder, Fußnoten neben der Zeile, Überschriften kursiv" aria-pressed={P.look === 'book'}>
+                <LookIcon book />
+                <span>Buchsatz mit Randspalte</span>
+              </button>
+            </Group>
             <Group label="Schrift des Blatts">
               <Drop icon="charfontname" label="Schriftart" value={P.font === 'serif' ? 'Mit Serifen' : 'Ohne Serifen'} big>
                 <MI label="Ohne Serifen (Carlito)" on={P.font !== 'serif'} onClick={() => props.setPageOpt({ font: 'sans' })} />
@@ -2717,9 +2838,6 @@ function Ribbon(props: RibbonProps) {
                   <MI key={z} label={`${de(z)} pt`} on={P.fontSize === z} onClick={() => props.setPageOpt({ fontSize: z })} />
                 ))}
               </Drop>
-            </Group>
-            <Group label="Unterschriften">
-              <CaptionDrop doc={doc} setPageOpt={props.setPageOpt} big />
             </Group>
             <Group label="Kopf der Seite">
               <Drop icon="insertheader" label="Kopfzeile" value={H.style === 'box' ? 'Kasten' : H.style === 'none' ? 'schlicht' : 'Linie'} big>
@@ -2738,22 +2856,18 @@ function Ribbon(props: RibbonProps) {
                   <MI key={v} label={l} on={(H.titleSize ?? 'm') === v} onClick={() => props.setHeader({ titleSize: v })} stay />
                 ))}
               </Drop>
+              <RB icon="insertheader" label="Rahmendaten" big on={H.show !== false} onClick={() => props.openHead()} title="Kopf mit vier Feldern in den Ecken: direkt auf der Seite ausfüllen" />
             </Group>
-            <Group label="Ansicht">
-              <RB icon="controlcodes" label="Textfluss zeigen" big on={props.flowView} onClick={() => props.setFlowView(!props.flowView)} title="Zeigt, wie der Text über Seiten und Spalten weiterläuft und wo Bausteine zusammengehalten werden" />
-              <RB
-                icon="basicideappear"
-                label="Typst-Code"
-                big
-                on={props.panel === 'typst'}
-                onClick={() => {
-                  props.setPanel(props.panel === 'typst' ? null : 'typst');
-                  try {
-                    localStorage.setItem('collegare.blatt.code', '1');
-                  } catch {}
-                }}
-                title="Für Fortgeschrittene: das ganze Blatt als Typst-Code rechts lesen und ändern"
-              />
+            <Group label="Seitenhintergrund">
+              <Drop icon="watermark" label="Wasserzeichen" value={P.watermark ? P.watermark : 'aus'} big title="Schriftzug quer über jeder Seite">
+                {marks.map((m) => (
+                  <MI key={m} label={m || 'kein Wasserzeichen'} on={(P.watermark ?? '') === m} onClick={() => props.setPageOpt({ watermark: m })} />
+                ))}
+                <MH>Eigener Text</MH>
+                <div className={st.miIn}>
+                  <input className={st.rIn} value={marks.includes(P.watermark ?? '') ? '' : (P.watermark ?? '')} onChange={(e) => props.setPageOpt({ watermark: e.target.value })} placeholder="z. B. NACHSCHRIFT" aria-label="Eigener Text des Wasserzeichens" />
+                </div>
+              </Drop>
             </Group>
           </>
         )}
@@ -2987,6 +3101,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Anordnen: nach oben/unten, verdoppeln, neben den nächsten, entfernen */
+const SIDE_LABEL: Record<'left' | 'right' | 'inner' | 'outer', string> = { left: 'links', right: 'rechts', inner: 'innen', outer: 'außen' };
 /** Seitenzahl, die die Seitenfolge erlaubt: Broschüre in Schritten von 4, zwei je Blatt in Schritten von 2 */
 const pageStep = (order: 'single' | 'nup' | 'booklet') => (order === 'booklet' ? 4 : order === 'nup' ? 2 : 1);
 function ArrangeRows(props: RibbonProps & { b: Block; noDelete?: boolean }) {
@@ -3153,6 +3268,20 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <input type="range" min={20} max={100} step={5} value={b2.width ?? 100} onChange={(e) => set({ width: Number(e.target.value) })} aria-label="Breite" title={`Breite ${b2.width ?? 100} %`} />
       <span className={st.hint}>{b2.width ?? 100} %</span>
     </>
+  );
+  /** Lage für Formel, WordArt und Form */
+  const alignRow = (
+    <span className={st.row}>
+      {(
+        [
+          ['left', 'leftpara', 'links'],
+          ['center', 'centerpara', 'Mitte'],
+          ['right', 'rightpara', 'rechts'],
+        ] as const
+      ).map(([v, i, l]) => (
+        <RB key={v} icon={i} label={l} hideLabel on={(b.align ?? 'center') === v} onClick={() => set({ align: v })} />
+      ))}
+    </span>
   );
   const align = !b.free && (b.type === 'image' || b.type === 'chart') && (
     <span className={st.row}>
@@ -3396,6 +3525,90 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           </div>
         </Group>
       )}
+      {b.type === 'formula' && (
+        <>
+          <Group label="Formel (LaTeX)">
+            <textarea className={st.texIn} value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} rows={2} spellCheck={false} aria-label="Formel in LaTeX" placeholder={String.raw`z. B. \frac{1}{2}`} />
+          </Group>
+          <Group label="Zeichen">
+            <div className={st.texKeys}>
+              {TEX_KEYS.map(([l, t]) => (
+                <button key={l} type="button" className={st.texKey} title={t} onClick={() => set({ text: (b.text ?? '') + t })}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </Group>
+          <Group label="Lage">{alignRow}</Group>
+        </>
+      )}
+      {b.type === 'wordart' && (
+        <>
+          <Group label="Stil">
+            {(Object.keys(WA_LABEL) as NonNullable<Block['wa']>[]).map((k) => (
+              <button key={k} type="button" className={`${st.rb} ${st.rbBig} ${(b.wa ?? 'verlauf') === k ? st.rbOn : ''}`} onClick={() => set({ wa: k })} aria-pressed={(b.wa ?? 'verlauf') === k}>
+                <span className={`${st.waIco} ${st['wa_' + k] ?? ''}`} style={{ ['--wa' as string]: b.color ?? '#2f6db5' }} aria-hidden>
+                  A
+                </span>
+                <span>{WA_LABEL[k]}</span>
+              </button>
+            ))}
+          </Group>
+          <Group label="Farbe und Text">
+            <div className={st.rows}>
+              <ColorRow value={b.color ?? '#2f6db5'} onChange={(c) => set({ color: c })} colors={['#2f6db5', '#b8322a', '#2e7d32', '#e07b39', '#6a3fa0', '#222222']} />
+              <input className={st.rIn} value={b.text ?? ''} onChange={(e) => set({ text: e.target.value })} aria-label="Text" style={{ width: 200 }} />
+            </div>
+          </Group>
+          <Group label="Lage">{alignRow}</Group>
+        </>
+      )}
+      {b.type === 'shape' && (
+        <>
+          <Group label="Form">
+            {(Object.keys(SHAPE_LABEL) as NonNullable<Block['shape']>[]).map((k) => (
+              <button key={k} type="button" className={`${st.rb} ${st.rbBig} ${(b.shape ?? 'round') === k ? st.rbOn : ''}`} onClick={() => set({ shape: k })} aria-pressed={(b.shape ?? 'round') === k}>
+                <ShapeIcon kind={k} />
+                <span>{SHAPE_LABEL[k]}</span>
+              </button>
+            ))}
+          </Group>
+          <Group label="Füllung und Linie">
+            <div className={st.rows}>
+              <ColorRow value={b.color ?? '#e8f0fb'} onChange={(c) => set({ color: c })} colors={['#ffffff', '#e8f0fb', '#fdf1d6', '#e3f4e1', '#fbe3e1', '#eeeeee']} />
+              <div className={st.row}>
+                <LineDrop b={b} set={set} />
+              </div>
+            </div>
+          </Group>
+          <Group label="Größe">
+            <div className={st.rows}>
+              <div className={st.row}>{size(b)}</div>
+              <div className={st.row}>
+                {alignRow}
+                <select value={b.hMm ?? 25} onChange={(e) => set({ hMm: Number(e.target.value) })} aria-label="Höhe">
+                  {[10, 15, 20, 25, 35, 50, 75, 100].map((v) => (
+                    <option key={v} value={v}>
+                      Höhe {de(v / 10)} cm
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Group>
+          <Group label="Umfluss">
+            {(
+              [
+                [undefined, 'wrapoff', 'keiner'],
+                ['left', 'wrapleft', 'links'],
+                ['right', 'wrapright', 'rechts'],
+              ] as const
+            ).map(([v, i, l]) => (
+              <RB key={l} icon={i} label={l} on={b.wrap === v} onClick={() => set({ wrap: v })} title={v ? `Text fließt ${v === 'left' ? 'rechts' : 'links'} an der Form vorbei` : 'Form steht für sich'} />
+            ))}
+          </Group>
+        </>
+      )}
       {b.type === 'pagebreak' && (
         <Group label="Seitenumbruch">
           <span className={st.hint}>Der nächste Baustein beginnt auf einer neuen Seite.</span>
@@ -3409,10 +3622,153 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <Arrange {...props} />
       <span className={st.groupGap} />
       <Group label="Baustein">
+        {b.type !== 'cols' && <RB icon="protect" label="Unten fest" big on={!!b.bottom} onClick={() => set({ bottom: b.bottom ? undefined : true })} title="Unten auf der Seite festhalten (z. B. Notenkasten); Linien bis zum Seitenende lassen ihm Platz" />}
         <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} big on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
         <RB icon="delete" label="Löschen" big onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
       </Group>
     </>
+  );
+}
+
+/** Formelbeispiele zum Einfügen */
+const FORMULAS: [string, string][] = [
+  ['Bruch', String.raw`\frac{a}{b}`],
+  ['Wurzel', String.raw`\sqrt{x}`],
+  ['Potenz', 'x^{2}'],
+  ['Summe', String.raw`\sum_{i=1}^{n} x_i`],
+  ['Integral', String.raw`\int_{a}^{b} f(x)\,dx`],
+  ['Mitternachtsformel', String.raw`x_{1,2} = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`],
+  ['Reaktionspfeil', String.raw`\mathrm{2H_2 + O_2 \rightarrow 2H_2O}`],
+  ['leer', ''],
+];
+/** Zeichen-Knöpfe im Reiter „Formel“: Beschriftung, angehängter LaTeX-Text */
+const TEX_KEYS: [string, string][] = [
+  ['a/b', String.raw`\frac{}{}`],
+  ['√', String.raw`\sqrt{}`],
+  ['x²', '^{2}'],
+  ['xₙ', '_{n}'],
+  ['·', String.raw`\cdot `],
+  ['×', String.raw`\times `],
+  ['±', String.raw`\pm `],
+  ['≤', String.raw`\le `],
+  ['≥', String.raw`\ge `],
+  ['≠', String.raw`\neq `],
+  ['≈', String.raw`\approx `],
+  ['∞', String.raw`\infty `],
+  ['π', String.raw`\pi `],
+  ['α', String.raw`\alpha `],
+  ['Δ', String.raw`\Delta `],
+  ['→', String.raw`\rightarrow `],
+  ['∑', String.raw`\sum_{}^{} `],
+  ['∫', String.raw`\int_{}^{} `],
+];
+
+function ColorRow({ value, onChange, colors }: { value: string; onChange: (c: string) => void; colors: string[] }) {
+  return (
+    <div className={st.row}>
+      {colors.map((c) => (
+        <button key={c} type="button" className={`${st.swatch} ${value.toLowerCase() === c ? st.swatchOn : ''}`} style={{ background: c }} onClick={() => onChange(c)} title={c} aria-label={`Farbe ${c}`} />
+      ))}
+      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label="eigene Farbe" title="eigene Farbe" className={st.colorIn} />
+    </div>
+  );
+}
+
+function ShapeIcon({ kind }: { kind: NonNullable<Block['shape']> }) {
+  const p: Record<string, React.ReactNode> = {
+    rect: <rect x={3} y={6} width={18} height={12} />,
+    round: <rect x={3} y={6} width={18} height={12} rx={3} />,
+    ellipse: <ellipse cx={12} cy={12} rx={9} ry={6} />,
+    arrow: <path d="M3 9 H14 V5 L21 12 L14 19 V15 H3 Z" />,
+    speech: <path d="M4 4 H20 V15 H10 L6 20 V15 H4 Z" />,
+    star: <path d="M12 3 L14.6 9.2 L21 9.5 L16 13.6 L17.6 20 L12 16.5 L6.4 20 L8 13.6 L3 9.5 L9.4 9.2 Z" />,
+  };
+  return (
+    <span className={st.ico} style={{ width: 24, height: 24 }} aria-hidden>
+      <svg className="cb" viewBox="0 0 24 24" fill="#dce8f8" stroke="#3a3a38" strokeWidth={1.2}>
+        {p[kind]}
+      </svg>
+    </span>
+  );
+}
+
+/** Reiter „Überprüfen“ (Wunsch Jo, 25. November 2026) */
+function ReviewTab(props: RibbonProps) {
+  const { doc } = props;
+  const all = walk(doc.blocks);
+  const hidden = all.filter((x) => x.hidden);
+  const plain = toMarkdown({ ...doc, blocks: shownBlocks(doc.blocks) }).replace(/[#*>|_[\]()$-]+/g, ' ');
+  const words = plain.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  const chars = plain.replace(/\s+/g, '').length;
+  const total = totalPoints(doc);
+  const tasks = all.filter((x) => x.type === 'task' && !x.hidden);
+  const noPts = tasks.filter((x) => !x.points?.trim());
+  return (
+    <>
+      <Group label="Sprache">
+        <RB icon="spelling" label="Rechtschreibung" big on={props.spell} onClick={() => props.setSpell(!props.spell)} title="Beim Schreiben auf der Seite Fehler rot unterstreichen (Wörterbuch des Browsers)" />
+        <div className={st.rows}>
+          <span className={st.hint}>
+            <Ico n="wordcountdialog" size={14} /> {words.toLocaleString('de-DE')} Wörter
+          </span>
+          <span className={st.hint}>{chars.toLocaleString('de-DE')} Zeichen</span>
+        </div>
+      </Group>
+      <Group label="Prüfen">
+        <Drop icon="trackchanges" label="Probleme" value={props.problems.length ? String(props.problems.length) : 'keine'} big title="Bausteine, die nicht auf eine Seite passen">
+          {props.problems.length ? props.problems.map((p) => <MI key={p.bid} label={BLOCK_LABEL[findIn(all, p.bid)?.type ?? 'text']} hint={p.msg} onClick={() => props.select(p.bid)} />) : <MH>Alles passt auf die Seiten.</MH>}
+        </Drop>
+        <Drop icon="edit" label="Aufgaben" value={noPts.length ? `${noPts.length} ohne Punkte` : `${tasks.length}`} big title="Aufgaben ohne Punktzahl">
+          <MH>{noPts.length ? 'Ohne Punktzahl' : 'Alle Aufgaben haben Punkte.'}</MH>
+          {noPts.map((t) => (
+            <MI key={t.id} label={blockSummary(t).slice(0, 50) || 'Aufgabe'} onClick={() => props.select(t.id)} />
+          ))}
+        </Drop>
+        <Drop icon="hideslide" label="Ausgeblendet" value={hidden.length ? String(hidden.length) : 'keine'} big title="Vorübergehend ausgeblendete Bausteine">
+          {hidden.length ? (
+            hidden.map((h) => <MI key={h.id} label={`${BLOCK_LABEL[h.type]}: ${blockSummary(h).slice(0, 40)}`} hint="einblenden" onClick={() => props.toggleHidden(h.id)} />)
+          ) : (
+            <MH>Nichts ausgeblendet.</MH>
+          )}
+        </Drop>
+      </Group>
+      <Group label="Punkte">
+        <RB icon="inserttable" label="Punkte­tabelle" big onClick={props.openPoints} title="Punkte aller Aufgaben in einer Tabelle abstimmen und nach Autogra.fi übertragen" />
+        <span className={st.hint}>{total !== null ? <>zusammen<br /><strong>{de(total)} Punkte</strong></> : <>Punkte: nicht bei<br />allen Aufgaben</>}</span>
+      </Group>
+      <Group label="Ansicht">
+        <RB icon="controlcodes" label="Textfluss zeigen" big on={props.flowView} onClick={() => props.setFlowView(!props.flowView)} title="Zeigt, wie der Text über Seiten und Spalten weiterläuft und wo Bausteine zusammengehalten werden" />
+        <RB
+          icon="basicideappear"
+          label="Typst-Code"
+          big
+          on={props.panel === 'typst'}
+          onClick={() => {
+            props.setPanel(props.panel === 'typst' ? null : 'typst');
+            try {
+              localStorage.setItem('collegare.blatt.code', '1');
+            } catch {}
+          }}
+          title="Für Fortgeschrittene: das ganze Blatt als Typst-Code rechts lesen und ändern"
+        />
+      </Group>
+    </>
+  );
+}
+const findIn = (all: Block[], id: string) => all.find((x) => x.id === id);
+
+/** Vorschau der Blattvorlage */
+function LookIcon({ book }: { book: boolean }) {
+  return (
+    <span className={st.ico} style={{ width: 24, height: 24 }} aria-hidden>
+      <svg className="cb" viewBox="0 0 24 24" fill="none" stroke="#3a3a38" strokeWidth={1}>
+        <rect x={4} y={2} width={16} height={20} fill="#fff" />
+        {(book ? [6, 9, 12, 15, 18] : [6, 9, 12, 15, 18]).map((y) => (
+          <line key={y} x1={6} x2={book ? 14 : 18} y1={y} y2={y} stroke="#888" />
+        ))}
+        {book && [7, 13].map((y) => <line key={'m' + y} x1={15.5} x2={18.5} y1={y} y2={y} stroke="#2f6db5" strokeWidth={1.4} />)}
+      </svg>
+    </span>
   );
 }
 

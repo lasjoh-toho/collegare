@@ -29,9 +29,9 @@
 @keyframes ctxIn { from { opacity: 0; transform: translate(-8px, -2px); } to { opacity: 1; transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .ctxWrap .tabCtx { animation: none; } }
 .groups { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; padding: 6px 8px 4px; background: var(--bg-elev); min-height: 64px; }
-.group { display: flex; flex-direction: column; justify-content: space-between; padding: 0 7px; border-right: 1px solid var(--line); }
+.group { display: flex; flex-direction: column; justify-content: space-between; padding: 0 5px; border-right: 1px solid var(--line); }
 .group:last-child { border-right: 0; }
-.groupBody { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: 34px; }
+.groupBody { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; min-height: 34px; }
 .groupBody select, .rIn { font-size: 12.5px; height: 28px; border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; background: var(--bg-elev); color: var(--fg); }
 .groupBody :global(.btn) { height: 28px; padding: 0 8px; font-size: 12.5px; }
 .groupLabel { font-size: 10.5px; color: var(--fg-faint); text-align: center; padding-top: 3px; white-space: nowrap; }
@@ -181,6 +181,11 @@
 /* Rand für Notizen: Text schmaler, Randbemerkungen stehen daneben */
 .host :global(.bl-hasnm) { padding-right: calc(var(--nm) + 3mm); }
 .host :global(.bl-mnote) { float: right; clear: right; width: var(--nm, 30mm); margin-right: calc(-1 * (var(--nm, 30mm) + 3mm)); font-size: 0.78em; line-height: 1.25; font-style: italic; font-weight: 400; text-align: left; hyphens: manual; color: #333; }
+/* Rand für Notizen links bzw. innen/außen je nach Seite (Wunsch Jo, 25. November 2026) */
+.host :global(.bl-nm-left), .host :global(.bl-recto .bl-nm-inner), .host :global(.bl-verso .bl-nm-outer) { padding-right: 0; padding-left: calc(var(--nm) + 3mm); }
+.host :global(.bl-nm-left .bl-mnote), .host :global(.bl-recto .bl-nm-inner .bl-mnote), .host :global(.bl-verso .bl-nm-outer .bl-mnote) { float: left; clear: left; margin-right: 0; margin-left: calc(-1 * (var(--nm, 30mm) + 3mm)); text-align: right; }
+/* Korrekturrand innen/außen: rechts gezeichnet, auf den Seiten mit Rand links gespiegelt */
+.host :global(.bl-recto svg[data-korr='inner']), .host :global(.bl-verso svg[data-korr='outer']) { transform: scaleX(-1); }
 .host :global(.bl-block:not(.bl-hasnm) .bl-mnote) { float: none; display: inline; margin: 0; width: auto; }
 .host :global(.bl-block:not(.bl-hasnm) .bl-mnote)::before { content: ' ('; }
 .host :global(.bl-block:not(.bl-hasnm) .bl-mnote)::after { content: ')'; }
@@ -289,7 +294,7 @@
 .rb:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 7%, transparent); border-color: var(--line); }
 .rb:disabled { opacity: 0.4; cursor: default; }
 .rbOn { background: color-mix(in srgb, var(--office-word, #2b579a) 14%, transparent) !important; border-color: color-mix(in srgb, var(--office-word, #2b579a) 35%, transparent) !important; }
-.rbBig { flex-direction: column; justify-content: flex-start; height: auto; min-height: 58px; min-width: 44px; max-width: 84px; padding: 4px 3px 3px; gap: 3px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; }
+.rbBig { flex-direction: column; justify-content: flex-start; height: auto; min-height: 58px; min-width: 40px; max-width: 80px; padding: 4px 2px 3px; gap: 3px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; }
 .rows { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
 .row { display: flex; align-items: center; gap: 2px; }
 .icoSel { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
@@ -334,6 +339,7 @@
 .host :global(.bl-flow > [data-field='md'] > *) { break-inside: avoid-column; }
 .host :global(.bl-wrap-left) { float: left; margin: 0 5mm 2mm 0; clear: both; }
 .host :global(.bl-wrap-right) { float: right; margin: 0 0 2mm 5mm; clear: both; }
+.host :global(.bl-wrap-left), .host :global(.bl-wrap-right) { position: relative; z-index: 2; }
 .host :global(.bl-page) { isolation: isolate; }
 .host :global(.bl-behind .bl-fig) { opacity: 0.9; }
 .host :global(.bl-sheet.bl-stack) { flex-direction: column; }
@@ -531,3 +537,46 @@
 .ptsTable td:first-child { white-space: nowrap; width: 1%; color: var(--fg-muted, #667); }
 .ptsTable tfoot td { border-bottom: 0; font-weight: 600; }
 .ptsSub td:nth-child(2) { padding-left: 22px; }
+
+/* Formel, WordArt, Form (Wunsch Jo, 25. November 2026) */
+.host :global(.bl-formula) { padding: 1mm 0; font-size: 1.15em; }
+.host :global(.bl-formula math) { display: block; }
+.host :global(.bl-formula.bl-align-left math) { text-align: left; }
+.host :global(.bl-formula.bl-align-right math) { text-align: right; }
+.host :global(.bl-wa-wrap) { --wa: #2f6db5; padding: 1mm 0; }
+.host :global(.bl-wa-wrap.bl-align-center) { text-align: center; }
+.host :global(.bl-wa-wrap.bl-align-right) { text-align: right; }
+.host :global(.bl-wa) { display: inline-block; font-size: 2.4em; font-weight: 800; line-height: 1.15; letter-spacing: 0.01em; color: var(--wa); outline: none; }
+.host :global(.bl-wa-verlauf) { background: linear-gradient(180deg, var(--wa), color-mix(in srgb, var(--wa) 45%, #000)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.host :global(.bl-wa-schatten) { text-shadow: 0.06em 0.06em 0 color-mix(in srgb, var(--wa) 30%, #fff); }
+.host :global(.bl-wa-kontur) { color: #fff; -webkit-text-stroke: 0.035em var(--wa); paint-order: stroke fill; }
+.host :global(.bl-wa-stempel) { border: 0.08em solid var(--wa); border-radius: 0.12em; padding: 0 0.25em; transform: rotate(-4deg); text-transform: uppercase; letter-spacing: 0.06em; }
+.host :global(.bl-wa-arc) { width: 70%; height: auto; overflow: visible; }
+.host :global(.bl-wa-arc text) { font-size: 52px; font-weight: 800; fill: var(--wa); font-family: inherit; }
+.host :global(.bl-wa-edit) { font-size: 0.85em; color: #888; border-top: 1px dashed #ccc; margin-top: 1mm; }
+.host :global(.bl-shape) { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; }
+.host :global(.bl-shape.bl-align-center) { margin: 0 auto; }
+.host :global(.bl-shape.bl-align-right) { margin-left: auto; }
+.host :global(.bl-shape-svg) { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.host :global(.bl-shape-t) { position: relative; padding: 2mm 4mm; min-width: 2em; }
+.host :global(.bl-wrap-left .bl-shape), .host :global(.bl-wrap-right .bl-shape) { width: 100% !important; }
+.texIn { width: 280px; font: 12.5px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--bg-elev); color: var(--fg); resize: vertical; }
+.texKeys { display: grid; grid-template-columns: repeat(9, 26px); gap: 2px; }
+.texKey { height: 26px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg-elev); color: var(--fg); font-size: 13px; cursor: pointer; padding: 0; }
+.texKey:hover { border-color: var(--accent, #2f6db5); }
+.waIco { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; font-weight: 800; font-size: 19px; color: var(--wa); }
+.wa_verlauf { background: linear-gradient(180deg, var(--wa), #000); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wa_schatten { text-shadow: 2px 2px 0 color-mix(in srgb, var(--wa) 30%, #fff); }
+.wa_kontur { color: transparent; -webkit-text-stroke: 1px var(--wa); }
+.wa_bogen { transform: rotate(-12deg); }
+.wa_stempel { border: 2px solid var(--wa); border-radius: 3px; font-size: 14px; }
+.swatch { width: 18px; height: 18px; border: 1px solid var(--line); border-radius: 4px; padding: 0; cursor: pointer; }
+.swatchOn { outline: 2px solid var(--accent, #2f6db5); outline-offset: 1px; }
+.colorIn { width: 26px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+/* Zoom unten rechts in der Mitte (Wunsch Jo, 25. November 2026) */
+.zoomBar { order: 99; position: sticky; bottom: 10px; align-self: flex-end; margin: -40px 14px 10px 0; z-index: 20; display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-elev); box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); font-size: 12px; }
+.zoomBar button { border: 0; background: none; color: var(--fg); cursor: pointer; font-size: 14px; min-width: 20px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; }
+.zoomBar button:hover { background: var(--bg-sunken); }
+.zoomBar input { width: 90px; }
+.zoomBar .zoomPct { font-size: 12px; min-width: 44px; }
+.lookBtn { max-width: 96px; }

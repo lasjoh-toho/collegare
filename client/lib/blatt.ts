@@ -10,8 +10,9 @@
  * später andere Ausgaben (Ausarbeitung als Broschüre, Autogra.fi) denselben Satz nutzen.
  */
 import { renderMarkdown } from './markdown';
+import temml from 'temml';
 
-export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak' | 'grade';
+export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak' | 'grade' | 'formula' | 'wordart' | 'shape';
 export type Ruling = 'lines' | 'grid' | 'empty';
 
 export interface Block {
@@ -114,6 +115,16 @@ export interface Block {
   remark?: boolean;
   /** Bewertung: Hinweis „Scannen Sie für ein genaues Feedback erneut den QR-Code“, wenn das Blatt einen QR-Code hat (Standard an) */
   qrHint?: boolean;
+  /** Seite des Rands für Notizen (Standard rechts); innen/außen wechseln mit der Seite (Wunsch Jo, 25. November 2026) */
+  nmSide?: 'left' | 'right' | 'inner' | 'outer';
+  /** WordArt (Wunsch Jo, 25. November 2026): Stil der Schrift */
+  wa?: 'schatten' | 'kontur' | 'verlauf' | 'bogen' | 'stempel';
+  /** Form: Art der Form */
+  shape?: 'rect' | 'round' | 'ellipse' | 'arrow' | 'speech' | 'star';
+  /** WordArt und Form: Farbe (#rrggbb) */
+  color?: string;
+  /** unten auf der Seite festhalten: steht am Fuß der Seite, auf der er landet */
+  bottom?: boolean;
   /** vorübergehend ausgeblendet (Wunsch Jo, 25. November 2026): bleibt in „Elemente“ ausgegraut, fehlt auf dem Blatt, im Druck und in der Ausgabe */
   hidden?: boolean;
   /** Kästen (Kasten, Aufgabe im Kasten, Glossar im Kasten, Bewertung): Linienstärke (Wunsch Jo, 24. November 2026) */
@@ -138,7 +149,7 @@ export const LINE_LABEL: Record<LineWeight, string> = { hair: 'Haarlinie', thin:
 /** Bausteine mit Rahmen, bei denen man die Linienstärke wählen kann */
 export function hasFrame(b: Block | undefined | null): boolean {
   if (!b) return false;
-  if (b.type === 'grade') return true;
+  if (b.type === 'grade' || b.type === 'shape') return true;
   if (b.type === 'box') return (b.tpl ?? 'rahmen') === 'rahmen' || b.tpl === 'gestrichelt';
   if (b.type === 'task' || b.type === 'glossary') return b.tpl === 'kasten';
   return false;
@@ -146,7 +157,8 @@ export function hasFrame(b: Block | undefined | null): boolean {
 
 /** Korrekturrand auf Schreiblinien und Karos (Wunsch Jo, 22. November 2026) */
 export interface Korr {
-  side: 'none' | 'right' | 'left';
+  /** innen/außen: je nach Seite links oder rechts (Seite 1 ist eine rechte Seite, innen ist dort links) */
+  side: 'none' | 'right' | 'left' | 'inner' | 'outer';
   width: number;
   /** Linie dünn, mittel oder dick, oder ohne Linie: die Zeilen enden vor dem Rand */
   style: 'thin' | 'medium' | 'thick' | 'end';
@@ -367,6 +379,9 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   lines: 'Linien',
   pagebreak: 'Seitenumbruch',
   grade: 'Bewertung',
+  formula: 'Formel',
+  wordart: 'WordArt',
+  shape: 'Form',
 };
 
 export function blankDoc(title = ''): BlattDoc {
@@ -410,6 +425,9 @@ export function newBlock(type: BlockType): Block {
   if (type === 'chart') Object.assign(b, { kind: 'col', width: 90, hMm: 60, caption: '' });
   if (type === 'lines') Object.assign(b, { style: 'lines', count: 8, fill: true, spacing: 8 });
   if (type === 'grade') Object.assign(b, { text: 'Note', scoreTable: true, sign: false, remark: false });
+  if (type === 'formula') Object.assign(b, { text: String.raw`\frac{a}{b} = \sqrt{x^2 + y^2}`, align: 'center' });
+  if (type === 'wordart') Object.assign(b, { text: 'Überschrift', wa: 'verlauf', color: '#2f6db5', align: 'center' });
+  if (type === 'shape') Object.assign(b, { text: '', shape: 'round', width: 40, hMm: 25, align: 'center', color: '#e8f0fb' });
   const t = TEMPLATES[type]?.[0];
   if (t) b.tpl = t.id;
   return b;
@@ -580,6 +598,12 @@ export function blockSummary(b: Block): string {
       return `${b.style === 'grid' ? 'Karos' : b.style === 'empty' ? 'Freiraum' : 'Schreiblinien'}${b.fill ? ' bis zum Seitenende' : `, ${b.count ?? 0}`}`;
     case 'pagebreak':
       return '';
+    case 'formula':
+      return b.text || '';
+    case 'wordart':
+      return [WA_LABEL[b.wa ?? 'verlauf'], b.text].filter(Boolean).join(': ');
+    case 'shape':
+      return [SHAPE_LABEL[b.shape ?? 'round'], b.text].filter(Boolean).join(': ');
     case 'grade':
       return [b.scoreTable !== false && 'Punkte je Aufgabe', b.text || 'Note', b.remark && 'Bemerkung', b.sign && 'Unterschrift'].filter(Boolean).join(', ');
     default:
@@ -1048,8 +1072,10 @@ function ruling(style: Ruling, widthMm: number, heightMm: number, spacing: numbe
   const k = korr && korr.side !== 'none' && style !== 'empty' ? korr : null;
   const kw = k ? Math.max(10, Math.min(widthMm / 2, Number(k.width) || 30)) : 0;
   // Schreibfläche ohne Rand; bei „Zeilen enden“ ein kleiner Abstand, damit das Ende klar zu sehen ist
+  // innen/außen wird wie rechts gezeichnet und auf den passenden Seiten gespiegelt (siehe paginate)
+  if (k) svg.dataset.korr = k.side;
   const x0 = k?.side === 'left' ? kw : 0;
-  const x1 = k?.side === 'right' ? widthMm - kw : widthMm;
+  const x1 = k && k.side !== 'left' ? widthMm - kw : widthMm;
   if (style === 'grid') {
     const g = 5;
     const w = x1 - x0;
@@ -1060,7 +1086,7 @@ function ruling(style: Ruling, widthMm: number, heightMm: number, spacing: numbe
     for (let y = spacing; y <= heightMm + 0.01; y += spacing) line(x0, y, x1, y, 0.2, '#7b8794');
   }
   if (k && k.style !== 'end') {
-    const x = k.side === 'right' ? widthMm - kw : kw;
+    const x = k.side !== 'left' ? widthMm - kw : kw;
     line(x, 0, x, heightMm, KORR_W[k.style] ?? 0.25, '#555');
   }
   return svg;
@@ -1269,6 +1295,7 @@ function applyStyle(box: HTMLElement, b: Block, margin: number) {
   if (nm) {
     box.classList.add('bl-hasnm');
     box.style.setProperty('--nm', Math.max(10, Math.min(70, nm)) + 'mm');
+    if (b.nmSide && b.nmSide !== 'right') box.classList.add('bl-nm-' + b.nmSide);
   }
 }
 
@@ -1278,6 +1305,37 @@ function capField(tag: string, cls: string, b: Block, ctx: Ctx, ph: string): HTM
   // steht schon „Abb. 1:“ im Text, keine zweite Nummer davor
   if (ctx.capLabel && b.caption?.trim() && !/^\s*(abb|abbildung|tab|tabelle|fig|m)\.?\s*\d+/i.test(b.caption)) f.dataset.cap = ctx.capLabel;
   return f;
+}
+
+export const SHAPE_LABEL: Record<NonNullable<Block['shape']>, string> = { rect: 'Rechteck', round: 'Abgerundet', ellipse: 'Ellipse', arrow: 'Pfeil', speech: 'Sprechblase', star: 'Stern' };
+export const WA_LABEL: Record<NonNullable<Block['wa']>, string> = { verlauf: 'Verlauf', schatten: 'Schatten', kontur: 'Kontur', bogen: 'Bogen', stempel: 'Stempel' };
+
+/** nur #rgb/#rrggbb zulassen (Farbe landet im Stil) */
+function safeColor(c: string | undefined, fb: string): string {
+  return c && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c) ? c : fb;
+}
+
+/** LaTeX als MathML (temml); Fehler zeigt temml rot im Text */
+export function formulaHtml(tex: string): string {
+  try {
+    return temml.renderToString(tex, { displayMode: true, throwOnError: false });
+  } catch {
+    return `<span class="bl-ph">${esc(tex)}</span>`;
+  }
+}
+
+function shapeSvg(kind: NonNullable<Block['shape']>, fill: string, line: string): string {
+  const sw = line === 'hair' ? 0.6 : line === 'thick' ? 2.4 : line === 'medium' ? 1.6 : 1;
+  const a = `fill="${fill}" stroke="#333" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
+  const d: Record<string, string> = {
+    rect: `<rect x="1" y="1" width="98" height="98" ${a}/>`,
+    round: `<rect x="1" y="1" width="98" height="98" rx="12" ry="12" ${a}/>`,
+    ellipse: `<ellipse cx="50" cy="50" rx="49" ry="49" ${a}/>`,
+    arrow: `<path d="M1 30 H65 V5 L99 50 L65 95 V70 H1 Z" ${a}/>`,
+    speech: `<path d="M8 2 H92 Q98 2 98 8 V62 Q98 68 92 68 H40 L22 96 L26 68 H8 Q2 68 2 62 V8 Q2 2 8 2 Z" ${a}/>`,
+    star: `<path d="M50 2 L62 36 L98 37 L69 58 L80 94 L50 73 L20 94 L31 58 L2 37 L38 36 Z" ${a}/>`,
+  };
+  return `<svg class="bl-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${d[kind] ?? d.round}</svg>`;
 }
 
 /** Feld, das man auf der Seite anklicken und dort bearbeiten kann */
@@ -1550,10 +1608,41 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       }
       break;
     }
+    case 'formula': {
+      const f = el('div', 'bl-formula bl-align-' + (b.align ?? 'center'), b.text?.trim() ? formulaHtml(b.text) : '<span class="bl-ph">Formel (LaTeX) im Reiter „Formel“ eingeben</span>');
+      f.dataset.formula = '1';
+      box.appendChild(f);
+      break;
+    }
+    case 'wordart': {
+      const wa = b.wa ?? 'verlauf';
+      const color = safeColor(b.color, '#2f6db5');
+      const wrap = el('div', 'bl-wa-wrap bl-align-' + (b.align ?? 'center'));
+      wrap.style.setProperty('--wa', color);
+      if (wa === 'bogen') {
+        const txt = esc(b.text || 'WordArt');
+        wrap.innerHTML = `<svg class="bl-wa-arc" viewBox="0 12 400 104" aria-label="${txt}"><defs><path id="wa-${b.id}" d="M20 110 Q200 -20 380 110"/></defs><text><textPath href="#wa-${b.id}" startOffset="50%" text-anchor="middle">${txt}</textPath></text></svg>`;
+        if (ctx.editing) wrap.appendChild(field('div', 'bl-wa-edit', 'text', esc(b.text) || '<span class="bl-ph">Text</span>'));
+      } else wrap.appendChild(field('div', 'bl-wa bl-wa-' + wa, 'text', esc(b.text) || '<span class="bl-ph">WordArt</span>'));
+      box.appendChild(wrap);
+      break;
+    }
+    case 'shape': {
+      const pct = Math.max(10, Math.min(100, Number(b.width) || 40));
+      const h = Math.max(8, Math.min(250, Number(b.hMm) || 25));
+      const sh = el('div', 'bl-shape bl-align-' + (b.align ?? 'center'));
+      sh.style.width = pct + '%';
+      sh.style.height = h + 'mm';
+      sh.innerHTML = shapeSvg(b.shape ?? 'round', safeColor(b.color, '#e8f0fb'), b.line ?? 'thin');
+      sh.appendChild(field('div', 'bl-shape-t', 'text', esc(b.text) || (ctx.editing ? '<span class="bl-ph">Text (optional)</span>' : '')));
+      if (b.wrap === 'left' || b.wrap === 'right') box.classList.add('bl-wrap-' + b.wrap);
+      box.appendChild(sh);
+      break;
+    }
     default:
       break;
   }
-  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart') applyStyle(box, b, ctx.book && b.type !== 'table' && b.type !== 'grade' ? 42 : /bl-mnote/.test(html) ? 30 : 0);
+  if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart' && b.type !== 'shape') applyStyle(box, b, ctx.book && b.type !== 'table' && b.type !== 'grade' ? 42 : /bl-mnote/.test(html) ? 30 : 0);
   // im Editor: X zum Löschen hinten am Baustein (Wunsch Jo, 24. November 2026); sichtbar beim Darüberfahren und gewählt
   if (ctx.editing && first) {
     const x = el('button', 'bl-x', '×');
@@ -1814,7 +1903,20 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     };
   };
 
-  for (const b of doc.blocks) {
+  /** Höhe der Bausteine „unten festhalten“ direkt hinter Baustein i (in mm), damit Linien bis zum Seitenende Platz lassen */
+  const bottomAfter = (i: number): number => {
+    let h = 0;
+    for (let j = i + 1; j < doc.blocks.length && doc.blocks[j].bottom; j++) {
+      const nb = doc.blocks[j];
+      const c = mkCtx();
+      const p = place(nb, c, prepare(nb, c));
+      const cs = getComputedStyle(p.e);
+      h += (p.e.offsetHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0')) / pxPerMm(pg);
+      p.remove();
+    }
+    return h;
+  };
+  for (const [bi, b] of doc.blocks.entries()) {
     if (b.type === 'pagebreak') {
       if (pg.body.children.length) next();
       continue;
@@ -1852,7 +1954,8 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     if (b.type === 'lines' && b.fill) {
       // bis zum Seitenende: Rest messen; ist kaum noch Platz, eine neue Seite füllen
       const sp = b.style === 'grid' ? 5 : Number(b.spacing) || 8;
-      const free = () => (pg.body.clientHeight - usedPx(pg)) / pxPerMm(pg) - 2;
+      const reserve = bottomAfter(bi);
+      const free = () => (pg.body.clientHeight - usedPx(pg)) / pxPerMm(pg) - 2 - reserve;
       if (free() < sp * 2) next();
       place(b, mkCtx(), { heightMm: Math.max(sp, Math.floor(free() / sp) * sp) });
       continue;
@@ -1927,7 +2030,23 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     }
   }
 
+  // unten festhalten: Lücke vor dem ersten solchen Baustein der Seite, damit er am Fuß steht
+  const bottomIds = new Set(doc.blocks.filter((b) => b.bottom).map((b) => b.id));
+  if (bottomIds.size)
+    for (const p of pages) {
+      const first = [...p.body.children].find((c) => bottomIds.has((c as HTMLElement).dataset.bid ?? '')) as HTMLElement | undefined;
+      if (!first) continue;
+      const gap = p.body.clientHeight - usedPx(p) - 2;
+      if (gap > 1) {
+        const sp = document.createElement('div');
+        sp.className = 'bl-bottom-gap';
+        sp.style.height = gap + 'px';
+        p.body.insertBefore(sp, first);
+      }
+    }
   pages.forEach((p, k) => {
+    // rechte Seite (1, 3, …): innen ist links; linke Seite (2, 4, …): innen ist rechts
+    p.page.classList.add(k % 2 ? 'bl-verso' : 'bl-recto');
     if (doc.page.pageNumbers) p.foot.textContent = `Seite ${k + 1} von ${pages.length}`;
     if (!p.notes.children.length) p.notes.remove();
   });
@@ -2062,6 +2181,15 @@ export function toMarkdown(doc: BlattDoc): string {
         break;
       case 'chart':
         out.push(`[Diagramm${b.caption?.trim() ? ': ' + b.caption.trim() : ''}]`);
+        break;
+      case 'formula':
+        if (b.text?.trim()) out.push(`$$${b.text.trim()}$$`);
+        break;
+      case 'wordart':
+        if (b.text?.trim()) out.push(`**${b.text.trim()}**`);
+        break;
+      case 'shape':
+        out.push(`[Form: ${SHAPE_LABEL[b.shape ?? 'round']}${b.text?.trim() ? ', ' + b.text.trim() : ''}]`);
         break;
       case 'table': {
         const rows = (b.rows ?? []).map((r) => '| ' + r.map((c) => plainMd(c ?? '').replace(/\|/g, '/').replace(/\n+/g, ' ').trim()).join(' | ') + ' |');
