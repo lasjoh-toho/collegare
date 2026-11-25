@@ -469,7 +469,7 @@ const FIELDS: Partial<Record<BlockType, [keyof Block, string, Kind][]>> = {
     ['lineStyle', 'linien', 'str'],
     ['line', 'linie', 'str'],
   ],
-  image: [...PLACE, ['rot', 'drehung', 'num'], ['ar', 'seitenverhaeltnis', 'num'], ['bright', 'helligkeit', 'num'], ['contrast', 'kontrast', 'num'], ['gray', 'grau', 'bool'], ['frame', 'rahmen', 'str'], ['round', 'rund', 'bool'], ['shadow', 'schatten', 'bool']],
+  image: [...PLACE, ['rot', 'drehung', 'num'], ['ar', 'seitenverhaeltnis', 'num'], ['bright', 'helligkeit', 'num'], ['contrast', 'kontrast', 'num'], ['gray', 'grau', 'bool'], ['invert', 'invertiert', 'bool'], ['blend', 'mischmodus', 'str'], ['poster', 'tontrennung', 'num'], ['dither', 'dithering', 'str'], ['frame', 'rahmen', 'str'], ['round', 'rund', 'bool'], ['shadow', 'schatten', 'bool']],
   chart: [['ref', 'tabelle', 'str'], ['kind', 'art', 'str'], ['gray', 'grau', 'bool'], ['hMm', 'hoehe', 'mm'], ...PLACE],
   table: [
     ['headRow', 'kopfzeile', 'bool'],

@@ -8,7 +8,7 @@
  */
 import { type BlattDoc, type Block, type HeadCtx, chartSvg, cornerText, glossaryTerms, headCorners, LINE_MM, pageGeom, plainMd, shownBlocks, svgSrc, taskLabels, totalPoints, walk } from './blatt';
 import { makeZip } from './zip';
-import { imageFilter } from './blattImage';
+import { effectImage, hasFx, imageFilter } from './blattImage';
 
 const xe = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const TW = 56.6929; // twips je mm
@@ -274,8 +274,13 @@ async function blockXml(b: Block, doc: BlattDoc, ctx: Ctx, st: { mat: number; la
     case 'image': {
       if (!b.src) return '';
       const w = (ctx.width * Math.min(100, b.width ?? 100)) / 100;
-      const filter = imageFilter(b);
-      const img = await toPng(b.src, undefined, filter || b.frame ? { filter, frame: b.frame ? LINE_MM[b.frame] / w : 0 } : undefined);
+      let filter = imageFilter(b);
+      let src = b.src;
+      if (hasFx(b)) {
+        src = await effectImage(b.src, { filter, poster: b.poster, dither: b.dither });
+        filter = '';
+      }
+      const img = await toPng(src, undefined, filter || b.frame ? { filter, frame: b.frame ? LINE_MM[b.frame] / w : 0 } : undefined);
       if (!img) return '';
       const rot = ((Number(b.rot) || 0) % 180) !== 0;
       const h = rot ? w / Math.max(0.05, img.ar) : w * img.ar;

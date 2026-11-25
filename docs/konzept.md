@@ -1500,6 +1500,9 @@ Beschriftungen, Definitionen) und „Überprüfen“ (Rechtschreibung, Wörter, 
 Punkte, Textfluss, Typst). Zoom unten rechts (30–200 %, Klick auf die Zahl: 100 % ↔ eingepasst).
 Dazu (0.7.33, Jo): WordArt, Formel und Formen-Editor kommen aus dem Einzel-Editor der Pinnwand (`/pinnwand/editor.html`, wie
 Folien); `Block.svg` (als data-URL-Bild) und `Block.pdata` (Stand des Editors), Formel als LaTeX in `text`.
+Bildfilter (0.7.33): `invert`, `blend` (mix-blend-mode), `poster` (Stufen je Kanal) und `dither` (`fs`/`bayer`); Tontrennung und
+Dithering rechnet `effectImage` auf einer Leinwand (zwischengespeichert, auch für docx). Abwedeln/Nachbelichten einzelner
+Bereiche (Pinsel) gibt es noch nicht.
 
 ### 8j.5 Nächste Stufen
 

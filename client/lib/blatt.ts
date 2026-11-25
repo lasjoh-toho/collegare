@@ -11,6 +11,7 @@
  */
 import { renderMarkdown } from './markdown';
 import temml from 'temml';
+import { effectCached, hasFx, imageFilter } from './blattImage';
 
 export type BlockType = 'heading' | 'text' | 'material' | 'quote' | 'image' | 'task' | 'box' | 'glossary' | 'table' | 'chart' | 'cols' | 'lines' | 'pagebreak' | 'grade' | 'formula' | 'wordart' | 'shape';
 export type Ruling = 'lines' | 'grid' | 'empty';
@@ -123,6 +124,11 @@ export interface Block {
   shape?: 'rect' | 'round' | 'ellipse' | 'arrow' | 'speech' | 'star';
   /** WordArt und Form: Farbe (#rrggbb) */
   color?: string;
+  /** Bild: Farben umkehren, Mischmodus mit dem Hintergrund, Tontrennung (Stufen je Kanal), Dithering (Wunsch Jo, 25. November 2026) */
+  invert?: boolean;
+  blend?: 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'color-dodge' | 'color-burn' | 'soft-light' | 'hard-light' | 'difference' | 'luminosity';
+  poster?: number;
+  dither?: 'fs' | 'bayer';
   /** WordArt und Form aus dem Editor der Pinnwand (Wunsch Jo, 25. November 2026): fertiges SVG mit eingebetteten Schriften */
   svg?: string;
   /** dazu der Stand des Editors (JSON), um später weiter zu bearbeiten */
@@ -1424,9 +1430,20 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       const rot = (((Number(b.rot) || 0) % 360) + 360) % 360;
       if (b.src) {
         const img = el('img') as HTMLImageElement;
-        img.src = b.src;
-        const filter = [b.bright ? `brightness(${1 + b.bright / 100})` : '', b.contrast ? `contrast(${1 + b.contrast / 100})` : '', b.gray ? 'grayscale(1)' : ''].filter(Boolean).join(' ');
-        if (filter) img.style.filter = filter;
+        const filter = imageFilter(b);
+        if (hasFx(b)) {
+          // Tontrennung/Dithering rechnet die Leinwand (mit den Filtern); bis dahin das Bild mit Filtern zeigen
+          const ready = effectCached(b.src, { filter, poster: b.poster, dither: b.dither }, (u) => {
+            img.src = u;
+            img.style.filter = '';
+          });
+          img.src = ready ?? b.src;
+          if (!ready && filter) img.style.filter = filter;
+        } else {
+          img.src = b.src;
+          if (filter) img.style.filter = filter;
+        }
+        if (b.blend) img.style.mixBlendMode = b.blend;
         if (b.frame && LINE_MM[b.frame]) img.style.border = `${LINE_MM[b.frame]}mm solid #333`;
         if (b.round) img.style.borderRadius = '2.5mm';
         if (b.shadow) img.style.boxShadow = '0.6mm 0.8mm 2mm rgba(0, 0, 0, 0.35)';

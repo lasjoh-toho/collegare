@@ -112,7 +112,7 @@ Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts st
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -1739,61 +1739,92 @@ function ImageTools({ b, set, crop, setCrop, onError }: { b: Block; set: (p: Par
   return (
     <>
       <Group label="Anpassen">
-        <div className={st.rows}>
-          <div className={st.row}>
-            <Drop icon="grow" label="Helligkeit" value={pct(b.bright)} disabled={!b.src} title="Bild heller oder dunkler">
-              <MH>Helligkeit</MH>
-              {steps.map((v) => (
-                <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.bright ?? 0) === v} onClick={() => set({ bright: v || undefined })} />
-              ))}
-            </Drop>
-          </div>
-          <div className={st.row}>
-            <Drop icon="spacing" label="Kontrast" value={pct(b.contrast)} disabled={!b.src} title="Kontrast verringern oder verstärken (z. B. für blasse Kopien)">
-              <MH>Kontrast</MH>
-              {steps.map((v) => (
-                <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.contrast ?? 0) === v} onClick={() => set({ contrast: v || undefined })} />
-              ))}
-            </Drop>
-          </div>
+        <div className={st.stack}>
+          <Drop icon="grow" label="Helligkeit" value={pct(b.bright)} disabled={!b.src} title="Bild heller oder dunkler">
+            <MH>Helligkeit</MH>
+            {steps.map((v) => (
+              <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.bright ?? 0) === v} onClick={() => set({ bright: v || undefined })} />
+            ))}
+          </Drop>
+          <Drop icon="spacing" label="Kontrast" value={pct(b.contrast)} disabled={!b.src} title="Kontrast verringern oder verstärken (z. B. für blasse Kopien)">
+            <MH>Kontrast</MH>
+            {steps.map((v) => (
+              <MI key={v} label={v === 0 ? 'normal' : pct(v)} on={(b.contrast ?? 0) === v} onClick={() => set({ contrast: v || undefined })} />
+            ))}
+          </Drop>
+          <Drop icon="formatline" label="Rahmen" value={b.frame ? LINE_LABEL[b.frame] : 'kein'} disabled={!b.src} title="Rahmen, runde Ecken und Schatten">
+            <MH>Rahmenlinie</MH>
+            <MI label="keine" on={!b.frame} onClick={() => set({ frame: undefined })} />
+            {(Object.keys(LINE_MM) as LineWeight[]).map((k) => (
+              <MI key={k} label={LINE_LABEL[k]} hint={`${de(LINE_MM[k])} mm`} on={b.frame === k} onClick={() => set({ frame: k })} />
+            ))}
+            <MH>Form</MH>
+            <MI label="Runde Ecken" stay on={!!b.round} onClick={() => set({ round: !b.round || undefined })} />
+            <MI label="Schatten" stay on={!!b.shadow} onClick={() => set({ shadow: !b.shadow || undefined })} />
+          </Drop>
         </div>
-        <div className={st.rows}>
-          <div className={st.row}>
-            <Drop icon="formatline" label="Rahmen" value={b.frame ? LINE_LABEL[b.frame] : 'kein'} disabled={!b.src} title="Rahmen, runde Ecken und Schatten">
-              <MH>Rahmenlinie</MH>
-              <MI label="keine" on={!b.frame} onClick={() => set({ frame: undefined })} />
-              {(Object.keys(LINE_MM) as LineWeight[]).map((k) => (
-                <MI key={k} label={LINE_LABEL[k]} hint={`${de(LINE_MM[k])} mm`} on={b.frame === k} onClick={() => set({ frame: k })} />
-              ))}
-              <MH>Form</MH>
-              <MI label="Runde Ecken" stay on={!!b.round} onClick={() => set({ round: !b.round || undefined })} />
-              <MI label="Schatten" stay on={!!b.shadow} onClick={() => set({ shadow: !b.shadow || undefined })} />
-            </Drop>
-          </div>
-          <div className={st.row}>
-            <RB icon="backcolor" label="Graustufen" disabled={!b.src} on={!!b.gray} onClick={() => set({ gray: !b.gray || undefined })} title="Bild schwarz-weiß (spart Farbe beim Kopieren)" />
-          </div>
+        <div className={st.stack}>
+          <Drop icon="backcolor" label="Farben" value={[b.gray && 'grau', b.invert && 'invertiert'].filter(Boolean).join(', ') || 'normal'} disabled={!b.src} title="Graustufen und Invertieren">
+            <MI label="Graustufen" hint="spart Farbe beim Kopieren" stay on={!!b.gray} onClick={() => set({ gray: !b.gray || undefined })} />
+            <MI label="Invertieren" hint="hell wird dunkel, Farben werden zur Gegenfarbe" stay on={!!b.invert} onClick={() => set({ invert: !b.invert || undefined })} />
+          </Drop>
+          <Drop icon="bringtofront" label="Überlagerung" value={BLEND.find(([k]) => k === (b.blend ?? ''))?.[1] ?? 'normal'} disabled={!b.src} title="Wie sich das Bild mit dem mischt, was darunter liegt (Papier, Text hinter oder vor dem Bild)">
+            <MH>Mischmodus</MH>
+            {BLEND.map(([k, l, h]) => (
+              <MI key={k || 'n'} label={l} hint={h} on={(b.blend ?? '') === k} onClick={() => set({ blend: (k || undefined) as Block['blend'] })} />
+            ))}
+          </Drop>
+          <Drop icon="gridvisible" label="Tontrennung" value={[b.poster ? `${b.poster} Stufen` : '', b.dither ? (b.dither === 'fs' ? 'gestreut' : 'Raster') : ''].filter(Boolean).join(', ') || 'aus'} disabled={!b.src} title="Weniger Farbstufen (Tontrennung) und Dithering für Kopierer und Siebdruck-Optik">
+            <MH>Tontrennung: Stufen je Farbe</MH>
+            {[0, 2, 3, 4, 6, 8].map((v) => (
+              <MI key={v} label={v ? `${v} Stufen` : 'aus'} on={(b.poster ?? 0) === v} stay onClick={() => set({ poster: v || undefined })} />
+            ))}
+            <MH>Dithering</MH>
+            <MI label="aus" on={!b.dither} stay onClick={() => set({ dither: undefined })} />
+            <MI label="Fehlerstreuung" hint={b.poster ? 'mit den gewählten Stufen' : 'schwarz-weiß, Punkte gestreut'} on={b.dither === 'fs'} stay onClick={() => set({ dither: 'fs' })} />
+            <MI label="Raster" hint={b.poster ? 'mit den gewählten Stufen' : 'schwarz-weiß, gleichmäßiges Punktraster'} on={b.dither === 'bayer'} stay onClick={() => set({ dither: 'bayer' })} />
+          </Drop>
         </div>
       </Group>
       <Group label="Bearbeiten">
-        <RB icon="insertframe" label="Zuschneiden" big disabled={!b.src || !!work} on={crop === b.id} onClick={() => setCrop(crop === b.id ? null : b.id)} title="Ränder auf der Seite wegziehen; Enter übernimmt, Esc bricht ab" />
-        <Drop icon="rect" label="Freistellen" value={work === 'frei' ? 'läuft …' : undefined} big disabled={!b.src || !!work} title="Hintergrund entfernen: was vom Rand her zusammenhängt und ihm ähnelt, wird durchsichtig">
+        <div className={st.stack}>
+        <RB icon="insertframe" label="Zuschneiden" disabled={!b.src || !!work} on={crop === b.id} onClick={() => setCrop(crop === b.id ? null : b.id)} title="Ränder auf der Seite wegziehen; Enter übernimmt, Esc bricht ab" />
+        <Drop icon="rect" label="Freistellen" value={work === 'frei' ? 'läuft …' : undefined} disabled={!b.src || !!work} title="Hintergrund entfernen: was vom Rand her zusammenhängt und ihm ähnelt, wird durchsichtig">
           <MH>Hintergrund entfernen</MH>
           <MI label="genau" hint="nur fast gleiche Farbe wie am Rand" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 18))} />
           <MI label="mittel" hint="für Fotos vor hellem Hintergrund" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 36))} />
           <MI label="großzügig" hint="auch Schatten und Verläufe" onClick={() => void run('frei', () => removeBackground(b.src!, rot, 64))} />
         </Drop>
-        <Drop icon="shrink" label="Verkleinern" value={work === 'klein' ? 'läuft …' : bytes ? kb(bytes) : undefined} big disabled={!b.src || !!work} title="Datei verkleinern: das Blatt lädt und speichert schneller">
+        </div>
+        <div className={st.stack}>
+        <Drop icon="shrink" label="Verkleinern" value={work === 'klein' ? 'läuft …' : bytes ? kb(bytes) : undefined} disabled={!b.src || !!work} title="Datei verkleinern: das Blatt lädt und speichert schneller">
           <MH>Datei verkleinern (jetzt {bytes ? kb(bytes) : '–'})</MH>
           <MI label="für den Druck" hint="längste Seite 1600 Bildpunkte" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 1600, 0.82))} />
           <MI label="kleiner" hint="1000 Bildpunkte, für kleine Bilder" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 1000, 0.78))} />
           <MI label="sehr klein" hint="600 Bildpunkte, Symbole und Skizzen" onClick={() => void run('klein', () => shrinkImage(b.src!, rot, 600, 0.75))} />
         </Drop>
-        <RB icon="resetattributes" label="Original" big disabled={!b.orig || !!work} onClick={() => void restore()} title="Zuschneiden, Freistellen und Verkleinern zurücknehmen" />
+        <RB icon="resetattributes" label="Original" disabled={!b.orig || !!work} onClick={() => void restore()} title="Zuschneiden, Freistellen und Verkleinern zurücknehmen" />
+        </div>
       </Group>
     </>
   );
 }
+
+/** Mischmodi für Bilder: Wert, Name, Erklärung */
+const BLEND: [string, string, string][] = [
+  ['', 'normal', 'deckt ab'],
+  ['multiply', 'Multiplizieren', 'Weiß wird durchsichtig, gut für Scans und Strichzeichnungen'],
+  ['darken', 'Abdunkeln', 'nur dunklere Stellen bleiben'],
+  ['color-burn', 'Farbig nachbelichten', 'dunkler und kräftiger'],
+  ['screen', 'Negativ multiplizieren', 'Schwarz wird durchsichtig, alles heller'],
+  ['lighten', 'Aufhellen', 'nur hellere Stellen bleiben'],
+  ['color-dodge', 'Farbig abwedeln', 'hellt stark auf'],
+  ['overlay', 'Ineinanderkopieren', 'mehr Kontrast mit dem Untergrund'],
+  ['soft-light', 'Weiches Licht', 'sanft heller oder dunkler'],
+  ['hard-light', 'Hartes Licht', 'kräftig heller oder dunkler'],
+  ['difference', 'Differenz', 'Farben werden voneinander abgezogen'],
+  ['luminosity', 'Luminanz', 'nur die Helligkeit des Bilds'],
+];
 
 /** Zuschneiden auf der Seite: Rahmen über dem Bild mit Griffen an Ecken und Kanten; Enter übernimmt, Esc bricht ab */
 function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<HTMLDivElement | null>; bid: string; onApply: (c: Crop) => void; onCancel: () => void }) {
@@ -3356,14 +3387,17 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       {b.type === 'image' && (
         <>
           <Group label="Bild">
-            <label className={`${st.rb} ${st.rbBig}`} title="Bild vom Gerät">
-              <Ico n="insertgraphic" />
+            <div className={st.stack}>
+            <label className={st.rb} title="Bild vom Gerät">
+              <Ico n="insertgraphic" size={16} />
               <span>{b.src ? 'Anderes Bild' : 'Auswählen'}</span>
               <input type="file" accept="image/*" hidden onChange={(e) => (e.target.files?.[0] && props.onImage(e.target.files[0]), (e.target.value = ''))} />
             </label>
-            <RB icon="camera" label="Aufnehmen" big onClick={props.onScan} title="Bild mit der Kamera aufnehmen (Scanner)" />
-            <RB icon="gallery" label="Aus dem Material" big onClick={() => props.setPanel('material')} />
-            <Drop icon="inserthyperlink" label="Aus dem Netz" value={loading ? 'lädt …' : undefined} big wide title="Bild über seine Adresse im Netz holen">
+            <RB icon="camera" label="Aufnehmen" onClick={props.onScan} title="Bild mit der Kamera aufnehmen (Scanner)" />
+            </div>
+            <div className={st.stack}>
+            <RB icon="gallery" label="Aus dem Material" onClick={() => props.setPanel('material')} />
+            <Drop icon="inserthyperlink" label="Aus dem Netz" value={loading ? 'lädt …' : undefined} wide title="Bild über seine Adresse im Netz holen">
               <MH>Adresse des Bilds</MH>
               <form
                 className={st.urlRow}
@@ -3379,6 +3413,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
                 </button>
               </form>
             </Drop>
+            </div>
           </Group>
           <Group label="Größe und Lage">
             <div className={st.rows}>
@@ -3694,9 +3729,11 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <Arrange {...props} />
       <span className={st.groupGap} />
       <Group label="Baustein">
-        {b.type !== 'cols' && <RB icon="protect" label="Unten fest" big on={!!b.bottom} onClick={() => set({ bottom: b.bottom ? undefined : true })} title="Unten auf der Seite festhalten (z. B. Notenkasten); Linien bis zum Seitenende lassen ihm Platz" />}
-        <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} big on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
-        <RB icon="delete" label="Löschen" big onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
+        <div className={st.stack}>
+        {b.type !== 'cols' && <RB icon="protect" label="Unten fest" on={!!b.bottom} onClick={() => set({ bottom: b.bottom ? undefined : true })} title="Unten auf der Seite festhalten (z. B. Notenkasten); Linien bis zum Seitenende lassen ihm Platz" />}
+        <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
+        <RB icon="delete" label="Löschen" onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
+        </div>
       </Group>
     </>
   );

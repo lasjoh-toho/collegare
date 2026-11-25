@@ -143,10 +143,93 @@ export function kb(n: number): string {
 }
 
 /** CSS-Filter für Helligkeit, Kontrast und Graustufen */
-export function imageFilter(b: { bright?: number; contrast?: number; gray?: boolean }): string {
+export function imageFilter(b: { bright?: number; contrast?: number; gray?: boolean; invert?: boolean }): string {
   const f: string[] = [];
   if (b.bright) f.push(`brightness(${1 + b.bright / 100})`);
   if (b.contrast) f.push(`contrast(${1 + b.contrast / 100})`);
   if (b.gray) f.push('grayscale(1)');
+  if (b.invert) f.push('invert(1)');
   return f.join(' ');
+}
+
+// ---------- Tontrennung und Dithering (Wunsch Jo, 25. November 2026) ----------
+/** poster: Stufen je Farbkanal (2–8); dither: Fehlerstreuung (Floyd-Steinberg) oder Raster (Bayer); ohne poster schwarz-weiß */
+export type Fx = { filter?: string; poster?: number; dither?: 'fs' | 'bayer' };
+export const hasFx = (b: { poster?: number; dither?: string }) => !!(b.poster || b.dither);
+
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+/** Filter, Tontrennung und Dithering auf einer Leinwand anwenden; Ergebnis als PNG (data-URL) */
+export async function effectImage(src: string, fx: Fx, maxPx = 1400): Promise<string> {
+  const img = await loadImage(src);
+  const k = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k));
+  c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  if (fx.filter) g.filter = fx.filter;
+  g.drawImage(img, 0, 0, c.width, c.height);
+  g.filter = 'none';
+  const id = g.getImageData(0, 0, c.width, c.height);
+  const d = id.data;
+  const W = c.width;
+  const H = c.height;
+  const bw = !!fx.dither && !fx.poster;
+  const n = Math.max(2, Math.min(16, fx.poster || 2));
+  const q = (v: number) => Math.round((Math.max(0, Math.min(255, v)) / 255) * (n - 1)) * (255 / (n - 1));
+  if (bw) for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const chans = bw ? [0] : [0, 1, 2];
+  if (fx.dither === 'fs') {
+    const err = chans.map(() => new Float32Array(W * H));
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const p = y * W + x;
+        for (const [ci, ch] of chans.entries()) {
+          const e = err[ci];
+          const old = d[p * 4 + ch] + e[p];
+          const nv = q(old);
+          d[p * 4 + ch] = nv;
+          const r = old - nv;
+          if (x + 1 < W) e[p + 1] += (r * 7) / 16;
+          if (y + 1 < H) {
+            if (x > 0) e[p + W - 1] += (r * 3) / 16;
+            e[p + W] += (r * 5) / 16;
+            if (x + 1 < W) e[p + W + 1] += r / 16;
+          }
+        }
+        if (bw) d[p * 4 + 1] = d[p * 4 + 2] = d[p * 4];
+      }
+  } else if (fx.dither === 'bayer') {
+    const step = 255 / (n - 1);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const p = (y * W + x) * 4;
+        const t = (BAYER[(y % 4) * 4 + (x % 4)] / 16 - 0.5) * step;
+        for (const ch of chans) d[p + ch] = q(d[p + ch] + t);
+        if (bw) d[p + 1] = d[p + 2] = d[p];
+      }
+  } else for (let i = 0; i < d.length; i += 4) for (const ch of chans) d[i + ch] = q(d[i + ch]);
+  g.putImageData(id, 0, 0);
+  return c.toDataURL('image/png');
+}
+
+const fxCache = new Map<string, string>();
+const fxRunning = new Map<string, Promise<string>>();
+/** fertiges Ergebnis sofort, sonst null und onReady, sobald es gerechnet ist (Ergebnisse bleiben im Speicher) */
+export function effectCached(src: string, fx: Fx, onReady: (url: string) => void): string | null {
+  const key = `${fx.filter ?? ''}|${fx.poster ?? 0}|${fx.dither ?? ''}|${src.length}|${src.slice(0, 64)}|${src.slice(-64)}`;
+  const hit = fxCache.get(key);
+  if (hit) return hit;
+  let run = fxRunning.get(key);
+  if (!run) {
+    run = effectImage(src, fx).then((u) => {
+      fxCache.set(key, u);
+      if (fxCache.size > 40) fxCache.delete(fxCache.keys().next().value as string);
+      fxRunning.delete(key);
+      return u;
+    });
+    fxRunning.set(key, run);
+  }
+  run.then(onReady).catch(() => {});
+  return null;
 }

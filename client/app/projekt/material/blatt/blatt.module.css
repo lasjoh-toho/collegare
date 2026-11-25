@@ -589,3 +589,6 @@
 .host :global(.bl-pw.bl-align-center) { text-align: center; }
 .host :global(.bl-pw.bl-align-right) { text-align: right; }
 .host :global(.bl-pw img) { display: inline-block; height: auto; vertical-align: top; }
+/* kleine Knöpfe untereinander in einer Spalte (Wunsch Jo, 25. November 2026: Ausblenden, Löschen …) */
+.stack { display: flex; flex-direction: column; justify-content: center; gap: 0; }
+.stack > .rb, .stack > .drop > .rb, .stack .rb { height: 21px; padding: 0 5px; font-size: 12px; }
