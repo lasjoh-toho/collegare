@@ -16,6 +16,10 @@ export interface PhaseInfo {
   badge: string;
   /** Handlungsanleitung für Lernende */
   help: string;
+  /** zweiter Block des Zeitplans läuft: die Lehrkraft kommentiert (Jo, 25. November 2026) */
+  commenting?: boolean;
+  /** Bearbeitung gesperrt; der Bereich bleibt zum Lesen und Exportieren offen */
+  locked?: boolean;
 }
 
 export const PHASE_ORDER: { key: PhaseKey; title: string; icon: string }[] = [
@@ -75,7 +79,7 @@ export function phaseList(s: ProjectSettings, single: boolean, now = Date.now(),
       const ok = concept === undefined ? released.length > 0 : concept !== null && released.includes(concept);
       if (ph.to && now > ph.to) {
         state = 'closed';
-        badge = 'beendet';
+        badge = 'gesperrt';
       } else if (!ok) {
         state = 'upcoming';
         badge = 'nach Freigabe';
@@ -92,10 +96,22 @@ export function phaseList(s: ProjectSettings, single: boolean, now = Date.now(),
         badge = `ab ${fmtDay(ph.from)}`;
       } else if (ph.to && now > ph.to) {
         state = 'closed';
-        badge = 'beendet';
+        badge = 'gesperrt';
       } else if (ph.to) badge = `bis ${fmtDay(ph.to)}`;
     }
-    return { key, title, icon, state, badge, help: help(key, s, single) };
+    const live = state === 'open' && (ph.state === 'scheduled' || ph.state === 'release');
+    const commenting = live && !!ph.comment && now >= ph.comment;
+    if (commenting) badge = ph.to ? `Rückmeldung, bis ${fmtDay(ph.to)}` : 'Rückmeldung';
+    let text = help(key, s, single);
+    if (live && ph.comment && now < ph.comment) text += ` Ab ${fmtDay(ph.comment)} kommentiert deine Lehrkraft.`;
+    else if (commenting) text += ' Deine Lehrkraft kommentiert jetzt; du kannst noch überarbeiten.';
+    if (state === 'open' && ph.to && (ph.state === 'scheduled' || ph.state === 'release')) text += ` Ab ${fmtDay(ph.to + 60_000)} ist die Bearbeitung gesperrt, lesen und exportieren geht weiter.`;
+    if (ph.state === 'scheduled' && ph.to && now > ph.to) text = 'Die Bearbeitung ist gesperrt. Du kannst alles weiter lesen und exportieren.';
+    if (key === 'presentation') {
+      const mine = (s.showings ?? []).filter((x) => concept === undefined || (concept !== null && x.who === concept)).sort((a, b) => a.at - b.at);
+      if (mine.length && concept !== undefined) text += ` Vorführtermin: ${mine.map((x) => fmtDayTime(x.at)).join(', ')}.`;
+    }
+    return { key, title, icon, state, badge, help: text, commenting, locked: ph.state === 'closed' || state === 'closed' };
   });
 }
 

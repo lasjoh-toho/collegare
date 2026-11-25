@@ -35,7 +35,23 @@ const PhaseSchema = z.object({
    */
   state: z.enum(['on', 'closed', 'scheduled', 'off', 'release']),
   from: z.number().int().nullable().default(null),
+  /**
+   * Zwei verbundene Blöcke je Schritt (Jo, 25. November 2026): ab comment kommentiert die Lehrkraft, ab to ist die
+   * Bearbeitung gesperrt. to null = kein Ende. Der Bereich bleibt auch danach zum Lesen und Exportieren offen.
+   */
+  comment: z.number().int().nullable().default(null),
   to: z.number().int().nullable().default(null),
+});
+
+/** Vorführtermin einer Gruppe (bei Einzelarbeit einer Person) im Schritt Präsentation (Jo, 25. November 2026) */
+const ShowingSchema = z.object({
+  id: z.string().min(1).max(40),
+  at: z.number().int(),
+  /** Dauer in Minuten */
+  min: z.number().int().min(5).max(240),
+  /** Gruppe bzw. Person; null = noch niemand zugeordnet */
+  who: z.number().int().nullable(),
+  label: z.string().max(80),
 });
 
 /** Höchstdauer für Zugangscodes „solange freigegeben“, wenn eine Phase ohne Ende offen ist; beim Speichern neu gesetzt. */
@@ -129,10 +145,12 @@ export const SettingsSchema = z.object({
   tools: z.record(z.string().max(40), z.boolean()),
   /** Gruppen (bei Einzelarbeit Personen), deren Konzept die Lehrkraft freigegeben hat: öffnet Schritte mit state release */
   conceptReleased: z.array(z.number().int()).max(500),
+  /** Vorführtermine, im Fenster „Schritte für die Lernenden“ im gezoomten Zeitstrahl gesetzt */
+  showings: z.array(ShowingSchema).max(200),
 });
 export type ProjectSettings = z.infer<typeof SettingsSchema>;
 
-const phase = (state: 'on' | 'off') => ({ state, from: null, to: null });
+const phase = (state: 'on' | 'off') => ({ state, from: null, comment: null, to: null });
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
   brief: '',
@@ -175,6 +193,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   infos: {},
   tools: {},
   conceptReleased: [],
+  showings: [],
 };
 
 /** Voreinstellungen der Leiste oben auf der Einstellungsseite: setzen nur die genannten Felder. */

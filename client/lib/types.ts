@@ -64,7 +64,18 @@ export interface PhaseSetting {
   /** release: Start nach Konzept und Freigabe (je Gruppe, siehe conceptReleased) */
   state: 'on' | 'closed' | 'scheduled' | 'off' | 'release';
   from: number | null;
+  /** ab hier kommentiert die Lehrkraft (zweiter Block im Zeitplan); to = Bearbeitung gesperrt, null = kein Ende */
+  comment?: number | null;
   to: number | null;
+}
+
+/** Vorführtermin (Schritt Präsentation): who = Gruppe bzw. bei Einzelarbeit Person */
+export interface Showing {
+  id: string;
+  at: number;
+  min: number;
+  who: number | null;
+  label: string;
 }
 
 export interface ProjectSettings {
@@ -114,6 +125,7 @@ export interface ProjectSettings {
   tools?: Record<string, boolean>;
   /** Gruppen bzw. Personen mit freigegebenem Konzept */
   conceptReleased?: number[];
+  showings?: Showing[];
 }
 
 export interface ProjectView {

@@ -108,7 +108,7 @@ export default function Projekt() {
         return { ...base, kind: done === list.length ? 'done' : base.kind, line: `${done} von ${list.length} ${what} fertig` };
       }
     }
-    return { ...base, line: closed ? 'Phase beendet, nur lesen' : tile.sub };
+    return { ...base, line: closed ? 'Bearbeitung gesperrt, lesen und exportieren geht weiter' : tile.sub };
   };
 
   const tiles = TILES.filter((tile) => {
