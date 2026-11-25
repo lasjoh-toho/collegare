@@ -3544,9 +3544,39 @@ interface AgClass {
   id: number;
   title: string;
 }
+/** „1-25, 30“ wie in Druckdialogen → Nummern (höchstens 200, je bis 500) */
+function parseNumbers(t: string): number[] {
+  const out = new Set<number>();
+  for (const part of t.split(/[,;\s]+/).filter(Boolean)) {
+    const m = /^(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?$/.exec(part);
+    if (!m) throw new Error(`„${part}“ ist keine Nummer. Beispiel: 1-25, 30`);
+    let a = Number(m[1]);
+    let z = m[2] ? Number(m[2]) : a;
+    if (z < a) [a, z] = [z, a];
+    if (a < 1 || z > 500) throw new Error('Nummern von 1 bis 500.');
+    for (let i = a; i <= z; i++) out.add(i);
+  }
+  if (!out.size) throw new Error('Bitte Nummern eingeben, z. B. 1-25.');
+  if (out.size > 200) throw new Error('Höchstens 200 Exemplare auf einmal.');
+  return [...out].sort((x, y) => x - y);
+}
+/** Nummern kurz: [1,2,3,5] → „1-3, 5“ */
+function rangeText(ns: number[]): string {
+  const s = [...new Set(ns)].sort((a, b) => a - b);
+  const out: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    out.push(j > i ? `${s[i]}-${s[j]}` : String(s[i]));
+    i = j;
+  }
+  return out.join(', ');
+}
 interface AgStudent {
   id: number;
   name: string;
+  /** nummerierter Platz nur dieser Aufgabe („Abgabe 3“) */
+  seat?: number;
 }
 
 /**
@@ -3581,10 +3611,12 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
   const [newTitle, setNewTitle] = useState(title);
   const [newDue, setNewDue] = useState('');
   const [newMode, setNewMode] = useState<'summative' | 'formative'>('summative');
-  // Personen ergänzen: Namen oder eine Zahl nummerierter Plätze („Abgabe 1“ …)
-  const [addTab, setAddTab] = useState<'names' | 'count'>('names');
+  // Drucken mit Namen (Auswahl im eigenen Fenster mit Häkchen) oder mit Nummern („1-25, 30“ wie in Druckdialogen).
+  // Nummerierte Plätze gehören nur zu dieser Aufgabe: „Abgabe 1“ bleibt hier Abgabe 1 (Jo, 25. November 2026).
+  const [who, setWho] = useState<'names' | 'numbers'>('names');
+  const [namesOpen, setNamesOpen] = useState(false);
   const [addNames, setAddNames] = useState('');
-  const [addCount, setAddCount] = useState(0);
+  const [numbers, setNumbers] = useState('');
   // Aufgabentext nach Autogra.fi (Grundlage für Erwartungshorizont und KI-Bewertung)
   const [sendText, setSendText] = useState(true);
   const [taskText, setTaskText] = useState<string | null>(null);
@@ -3596,6 +3628,15 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const sheet = sheetSize(doc);
+  const named = students.filter((x) => !x.seat);
+  const copiesN = (() => {
+    if (who === 'names') return picked.size;
+    try {
+      return parseNumbers(numbers).length;
+    } catch {
+      return 0;
+    }
+  })();
 
   useEffect(() => {
     let stored = '';
@@ -3651,7 +3692,13 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
     try {
       const r = await ag<{ assessment: { pseudonymized: boolean }; students: AgStudent[] }>(base, 'GET', `/api/v1/assessments/${aid}/access-codes`);
       setStudents(r.students);
-      setPicked(keep ?? new Set(r.students.map((s) => s.id)));
+      setPicked(keep ?? new Set(r.students.filter((s) => !s.seat).map((s) => s.id)));
+      if (!keep) {
+        const seats = r.students.filter((s) => s.seat).map((s) => s.seat!);
+        const named = r.students.some((s) => !s.seat);
+        setWho(!named && seats.length ? 'numbers' : 'names');
+        setNumbers(seats.length ? rangeText(seats) : named ? '' : '1-25');
+      }
       setPrintName(!r.assessment.pseudonymized);
       if (!keep) {
         setSent('');
@@ -3714,21 +3761,12 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
     setSent('Der Text des Blatts steht jetzt als Aufgabenstellung in Autogra.fi.');
   }
 
-  /** Namen oder nummerierte Plätze in die Klasse der Aufgabe eintragen; die neuen werden gleich angehakt. */
+  /** Namen in die Klasse der Aufgabe eintragen; die neuen werden gleich angehakt. */
   async function addPeople() {
     const a = tasks.find((x) => x.id === task);
     if (!a) return;
-    let names: string[];
-    if (addTab === 'names') names = addNames.split(/\n|;/).map((n) => n.trim()).filter(Boolean);
-    else {
-      let max = 0;
-      for (const s of students) {
-        const m = /^Abgabe (\d+)$/.exec(s.name);
-        if (m) max = Math.max(max, Number(m[1]));
-      }
-      names = Array.from({ length: Math.max(0, Math.min(200, addCount)) }, (_, i) => `Abgabe ${max + i + 1}`);
-    }
-    if (!names.length) return setErr(addTab === 'names' ? 'Bitte mindestens einen Namen eingeben (einer je Zeile).' : 'Bitte eine Anzahl größer als 0 eingeben.');
+    const names = addNames.split(/\n|;/).map((n) => n.trim()).filter(Boolean);
+    if (!names.length) return setErr('Bitte mindestens einen Namen eingeben (einer je Zeile).');
     setErr('');
     setBusy(true);
     try {
@@ -3739,7 +3777,6 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
       // schon vorhandene Namen aus der Eingabe ebenfalls anhaken
       setPicked(new Set([...picked, ...list.filter((s) => fresh.has(s.id) || lower.has(s.name.toLowerCase())).map((s) => s.id)]));
       setAddNames('');
-      setAddCount(0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -3754,14 +3791,24 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
       let copies: Copy[] = [{}];
       const d: BlattDoc = structuredClone(doc);
       if (mode === 'ag') {
-        if (!task || !picked.size) throw new Error('Bitte eine Aufgabe und mindestens eine Person wählen.');
+        if (!task) throw new Error('Bitte eine Aufgabe wählen.');
+        let ids = [...picked];
+        let withName = printName;
+        if (who === 'numbers') {
+          // Nummern prüfen, bevor etwas angelegt wird
+          const nums = parseNumbers(numbers);
+          const seats = await ag<{ items: AgStudent[] }>(base, 'POST', `/api/v1/assessments/${task}/seats`, { numbers: nums });
+          ids = seats.items.map((x) => x.id);
+          withName = false;
+          await pickTask(task, picked);
+        } else if (!ids.length) throw new Error('Bitte mindestens einen Namen ankreuzen.');
         if (sendText) await sendToAutografi(task);
-        const body: Record<string, unknown> = { user_ids: [...picked] };
+        const body: Record<string, unknown> = { user_ids: ids };
         if (valid === 'freigabe') body.until = 'freigabe';
         else body.hours = Number(valid);
         const r = await ag<{ items: { user_id: number; name: string; code: string; qr: string }[] }>(base, 'POST', `/api/v1/assessments/${task}/access-codes`, body);
-        const order = new Map(students.map((s, i) => [s.id, i]));
-        copies = r.items.sort((a, b) => (order.get(a.user_id) ?? 0) - (order.get(b.user_id) ?? 0)).map((it) => ({ name: it.name, printName, code: it.code, qr: it.qr, klasse: tasks.find((x) => x.id === task)?.class || undefined }));
+        const order = new Map(ids.map((x, i) => [x, i]));
+        copies = r.items.sort((a, b) => (order.get(a.user_id) ?? 0) - (order.get(b.user_id) ?? 0)).map((it) => ({ name: it.name, printName: withName, code: it.code, qr: it.qr, klasse: tasks.find((x) => x.id === task)?.class || undefined }));
         if (d.page.header.qr === 'none') d.page.header = { ...d.page.header, show: true, qr: 'first' };
       }
       printCopies(d, copies, title, head);
@@ -3881,50 +3928,86 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
                 )}
                 {task && !creating && (
                   <>
-                    <div className="row">
-                      <button className="btn" onClick={() => setPicked(new Set(students.map((s) => s.id)))}>
-                        Alle
+                    <div className="seg" role="group" aria-label="Wer bekommt ein Exemplar">
+                      <button className={`btn ${who === 'names' ? 'on' : ''}`} onClick={() => setWho('names')}>
+                        Mit Namen
                       </button>
-                      <button className="btn" onClick={() => setPicked(new Set())}>
-                        Keine
+                      <button className={`btn ${who === 'numbers' ? 'on' : ''}`} onClick={() => setWho('numbers')} title="Ohne Namen: Abgabe 1, Abgabe 2 … nur in dieser Aufgabe">
+                        Mit Nummern
                       </button>
-                      <span className="muted">
-                        {picked.size} von {students.length} ausgewählt
-                      </span>
                     </div>
-                    <div className={st.people}>
-                      {students.map((s) => (
-                        <label key={s.id} className={st.person}>
-                          <input type="checkbox" checked={picked.has(s.id)} onChange={(e) => setPicked((p) => (e.target.checked ? new Set(p).add(s.id) : new Set([...p].filter((x) => x !== s.id))))} />
-                          {s.name}
-                        </label>
-                      ))}
-                      {!students.length && <div className={st.person}>In der Klasse sind noch keine Lernenden eingetragen. Trag unten Namen ein oder bestell Nummern.</div>}
-                    </div>
-                    <div className={st.addPeople}>
-                      <div className="seg" role="group" aria-label="Personen ergänzen">
-                        <button className={`btn ${addTab === 'names' ? 'on' : ''}`} onClick={() => setAddTab('names')}>
-                          Namen eintragen
-                        </button>
-                        <button className={`btn ${addTab === 'count' ? 'on' : ''}`} onClick={() => setAddTab('count')} title="Codes ohne Namen, z. B. zum Verteilen in der Stunde">
-                          Nummern bestellen
-                        </button>
-                      </div>
-                      {addTab === 'names' ? (
-                        <textarea rows={3} value={addNames} onChange={(e) => setAddNames(e.target.value)} placeholder={'Ein Name je Zeile, z. B.\nLea Brandt\nTom Kühn'} />
-                      ) : (
-                        <div className="row">
-                          <input type="number" min={1} max={200} value={addCount || ''} onChange={(e) => setAddCount(Number(e.target.value) || 0)} placeholder="Anzahl" style={{ width: 90 }} />
-                          <span className={st.hint}>Plätze „Abgabe 1“, „Abgabe 2“ … ohne Namen; wer welchen Zettel bekommt, entscheidest du beim Verteilen.</span>
-                        </div>
-                      )}
+                    {who === 'names' ? (
                       <div className="row">
-                        <span className="grow" />
-                        <button className="btn" disabled={busy} onClick={() => void addPeople()}>
-                          In die Klasse übernehmen
+                        <button className="btn" onClick={() => setNamesOpen(true)}>
+                          Namen auswählen …
                         </button>
+                        <span className="muted">
+                          {picked.size} von {named.length} ausgewählt
+                        </span>
+                        <span className="grow" />
+                        <label className={st.check}>
+                          <input type="checkbox" checked={printName} onChange={(e) => setPrintName(e.target.checked)} /> Namen eindrucken
+                        </label>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="field">
+                        <label>Nummern</label>
+                        <input value={numbers} onChange={(e) => setNumbers(e.target.value)} placeholder="z. B. 1-25, 30" />
+                        <span className={st.hint}>
+                          {(() => {
+                            try {
+                              const n = parseNumbers(numbers).length;
+                              const have = students.filter((s) => s.seat).map((s) => s.seat!);
+                              return `${n} ${n === 1 ? 'Exemplar' : 'Exemplare'} „Abgabe 1“, „Abgabe 2“ … Die Nummern gelten nur in dieser Aufgabe; dieselbe Nummer ist hier immer derselbe Platz.${have.length ? ` Schon angelegt: ${rangeText(have)}.` : ''}`;
+                            } catch (e) {
+                              return e instanceof Error ? e.message : '';
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    )}
+                    {namesOpen && (
+                      <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && setNamesOpen(false)}>
+                        <div className={`modal ${st.dialog}`} role="dialog" aria-label="Namen auswählen">
+                          <h2>Namen auswählen</h2>
+                          <div className="row">
+                            <button className="btn" onClick={() => setPicked(new Set(named.map((s) => s.id)))}>
+                              Alle
+                            </button>
+                            <button className="btn" onClick={() => setPicked(new Set())}>
+                              Keine
+                            </button>
+                            <span className="muted">
+                              {picked.size} von {named.length} ausgewählt
+                            </span>
+                          </div>
+                          <div className={st.people}>
+                            {named.map((s) => (
+                              <label key={s.id} className={st.person}>
+                                <input type="checkbox" checked={picked.has(s.id)} onChange={(e) => setPicked((p) => (e.target.checked ? new Set(p).add(s.id) : new Set([...p].filter((x) => x !== s.id))))} />
+                                {s.name}
+                              </label>
+                            ))}
+                            {!named.length && <div className={st.person}>In der Klasse sind noch keine Namen eingetragen. Trag unten Namen ein oder druck mit Nummern.</div>}
+                          </div>
+                          <div className={st.addPeople}>
+                            <textarea rows={3} value={addNames} onChange={(e) => setAddNames(e.target.value)} placeholder={'Namen ergänzen, einer je Zeile, z. B.\nLea Brandt\nTom Kühn'} />
+                            <div className="row">
+                              <span className="grow" />
+                              <button className="btn" disabled={busy || !addNames.trim()} onClick={() => void addPeople()}>
+                                In die Klasse übernehmen
+                              </button>
+                            </div>
+                          </div>
+                          <div className="row">
+                            <span className="grow" />
+                            <button className="btn primary" onClick={() => setNamesOpen(false)}>
+                              Fertig
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className={st.grid2}>
                       <div className="field">
                         <label>Codes gültig</label>
@@ -3935,9 +4018,6 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
                           <option value="336">14 Tage</option>
                         </select>
                       </div>
-                      <label className={st.check}>
-                        <input type="checkbox" checked={printName} onChange={(e) => setPrintName(e.target.checked)} /> Namen eindrucken
-                      </label>
                     </div>
                     <p className={st.hint}>Neue Codes ersetzen ältere nicht; schon verteilte Codes gelten weiter.</p>
                     <div className={st.newTask}>
@@ -3992,8 +4072,8 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
           <button className="btn" onClick={onClose}>
             Abbrechen
           </button>
-          <button className="btn primary" disabled={busy || (mode === 'ag' && (!task || !picked.size))} onClick={() => void run()}>
-            {busy ? 'Bereitet vor …' : mode === 'ag' ? `${picked.size} ${picked.size === 1 ? 'Exemplar' : 'Exemplare'} drucken` : 'Drucken'}
+          <button className="btn primary" disabled={busy || (mode === 'ag' && (!task || !copiesN))} onClick={() => void run()}>
+            {busy ? 'Bereitet vor …' : mode === 'ag' ? `${copiesN} ${copiesN === 1 ? 'Exemplar' : 'Exemplare'} drucken` : 'Drucken'}
           </button>
         </div>
       </div>
