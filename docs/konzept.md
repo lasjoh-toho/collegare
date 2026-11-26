@@ -1503,6 +1503,12 @@ Folien); `Block.svg` (als data-URL-Bild) und `Block.pdata` (Stand des Editors), 
 Bildfilter (0.7.33): `invert`, `blend` (mix-blend-mode), `poster` (Stufen je Kanal) und `dither` (`fs`/`bayer`); Tontrennung und
 Dithering rechnet `effectImage` auf einer Leinwand (zwischengespeichert, auch für docx). Pinsel (0.7.34): Aufhellen,
 Abdunkeln, Verpixeln (`BrushOverlay`, `brushDab`) malen auf einer Leinwand über dem Bild; Übernehmen ersetzt `src`, `orig` bleibt.
+Dazu (0.7.35, Jo, 26. November 2026): „Unten fest“ heißt jetzt „Fixieren“ (`Block.pin` oben/unten, `bottom` gilt weiter als
+unten). Umfluss `Block.pinLayer`: ohne Angabe weicht der Text aus; `front`/`behind` legt den Baustein auf die Seite
+(`bl-pinned`, außerhalb von `.bl-body`), er belegt keinen Platz und lässt sich am Griff um `dx`/`dy` schieben, auch über
+die Seitenzahl. WordArt, Formen und Formeln lassen sich frei ziehen (`free`, `dx`, `dy`, „An seinen Platz“). Platzhalter im
+Kopf schalten um (zweiter Klick nimmt sie heraus); Muster mit Vorschau: Arbeitsblatt, Klassenarbeit (Punkte und Note im
+Notenkasten), Klassenarbeit mit Punkten im Kopf, Nur Titel und Name, Leer.
 
 ### 8j.5 Nächste Stufen
 

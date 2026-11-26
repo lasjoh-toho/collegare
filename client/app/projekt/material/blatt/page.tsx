@@ -76,6 +76,7 @@ import {
   type Ruling,
   SHAPE_LABEL,
   WA_LABEL,
+  pinOf,
 } from '@/lib/blatt';
 
 /** Editor der Pinnwand (WordArt, Formen-Editor, Formel), wie in den Folien; bid: vorhandener Baustein */
@@ -112,7 +113,7 @@ Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts st
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Unten fest“ (Reiter des Bausteins oder Rechtsklick) hält einen Baustein wie den Notenkasten am Fuß der Seite. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering; Bearbeiten: Pinsel zum Aufhellen, Abdunkeln und Verpixeln (Enter übernimmt, Esc bricht ab, Strg+Z nimmt einen Strich zurück). Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Fixieren“ (Reiter des Bausteins, Rechtsklick links) hält einen Baustein oben oder unten auf der Seite, etwa den Notenkasten am Fuß. Unter „Umfluss“ weicht der Text aus, oder der Baustein liegt vor oder hinter dem Text; dann lässt er sich frei schieben, auch über die Seitenzahl. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering; Bearbeiten: Pinsel zum Aufhellen, Abdunkeln und Verpixeln (Enter übernimmt, Esc bricht ab, Strg+Z nimmt einen Strich zurück). Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -200,6 +201,8 @@ export default function BlattPage() {
   const [conv, setConv] = useState<{ bid: string; x: number; y: number } | null>(null);
   /** Bild, das gerade auf der Seite zugeschnitten wird */
   const [cropBid, setCropBid] = useState<string | null>(null);
+  /** zuletzt beim Drücken gewähltes Bild/Objekt (der folgende Klick wird übergangen) */
+  const downAt = useRef<{ bid: string; t: number } | null>(null);
   /** Pinsel auf einem Bild (aufhellen, abdunkeln, verpixeln) */
   const [brush, setBrush] = useState<{ bid: string; mode: BrushMode } | null>(null);
   /** wo die Seiten beginnen: vor welchem Baustein (oder mitten in ihm, wenn er weiterläuft) */
@@ -862,6 +865,11 @@ export default function BlattPage() {
     const t = e.target as HTMLElement;
     // Doppelklick auf WordArt, Form aus dem Editor oder Formel: gleich den Editor öffnen (Wunsch Jo, 26. November 2026)
     if (e.detail === 2 && pwOpenAt(e.clientX, e.clientY, t)) return;
+    // Bild oder Objekt wurde eben beim Drücken gewählt: dieser Klick gehört dazu
+    if (downAt.current && performance.now() - downAt.current.t < 1000) {
+      downAt.current = null;
+      return;
+    }
     const del = t.closest<HTMLElement>('[data-del]');
     if (del?.dataset.del) {
       e.stopPropagation();
@@ -1035,13 +1043,19 @@ export default function BlattPage() {
     if ((e.target as HTMLElement).closest('[data-del]')) return;
     const gut = (e.target as HTMLElement).closest<HTMLElement>('.bl-gutter');
     if (gut?.dataset.gutter) return dragGutter(e, gut);
-    const fig = (e.target as HTMLElement).closest<HTMLElement>('.bl-fig');
-    const box = fig?.closest<HTMLElement>('.bl-image');
+    // WordArt, Form, Formel: frei verschieben wie Bilder (Wunsch Jo, 26. November 2026)
+    // fixiert vor oder hinter dem Text: der ganze Baustein lässt sich schieben, auch über die Seitenzahl
+    const pinned = (e.target as HTMLElement).closest<HTMLElement>('.bl-pinned');
+    const objBox = pinned ? null : (e.target as HTMLElement).closest<HTMLElement>('.bl-wordart, .bl-shape.bl-block, .bl-formula.bl-block');
+    const fig = pinned ?? (objBox ? (objBox.firstElementChild as HTMLElement | null) : (e.target as HTMLElement).closest<HTMLElement>('.bl-fig'));
+    const box = pinned ?? objBox ?? fig?.closest<HTMLElement>('.bl-image');
     const bid = box?.dataset.bid;
     if (!fig || !bid || (e.target as HTMLElement).closest('[data-field]')) return;
     const b = doc ? findBlock(doc.blocks, bid) : null;
-    if (!b?.src) return;
+    if (!b || (b.type === 'image' && !b.src)) return;
     e.preventDefault();
+    // der Klick danach trifft oft schon die neu gezeichnete Seite (oder gar keinen Baustein) und hob die Auswahl wieder auf
+    downAt.current = { bid, t: performance.now() };
     select(bid);
     setEdit(null);
     const pxmm = 3.7795 * zoom;
@@ -1064,7 +1078,8 @@ export default function BlattPage() {
       if (!moved) return;
       const dx = Math.round((left0 + (ev.clientX - sx) / pxmm) * 2) / 2;
       const dy = Math.round((top0 + (ev.clientY - sy) / pxmm) * 2) / 2;
-      setBlock(bid, { free: true, dx, dy });
+      setBlock(bid, pinned ? { dx, dy } : { free: true, dx, dy });
+      downAt.current = { bid, t: performance.now() };
     };
     addEventListener('pointermove', mv);
     addEventListener('pointerup', up);
@@ -1367,9 +1382,9 @@ export default function BlattPage() {
                   onPick={(to) => (transform(conv.bid, to), setConv(null))}
                   onSplit={(m) => (split(conv.bid, m), setConv(null))}
                   onHide={() => (toggleHidden(conv.bid), setConv(null))}
-                  onBottom={() => {
+                  onPin={(pin) => {
                     const cb = doc ? findBlock(doc.blocks, conv.bid) : null;
-                    if (cb) setBlock(cb.id, { bottom: cb.bottom ? undefined : true });
+                    if (cb) setBlock(cb.id, pinPatch(cb, pin));
                     setConv(null);
                   }}
                   onDelete={() => (remove(conv.bid), setConv(null))}
@@ -1431,7 +1446,7 @@ export default function BlattPage() {
                         </span>
                         <span className={st.itemText}>
                           {BLOCK_LABEL[b.type]}
-                          <small>{b.hidden ? 'ausgeblendet · ' : ''}{b.bottom ? 'unten fest · ' : ''}{blockSummary(b)}</small>
+                          <small>{b.hidden ? 'ausgeblendet · ' : ''}{pinOf(b) ? (pinOf(b) === 'top' ? 'oben' : 'unten') + ' fixiert · ' : ''}{blockSummary(b)}</small>
                         </span>
                         {editing && sel === b.id && (
                           <button
@@ -2103,7 +2118,7 @@ function CropOverlay({ host, bid, onApply, onCancel }: { host: React.RefObject<H
 }
 
 /** Kontextmenü der linken Leiste: Baustein umwandeln */
-function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onBottom, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onHide?: () => void; onBottom?: () => void; onDelete: () => void; onClose: () => void }) {
+function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onPin, onDelete, onClose }: { conv: { x: number; y: number }; b: Block | null | undefined; head?: boolean; onPick: (to: BlockType) => void; onSplit?: (m: SplitMode) => void; onHide?: () => void; onPin?: (pin: 'top' | 'bottom') => void; onDelete: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   // nicht unten über den Rand: nach dem Zeichnen messen und nach oben schieben, notfalls mit Bildlauf
   const [top, setTop] = useState(conv.y);
@@ -2135,7 +2150,12 @@ function ConvMenu({ conv, b, head, onPick, onSplit, onHide, onBottom, onDelete, 
       )}
       {!head && onSplit && SPLITTABLE.includes(b.type) && <SplitItems b={b} split={onSplit} caret={false} />}
       <div className={st.mh}>{head ? 'Kopf' : BLOCK_LABEL[b.type]}</div>
-      {onBottom && b.type !== 'cols' && <MI icon="protect" label="Unten auf der Seite festhalten" on={!!b.bottom} hint="steht am Fuß der Seite; Linien bis zum Seitenende lassen ihm Platz" onClick={onBottom} />}
+      {onPin && b.type !== 'cols' && (
+        <>
+          <MI icon="protect" label="Oben fixieren" on={pinOf(b) === 'top'} hint="steht oben auf der Seite" onClick={() => onPin('top')} />
+          <MI icon="protect" label="Unten fixieren" on={pinOf(b) === 'bottom'} hint="steht am Fuß der Seite; Linien bis zum Seitenende lassen ihm Platz" onClick={() => onPin('bottom')} />
+        </>
+      )}
       {onHide && <MI icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} hint={b.hidden ? undefined : 'vorübergehend, bleibt in „Elemente“'} onClick={onHide} />}
       <MI icon="delete" label="Löschen" onClick={onDelete} />
     </div>
@@ -2564,6 +2584,32 @@ function LineDrop({ b, set }: { b: Block | null | undefined; set: (p: Partial<Bl
 }
 /** Überschrift im Klappmenü */
 const MH = ({ children }: { children: React.ReactNode }) => <div className={st.mh}>{children}</div>;
+/** fixieren an- oder umschalten; vor oder hinter dem Text gesetzte Verschiebung fällt mit weg */
+function pinPatch(b: Block, pin: 'top' | 'bottom' | undefined, layer?: 'front' | 'behind' | null): Partial<Block> {
+  const now = pinOf(b);
+  const next = pin === now && layer === undefined ? undefined : pin;
+  const nextLayer = layer === undefined ? (next ? b.pinLayer : undefined) : layer ?? undefined;
+  const p: Partial<Block> = { pin: next, bottom: undefined, pinLayer: nextLayer };
+  if (b.pinLayer && !nextLayer) Object.assign(p, { dx: undefined, dy: undefined });
+  return p;
+}
+/** Fixieren (Wunsch Jo, 26. November 2026): oben oder unten auf der Seite; der Text weicht aus oder der Baustein liegt
+ * vor oder hinter ihm und lässt sich frei schieben */
+function PinDrop({ b, set, big }: { b: Block; set: (p: Partial<Block>) => void; big?: boolean }) {
+  const pin = pinOf(b);
+  return (
+    <Drop icon="protect" label="Fixieren" big={big} value={big ? (pin ? (pin === 'top' ? 'oben' : 'unten') : undefined) : undefined} title="Auf der Seite fixieren: oben oder unten; der Text weicht aus oder der Baustein liegt vor oder hinter ihm">
+      <MH>Auf der Seite</MH>
+      <MI label="Nicht fixiert" on={!pin} stay onClick={() => set(pinPatch(b, undefined, null))} />
+      <MI label="Oben" on={pin === 'top'} stay onClick={() => set(pinPatch(b, 'top', b.pinLayer ?? null))} />
+      <MI label="Unten" on={pin === 'bottom'} stay hint="z. B. Notenkasten" onClick={() => set(pinPatch(b, 'bottom', b.pinLayer ?? null))} />
+      <MH>Umfluss</MH>
+      <MI label="Text weicht aus" on={!!pin && !b.pinLayer} disabled={!pin} stay onClick={() => set(pinPatch(b, pin, null))} />
+      <MI label="Vor dem Text" on={!!pin && b.pinLayer === 'front'} disabled={!pin} stay hint="frei schieben, auch über die Seitenzahl" onClick={() => set(pinPatch(b, pin, 'front'))} />
+      <MI label="Hinter dem Text" on={!!pin && b.pinLayer === 'behind'} disabled={!pin} stay hint="frei schieben, Text liegt darüber" onClick={() => set(pinPatch(b, pin, 'behind'))} />
+    </Drop>
+  );
+}
 
 const cm = (mm: number) => `${String(mm / 10).replace('.', ',')} cm`;
 const de = (n: number) => String(n).replace('.', ',');
@@ -3169,6 +3215,11 @@ function Ribbon(props: RibbonProps) {
                 <MI label="mit dem nächsten zusammenhalten" on={!!b?.keepNext} disabled={!b} onClick={() => set({ keepNext: !b?.keepNext || undefined })} stay hint="z. B. Aufgabe und Material" />
               </Drop>
             </Group>
+            {b && b.type !== 'cols' && b.type !== 'pagebreak' && (
+              <Group label="Fixieren">
+                <PinDrop b={b} set={set} big />
+              </Group>
+            )}
             <Group label="Spalten">
               <Drop
                 iconEl={<ColsIcon n={b?.type === 'cols' ? (b.cols ?? []).length : textBlock && (s.flow ?? 1) > 1 ? s.flow! : 2} />}
@@ -3393,14 +3444,69 @@ function Arrange(props: RibbonProps & { b: Block }) {
   );
 }
 
-/** Muster für die vier Ecken des Kopfs */
-const CORNER_SETS: { label: string; c: Record<CornerKey, string> }[] = [
-  { label: 'Standard', c: DEFAULT_CORNERS },
-  { label: 'Klassenarbeit', c: { tl: '{Titel}\n{Klasse} · {Lehrkraft}', tr: 'Datum: {Datum}', bl: 'Name: {Name}', br: 'Punkte: {Punkte}   Note: ______' } },
-  { label: 'Arbeitsblatt', c: { tl: '{Titel}', tr: '{Klasse}', bl: 'Name: {Name}', br: 'Datum: __________' } },
-  { label: 'nur Titel', c: { tl: '{Titel}', tr: '', bl: '', br: '' } },
-  { label: 'leer', c: { tl: '', tr: '', bl: '', br: '' } },
+/** Muster für die vier Ecken des Kopfs (Wunsch Jo, 26. November 2026: verständlich, Punkte und Note nur, wenn gewollt) */
+const CORNER_SETS: { label: string; hint: string; c: Record<CornerKey, string> }[] = [
+  { label: 'Arbeitsblatt', hint: 'Titel, Datum, Name, Klasse', c: { tl: '{Titel}', tr: 'Datum: __________', bl: 'Name: {Name}', br: '{Klasse}' } },
+  { label: 'Klassenarbeit', hint: 'mit Klasse und Lehrkraft; Punkte und Note stehen im Notenkasten', c: { tl: '{Titel}\n{Klasse} · {Lehrkraft}', tr: 'Datum: {Datum}', bl: 'Name: {Name}', br: '' } },
+  { label: 'Klassenarbeit mit Punkten im Kopf', hint: 'Punkte und Note im Kopf unten rechts', c: { tl: '{Titel}\n{Klasse} · {Lehrkraft}', tr: 'Datum: {Datum}', bl: 'Name: {Name}', br: 'Punkte: {Punkte}   Note: ______' } },
+  { label: 'Nur Titel und Name', hint: 'schlicht', c: { tl: '{Titel}', tr: '', bl: 'Name: {Name}', br: '' } },
+  { label: 'Leer', hint: 'selbst gestalten', c: { tl: '', tr: '', bl: '', br: '' } },
 ];
+/** Ecke, in die ein Platzhalter von selbst kommt */
+const TOKEN_HOME: Record<string, { k: CornerKey; line: string }> = {
+  Titel: { k: 'tl', line: '{Titel}' },
+  Lehrkraft: { k: 'tl', line: '{Lehrkraft}' },
+  Klasse: { k: 'br', line: '{Klasse}' },
+  Datum: { k: 'tr', line: 'Datum: {Datum}' },
+  Name: { k: 'bl', line: 'Name: {Name}' },
+  Punkte: { k: 'br', line: 'Punkte: {Punkte}' },
+};
+function addToken(C: Record<CornerKey, string>, key: string): Record<CornerKey, string> {
+  const h = TOKEN_HOME[key] ?? { k: 'tl' as CornerKey, line: `{${key}}` };
+  const cur = (C[h.k] ?? '').trim();
+  return { ...C, [h.k]: key === 'Titel' ? (cur ? h.line + '\n' + cur : h.line) : cur ? cur + '\n' + h.line : h.line };
+}
+/** Platzhalter herausnehmen: nur ihn, bleibt dann nur Beschriftung („Datum:“, Linie), die ganze Zeile */
+function dropToken(C: Record<CornerKey, string>, key: string): Record<CornerKey, string> {
+  const out = { ...C };
+  for (const { key: k } of CORNERS) {
+    out[k] = (C[k] ?? '')
+      .split('\n')
+      .flatMap((l) => {
+        if (!l.includes(`{${key}}`)) return [l];
+        const rest = l.replace(new RegExp(`\\s*[·,]?\\s*\\{${key}\\}\\s*[·,]?`, 'g'), ' ').trim();
+        // nur noch Beschriftung oder Linie übrig: ganze Zeile weg
+        return /^[\p{L} .]*:?\s*_*$/u.test(rest) ? [] : [rest];
+      })
+      .join('\n')
+      .trim();
+  }
+  return out;
+}
+/** kleine Vorschau der vier Ecken */
+function CornerPreview({ c }: { c: Record<CornerKey, string> }) {
+  const txt = (s: string) =>
+    s
+      .replace(/_{4,}/g, '____')
+      .replace(/\{Name\}/g, '______')
+      .replace(/\{Punkte\}/g, '___ / 24')
+      .replace(/\{Datum\}/g, '12.3.')
+      .replace(/\{(\w+)\}/g, '$1')
+      .split('\n');
+  return (
+    <span className={st.cornerPrev} aria-hidden>
+      {(['tl', 'tr', 'bl', 'br'] as CornerKey[]).map((k) => (
+        <span key={k} className={st['cp_' + k]}>
+          {txt(c[k]).map((l, i) => (
+            <span key={i} className={k === 'tl' && i === 0 ? st.cpTitle : undefined}>
+              {l || '\u00a0'}
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
 /** Reiter „Kopf“: Platzhalter und Linien in die Ecke setzen, Muster, Abgrenzung, QR-Code */
 function HeadTab(props: RibbonProps) {
   const H = props.doc.page.header;
@@ -3430,16 +3536,36 @@ function HeadTab(props: RibbonProps) {
   return (
     <>
       <Group label="Einsetzen">
-        {HEAD_TOKENS.map((t) => (
-          <RB key={t.key} icon={t.key === 'Datum' ? 'datefield' : t.key === 'Name' ? 'edit' : t.key === 'Punkte' ? 'checkbox' : t.key === 'Titel' ? 'inserttitlefield' : 'text'} label={t.label} onClick={() => insert(tokHtml(t.key) + '&nbsp;')} title={`Platzhalter „${t.label}“: ${t.hint}`} />
-        ))}
+        {HEAD_TOKENS.map((t) => {
+          const has = CORNERS.some(({ key }) => (C[key] ?? '').includes(`{${t.key}}`));
+          return (
+            <RB
+              key={t.key}
+              icon={t.key === 'Datum' ? 'datefield' : t.key === 'Name' ? 'edit' : t.key === 'Punkte' ? 'checkbox' : t.key === 'Titel' ? 'inserttitlefield' : 'text'}
+              label={t.label}
+              on={has}
+              onClick={() => (has ? props.setHeader({ corners: dropToken(C, t.key), show: true }) : inHead() ? insert(tokHtml(t.key) + '&nbsp;') : props.setHeader({ corners: addToken(C, t.key), show: true }))}
+              title={has ? `„${t.label}“ steht im Kopf: Klick nimmt die Zeile heraus` : `„${t.label}“ in den Kopf setzen (${t.hint})`}
+            />
+          );
+        })}
         <RB icon="line" label="Linie" onClick={() => insert('__________')} title="Linie zum Ausfüllen (so lang wie die Unterstriche)" />
       </Group>
       <Group label="Ecken">
-        <Drop icon="insertheader" label="Muster" big title="Alle vier Ecken auf einmal füllen">
-          {CORNER_SETS.map((m) => (
-            <MI key={m.label} label={m.label} on={CORNERS.every(({ key }) => (C[key] ?? '') === m.c[key])} onClick={() => props.setHeader({ corners: { ...m.c }, show: true })} hint={[m.c.tl, m.c.tr, m.c.bl, m.c.br].filter(Boolean).join(' · ').replace(/\n/g, ' ') || 'alle Ecken leer'} />
-          ))}
+        <Drop icon="insertheader" label="Muster" big wide title="Alle vier Ecken auf einmal füllen (ersetzt, was im Kopf steht)">
+          <MH>Kopf auf einmal füllen</MH>
+          {CORNER_SETS.map((m) => {
+            const on = CORNERS.every(({ key }) => (C[key] ?? '') === m.c[key]);
+            return (
+              <button key={m.label} type="button" className={`${st.cornerSet} ${on ? st.miOn : ''}`} data-close="" onClick={() => props.setHeader({ corners: { ...m.c }, show: true })}>
+                <CornerPreview c={m.c} />
+                <span>
+                  <b>{m.label}</b>
+                  <small>{m.hint}</small>
+                </span>
+              </button>
+            );
+          })}
         </Drop>
       </Group>
       <Group label="Gestaltung">
@@ -3550,6 +3676,14 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       </div>
     </Group>
   );
+  /** frei verschoben: zurück an den Platz */
+  const freeBack = b.free ? (
+    <Group label="Verschoben">
+      <button className="btn" onClick={() => set({ free: undefined, dx: undefined, dy: undefined })} title="Wieder an seinen Platz im Text setzen">
+        An seinen Platz
+      </button>
+    </Group>
+  ) : null;
   /** Lage für Formel, WordArt und Form */
   const alignRow = (
     <span className={st.row}>
@@ -3817,6 +3951,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
           </Group>
           <Group label="Lage">{alignRow}</Group>
           {rotGroup}
+          {freeBack}
         </>
       )}
       {b.type === 'wordart' && b.svg && (
@@ -3831,6 +3966,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
             </div>
           </Group>
           {rotGroup}
+          {freeBack}
         </>
       )}
       {b.type === 'wordart' && !b.svg && (
@@ -3869,6 +4005,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
             </div>
           </Group>
           {rotGroup}
+          {freeBack}
           <Group label="Umfluss">
             {(
               [
@@ -3917,6 +4054,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
             </div>
           </Group>
           {rotGroup}
+          {freeBack}
           <Group label="Umfluss">
             {(
               [
@@ -3944,7 +4082,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <span className={st.groupGap} />
       <Group label="Baustein">
         <div className={st.stack}>
-        {b.type !== 'cols' && <RB icon="protect" label="Unten fest" on={!!b.bottom} onClick={() => set({ bottom: b.bottom ? undefined : true })} title="Unten auf der Seite festhalten (z. B. Notenkasten); Linien bis zum Seitenende lassen ihm Platz" />}
+        {b.type !== 'cols' && <PinDrop b={b} set={set} />}
         <RB icon={b.hidden ? 'showslide' : 'hideslide'} label={b.hidden ? 'Einblenden' : 'Ausblenden'} on={!!b.hidden} onClick={() => props.toggleHidden(b.id)} title={b.hidden ? 'Wieder einblenden' : 'Vorübergehend ausblenden: fehlt auf dem Blatt und im Druck, bleibt in „Elemente“'} />
         <RB icon="delete" label="Löschen" onClick={() => props.remove(b.id)} title={`${BLOCK_LABEL[b.type]} löschen (Entf)`} />
         </div>

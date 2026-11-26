@@ -133,8 +133,13 @@ export interface Block {
   svg?: string;
   /** dazu der Stand des Editors (JSON), um später weiter zu bearbeiten */
   pdata?: string;
-  /** unten auf der Seite festhalten: steht am Fuß der Seite, auf der er landet */
+  /** früher „Unten fest“; gilt weiter als pin: 'bottom' */
   bottom?: boolean;
+  /** auf der Seite fixieren (Wunsch Jo, 26. November 2026): oben oder unten auf der Seite, auf der er landet */
+  pin?: 'top' | 'bottom';
+  /** Umfluss beim Fixieren: ohne Angabe weicht der Text aus; vor oder hinter dem Text belegt er keinen Platz und lässt
+   * sich frei schieben, auch über die Seitenzahl */
+  pinLayer?: 'front' | 'behind';
   /** vorübergehend ausgeblendet (Wunsch Jo, 25. November 2026): bleibt in „Elemente“ ausgegraut, fehlt auf dem Blatt, im Druck und in der Ausgabe */
   hidden?: boolean;
   /** Kästen (Kasten, Aufgabe im Kasten, Glossar im Kasten, Bewertung): Linienstärke (Wunsch Jo, 24. November 2026) */
@@ -291,7 +296,7 @@ export const HEAD_TOKENS: { key: string; label: string; hint: string }[] = [
   { key: 'Datum', label: 'Datum', hint: 'Tag des Drucks' },
   { key: 'Punkte', label: 'Punkte', hint: 'Linie und Summe der Aufgaben, z. B. ___ / 24' },
 ];
-export const DEFAULT_CORNERS: Required<HeadCorners> = { tl: '{Titel}', tr: 'Datum: __________', bl: 'Name: {Name}', br: 'Punkte: {Punkte}   Note: ______' };
+export const DEFAULT_CORNERS: Required<HeadCorners> = { tl: '{Titel}', tr: 'Datum: __________', bl: 'Name: {Name}', br: '{Klasse}' };
 /** Eckfelder lesen; ältere Blätter (Rahmendaten mit einzelnen Feldern) werden in die Ecken übertragen */
 export function headCorners(doc: BlattDoc): Required<HeadCorners> {
   const H = doc.page.header;
@@ -1473,7 +1478,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
         fig.style.width = '100%';
       }
       const overText = b.over || b.wrap === 'front' || b.wrap === 'behind';
-      if (b.free || b.wrap === 'front' || b.wrap === 'behind') {
+      if (!pinLayered(b) && (b.free || b.wrap === 'front' || b.wrap === 'behind')) {
         // verschoben um dx/dy gegenüber seiner Stelle; sein Platz im Text bleibt frei, außer es liegt vor oder hinter dem Text
         const dx = Number(b.dx) || 0;
         const dy = Number(b.dy) || 0;
@@ -1693,6 +1698,16 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     default:
       break;
   }
+  // WordArt, Form und Formel frei verschoben (Wunsch Jo, 26. November 2026): ihr Platz im Text bleibt, das Bild rückt um dx/dy
+  if (b.free && !pinLayered(b) && (b.type === 'wordart' || b.type === 'shape' || b.type === 'formula')) {
+    const v = box.firstElementChild as HTMLElement | null;
+    if (v) {
+      v.style.position = 'relative';
+      v.style.left = (Number(b.dx) || 0) + 'mm';
+      v.style.top = (Number(b.dy) || 0) + 'mm';
+    }
+    box.classList.add('bl-moved');
+  }
   if (b.type !== 'lines' && b.type !== 'pagebreak' && b.type !== 'image' && b.type !== 'cols' && b.type !== 'chart' && b.type !== 'shape') applyStyle(box, b, ctx.book && b.type !== 'table' && b.type !== 'grade' ? 42 : /bl-mnote/.test(html) ? 30 : 0);
   // im Editor: X zum Löschen hinten am Baustein (Wunsch Jo, 24. November 2026); sichtbar beim Darüberfahren und gewählt
   if (ctx.editing && first) {
@@ -1880,6 +1895,11 @@ function usedPx(pg: Pg): number {
   return last.offsetTop - pg.body.offsetTop + last.offsetHeight + parseFloat(getComputedStyle(last).marginBottom || '0');
 }
 
+/** fixiert oben oder unten (auch das alte „Unten fest“) */
+export const pinOf = (b: Block): 'top' | 'bottom' | undefined => b.pin ?? (b.bottom ? 'bottom' : undefined);
+/** fixiert und vor oder hinter dem Text: liegt über der Seite statt im Textfluss */
+export const pinLayered = (b: Block): boolean => !!pinOf(b) && !!b.pinLayer;
+
 export interface Problem {
   bid: string;
   msg: string;
@@ -1955,9 +1975,10 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   };
 
   /** Höhe der Bausteine „unten festhalten“ direkt hinter Baustein i (in mm), damit Linien bis zum Seitenende Platz lassen */
+  const layered: { pg: Pg; e: HTMLElement; b: Block }[] = [];
   const bottomAfter = (i: number): number => {
     let h = 0;
-    for (let j = i + 1; j < doc.blocks.length && doc.blocks[j].bottom; j++) {
+    for (let j = i + 1; j < doc.blocks.length && pinOf(doc.blocks[j]) === 'bottom' && !doc.blocks[j].pinLayer; j++) {
       const nb = doc.blocks[j];
       const c = mkCtx();
       const p = place(nb, c, prepare(nb, c));
@@ -2009,6 +2030,17 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
       const free = () => (pg.body.clientHeight - usedPx(pg)) / pxPerMm(pg) - 2 - reserve;
       if (free() < sp * 2) next();
       place(b, mkCtx(), { heightMm: Math.max(sp, Math.floor(free() / sp) * sp) });
+      continue;
+    }
+
+    // fixiert vor oder hinter dem Text: auf die Seite legen, belegt keinen Platz im Text
+    if (pinLayered(b) && !(b.type === 'lines' && b.fill)) {
+      const p = place(b, ctx, prepare(b, ctx));
+      if (b.type === 'material') numberLines(p.e, 0);
+      p.e.style.width = pg.body.clientWidth + 'px';
+      p.e.style.position = 'absolute';
+      pg.page.appendChild(p.e);
+      layered.push({ pg, e: p.e, b });
       continue;
     }
 
@@ -2081,12 +2113,22 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
     }
   }
 
-  // unten festhalten: Lücke vor dem ersten solchen Baustein der Seite, damit er am Fuß steht
-  const bottomIds = new Set(doc.blocks.filter((b) => b.bottom).map((b) => b.id));
+  // oben fixiert (Text weicht aus): an den Anfang der Seite, in ihrer Reihenfolge
+  const topIds = new Set(doc.blocks.filter((b) => pinOf(b) === 'top' && !b.pinLayer).map((b) => b.id));
+  if (topIds.size)
+    for (const p of pages) {
+      const tops = [...p.body.children].filter((c) => topIds.has((c as HTMLElement).dataset.bid ?? ''));
+      tops.reverse().forEach((c) => p.body.insertBefore(c, p.body.firstChild));
+    }
+  // unten fixiert: Lücke vor dem ersten solchen Baustein der Seite, damit er am Fuß steht
+  const bottomIds = new Set(doc.blocks.filter((b) => pinOf(b) === 'bottom' && !b.pinLayer).map((b) => b.id));
   if (bottomIds.size)
     for (const p of pages) {
-      const first = [...p.body.children].find((c) => bottomIds.has((c as HTMLElement).dataset.bid ?? '')) as HTMLElement | undefined;
-      if (!first) continue;
+      const bots = [...p.body.children].filter((c) => bottomIds.has((c as HTMLElement).dataset.bid ?? '')) as HTMLElement[];
+      if (!bots.length) continue;
+      // ans Ende der Seite, auch wenn noch Text folgt
+      for (const c of bots) p.body.appendChild(c);
+      const first = bots[0];
       const gap = p.body.clientHeight - usedPx(p) - 2;
       if (gap > 1) {
         const sp = document.createElement('div');
@@ -2095,6 +2137,25 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
         p.body.insertBefore(sp, first);
       }
     }
+  // vor oder hinter dem Text fixiert: oben oder unten an den Textbereich, dazu verschoben um dx/dy
+  for (const L of layered) {
+    const pr = L.pg.page.getBoundingClientRect();
+    const br = L.pg.body.getBoundingClientRect();
+    const sc = L.pg.page.offsetWidth / (pr.width || 1);
+    const k = pxPerMm(L.pg);
+    const left = (br.left - pr.left) * sc;
+    const top = (br.top - pr.top) * sc;
+    const y = pinOf(L.b) === 'top' ? top : top + L.pg.body.clientHeight - L.e.offsetHeight;
+    L.e.classList.add('bl-pinned', 'bl-pin-' + L.b.pinLayer);
+    // Griff zum Schieben (nur im Editor sichtbar)
+    const grip = el('span', 'bl-pin-grip', '✥');
+    grip.title = 'Ziehen: frei auf der Seite verschieben';
+    L.e.appendChild(grip);
+    L.e.style.margin = '0';
+    L.e.style.left = left + (Number(L.b.dx) || 0) * k + 'px';
+    L.e.style.top = y + (Number(L.b.dy) || 0) * k + 'px';
+    L.e.style.zIndex = L.b.pinLayer === 'behind' ? '-1' : '4';
+  }
   pages.forEach((p, k) => {
     // rechte Seite (1, 3, …): innen ist links; linke Seite (2, 4, …): innen ist rechts
     p.page.classList.add(k % 2 ? 'bl-verso' : 'bl-recto');
