@@ -598,3 +598,4 @@
 .brushIn { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
 .brushIn input { width: 80px; }
 .cropBar { align-items: center; flex-wrap: wrap; max-width: calc(100vw - 16px); }
+.host :global(.bl-formula math) { transform: rotate(var(--rot, 0deg)); }

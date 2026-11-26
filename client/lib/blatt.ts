@@ -1344,6 +1344,7 @@ function pwImg(b: Block, def: number): HTMLElement {
   img.src = svgSrc(b.svg ?? '');
   img.alt = b.text ?? '';
   img.style.width = Math.max(10, Math.min(100, Number(b.width) || def)) + '%';
+  if (b.rot) img.style.transform = `rotate(${Number(b.rot)}deg)`;
   wrap.appendChild(img);
   return wrap;
 }
@@ -1646,6 +1647,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
     case 'formula': {
       const f = el('div', 'bl-formula bl-align-' + (b.align ?? 'center'), b.text?.trim() ? formulaHtml(b.text) : '<span class="bl-ph">Formel (LaTeX) im Reiter „Formel“ eingeben</span>');
       f.dataset.formula = '1';
+      if (b.rot) f.style.setProperty('--rot', `${Number(b.rot)}deg`);
       box.appendChild(f);
       break;
     }
@@ -1681,6 +1683,7 @@ function render(b: Block, ctx: Ctx, part: Part = {}): HTMLElement {
       const sh = el('div', 'bl-shape bl-align-' + (b.align ?? 'center'));
       sh.style.width = pct + '%';
       sh.style.height = h + 'mm';
+      if (b.rot) sh.style.transform = `rotate(${Number(b.rot)}deg)`;
       sh.innerHTML = shapeSvg(b.shape ?? 'round', safeColor(b.color, '#e8f0fb'), b.line ?? 'thin');
       sh.appendChild(field('div', 'bl-shape-t', 'text', esc(b.text) || (ctx.editing ? '<span class="bl-ph">Text (optional)</span>' : '')));
       if (b.wrap === 'left' || b.wrap === 'right') box.classList.add('bl-wrap-' + b.wrap);

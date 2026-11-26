@@ -284,6 +284,15 @@ export default function BlattPage() {
   const [pw, setPw] = useState<PwEdit | null>(null);
   const pwFrame = useRef<HTMLIFrameElement>(null);
   const openPw = (kind: PwEdit['kind'], b?: Block) => setPw({ kind, bid: b?.id, data: b ? (kind === 'formula' ? (b.text ?? '') : (b.pdata ?? '')) : '', text: b?.type === 'wordart' && !b.pdata ? b.text : undefined });
+  /** Baustein unter dem Zeiger im Editor öffnen; der erste Klick kann die Seite schon neu gezeichnet haben */
+  const pwOpenAt = (x: number, y: number, t: HTMLElement): boolean => {
+    const at = (t.isConnected ? t : document.elementFromPoint(x, y)) as HTMLElement | null;
+    const id = (at?.closest<HTMLElement>('[data-bid]') ?? (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-bid]'))?.dataset.bid;
+    const blk = id && doc ? findBlock(doc.blocks, id) : null;
+    if (!blk || pw || !(blk.type === 'formula' || ((blk.type === 'wordart' || blk.type === 'shape') && blk.svg))) return false;
+    openPw(blk.type, blk);
+    return true;
+  };
   const pwDone = useRef<(m: { svg?: string; data?: string; tex?: string }) => void>(() => {});
   pwDone.current = (m) => {
     if (!pw) return;
@@ -851,6 +860,8 @@ export default function BlattPage() {
   function onPagesClick(e: React.MouseEvent) {
     if (!canEdit || !doc) return;
     const t = e.target as HTMLElement;
+    // Doppelklick auf WordArt, Form aus dem Editor oder Formel: gleich den Editor öffnen (Wunsch Jo, 26. November 2026)
+    if (e.detail === 2 && pwOpenAt(e.clientX, e.clientY, t)) return;
     const del = t.closest<HTMLElement>('[data-del]');
     if (del?.dataset.del) {
       e.stopPropagation();
@@ -1474,9 +1485,7 @@ export default function BlattPage() {
                 )}
               </div>
               <div className={st.pagesOuter} onClick={onPagesClick} onDoubleClick={(e) => {
-                const id = (e.target as HTMLElement).closest<HTMLElement>('[data-bid]')?.dataset.bid;
-                const x = id && doc ? findBlock(doc.blocks, id) : null;
-                if (x && canEdit && (x.type === 'formula' || (x.type === 'wordart' && x.svg) || (x.type === 'shape' && x.svg))) openPw(x.type, x);
+                if (canEdit) pwOpenAt(e.clientX, e.clientY, e.target as HTMLElement);
               }} onPointerDown={onPointerDown} onDragStart={onPagesDragStart} onDragOver={onPagesDragOver} onDragEnd={() => ((headDrag.current = null), clearHeadDrop())} onDrop={onPagesDrop}>
                 <div ref={wrap} className={st.zoomWrap} style={{ zoom } as React.CSSProperties}>
                   <div ref={host} className={`${st.host} ${editing ? st.editing : ''} ${view !== 'pages' ? st.sheets : ''} ${painter ? st.painting : ''} ${flowView ? st.flowView : ''}`} />
@@ -3523,6 +3532,24 @@ function BlockTab(props: RibbonProps & { b: Block }) {
       <span className={st.hint}>{b2.width ?? 100} %</span>
     </>
   );
+  /** Drehen für Formel, WordArt und Form (Wunsch Jo, 26. November 2026) */
+  const rotGroup = (
+    <Group label="Drehen">
+      <div className={st.rows}>
+        <div className={st.row}>
+          <RB icon="rotateleft" label="15° nach links" hideLabel onClick={() => set({ rot: (((Number(b.rot) || 0) - 15 + 540) % 360) - 180 || undefined })} />
+          <input type="range" min={-180} max={180} step={1} value={Number(b.rot) || 0} onChange={(e) => set({ rot: Number(e.target.value) || undefined })} aria-label="Drehung" style={{ width: 90 }} />
+          <RB icon="rotateright" label="15° nach rechts" hideLabel onClick={() => set({ rot: (((Number(b.rot) || 0) + 15 + 540) % 360) - 180 || undefined })} />
+        </div>
+        <div className={st.row}>
+          <span className={st.hint}>{Number(b.rot) || 0}°</span>
+          <button type="button" className="btn" onClick={() => set({ rot: undefined })} disabled={!b.rot}>
+            gerade
+          </button>
+        </div>
+      </div>
+    </Group>
+  );
   /** Lage für Formel, WordArt und Form */
   const alignRow = (
     <span className={st.row}>
@@ -3789,6 +3816,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
             <RB icon="insertmath" label="Bearbeiten" big onClick={() => props.openPw('formula', b)} title="Im Formel-Editor öffnen (auch Doppelklick auf die Formel)" />
           </Group>
           <Group label="Lage">{alignRow}</Group>
+          {rotGroup}
         </>
       )}
       {b.type === 'wordart' && b.svg && (
@@ -3802,6 +3830,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               <div className={st.row}>{alignRow}</div>
             </div>
           </Group>
+          {rotGroup}
         </>
       )}
       {b.type === 'wordart' && !b.svg && (
@@ -3839,6 +3868,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               <div className={st.row}>{alignRow}</div>
             </div>
           </Group>
+          {rotGroup}
           <Group label="Umfluss">
             {(
               [
@@ -3886,6 +3916,7 @@ function BlockTab(props: RibbonProps & { b: Block }) {
               </div>
             </div>
           </Group>
+          {rotGroup}
           <Group label="Umfluss">
             {(
               [
