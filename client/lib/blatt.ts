@@ -197,6 +197,9 @@ export interface BlattDoc {
       nameLine: boolean;
       date: boolean;
       qr: 'first' | 'all' | 'none';
+      /** Nummerncode unter dem QR-Code (Wunsch Jo, 27. November 2026): ohne Angabe nach Art der Aufgabe in Autogra.fi,
+       * bei Übungen ja (Lernende korrigieren ihren Text am PC), bei Klausuren nein */
+      qrNumber?: boolean;
       fields?: HeadFields;
       /** Gestaltung des Kopfs: Reihenfolge, Linie darunter, Kasten oder nichts, Größe des Titels */
       order?: HeadKey[];
@@ -361,6 +364,8 @@ export interface Copy {
   klasse?: string;
   printName?: boolean;
   code?: string;
+  /** Nummerncode unter dem QR-Code eindrucken */
+  showCode?: boolean;
   qr?: string;
 }
 
@@ -1864,8 +1869,17 @@ function newPage(doc: BlattDoc, host: HTMLElement, index: number, copy?: Copy, h
         img.src = copy.qr;
         img.alt = 'QR-Code für Autogra.fi';
         q.appendChild(img);
-        if (copy.code) q.appendChild(el('div', 'bl-qr-code', esc(copy.code)));
-      } else q.appendChild(el('div', 'bl-qr-ph', '<span>QR-Code<br>Autogra.fi</span>'));
+        if (copy.code && copy.showCode) {
+          q.classList.add('bl-qr-with-code');
+          q.appendChild(el('div', 'bl-qr-code', esc(copy.code)));
+        }
+      } else {
+        q.appendChild(el('div', 'bl-qr-ph', '<span>QR-Code<br>Autogra.fi</span>'));
+        if (H.qrNumber) {
+          q.classList.add('bl-qr-with-code');
+          q.appendChild(el('div', 'bl-qr-code bl-qr-code-ph', '1234 5678'));
+        }
+      }
       head.appendChild(q);
     }
     if (editing && index === 0) {

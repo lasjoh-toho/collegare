@@ -127,10 +127,14 @@
 .host :global(.bl-blank.bl-labelled) { position: relative; margin-bottom: 3mm; }
 .host :global(.bl-under) { position: absolute; left: 0; top: 100%; margin-top: 0.6mm; font-size: 7pt; line-height: 1; color: #555; white-space: nowrap; }
 .host :global(.bl-filled) { font-weight: 600; border-bottom: 0.25mm solid #333; padding: 0 2mm; }
-.host :global(.bl-qr) { flex: none; width: 21mm; text-align: center; }
-.host :global(.bl-qr img) { width: 21mm; height: 21mm; display: block; }
+/* QR-Code so hoch wie der Kopf (Wunsch Jo, 27. November 2026), mindestens 21 mm */
+.host :global(.bl-qr) { flex: none; align-self: stretch; display: flex; flex-direction: column; align-items: center; min-height: 21mm; text-align: center; }
+.host :global(.bl-qr img), .host :global(.bl-qr .bl-qr-ph) { flex: 1 1 0; min-height: 21mm; height: 0; width: auto; aspect-ratio: 1 / 1; display: block; }
+.host :global(.bl-qr .bl-qr-ph) { display: grid; place-items: center; }
+.host :global(.bl-qr-code) { margin-top: 0.8mm; }
+.host :global(.bl-qr-code-ph) { opacity: 0.5; }
 .host :global(.bl-qr-code) { font-family: ui-monospace, Menlo, monospace; font-size: 7pt; letter-spacing: 0.12em; font-weight: 700; }
-.host :global(.bl-qr-ph) { width: 21mm; height: 21mm; border: 0.3mm dashed #999; border-radius: 1mm; display: grid; place-items: center; font-size: 6.5pt; color: #888; line-height: 1.2; }
+.host :global(.bl-qr-ph) { box-sizing: border-box; border: 0.3mm dashed #999; border-radius: 1mm; display: grid; place-items: center; font-size: 6.5pt; color: #888; line-height: 1.2; }
 .host :global(.bl-body) { flex: 1; min-height: 0; overflow: hidden; }
 .host :global(.bl-notes) { flex: none; border-top: 0.2mm solid #888; width: 45%; padding-top: 1mm; margin-top: 2mm; font-size: 0.72em; }
 .host :global(.bl-note sup) { font-size: 0.8em; }

@@ -113,7 +113,7 @@ Typst-Code (Überprüfen → „Typst-Code“, für Fortgeschrittene): rechts st
 
 Kopf: vier Felder in den Ecken, die du direkt auf der Seite ausfüllst (oben links steht in der ersten Zeile der Titel). Klick in eine Ecke und schreib; Enter beginnt eine neue Zeile. Im Reiter „Kopf“ setzt du Platzhalter ein, die das Blatt selbst füllt (Titel = Name des Blatts, Name aus der Klassenliste beim Druck, Klasse, Lehrkraft, Datum = Tag des Drucks, Punkte = Linie und Summe der Aufgaben), dazu „Linie“ zum Ausfüllen: drei oder mehr Unterstriche ___ werden zur Linie, so lang wie getippt. „Muster“ füllt alle vier Ecken auf einmal (Standard, Klassenarbeit, Arbeitsblatt, nur Titel, leer). Dort auch Abgrenzung (Linie, Kasten, schlicht), Größe des Titels, QR-Code und Löschen.
 
-Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Fixieren“ (Reiter des Bausteins, Rechtsklick links) hält einen Baustein oben oder unten auf der Seite, etwa den Notenkasten am Fuß. Unter „Umfluss“ weicht der Text aus, oder der Baustein liegt vor oder hinter dem Text; dann lässt er sich frei schieben, auch über die Seitenzahl. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering; Bearbeiten: Pinsel zum Aufhellen, Abdunkeln und Verpixeln (Enter übernimmt, Esc bricht ab, Strg+Z nimmt einen Strich zurück). Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
+Aufteilen (unter „Start“ → Im Text, bei Aufgaben unter „Aufgabe“, oder Rechtsklick links): Ein Baustein mit eingefügtem Text wird an der Schreibmarke geteilt, nach Nummern (1., 2), Aufgabe 3:, a); bei Aufgaben fällt die Nummer weg, a) wird Teilaufgabe, Punkte am Zeilenende kommen ins Punktefeld), in einzelne Absätze oder an Überschriften (#). Die Zahl hinter dem Knopf zeigt, wie viele Nummern erkannt wurden. Definitionen (Einfügen → Definitionen, z. B. Operatoren): jede Zeile „Begriff: Erklärung“ steht als Begriff links und Erklärung rechts; Zeilen ohne Doppelpunkt sind Zwischenüberschriften. Die Vorlage „Definitionen“ gibt es auch für Erklärtext und Kasten. „Entwurf“ bestimmt das Aussehen (Blattvorlage, Schrift, Kopf, Wasserzeichen), „Layout“ Seite und Platz (Ränder, Format, Umbrüche, Spalten, Seitenfolge, Anordnen). „Referenzen“: Fußnoten, Randbemerkung, Glossar, Beschriftungen, Definitionen. „Überprüfen“: Rechtschreibung, Wörter, Probleme, Aufgaben ohne Punkte, ausgeblendete Bausteine, Punkte, Textfluss. Einfügen → Form, WordArt und Formel öffnen dieselben Editoren wie Pinnwand und Folien; Doppelklick auf das Ergebnis bearbeitet es wieder. Korrekturrand und Rand für Notizen gehen links, rechts, innen oder außen; innen/außen wechseln mit der Seite. „Fixieren“ (Reiter des Bausteins, Rechtsklick links) hält einen Baustein oben oder unten auf der Seite, etwa den Notenkasten am Fuß. Unter „Umfluss“ weicht der Text aus, oder der Baustein liegt vor oder hinter dem Text; dann lässt er sich frei schieben, auch über die Seitenzahl. Bild → Anpassen: Farben (Graustufen, Invertieren), Überlagerung (Mischmodus mit dem, was darunter liegt), Tontrennung und Dithering; Bearbeiten: Pinsel zum Aufhellen, Abdunkeln und Verpixeln (Enter übernimmt, Esc bricht ab, Strg+Z nimmt einen Strich zurück). Der QR-Code ist so hoch wie der Kopf. Ob darunter zusätzlich ein Nummerncode steht, stellst du unter Kopf → QR-Code ein (nach Art der Aufgabe: Übung ja, Klausur nein; oder immer/nie) und beim Drucken mit Autogra.fi. Zoom unten rechts; Klick auf die Zahl wechselt zwischen 100 % und eingepasst. Entwurf → Blattvorlage (auch unter „Vorlagen“): Die Blattvorlage „Buchsatz mit Randspalte“ setzt das ganze Blatt in Serifenschrift mit breiter Randspalte; Fußnoten stehen nummeriert neben der Zeile (auch einzeln einschaltbar), Überschriften sind kursiv, ein Zitat wird zum Motto mit Quelle („Motto“ fügt eines ein). „Standard“ stellt alles zurück. Absatzvorlagen (z. B. Einleitung, Kleingedruckt, Mit Randspalte, Zwei Spalten) gelten für jeden Textbaustein; „Format merken“ speichert das Format des gewählten Bausteins als eigene Vorlage (Rechtsklick auf sie löscht sie). Zeichenvorlagen wirken auf den markierten Text: betont, stark, markiert, unterstrichen, in den Rand, als Fußnote, als Begriff. Löschen: das × am Baustein (beim Darüberfahren), „Löschen“ ganz rechts im Reiter des Bausteins oder Rechtsklick auf den Eintrag links. Ausblenden (neben „Löschen“, unter „Aufgabe“ oder Rechtsklick links) nimmt einen Baustein vorübergehend vom Blatt, aus Druck und Ausgabe; links unter „Elemente“ bleibt er ausgegraut und durchgestrichen stehen, „Einblenden“ holt ihn zurück. Wer Text markiert, landet im Reiter „Start“ zum Formatieren. Der QR-Hinweis im Notenkasten steht blass da, solange das Blatt keinen QR-Code hat; gedruckt wird er nur mit QR-Code. Links unter „Elemente“ zeigen gestrichelte Linien, wo eine neue Seite beginnt; ganz oben steht der Kopf mit den Rahmendaten (im Kopf hat jede Zeile beim Darüberfahren einen Griff zum Verschieben in eine andere Ecke und ein × zum Löschen) (× blendet ihn aus, „+ Kopf“ holt ihn zurück). Unterschriften unter Bildern, Diagrammen und Tabellen gestaltest du unter „Referenzen“ → Bildunterschrift (Größe von 70 bis 140 %, Schnitt, Ausrichtung, grau, nummerieren). Eine leere Zeile im Text bleibt stehen.
 
 Bilder (Reiter „Bild“, erscheint beim Anklicken eines Bilds): Helligkeit, Kontrast, Graustufen und Rahmen (Linie, runde Ecken, Schatten). „Zuschneiden“ zeigt Griffe am Bild auf der Seite: Ränder wegziehen, Enter oder „Zuschneiden“ übernimmt, Esc bricht ab. „Freistellen“ macht den Hintergrund durchsichtig, der vom Rand her zusammenhängt. „Verkleinern“ macht die Datei kleiner. „Original“ nimmt Zuschneiden, Freistellen und Verkleinern zurück. Ein Bild verschiebst du, indem du es auf der Seite ziehst.
 
@@ -2996,11 +2996,15 @@ function Ribbon(props: RibbonProps) {
             </Group>
             <Group label="Kopf">
               <RB icon="insertheader" label="Rahmendaten" big on={H.show !== false} onClick={() => props.openHead()} title="Kopf mit vier Feldern in den Ecken: direkt auf der Seite ausfüllen" />
-              <Drop icon="qr" label="QR-Code" value={H.qr === 'none' ? 'aus' : H.qr === 'all' ? 'jede Seite' : 'Seite 1'} big title="Persönlicher QR-Code aus Autogra.fi: die Abgabe wird beim Scannen gleich zugeordnet">
+              <Drop icon="qr" label="QR-Code" value={H.qr === 'none' ? 'aus' : H.qr === 'all' ? 'jede Seite' : 'Seite 1'} big title="Persönlicher QR-Code aus Autogra.fi, so hoch wie der Kopf: die Abgabe wird beim Scannen gleich zugeordnet">
                 <MH>Persönlicher QR-Code aus Autogra.fi</MH>
                 <MI label="kein QR-Code" on={H.qr === 'none'} onClick={() => props.setHeader({ qr: 'none' })} />
                 <MI label="auf Seite 1" on={H.qr === 'first'} onClick={() => props.setHeader({ qr: 'first', show: true })} />
                 <MI label="auf jeder Seite" on={H.qr === 'all'} onClick={() => props.setHeader({ qr: 'all', show: true })} hint="hilft, wenn Seiten getrennt gescannt werden" />
+                <MH>Nummerncode unter dem QR-Code</MH>
+                <MI label="nach Art der Aufgabe" on={H.qrNumber === undefined} hint="Übung ja, Klausur nein" onClick={() => props.setHeader({ qrNumber: undefined })} stay />
+                <MI label="immer" on={H.qrNumber === true} hint="zum Eintippen, wenn Lernende am PC korrigieren" onClick={() => props.setHeader({ qrNumber: true })} stay />
+                <MI label="nie" on={H.qrNumber === false} onClick={() => props.setHeader({ qrNumber: false })} stay />
               </Drop>
             </Group>
             <Group label="Bewertung">
@@ -3589,6 +3593,10 @@ function HeadTab(props: RibbonProps) {
           <MI label="kein QR-Code" on={H.qr === 'none'} onClick={() => props.setHeader({ qr: 'none' })} />
           <MI label="auf Seite 1" on={H.qr === 'first'} onClick={() => props.setHeader({ qr: 'first', show: true })} />
           <MI label="auf jeder Seite" on={H.qr === 'all'} onClick={() => props.setHeader({ qr: 'all', show: true })} hint="hilft, wenn Seiten getrennt gescannt werden" />
+          <MH>Nummerncode unter dem QR-Code</MH>
+          <MI label="nach Art der Aufgabe" on={H.qrNumber === undefined} hint="Übung ja, Klausur nein" onClick={() => props.setHeader({ qrNumber: undefined })} stay />
+          <MI label="immer" on={H.qrNumber === true} hint="zum Eintippen, wenn Lernende am PC korrigieren" onClick={() => props.setHeader({ qrNumber: true })} stay />
+          <MI label="nie" on={H.qrNumber === false} onClick={() => props.setHeader({ qrNumber: false })} stay />
         </Drop>
       </Group>
       <span className={st.groupGap} />
@@ -4433,6 +4441,7 @@ interface AgAssessment {
   title: string;
   class: string;
   status: string;
+  mode?: 'summative' | 'formative';
 }
 interface AgClass {
   id: number;
@@ -4663,6 +4672,8 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
   const [students, setStudents] = useState<AgStudent[]>([]);
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [printName, setPrintName] = useState(true);
+  // Nummerncode: Vorgabe des Blatts, sonst nach Art der Aufgabe (Übung ja, Klausur nein)
+  const [codeChoice, setCodeChoice] = useState<boolean | null>(doc.page.header.qrNumber ?? null);
   const [valid, setValid] = useState('freigabe');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -4847,7 +4858,9 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
         else body.hours = Number(valid);
         const r = await ag<{ items: { user_id: number; name: string; code: string; qr: string }[] }>(base, 'POST', `/api/v1/assessments/${task}/access-codes`, body);
         const order = new Map(ids.map((x, i) => [x, i]));
-        copies = r.items.sort((a, b) => (order.get(a.user_id) ?? 0) - (order.get(b.user_id) ?? 0)).map((it) => ({ name: it.name, printName: withName, code: it.code, qr: it.qr, klasse: tasks.find((x) => x.id === task)?.class || undefined }));
+        const taskMode = tasks.find((x) => x.id === task)?.mode ?? newMode;
+        const showCode = codeChoice ?? taskMode === 'formative';
+        copies = r.items.sort((a, b) => (order.get(a.user_id) ?? 0) - (order.get(b.user_id) ?? 0)).map((it) => ({ name: it.name, printName: withName, code: it.code, showCode, qr: it.qr, klasse: tasks.find((x) => x.id === task)?.class || undefined }));
         if (d.page.header.qr === 'none') d.page.header = { ...d.page.header, show: true, qr: 'first' };
       }
       printCopies(d, copies, title, head);
@@ -5005,6 +5018,9 @@ function PrintDialog({ doc, title, head, onClose }: { doc: BlattDoc; title: stri
                         </span>
                       </div>
                     )}
+                    <label className={st.check} title="Zum Eintippen, wenn Lernende ihren Text am PC korrigieren; bei Klausuren meist nicht gewünscht">
+                      <input type="checkbox" checked={codeChoice ?? tasks.find((x) => x.id === task)?.mode === 'formative'} onChange={(e) => setCodeChoice(e.target.checked)} /> Nummerncode unter dem QR-Code eindrucken
+                    </label>
                     {namesOpen && (
                       <div className="modal-bg" onPointerDown={(e) => e.target === e.currentTarget && setNamesOpen(false)}>
                         <div className={`modal ${st.dialog}`} role="dialog" aria-label="Namen auswählen">
