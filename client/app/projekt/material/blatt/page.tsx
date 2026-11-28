@@ -3207,7 +3207,7 @@ function Ribbon(props: RibbonProps) {
                 <MI label="A5" hint="14,8 × 21 cm" on={P.size === 'a5'} onClick={() => props.setPageOpt({ size: 'a5' })} />
               </Drop>
               <div className={st.rows}>
-                <RB icon="insertpagenumberfield" label="Seitenzahlen" on={P.pageNumbers} onClick={() => props.setPageOpt({ pageNumbers: !P.pageNumbers })} />
+                <RB icon="insertpagenumberfield" label="Seitenzahlen" on={P.pageNumbers} onClick={() => props.setPageOpt({ pageNumbers: !P.pageNumbers })} title="Seite 1 von 3, klein oben rechts in der Ecke (unten stört sie beim Scannen)" />
               </div>
             </Group>
             <Group label="Umbrüche">

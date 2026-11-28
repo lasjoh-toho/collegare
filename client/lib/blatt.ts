@@ -2173,7 +2173,8 @@ export function paginate(doc: BlattDoc, host: HTMLElement, copy?: Copy, opts: { 
   pages.forEach((p, k) => {
     // rechte Seite (1, 3, …): innen ist links; linke Seite (2, 4, …): innen ist rechts
     p.page.classList.add(k % 2 ? 'bl-verso' : 'bl-recto');
-    if (doc.page.pageNumbers) p.foot.textContent = `Seite ${k + 1} von ${pages.length}`;
+    // Seitenzahl klein oben rechts in der Ecke, nicht unten im Scanbereich (Wunsch Jo, 28. November 2026)
+    if (doc.page.pageNumbers) p.page.appendChild(el('div', 'bl-pnum', `Seite ${k + 1} von ${pages.length}`));
     if (!p.notes.children.length) p.notes.remove();
   });
   return { pages: pages.map((p) => p.page), problems };

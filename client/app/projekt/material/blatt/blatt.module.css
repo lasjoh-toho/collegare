@@ -139,6 +139,7 @@
 .host :global(.bl-notes) { flex: none; border-top: 0.2mm solid #888; width: 45%; padding-top: 1mm; margin-top: 2mm; font-size: 0.72em; }
 .host :global(.bl-note sup) { font-size: 0.8em; }
 .host :global(.bl-foot) { flex: none; text-align: center; font-size: 0.72em; color: #555; padding-top: 2mm; min-height: 1em; }
+.host :global(.bl-pnum) { position: absolute; top: 5mm; right: 6mm; font-size: 7pt; line-height: 1; color: #666; white-space: nowrap; }
 .host :global(.bl-block) { margin: 0 0 3.2mm; position: relative; }
 .host :global(.bl-block .bl-ruling) { font-style: normal; max-width: 100%; }
 .host :global(.bl-block p) { margin: 0 0 0.5em; }
